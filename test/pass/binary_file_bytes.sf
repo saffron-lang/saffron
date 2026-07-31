@@ -1,0 +1,129 @@
+// Binary files round-trip through IO.read_file_bytes without truncating at NUL.
+//
+// A Saffron String is a NUL-terminated C string, so String.length() is a strlen
+// that stops at the first embedded 0 byte. IO.read_file reads the whole file but
+// hands back a String, so every byte after an interior NUL becomes unreachable:
+// a wasm module (magic "\0asm") read back as "" because its very first byte
+// terminates the string, and "abc\0def" (7 bytes) read back with length 3.
+// That served every wasm asset as Content-Length: 0 (BUGS #66).
+//
+// IO.Bytes carries the length out of band — a heap pointer plus an explicit byte
+// count — so the full range stays addressable regardless of NUL bytes.
+//
+// This test also pins the reason the byte path uses `i64`-returning stdio
+// externs: a `void*` return is NaN-box POINTER-tagged, so `fp == 0` compares
+// TAG_PTR|0 against TAG_INT|0 and is never true, which made a failed open take
+// the success branch.
+
+import "@test" as Test
+import "@io" as FileIO
+
+// --- Fixtures: write them via the byte path so the test is self-contained ---
+
+// "\0asm\x01\x00\x00\x00hello" — the wasm magic plus a version and payload.
+// Leading NUL, plus three more interior NULs in the version field.
+var wasm_like: FileIO.Bytes = FileIO.bytes_alloc(13)
+wasm_like.set(0, 0)     // '\0'
+wasm_like.set(1, 97)    // 'a'
+wasm_like.set(2, 115)   // 's'
+wasm_like.set(3, 109)   // 'm'
+wasm_like.set(4, 1)
+wasm_like.set(5, 0)
+wasm_like.set(6, 0)
+wasm_like.set(7, 0)
+wasm_like.set(8, 104)   // 'h'
+wasm_like.set(9, 101)   // 'e'
+wasm_like.set(10, 108)  // 'l'
+wasm_like.set(11, 108)  // 'l'
+wasm_like.set(12, 111)  // 'o'
+
+var wasm_path: String = "/tmp/sf_test_wasm_magic.bin"
+FileIO.write_file_bytes(wasm_path, wasm_like)
+
+// "abc\0def" — 7 bytes on disk, NUL in the middle.
+var mid: FileIO.Bytes = FileIO.bytes_alloc(7)
+mid.set(0, 97)
+mid.set(1, 98)
+mid.set(2, 99)
+mid.set(3, 0)
+mid.set(4, 100)
+mid.set(5, 101)
+mid.set(6, 102)
+
+var mid_path: String = "/tmp/sf_test_nul_mid.bin"
+FileIO.write_file_bytes(mid_path, mid)
+
+// --- The bug: a String read truncates at the NUL ---
+
+var as_string: String = IO.read_file(wasm_path)
+Test.assert_eq(as_string.length(), 0, "read_file strlen-truncates a leading NUL to 0 (the #66 symptom)")
+
+var mid_string: String = IO.read_file(mid_path)
+Test.assert_eq(mid_string.length(), 3, "read_file strlen-truncates \"abc\\0def\" to 3")
+
+// --- The fix: read_file_bytes reports the true size ---
+
+var wasm_bytes: FileIO.Bytes = FileIO.read_file_bytes(wasm_path)
+Test.assert_eq(wasm_bytes.length(), 13, "read_file_bytes sees all 13 bytes past the leading NUL")
+
+var mid_bytes: FileIO.Bytes = FileIO.read_file_bytes(mid_path)
+Test.assert_eq(mid_bytes.length(), 7, "read_file_bytes sees all 7 bytes of \"abc\\0def\"")
+
+// --- Every byte survives, including the NULs ---
+
+Test.assert_eq(wasm_bytes.get(0), 0, "byte 0 is the leading NUL")
+Test.assert_eq(wasm_bytes.get(1), 97, "byte 1 is 'a'")
+Test.assert_eq(wasm_bytes.get(2), 115, "byte 2 is 's'")
+Test.assert_eq(wasm_bytes.get(3), 109, "byte 3 is 'm'")
+Test.assert_eq(wasm_bytes.get(4), 1, "byte 4 is the version LSB")
+Test.assert_eq(wasm_bytes.get(5), 0, "byte 5 is an interior NUL")
+Test.assert_eq(wasm_bytes.get(12), 111, "last byte is 'o'")
+Test.assert_eq(wasm_bytes.get(-1), 111, "negative index reaches the last byte")
+
+Test.assert_eq(mid_bytes.get(3), 0, "the interior NUL is preserved, not a terminator")
+Test.assert_eq(mid_bytes.get(4), 100, "the byte after the interior NUL is reachable")
+Test.assert_eq(mid_bytes.get(6), 102, "the final byte after the NUL is reachable")
+
+// --- Round-trip: write bytes back out and re-read them ---
+
+var copy_path: String = "/tmp/sf_test_roundtrip.bin"
+FileIO.write_file_bytes(copy_path, wasm_bytes)
+var reread: FileIO.Bytes = FileIO.read_file_bytes(copy_path)
+Test.assert_eq(reread.length(), 13, "write_file_bytes + read_file_bytes preserves the length")
+Test.assert_eq(reread.get(0), 0, "round-trip preserves the leading NUL")
+Test.assert_eq(reread.get(3), 109, "round-trip preserves a byte past the NUL")
+Test.assert_eq(reread.get(12), 111, "round-trip preserves the last byte")
+
+// to_list() exposes the same bytes
+var listed: List<Int> = reread.to_list()
+Test.assert_eq(listed.length(), 13, "to_list() yields every byte")
+Test.assert_eq(listed[0], 0, "to_list() keeps the leading NUL")
+Test.assert_eq(listed[3], 109, "to_list() keeps a byte past the NUL")
+
+// --- A missing file yields empty Bytes, not a bogus handle ---
+// This is the `fp == 0` check working. With a void*-returning fopen the compare
+// is always false and this path would read through a NULL FILE*.
+var missing: FileIO.Bytes = FileIO.read_file_bytes("/tmp/sf_test_definitely_absent_9e3f1a")
+Test.assert_eq(missing.length(), 0, "a missing file reads as 0 bytes")
+Test.assert(missing.is_empty(), "a missing file reads as empty")
+
+// --- bytes_alloc is zero-filled and correctly sized ---
+var zeros: FileIO.Bytes = FileIO.bytes_alloc(4)
+Test.assert_eq(zeros.length(), 4, "bytes_alloc sizes exactly")
+Test.assert_eq(zeros.get(0), 0, "bytes_alloc zero-fills")
+Test.assert_eq(zeros.get(3), 0, "bytes_alloc zero-fills to the end")
+Test.assert_eq(FileIO.bytes_alloc(0).length(), 0, "bytes_alloc(0) is empty")
+
+// --- set() mutates in place ---
+zeros.set(1, 255)
+Test.assert_eq(zeros.get(1), 255, "set() writes a byte")
+zeros.set(2, 300)
+Test.assert_eq(zeros.get(2), 44, "set() masks to a single byte (300 & 255)")
+
+// --- bytes_from_string covers the NUL-free text case ---
+var from_text: FileIO.Bytes = FileIO.bytes_from_string("hello")
+Test.assert_eq(from_text.length(), 5, "bytes_from_string measures NUL-free text")
+Test.assert_eq(from_text.get(0), 104, "bytes_from_string keeps 'h'")
+Test.assert_eq(from_text.to_string(), "hello", "to_string() recovers NUL-free text")
+
+Test.summary()

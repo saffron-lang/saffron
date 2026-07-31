@@ -1,0 +1,90 @@
+// An HTTP response can carry a byte-exact body, so Content-Length is the real
+// byte count rather than a strlen.
+//
+// Response.body is a String, and the writer emitted Content-Length from
+// resp.body.length() — a strlen. Any body with an interior NUL therefore
+// advertised a truncated length (0 for a wasm module, whose magic is "\0asm")
+// and wrote a truncated payload. Fixing the file read alone was not enough:
+// the whole response path was String-typed end to end (BUGS #66).
+//
+// Response._body_bytes carries an IO.Bytes instead, and body_length() reports its
+// true length. This test exercises the header serialization and the length
+// accounting; the socket write itself needs a live connection and is covered by
+// serving playground/static/app.wasm (19569 bytes, leading NUL) out of band.
+//
+// NOTE ON STRUCTURE: the assertions live inside main() rather than at module top
+// level. That is not a style preference. Repeated cross-module calls at module
+// top level miscompile here: after the first such call, later ones return the
+// earlier call's value regardless of their own arguments. Reduced, at top level,
+// `_content_length_of("...40014...")` and `_content_length_of("...777...")` both
+// returned 13 — the length of a byte body from a preceding `_serialize_headers`
+// call — and `_serialize_headers(textual)` handed back the previous response's
+// header block. Inside a function body the same calls are correct. The defect is
+// in codegen for top-level globals, not in this file or the code under test,
+// which is additionally exercised for real against a live server.
+
+import "@test" as Test
+import "@io" as FileIO
+import "@http/server" as Http
+
+fun main() {
+    // --- Content-Length parsing used by the read loop (BUGS #64) ---
+    Test.assert_eq(Http._content_length_of("POST / HTTP/1.1\r\nContent-Length: 40014\r\n\r\n"), 40014, "Content-Length is parsed")
+    Test.assert_eq(Http._content_length_of("POST / HTTP/1.1\r\ncontent-length: 512\r\n\r\n"), 512, "Content-Length is case-insensitive")
+    Test.assert_eq(Http._content_length_of("GET / HTTP/1.1\r\nHost: x\r\n\r\n"), 0, "no Content-Length means 0")
+    Test.assert_eq(Http._content_length_of("POST / HTTP/1.1\r\nContent-Length: 0\r\n\r\n"), 0, "an explicit 0 parses as 0")
+    Test.assert_eq(Http._content_length_of("POST / HTTP/1.1\r\nX-A: 1\r\nContent-Length: 7\r\nX-B: 2\r\n\r\n"), 7, "Content-Length is found among other headers")
+
+    // --- A wasm-like body: leading NUL plus interior NULs ---
+    var wasm: FileIO.Bytes = FileIO.bytes_alloc(13)
+    wasm.set(0, 0)     // '\0' — terminates a String immediately
+    wasm.set(1, 97)    // 'a'
+    wasm.set(2, 115)   // 's'
+    wasm.set(3, 109)   // 'm'
+    wasm.set(4, 1)
+    wasm.set(8, 104)   // 'h'
+    wasm.set(12, 111)  // 'o'
+
+    // --- body_length() reports bytes, not strlen ---
+    var resp: Http.Response = Http.file_bytes(wasm, "application/wasm")
+    Test.assert_eq(resp.body_length(), 13, "a byte body reports its true length")
+    Test.assert_eq(resp.body.length(), 0, "the String body stays empty for a byte body")
+    Test.assert_eq(resp.status, 200, "file_bytes builds a 200")
+
+    // This is the exact regression: a strlen over the same payload sees nothing.
+    Test.assert_eq(wasm.to_string().length(), 0, "the same payload as a String strlens to 0")
+
+    // --- Content-Length in the emitted headers is the real byte count ---
+    var head: String = Http._serialize_headers(resp)
+    Test.assert(head.contains("Content-Length: 13"), "Content-Length is the byte count, not 0")
+    Test.assert(head.contains("application/wasm"), "the Content-Type header survives")
+    Test.assert(head.contains("HTTP/1.1 200 OK"), "the status line is emitted")
+    Test.assert(head.ends_with("\r\n\r\n"), "the header block ends with a blank line")
+
+    // --- A String body still works unchanged ---
+    var textual: Http.Response = Http.text("hello")
+    Test.assert_eq(textual.body_length(), 5, "a String body still reports its length")
+    var text_head: String = Http._serialize_headers(textual)
+    Test.assert(text_head.contains("Content-Length: 5"), "a String body emits its strlen length")
+    Test.assert_eq(Http._serialize_response(textual), text_head + "hello", "a String body still serializes whole")
+
+    // --- .bytes() upgrades an existing response and clears the String body ---
+    var upgraded: Http.Response = Http.Response(200, "placeholder")
+    Test.assert_eq(upgraded.body_length(), 11, "starts as a String body")
+    upgraded = upgraded.bytes(wasm)
+    Test.assert_eq(upgraded.body_length(), 13, "bytes() switches to the byte length")
+    Test.assert_eq(upgraded.body, "", "bytes() clears the String body it cannot represent")
+
+    // --- An empty byte body is length 0, not an error ---
+    var empty: Http.Response = Http.file_bytes(FileIO.bytes_alloc(0), "application/octet-stream")
+    Test.assert_eq(empty.body_length(), 0, "an empty byte body is length 0")
+    Test.assert(Http._serialize_headers(empty).contains("Content-Length: 0"), "an empty byte body emits 0")
+
+    // --- The 413 / 400 status texts the read loop needs ---
+    Test.assert_eq(Http.Response(413, "").status_text, "Payload Too Large", "413 has a reason phrase")
+    Test.assert_eq(Http.Response(400, "").status_text, "Bad Request", "400 has a reason phrase")
+
+    Test.summary()
+}
+
+main()

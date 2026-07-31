@@ -26,6 +26,62 @@ import "@net" as Net
 import "@async" as Async
 import "@path" as Path
 import "@ssl" as SSL
+import "@io" as FileIO
+
+// Byte-exact socket write. `Net.TcpConnection.write` takes a `String` and sizes
+// it with `strlen`, so it cannot send a body containing an interior NUL byte —
+// it stops at the first one. These bind the socket primitives directly so a
+// response body can be written from an explicit (pointer, length) pair.
+@extern("i64 sf_tcp_write(i64, i8*, i64)") fun _srv_tcp_write(fd: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") fun _srv_tls_write(handle: Int, buf: Int, len: Int): Int
+@intrinsic fun __suspend(reason: Int, arg: Int)
+
+/// Default cap on a single request (headers + body). Requests larger than this
+/// are answered 413 and the connection is closed, instead of being parsed
+/// truncated. Override per-server with `app.max_request_bytes`.
+var DEFAULT_MAX_REQUEST_BYTES: Int = 8388608
+
+// =============================================================================
+// Byte-exact writing
+// =============================================================================
+
+/// Write exactly `len` bytes from `ptr` to a plain (non-TLS) connection,
+/// suspending on EWOULDBLOCK. Unlike a String write this never consults
+/// `strlen`, so NUL bytes inside the range are sent like any other byte.
+fun _write_bytes_plain(handle: Int, ptr: Int, len: Int): Int {
+    var fd: Int = handle & 0xFFFFFFFF
+    var written: Int = 0
+    while (written < len) {
+        var n: Int = _srv_tcp_write(fd, ptr + written, len - written)
+        if (n > 0) {
+            written = written + n
+        } else if (n == -1) {
+            __suspend(4, fd)
+        } else {
+            break
+        }
+    }
+    return written
+}
+
+/// Byte-exact counterpart for a TLS connection. `handle` is the packed
+/// `fd | (tls_handle << 32)` used throughout @net / @ssl.
+fun _write_bytes_tls(handle: Int, ptr: Int, len: Int): Int {
+    var fd: Int = handle & 0xFFFFFFFF
+    var tls: Int = handle >> 32
+    var written: Int = 0
+    while (written < len) {
+        var n: Int = _srv_tls_write(tls, ptr + written, len - written)
+        if (n > 0) {
+            written = written + n
+        } else if (n == -1) {
+            __suspend(4, fd)
+        } else {
+            break
+        }
+    }
+    return written
+}
 
 // =============================================================================
 // Request
@@ -168,6 +224,12 @@ class Response {
     var body: String
     var _is_stream: Bool
     var _stream_fn: Fun
+    /// Byte-exact body, set instead of `body` for binary content. When non-nil
+    /// this takes precedence: `Content-Length` comes from `_body_bytes.length()`
+    /// and the payload is written straight from its pointer, so interior NUL
+    /// bytes survive. `body` stays "" in that case, since a String simply cannot
+    /// hold the content (see BUGS #66).
+    var _body_bytes: FileIO.Bytes
 
     fun init(status: Int, body: String) {
         this.status = status
@@ -176,11 +238,14 @@ class Response {
         if (status == 500) { this.status_text = "Internal Server Error" }
         if (status == 301) { this.status_text = "Moved Permanently" }
         if (status == 302) { this.status_text = "Found" }
+        if (status == 413) { this.status_text = "Payload Too Large" }
+        if (status == 400) { this.status_text = "Bad Request" }
         this._headers = []
         this._header_values = []
         this.body = body
         this._is_stream = false
         this._stream_fn = fun () => {}
+        this._body_bytes = nil
     }
 
     fun header(name: String, value: String): Response {
@@ -192,6 +257,24 @@ class Response {
     fun status_code(code: Int): Response {
         this.status = code
         return this
+    }
+
+    /// Replace the body with a byte-exact payload. Use for any content that may
+    /// contain a NUL byte (wasm, images, gzip); a String body would truncate.
+    fun bytes(data: FileIO.Bytes): Response {
+        this._body_bytes = data
+        this.body = ""
+        return this
+    }
+
+    /// Body length in bytes — the value that goes in `Content-Length`. Reads the
+    /// byte body's real length when present, and falls back to the String
+    /// body's `strlen` otherwise.
+    fun body_length(): Int {
+        if (this._body_bytes != nil) {
+            return this._body_bytes.length()
+        }
+        return this.body.length()
     }
 }
 
@@ -211,6 +294,18 @@ fun json(body: String): Response {
 
 fun file(content: String, mime: String): Response {
     return Response(200, content).header("Content-Type", mime)
+}
+
+/// Build a 200 response with a byte-exact body. Use this for any content that
+/// may contain a NUL byte — `file()` takes a String and would truncate.
+///
+/// ```saffron
+/// import "@io" as FileIO
+/// var wasm = FileIO.read_file_bytes("app.wasm")
+/// return Http.file_bytes(wasm, "application/wasm")
+/// ```
+fun file_bytes(content: FileIO.Bytes, mime: String): Response {
+    return Response(200, "").bytes(content).header("Content-Type", mime)
 }
 
 fun redirect(url: String): Response {
@@ -239,17 +334,22 @@ fun event_stream(handler: Fun): Response {
 // Internal — HTTP serialization
 // =============================================================================
 
-fun _serialize_response(resp: Response): String {
+/// Serialize the status line and headers, up to and including the blank line
+/// that ends the header block. The body is written separately by
+/// `_write_response`, because a byte body cannot pass through a StringBuilder.
+fun _serialize_headers(resp: Response): String {
     var sb = StringBuilder()
     sb.append("HTTP/1.1 ")
     sb.append(resp.status.to_string())
     sb.append(" ")
     sb.append(resp.status_text)
     sb.append("\r\n")
-    // Content-Length (only for non-stream)
+    // Content-Length (only for non-stream). Uses body_length(), which reports
+    // the byte body's true length when one is set — resp.body.length() would be
+    // a strlen and truncate at the first NUL.
     if (!resp._is_stream) {
         sb.append("Content-Length: ")
-        sb.append(resp.body.length().to_string())
+        sb.append(resp.body_length().to_string())
         sb.append("\r\n")
     }
     // Custom headers
@@ -265,10 +365,55 @@ fun _serialize_response(resp: Response): String {
         sb.append("Connection: close\r\n")
     }
     sb.append("\r\n")
-    if (!resp._is_stream) {
-        sb.append(resp.body)
-    }
     return sb.to_string()
+}
+
+/// Serialize a full response into a single String.
+///
+/// Retained for callers that want the bytes in hand (and for tests). NOTE: this
+/// is lossy for a byte body — a String cannot represent interior NUL bytes, so
+/// the payload truncates. Use `_write_response` to actually send a response.
+fun _serialize_response(resp: Response): String {
+    var head: String = _serialize_headers(resp)
+    if (resp._is_stream) {
+        return head
+    }
+    return head + resp.body
+}
+
+/// Write a complete response to a connection: headers as a String, then the body
+/// byte-exactly. This is the only correct way to send a binary body — it writes
+/// from the byte body's (pointer, length) pair rather than handing a String to
+/// `strlen`.
+fun _write_response(conn: Net.TcpConnection, tls_conn: Any, resp: Response) {
+    var head: String = _serialize_headers(resp)
+    if (tls_conn != nil) {
+        tls_conn.write(head)
+    } else {
+        conn.write(head)
+    }
+    if (resp._is_stream) {
+        return
+    }
+    if (resp._body_bytes != nil) {
+        var len: Int = resp._body_bytes.length()
+        if (len > 0) {
+            if (tls_conn != nil) {
+                var packed: Int = tls_conn.fd | (tls_conn.tls_handle << 32)
+                _write_bytes_tls(packed, resp._body_bytes.ptr(), len)
+            } else {
+                _write_bytes_plain(conn._handle, resp._body_bytes.ptr(), len)
+            }
+        }
+    } else {
+        if (resp.body.length() > 0) {
+            if (tls_conn != nil) {
+                tls_conn.write(resp.body)
+            } else {
+                conn.write(resp.body)
+            }
+        }
+    }
 }
 
 // =============================================================================
@@ -318,6 +463,11 @@ class App {
     var _middlewares: List<Fun>
     var _after_middlewares: List<Fun>
     var _tls_ctx: Any
+    /// Maximum accepted request size (headers + body) in bytes. A request that
+    /// exceeds it is answered 413 rather than parsed truncated. Enforced while
+    /// reading, which is the only place it can be enforced — an application-level
+    /// check runs after the request has already been (mis)parsed.
+    var max_request_bytes: Int
 
     fun init(port: Int) {
         this.host = "0.0.0.0"
@@ -326,6 +476,7 @@ class App {
         this._middlewares = []
         this._after_middlewares = []
         this._tls_ctx = nil
+        this.max_request_bytes = DEFAULT_MAX_REQUEST_BYTES
     }
 
     /// Enable TLS on this server. Pass a SSL.Context created via SSL.server_context().
@@ -397,15 +548,15 @@ class App {
             }
         }
 
-        // Read request data
-        var raw: String = ""
-        if (tls_conn != nil) {
-            raw = tls_conn.read(8192)
-        } else {
-            raw = conn.read(8192)
-        }
+        // Read the request: drain until the header block is complete, then read
+        // exactly Content-Length more bytes. See _read_request for why a single
+        // read (or a single retry) is not enough.
+        var rr: _RawRequest = this._read_request(conn, tls_conn)
 
-        if (raw.length() == 0) {
+        if (rr.too_large) {
+            var big: Response = Response(413, "request too large")
+            big = big.header("Content-Type", "text/plain")
+            _write_response(conn, tls_conn, big)
             if (tls_conn != nil) {
                 tls_conn.close()
             } else {
@@ -414,26 +565,29 @@ class App {
             return
         }
 
-        var req: Request = _parse_request(raw)
-
-        // If Content-Length indicates more body data than we received, read more
-        var cl_str: String = req.header("Content-Length")
-        if (cl_str.length() > 0) {
-            var content_length: Int = cl_str.to_number()
-            var body_len: Int = req.body.length()
-            if (body_len < content_length) {
-                // Need to read more body data from the connection
-                var remaining: Int = content_length - body_len
-                var extra: String = ""
-                if (tls_conn != nil) {
-                    extra = tls_conn.read(remaining)
-                } else {
-                    extra = conn.read(remaining)
-                }
-                if (extra.length() > 0) {
-                    req.body = req.body + extra
-                }
+        if (rr.raw.length() == 0) {
+            if (tls_conn != nil) {
+                tls_conn.close()
+            } else {
+                conn.close()
             }
+            return
+        }
+
+        var req: Request = _parse_request(rr.raw)
+
+        // A short read is now an explicit error rather than a silent truncated
+        // parse: answer 400 instead of handing the application a partial body.
+        if (rr.incomplete) {
+            var bad: Response = Response(400, "incomplete request body")
+            bad = bad.header("Content-Type", "text/plain")
+            _write_response(conn, tls_conn, bad)
+            if (tls_conn != nil) {
+                tls_conn.close()
+            } else {
+                conn.close()
+            }
+            return
         }
 
         req._conn = conn
@@ -461,14 +615,99 @@ class App {
             // For streams with TLS, set the TLS connection on the stream
             // (handled via req.stream which creates a Stream with _tls_conn)
         } else {
+            _write_response(conn, tls_conn, resp)
             if (tls_conn != nil) {
-                tls_conn.write(_serialize_response(resp))
                 tls_conn.close()
             } else {
-                conn.write(_serialize_response(resp))
                 conn.close()
             }
         }
+    }
+
+    /// Read one complete HTTP request off the connection.
+    ///
+    /// Two things the old single `conn.read(8192)` could not do:
+    ///
+    /// 1. **Drain.** `Net._raw_read` returns after its *first* successful
+    ///    `recv` (it `break`s on `n > 0`, net.sf:102), so one call yields at most
+    ///    one TCP segment regardless of the size asked for. The previous code
+    ///    then did exactly one retry, which covered a body spanning two segments
+    ///    and no more — that is why ~8-32 KB happened to work on loopback and
+    ///    larger bodies did not. This loops until the headers are in hand and
+    ///    then until Content-Length bytes of body have actually arrived.
+    /// 2. **Detect a short read.** Truncation was indistinguishable from a
+    ///    complete request. Here a body that never reaches Content-Length sets
+    ///    `incomplete`, and the caller answers 400 instead of handing the
+    ///    application a half body.
+    ///
+    /// The size cap is enforced here, while reading, so it can actually fire.
+    fun _read_request(conn: Net.TcpConnection, tls_conn: Any): _RawRequest {
+        var out: _RawRequest = _RawRequest()
+        var chunk_size: Int = 65536
+        var buf: String = ""
+        var limit: Int = this.max_request_bytes
+
+        // Phase 1: read until the end of the header block ("\r\n\r\n").
+        var header_end: Int = -1
+        while (header_end < 0) {
+            var chunk: String = ""
+            if (tls_conn != nil) {
+                chunk = tls_conn.read(chunk_size)
+            } else {
+                chunk = conn.read(chunk_size)
+            }
+            if (chunk.length() == 0) {
+                // EOF. Either a bare connection probe (buf empty) or headers
+                // that never terminated.
+                out.raw = buf
+                if (buf.length() > 0) {
+                    out.incomplete = true
+                }
+                return out
+            }
+            buf = buf + chunk
+            if (buf.length() > limit) {
+                out.too_large = true
+                return out
+            }
+            header_end = buf.index_of("\r\n\r\n")
+        }
+
+        var body_start: Int = header_end + 4
+        var head: String = buf.slice(0, body_start)
+        var have_body: Int = buf.length() - body_start
+
+        // Phase 2: read exactly Content-Length more body bytes.
+        var content_length: Int = _content_length_of(head)
+        if (content_length > limit) {
+            out.too_large = true
+            return out
+        }
+        while (have_body < content_length) {
+            var want: Int = content_length - have_body
+            if (want > chunk_size) { want = chunk_size }
+            var more: String = ""
+            if (tls_conn != nil) {
+                more = tls_conn.read(want)
+            } else {
+                more = conn.read(want)
+            }
+            if (more.length() == 0) {
+                // Peer stopped sending before Content-Length was satisfied.
+                out.raw = buf
+                out.incomplete = true
+                return out
+            }
+            buf = buf + more
+            have_body = buf.length() - body_start
+            if (buf.length() > limit) {
+                out.too_large = true
+                return out
+            }
+        }
+
+        out.raw = buf
+        return out
     }
 
     fun _run_middlewares(req: Request): Response {
@@ -652,9 +891,11 @@ fun static_files(url_prefix: String, dir: String): Fun {
         if (!IO.file_exists(full_path)) {
             return nil
         }
-        var content: String = IO.read_file(full_path)
+        // Read byte-exactly, not via IO.read_file: a String body strlen-truncates
+        // at the first NUL, which served every wasm module as 0 bytes (BUGS #66).
+        var content: FileIO.Bytes = FileIO.read_file_bytes(full_path)
         var mime: String = _guess_mime(full_path)
-        return Response(200, content).header("Content-Type", mime)
+        return file_bytes(content, mime)
     }
 }
 
@@ -676,6 +917,45 @@ fun _guess_mime(path: String): String {
 // =============================================================================
 // Request parsing
 // =============================================================================
+
+/// Result of draining one request off a socket: the raw bytes plus whether the
+/// read ended badly. `incomplete` means the peer stopped before Content-Length
+/// was satisfied; `too_large` means the request exceeded max_request_bytes.
+class _RawRequest {
+    var raw: String
+    var incomplete: Bool
+    var too_large: Bool
+
+    fun init() {
+        this.raw = ""
+        this.incomplete = false
+        this.too_large = false
+    }
+}
+
+/// Parse Content-Length out of a raw header block. Returns 0 when absent.
+/// Case-insensitive on the field name, as HTTP requires.
+fun _content_length_of(head: String): Int {
+    var lines: List<String> = head.split("\r\n")
+    var i: Int = 1
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var colon: Int = line.index_of(":")
+        if (colon > 0) {
+            var name: String = line.slice(0, colon).to_lower().trim()
+            if (name == "content-length") {
+                var value: String = line.slice(colon + 1, line.length()).trim()
+                if (value.length() > 0) {
+                    var n: Int = value.to_number()
+                    if (n > 0) { return n }
+                }
+                return 0
+            }
+        }
+        i = i + 1
+    }
+    return 0
+}
 
 fun _parse_request(raw: String): Request {
     var lines: List<String> = raw.split("\r\n")
