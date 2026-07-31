@@ -9,6 +9,72 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 73. `tuple_test` compiles or fails at random — the same binary on the same source disagrees with itself run to run
+
+Found while diffing a baseline failure set for #69, where it presented as a
+phantom regression. `test/tuple_test.sf` either compiles and runs, or fails in
+the checker with:
+
+```
+ERROR: return: cannot return nullable Int from function expecting Tuple<Int,Int>
+```
+
+Measured on a pristine tree: **10 failures out of 20 runs** of the *same*
+`build/saffronc` binary against the *same* unmodified source file. A second
+build of identical source gave 18/20. Nothing about the input varies.
+
+The error text comes from `checker.sf:988`, in the `Return` arm:
+
+```saffron
+if (!this.is_nullable_type(this.current_func_ret) and this.is_nullable_type(val_type_node)) {
+```
+
+so whether `is_nullable_type` sees a Tuple return annotation as nullable is
+apparently not a function of the source alone. That points at uninitialized
+memory or pointer-identity-dependent behaviour in the type node built by
+`parse_type_node`, rather than at tuple support as such.
+
+**Why it matters beyond this one test.** It poisons any baseline comparison. A
+failure-set diff against a same-HEAD baseline will show `tuple_test` flipping in
+either direction, which reads as a regression or an improvement caused by
+whatever change is under test. Anyone measuring against the suite has to know to
+discount it. Either fix it or quarantine the test, but it should not stay as
+silent noise in the suite.
+
+### 72. An `Int?` return annotation makes the function's own parameters undefined at codegen
+
+`Int?` and `Int|Nil` are meant to be the same type, but only one of them keeps
+the parameter list intact:
+
+```saffron
+fun f(x: Int): Int? {
+    return x
+}
+IO.println(f(5))
+```
+
+```
+[codegen] Error: undefined variable 'x'
+Compilation failed with codegen errors
+```
+
+The identical body compiles and prints `5` under either other spelling of the
+return type:
+
+| Return annotation | Result |
+|---|---|
+| `: Int` | compiles, prints 5 |
+| `: Int\|Nil` | compiles, prints 5 |
+| `: Int?` | **`undefined variable 'x'`** |
+
+So it is the `?` spelling of the *return* annotation that loses the parameter
+scope — the parameter itself is unremarkable. This one at least fails loudly.
+
+Note that `Int?` is also rejected outright in some other positions
+(`var v: Int? = 5` is a parse error, "expected '=' but found '?'"), so the
+nullable shorthand is only partly wired up; this entry is specifically the
+codegen scope loss, which is the surprising half.
+
 ### 71. A module-level `fun main` in an imported file collides with the entry point's `main`, and the program silently never runs
 
 Codegen renamed *every* function called `main` to `__saffron_main`, regardless of
@@ -137,7 +203,7 @@ made is the underlying hazard, and it argues for resolving receiver kind in a
 separate pass (`docs/design/compiler-rewrite.md`, stage 2) rather than
 re-deriving it inline at each of a dozen call sites.
 
-### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead
+### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead — FIXED
 
 Found while writing the Map-iteration workaround for #62. On a value whose
 declared type is a union, **both** arms of an `is` test are false:
@@ -219,6 +285,28 @@ still, invert the condition: take the compile-time path only when the operand's
 type is a single concrete type, and emit the runtime check otherwise. The
 `"Any"`-only spelling is a whitelist that silently mis-answers everything it
 forgot.
+
+**Fixed** by taking the suggested inversion. `types_body.sf` gained
+`is_undecidable_type`, which matches on the AST variant rather than comparing a
+rendered type string, and answers true for `AnyType`, `UnionType` and
+`NullableType`. `gen_is_check` now gates the runtime branch on that predicate.
+Matching the variant is what makes it safe: any new multi-representation `Type`
+variant must be added to the match arms or the build fails, so the whitelist
+cannot silently fall behind the type system again.
+
+`NullableType` was folded in on the same reasoning even though the reproduction
+above uses a union — every `is_*_type` predicate answers false for it too, so it
+was the same latent bug one spelling away.
+
+**One case deliberately still answers false:** `is <ClassName>` on an
+undecidable operand. Values carry only a NaN-box tag, not a class identity, so
+there is nothing to test at runtime. It now emits a codegen warning instead of
+answering silently — a dead `is` branch is invisible at runtime, and that
+invisibility is what made this bug expensive. A correct answer needs runtime
+class tags, which is a separate piece of work.
+
+Regression test: `test/pass/is_union.sf` (15 assertions; the pre-fix compiler
+fails 5 of them).
 
 **Relationship to the old #11.** `#11` ("Flow narrowing for primitives in
 unions") is listed under Fixed, and that fix was real — it addressed the checker
