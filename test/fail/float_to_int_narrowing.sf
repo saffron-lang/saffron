@@ -1,0 +1,22 @@
+// The other half of the numeric coercion rule (BUGS #54): Int->Float widens
+// implicitly, but Float->Int narrowing is an ERROR and must stay one.
+//
+// This guards the widening direction. The risk of a coercion rule is that it
+// becomes bidirectional by accident — if the scalar_mismatch() exemption that
+// permits `Float` <- `Int`, or the codegen store that converts it, were made
+// symmetric, `var i: Int = 1.5` would start compiling and silently truncate or
+// misread the value.
+//
+// Narrowing must be rejected because it loses information: there is no
+// representation of 1.5 as an Int, so the only honest answer is a diagnostic.
+//
+// Expected: "ERROR: <name>: cannot assign Float to Int" and exit 1.
+
+fun main() {
+    var from_literal: Int = 1.5      // Float literal into Int — error
+    var source: Float = 2.5
+    var from_variable: Int = source  // Float variable into Int — error
+    var from_arith: Int = 1.0 + 2.0  // Float expression into Int — error
+    IO.println("${from_literal} ${from_variable} ${from_arith}")
+}
+main()
