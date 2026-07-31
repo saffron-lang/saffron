@@ -11,6 +11,7 @@ class Parser {
     var source: String
     var html_depth: Float
     var for_counter: Int
+    var map_counter: Int
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -20,6 +21,7 @@ class Parser {
         this.source = ""
         this.html_depth = 0
         this.for_counter = 0
+        this.map_counter = 0
     }
 
     /// Suffix that makes each desugared `for-in`'s temporaries unique.
@@ -29,6 +31,16 @@ class Parser {
     fun next_for_uid(): String {
         this.for_counter = this.for_counter + 1
         return "_" + this.for_counter.to_string()
+    }
+
+    /// Suffix that makes each desugared map literal's temporary unique.
+    ///
+    /// A literal nested inside another shares the enclosing scope's alloca, so a
+    /// fixed `__map` name let the inner map redeclare — and clobber — the outer
+    /// one (BUGS #41). Same fix as next_for_uid, for the same reason.
+    fun next_map_uid(): String {
+        this.map_counter = this.map_counter + 1
+        return "_" + this.map_counter.to_string()
     }
 
     fun current(): Lexer.Token {
@@ -692,23 +704,28 @@ class Parser {
             }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
             if (this.is_map_key_start() and this.peek_is(":")) {
-                // Parse as map literal — desugar to BlockExpr that builds the map
+                // Parse as map literal — desugar to BlockExpr that builds the map.
+                // The temporary needs a unique name: a nested literal shares this
+                // scope's alloca and a fixed `__map` clobbered the outer one
+                // (BUGS #41). Bind it BEFORE parse_expr below, which recurses into
+                // nested literals and bumps the counter.
+                var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
-                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
+                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
                     var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
-                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
+                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [k, v])))
                 }
                 this.consume("}")
-                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable("__map"))
+                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar))
             }
             // Block expression: { stmts...; expr }
             var block_stmts: List<AST.Stmt> = []
@@ -2544,23 +2561,26 @@ class Parser {
             }
             // Check for map literal: {"key": val, ...} or {ident: val, ...}
             if (this.is_map_key_start() and this.peek_is(":")) {
+                // Unique temporary — see the note at the other desugaring site
+                // (BUGS #41). Bind before the recursive parse_expr calls below.
+                var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
-                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
+                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
                     var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
-                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
+                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [k, v])))
                 }
                 this.consume("}")
                 this.html_depth = saved_depth
-                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable("__map"))
+                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar))
             }
             // General expression (lambda, arithmetic, etc.)
             var expr: AST.Expr = this.parse_expr()
