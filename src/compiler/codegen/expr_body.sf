@@ -2098,7 +2098,13 @@
         if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
-            if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
+            // Redirect `main()` to the entry point's emitted name, but ONLY when the
+            // callee actually resolved to the unprefixed `main`. Testing callee_name
+            // meant a call that resolved to some OTHER module's `main` (e.g.
+            // turmeric_prelude_main, the <main> element builder) was rewritten to
+            // __saffron_main as well, so the call landed on the wrong function --
+            // with the wrong arity, and no diagnostic.
+            if (resolved_callee == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(resolved_callee)
