@@ -7388,14 +7388,39 @@ class Codegen {
             Ref(rk, rn, rs) => {}
             This => {}
             MapLit => {}
-            ListLit(e) => {}
-            EnumConstruct(e, v, a) => {}
+            // A container literal's ELEMENTS can declare variables, because the
+            // parser desugars a map literal into a BlockExpr with a `__map_N`
+            // VarDecl. Not descending here meant `[{"a": 1}]` emitted a store to
+            // %__map_1 with no alloca — invalid IR, "use of undefined value".
+            // Same hazard for a tuple and for enum-construction arguments.
+            ListLit(e) => {
+                var lli: Float = 0
+                while (lli < e.length()) {
+                    this.collect_vars_expr(e[lli], names, types)
+                    lli = lli + 1
+                }
+            }
+            EnumConstruct(e, v, a) => {
+                var eci: Float = 0
+                while (eci < a.length()) {
+                    this.collect_vars_expr(a[eci], names, types)
+                    eci = eci + 1
+                }
+            }
+            // Lambda is deliberately NOT visited: gen_function hoists allocas per
+            // function, so a nested body's locals belong to that body, not this one.
             Lambda(p, r, b) => {}
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
             IfExpr(c, tb, tv, eb, ev) => {}
             TryExpr(tb, tv, cn, cb, cv) => {}
             Yield(v) => { this.collect_vars_expr(v, names, types) }
-            TupleLit(e) => {}
+            TupleLit(e) => {
+                var tli: Float = 0
+                while (tli < e.length()) {
+                    this.collect_vars_expr(e[tli], names, types)
+                    tli = tli + 1
+                }
+            }
         }
     }
 

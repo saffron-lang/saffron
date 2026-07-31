@@ -1,0 +1,61 @@
+// collect_vars must descend into container-literal ELEMENTS.
+//
+// The parser desugars a map literal into a BlockExpr that declares a temporary
+// (`__map_N`). collect_vars drives the per-function alloca hoisting, and its
+// ListLit / TupleLit / EnumConstruct arms were empty — so a map literal nested
+// inside one of those containers had its VarDecl never collected. Codegen then
+// emitted `store i64 %tN, i64* %__map_1` with no matching alloca, and the
+// program died in the LLVM verifier with "use of undefined value" rather than
+// producing a wrong answer.
+//
+// Minimal repro is just `[{"a": 1}]`. This predates the #41 unique-naming fix:
+// before that landed the same shape failed identically on `%__map`, so unique
+// names were necessary but not sufficient.
+//
+// Lambda is deliberately still not visited — gen_function hoists allocas per
+// function, so a nested body's locals belong to that body and not this one.
+
+import "@test" as Test
+
+// --- the bug: map literal inside a list literal ---
+var rows = [{"a": 1}, {"b": 2}]
+Test.assert_eq(rows.length(), 2, "a list of map literals builds")
+Test.assert_eq(rows[0].keys().to_string(), "[a]", "first element keeps its own entries")
+Test.assert_eq(rows[1].keys().to_string(), "[b]", "second element keeps its own entries")
+
+// --- two levels of container nesting ---
+var nested = [[{"x": 1}], [{"y": 2}]]
+Test.assert_eq(nested.length(), 2, "a list of lists of map literals builds")
+Test.assert_eq(nested[0][0].keys().to_string(), "[x]", "doubly nested literal is intact")
+
+// --- enum construction arguments ---
+//
+// The payload goes through a typed helper rather than `v.keys()` directly: a
+// match-bound binding has no inferred type, and dispatching a method on an
+// untyped receiver silently yields 0 instead of calling anything. That is a
+// separate known bug, and inlining the call here would mask what this test is
+// actually checking — that the literal's hoisted VarDecl got collected.
+enum Box {
+    Of(v: Map<String, Int>)
+}
+fun key_list(m: Map<String, Int>): String {
+    return m.keys().to_string()
+}
+var b = Box.Of({"k": 7})
+var got = match (b) {
+    Of(v) => key_list(v)
+}
+Test.assert_eq(got, "[k]", "a map literal as an enum-construction argument builds")
+
+var boxes = [Box.Of({"a": 1}), Box.Of({"b": 2})]
+Test.assert_eq(boxes.length(), 2, "enum construction with a literal payload, inside a list")
+
+// --- a map literal as a call argument inside a list ---
+fun count(m: Map<String, Int>): Int {
+    return m.keys().length()
+}
+var counts = [count({"p": 1, "q": 2}), count({"r": 3})]
+Test.assert_eq(counts[0], 2, "call argument literal inside a list, two entries")
+Test.assert_eq(counts[1], 1, "call argument literal inside a list, one entry")
+
+Test.summary()
