@@ -1,0 +1,40 @@
+// Regression test for BUGS #22: cross-module global variable access.
+//
+// `Module.global` used to emit `load i64, i64* %Module` — an undefined LLVM
+// local — because the MemberAccess handler only looked for known functions and
+// fell through for module-level vars. Reads, writes and read-modify-write must
+// all resolve to the module's `@__g_<prefix><name>` global, and a write from the
+// importing side must be visible to code inside the module.
+
+import "@test" as Test
+import "./cross_module_global_helper.sf" as Flag
+
+// --- Read ---
+Test.assert_eq(Flag.show(), "off", "read a Bool global through the module")
+Test.assert_eq(Flag.label, "start", "read a String global")
+Test.assert_eq(Flag.counter, 0, "read a Float global")
+
+// --- Write, observed from inside the module ---
+Flag.enabled = true
+Test.assert_eq(Flag.show(), "on", "a write is visible to a function in the module")
+Test.assert(Flag.enabled, "the write is visible to the importer too")
+
+// --- Round-trip through a local: the shape turmeric's render_into used ---
+var was: Bool = Flag.enabled
+Flag.enabled = false
+Test.assert_eq(Flag.show(), "off", "save/clear")
+Flag.enabled = was
+Test.assert_eq(Flag.show(), "on", "restore")
+
+// --- Read-modify-write ---
+Flag.counter = Flag.counter + 5
+Test.assert_eq(Flag.counter, 5, "read-modify-write a Float global")
+Flag.bump()
+Test.assert_eq(Flag.counter, 6, "mutation from inside the module is visible outside")
+
+// --- A GC-rooted global (List) survives cross-module mutation ---
+Flag.items.push(1)
+Flag.items.push(2)
+Test.assert_eq(Flag.items.length(), 2, "push onto a List global through the module")
+
+Test.summary()

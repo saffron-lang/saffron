@@ -790,40 +790,74 @@ from the type checker then trigger `runtimeError()` which corrupts VM state duri
 `type` is tokenized as `TOKEN_TYPE` for type alias declarations. Code that uses `type` as a parameter name (e.g. `fun define(name: String, type: String)`) gets a parse error. Consider making it a contextual keyword (only reserved at statement start).
 
 
-### 22. Cross-module global variable access emits undefined LLVM local
+### 22. Cross-module global variable access emits undefined LLVM local — FIXED
 
-**Reproduction:**
+**Original report:**
 ```saffron
 // cache.sf
 var store: CacheStore = CacheStore()
 
 // query.sf
 import "./cache.sf" as Cache
-Cache.store.get(key)  // <-- generates %Cache instead of @__g_basil_src_cache_store
+Cache.store.get(key)  // <-- generated %Cache instead of @__g_basil_src_cache_store
 ```
 
-**Expected:** `Cache.store` loads from the LLVM global `@__g_<prefix>store`.
-**Actual:** Codegen emits `load i64, i64* %Cache` — `%Cache` is undefined.
+Codegen emitted `load i64, i64* %Cache` — `%Cache` was undefined. The prescribed
+fix was a `module_globals.has(mp_resolved)` check in the `expr_body.sf`
+MemberAccess handler, and that check had already landed by the time this was
+re-measured. Regression coverage: `test/cross_module_global.sf`.
 
-**Root cause:** In `codegen/expr_body.sf` MemberAccess handler (~line 208), module-prefixed
-access only checks if the resolved name is a known function. If it's a module-level `var`
-(global), the check falls through and tries to load from a nonexistent local variable.
+**Three distinct defects were behind this entry.** The first was fixed earlier;
+the other two were found and fixed on 2026-07-30.
 
-**Fix:** After the known_functions check, add a `module_globals.has(mp_resolved)` check
-that emits `load i64, i64* @__g_<prefix><field>` for module-level variables.
+**(a) The undefined `%Module` local.** Fixed by the `module_globals` check at
+`expr_body.sf:244`. Reads, writes and read-modify-write of a cross-module global
+all resolve to `@__g_<prefix><name>` and produce correct results.
 
-**Impact:** Blocks any library that uses module-level globals accessed cross-module
-(e.g. basil's `Cache.store` singleton). Workaround: inline the global or avoid module-qualified access.
+**(b) A method call on a cross-module global was silently discarded.** The
+`module_globals` handler emitted the `load` but never set `last_type`, so the
+method dispatcher saw an untyped receiver and fell into its silent
+`return "0"` — emitting no call at all:
 
-**Confirmed hitting turmeric (2026-07-30).** Not just basil: `turmeric/src/`
-`router.sf`, `prelude.sf` and `index.sf` all reference `_tracking`, a real global
-at `turmeric/src/signal.sf:20`, and codegen emits `load i64, i64*
-%turmeric_signal__tracking` with no definition. `clang -x ir` rejects the
-emitted IR, so **turmeric does not currently build** — this is the blocker, and
-it was previously masked because the undefined-variable check only warned (see
-#37). The same measurement found zero other occurrences across `test/*.sf`,
-`src/lib/*.sf`, and the compiler's own source, so this one variable is the whole
-remaining surface of #22 in-repo.
+```saffron
+// helper.sf
+var items: List<Int> = []
+
+// main.sf
+import "./helper.sf" as Flag
+Flag.items.push(1)
+Flag.items.push(2)
+IO.println(Flag.items.length())   // printed 0; the pushes emitted no IR
+```
+
+RC=0, no diagnostic, the program just did nothing. Fixed by publishing
+`global_var_types.get(mp_resolved)` into `last_type` at both handler sites in
+`expr_body.sf`. This is the same silent-`return "0"` shape as #37.
+
+**(c) Dependency preludes were parsed without collecting their imports.** The
+auto-import loop in `main.sf` read each dependency's `src/prelude.sf`, lexed and
+parsed it, and pushed it as a module — but never registered its import aliases or
+recursed into what it imported, unlike `collect_modules` for an ordinary import.
+An alias used inside a prelude was therefore an undefined variable at codegen.
+
+That is why `turmeric/src/prelude/` hand-wrote the *already-mangled* symbols
+`turmeric_signal_effect` and `turmeric_signal__tracking` instead of importing
+`signal.sf`. Those are bare `Variable` references, so they never reached the
+MemberAccess handler that this entry describes — the earlier note blaming #22 for
+turmeric's build failure was right about the symptom and wrong about the cause.
+They resolve only when the prelude is auto-imported into an app (where
+`turmeric/signal` yields the `turmeric_signal_` prefix); building the library
+standalone, where the same module is reached as `./signal.sf`, left them
+undefined. The auto-import loop now registers aliases and recurses through
+`collect_modules`, and the prelude uses `Reactive.effect()` / `Reactive.untrack()`.
+
+**Worth knowing:** a module alias that collides with a class name in the same
+module (`import "./signal.sf" as Signal`, where signal.sf declares
+`class Signal`) silently compiles the member access to the class constructor and
+**drops the call entirely** — RC=0, no diagnostic, the function body becomes a
+no-op. That is why the prelude aliases it `Reactive`. Reproducing this needs the
+prelude auto-import path; a plain two-file program with the same shape works, so
+it is not yet isolated to a minimal case and is not separately filed.
 
 ### 23. Runtime functions return untagged i64 into NaN-boxed value space
 

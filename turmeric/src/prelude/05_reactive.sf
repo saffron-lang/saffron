@@ -9,7 +9,7 @@ fun reactive(compute: Any) {
     var parent: Float = _tc_current()
     var text_el: Float = _tc_create("span")
     _tc_append(parent, text_el)
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var val: String = compute()
         _tc_set_text(text_el, val)
     })
@@ -21,7 +21,7 @@ fun reactive(compute: Any) {
 // resolve generic function types in the no-prefix prelude context.
 fun reactive_class(rc_el: Float, rc_compute: Any) {
     var rc_handle: Float = rc_el
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var cls: String = rc_compute()
         _tc_set_attr(rc_handle, "class", cls)
     })
@@ -34,7 +34,7 @@ fun reactive_class(rc_el: Float, rc_compute: Any) {
 fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
     var ra_handle: Float = ra_el
     var ra_attr: String = ra_name
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var val: String = ra_compute()
         _tc_set_attr(ra_handle, ra_attr, val)
     })
@@ -47,7 +47,7 @@ fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
 // resolve generic function types in the no-prefix prelude context.
 fun reactive_show(rs_el: Float, rs_compute: Any) {
     var rs_handle: Float = rs_el
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var style_val: String = rs_compute()
         _tc_set_attr(rs_handle, "style", style_val)
     })

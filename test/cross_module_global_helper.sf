@@ -1,0 +1,16 @@
+// Helper for cross_module_global.sf — module-level globals of several types,
+// plus a function that reads one of them from inside the module.
+
+var enabled: Bool = false
+var counter: Float = 0
+var label: String = "start"
+var items: List<Int> = []
+
+fun show(): String {
+    if (enabled) { return "on" }
+    return "off"
+}
+
+fun bump() {
+    counter = counter + 1
+}

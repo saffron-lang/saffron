@@ -5,6 +5,17 @@
 // To regenerate: saffron run tools/generate_types.sf
 // Then run: tools/build_prelude.sh (concatenates infra + generated elements)
 
+// The prelude drives the signal module's effect()/untrack() for its reactive
+// helpers. Import it properly rather than hand-writing the mangled symbols
+// (turmeric_signal_effect, turmeric_signal__tracking) — that was a workaround
+// for BUGS #22, and cross-module globals and functions now resolve correctly
+// through module-qualified access.
+//
+// The alias must NOT be `Signal`: signal.sf also declares `class Signal`, and a
+// module alias that collides with a class name silently compiles the member
+// access to the class constructor and drops the call (see BUGS #42).
+import "./signal.sf" as Reactive
+
 // --- DOM FFI (provided by wasm_base.ll) ---
 @extern("i64 js_event_get_string(i64, void*)") fun _tc_event_get_string(event_ptr: Float, field: String): String
 @extern("i64 js_dom_create_element(void*)") fun _tc_create(tag: String): Float
@@ -175,7 +186,7 @@ fun reactive(compute: Any) {
     var parent: Float = _tc_current()
     var text_el: Float = _tc_create("span")
     _tc_append(parent, text_el)
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var val: String = compute()
         _tc_set_text(text_el, val)
     })
@@ -187,7 +198,7 @@ fun reactive(compute: Any) {
 // resolve generic function types in the no-prefix prelude context.
 fun reactive_class(rc_el: Float, rc_compute: Any) {
     var rc_handle: Float = rc_el
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var cls: String = rc_compute()
         _tc_set_attr(rc_handle, "class", cls)
     })
@@ -200,7 +211,7 @@ fun reactive_class(rc_el: Float, rc_compute: Any) {
 fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
     var ra_handle: Float = ra_el
     var ra_attr: String = ra_name
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var val: String = ra_compute()
         _tc_set_attr(ra_handle, ra_attr, val)
     })
@@ -213,7 +224,7 @@ fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
 // resolve generic function types in the no-prefix prelude context.
 fun reactive_show(rs_el: Float, rs_compute: Any) {
     var rs_handle: Float = rs_el
-    turmeric_signal_effect(fun () => {
+    Reactive.effect(fun () => {
         var style_val: String = rs_compute()
         _tc_set_attr(rs_handle, "style", style_val)
     })
@@ -223,13 +234,12 @@ fun reactive_show(rs_el: Float, rs_compute: Any) {
 // Used by router outlet. Temporarily disables tracking so inner signal
 // reads don't subscribe the caller's effect.
 fun render_into(container: Float, builder: () => Nil) {
-    var was: Bool = turmeric_signal__tracking
-    turmeric_signal__tracking = false
-    _tc_set_html(container, "")
-    _tc_push(container)
-    builder()
-    _tc_pop()
-    turmeric_signal__tracking = was
+    Reactive.untrack(fun () => {
+        _tc_set_html(container, "")
+        _tc_push(container)
+        builder()
+        _tc_pop()
+    })
 }
 
 // --- Attribute application: maps keys to DOM operations ---

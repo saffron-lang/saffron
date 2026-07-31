@@ -5,6 +5,17 @@
 // To regenerate: saffron run tools/generate_types.sf
 // Then run: tools/build_prelude.sh (concatenates infra + generated elements)
 
+// The prelude drives the signal module's effect()/untrack() for its reactive
+// helpers. Import it properly rather than hand-writing the mangled symbols
+// (turmeric_signal_effect, turmeric_signal__tracking) — that was a workaround
+// for BUGS #22, and cross-module globals and functions now resolve correctly
+// through module-qualified access.
+//
+// The alias must NOT be `Signal`: signal.sf also declares `class Signal`, and a
+// module alias that collides with a class name silently compiles the member
+// access to the class constructor and drops the call (see BUGS #42).
+import "./signal.sf" as Reactive
+
 // --- DOM FFI (provided by wasm_base.ll) ---
 @extern("i64 js_event_get_string(i64, void*)") fun _tc_event_get_string(event_ptr: Float, field: String): String
 @extern("i64 js_dom_create_element(void*)") fun _tc_create(tag: String): Float

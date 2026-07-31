@@ -858,6 +858,45 @@ fun main(): Int {
                     module_stmts.push(dep_program)
                     module_prefixes_list.push(dep_prefix)
                     visited.set(pkg_prelude, true)
+
+                    // A dependency prelude is a normal module: it may import
+                    // other modules of its own package. Register its aliases
+                    // and pull in what it imports, exactly as collect_modules
+                    // does for an ordinary import. Without this, an alias used
+                    // in the prelude is an undefined variable at codegen, which
+                    // is why turmeric's prelude hand-wrote mangled symbols
+                    // (turmeric_signal_effect) instead of importing signal.sf.
+                    var dp_aliases: Map<String, String> = extract_import_aliases(dep_src)
+                    var dp_keys: List<String> = dp_aliases.keys()
+                    var dpi: Float = 0
+                    while (dpi < dp_keys.length()) {
+                        var dp_alias: String = dp_keys[dpi]
+                        var dp_path: String = dp_aliases.get(dp_alias)
+                        if (!is_builtin_module(dp_path)) {
+                            var dp_full: String = resolve_import_path(pkg_prelude, dp_path, stdlib_dir)
+                            if (!path_to_prefix.has(dp_full)) {
+                                path_to_prefix.set(dp_full, path_based_prefix(dp_path, dp_full, stdlib_dir))
+                            }
+                            if (!resolved_aliases.has(dp_alias)) {
+                                resolved_aliases.set(dp_alias, path_to_prefix.get(dp_full))
+                            }
+                        }
+                        dpi = dpi + 1
+                    }
+
+                    var dp_imports: List<String> = extract_imports(dep_src)
+                    var dpj: Float = 0
+                    while (dpj < dp_imports.length()) {
+                        var dp_imp: String = dp_imports[dpj]
+                        if (!is_builtin_module(dp_imp)) {
+                            var dp_imp_full: String = resolve_import_path(pkg_prelude, dp_imp, stdlib_dir)
+                            if (!path_to_prefix.has(dp_imp_full)) {
+                                path_to_prefix.set(dp_imp_full, path_based_prefix(dp_imp, dp_imp_full, stdlib_dir))
+                            }
+                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
+                        }
+                        dpj = dpj + 1
+                    }
                 }
             }
             di = di + 1
