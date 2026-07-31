@@ -9,6 +9,71 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 83. FIXED — `__float_to_string` bitcast an int-tagged value, so `.to_string()` on a whole-number Float printed `nan`
+
+```saffron
+var s: List<Float> = [10, 20, 30]
+IO.println(s[1])                  // 20      — correct
+IO.println(s[1].to_string())      // nan     — wrong
+```
+
+`__float_to_string` (`src/runtime/base_nanbox.ll:162`) opened with a bare
+`bitcast i64 %v to double`. That is only valid if the incoming value really is
+an unboxed double. Codegen picks this helper from the **static** type, and the
+list is declared `List<Float>` — but `[10, 20, 30]` are whole numbers, so at
+runtime the elements are int-tagged (`0x7FF9...`). Those bits *are* a NaN, hence
+the literal output `nan`.
+
+`IO.println(s[1])` looked fine only because it goes through a different helper
+that dispatches on the runtime tag rather than the static type.
+
+**Fix:** route through `__val_untag_float`, which already branches on the tag
+and converts either shape. `base.ll` has the same bare bitcast but is the
+bootstrap base and runs in identity mode, so it never sees a tagged value;
+`wasm_base.ll` / `wasm_base_32.ll` have their own formatters, untouched.
+
+Watch for the general shape: any runtime helper chosen by static type but fed a
+tagged value must dispatch on the tag, not assume it. Same family as #77.
+
+### 82. FIXED — a list index held in a `Float`-annotated variable always read element 0
+
+```saffron
+fun f() {
+    var src: List<String> = ["a", "b", "c"]
+    var i: Float = 0
+    while (i < src.length()) { IO.println(src[i]) i = i + 1 }
+}
+f()      // printed "a a a"; with `var i = 0` it printed "a b c"
+```
+
+Silent wrong answers, no diagnostic, and it hit every container operation that
+untags an index: `list[i]`, `list[i] = v`, `list.set(i, v)`, `str[i]`,
+`str.char_at(i)`.
+
+`__val_untag_int` (`src/runtime/base_nanbox.ll:221`) assumed a NaN-boxed input
+and unconditionally masked the low 48 bits. A `Float`-annotated variable is
+stored float-tagged (`__val_tag_float`), and `0.0`, `1.0`, `2.0` all have an
+all-zero low 48 bits — so every index collapsed to `0` while the loop counter
+itself incremented correctly. That split is what makes it so confusing to
+debug: the counter prints right, the index is wrong.
+
+**Why it stayed hidden.** The compiler uses `var i: Float = 0` as a list index
+in hundreds of places, and none of them misbehave — the compiler compiles
+*itself* in identity mode, where tag/untag are no-ops and the annotation has no
+effect. The bug only reaches user programs, on the NaN-box path. Any bug in the
+tag/untag helpers is invisible to the compiler's own test of itself; a
+self-hosted compiler cannot dogfood its own value representation.
+
+**Fix:** three input shapes reach the helper — NaN-boxed, raw i64 straight from
+codegen, and a float-tagged double — so branch on which. `wasm_base_32.ll:685`
+already did exactly this; native was the odd one out. The native version adds a
+guard wasm32 lacks: a sign-extended negative raw int (high 32 bits all ones)
+must pass through, since bitcasting it to double yields NaN and would return 0,
+silently breaking negative indexing.
+
+Suite: 43 failures vs. the 45-failure baseline, zero regressions, and
+`test/narrowing.sf` + `test/test_async.sf` now pass. `./bootstrap.sh` passes.
+
 ### 81. `__gc_write_barrier` is defined but never called anywhere, so the remembered set is permanently empty
 
 `__gc_write_barrier` (`src/runtime/gc.ll:1378`) maintains the remembered set that
