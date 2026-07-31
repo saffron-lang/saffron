@@ -2008,7 +2008,7 @@ line 26 hints at ("capture POINTERS") but the code does not do.
 **`CLAUDE.md` shows a mutable-counter closure as a supported pattern, so the
 documentation is wrong here too.**
 
-### 52. Indexing a list with a `Float`-typed value silently reads element 0
+### 52. FIXED — indexing a list with a `Float`-typed value silently read element 0
 
 **Reproduction:**
 
@@ -2046,6 +2046,15 @@ loop with the older `Float` spelling — which is why the `Number` retirement
 
 Pre-existing, not a regression: reproduced on a clean baseline worktree at commit
 `11c9638` with its own committed `build/saffronc`.
+
+**Resolution (2026-07-31).** The three index paths (`gen_index_get`'s list and
+string cases, `gen_index_set`) untagged the index with `emit_untag_int`, which
+reinterprets a Float-tagged value's bits. New helper `emit_untag_index(val,
+idx_type)` (`types_body.sf`) converts a statically-`Float` index via
+`__val_untag_float` + `fptosi` and keeps the plain int untag otherwise. Verified:
+`chars[f]` → `c`, `s[sf]` → `e`, `chars[f] = "Z"` then `chars[2]` → `Z`. Zero
+regressions. Note this is the same float tag/untag confusion as the Float half of
+#51 and #54; the fix here is confined to index positions.
 
 ### 54. An `Int` literal in a `Float` position yields `nan`
 
