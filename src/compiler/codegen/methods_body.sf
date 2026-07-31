@@ -881,6 +881,39 @@
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
+    // super.method(args) — must be decided HERE, above the builtin-dispatch
+    // preamble further down, which does an unconditional gen_arg_value(object).
+    // `super` parses as an ordinary Variable node (parser.sf), so that preamble
+    // emits `load i64, i64* %super` for a slot no prologue allocates, and the
+    // module fails LLVM verification even though the call below is correct
+    // (BUGS #70). Same reason the `this` receiver is handled just above.
+    if (obj_name == "super" and this.current_parent.length() > 0) {
+        var super_self: String = this.fresh_local()
+        this.emit_indent(super_self + " = load i64, i64* %self")
+        var super_args: List<String> = []
+        super_args.push("i64 " + super_self)
+        var super_i: Float = 0
+        while (super_i < args.length()) {
+            var super_arg: String = this.gen_arg_value(args[super_i])
+            super_args.push("i64 " + super_arg)
+            super_i = super_i + 1
+        }
+        var parent_method: String = this.current_parent + "__" + method
+        this.called_functions.push(parent_method)
+        var super_result: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(super_result, "i64", parent_method, super_args.join(", ")))
+        } else {
+            this.emit_indent(super_result + " = call i64 @" + parent_method + "(" + super_args.join(", ") + ")")
+        }
+        if (this.func_ret_types.has(parent_method)) {
+            this.last_type = this.func_ret_types.get(parent_method)
+        } else {
+            this.last_type = AST.Type.StringType
+        }
+        return super_result
+    }
+
     // Actor fire-and-forget: actor.send("method_name", args...)
     if (method == "send" and args.length() >= 1 and obj_name.length() > 0) {
         var send_obj_type: String = this.get_var_type_str(obj_name)
@@ -2514,34 +2547,6 @@
         }
         this.last_type = AST.Type.IntType
         return obj
-    }
-
-    // Check for super.method() calls
-    if (obj_name == "super" and this.current_parent.length() > 0) {
-        var self_val: String = this.fresh_local()
-        this.emit_indent(self_val + " = load i64, i64* %self")
-        var arg_strs: List<String> = []
-        arg_strs.push("i64 " + self_val)
-        var ai: Float = 0
-        while (ai < args.length()) {
-            var val: String = this.gen_arg_value(args[ai])
-            arg_strs.push("i64 " + val)
-            ai = ai + 1
-        }
-        var parent_method: String = this.current_parent + "__" + method
-        this.called_functions.push(parent_method)
-        var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", parent_method, arg_strs.join(", ")))
-        } else {
-            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
-        }
-        if (this.func_ret_types.has(parent_method)) {
-            this.last_type = this.func_ret_types.get(parent_method)
-        } else {
-            this.last_type = AST.Type.StringType
-        }
-        return local
     }
 
     // (enum check moved above builtin dispatch)
