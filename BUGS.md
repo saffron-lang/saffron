@@ -83,7 +83,7 @@ implementation at all and reach the linker with no warning, because the
 namespace-dispatch path (`methods_body.sf:990-1008`) has no `known_functions`
 guard. That missing guard is why this whole class went undetected.
 
-### 84. A `void*`-returning `@extern` has its result pointer-tagged, so a NULL check is unconditionally false — `IO.open` does not throw on a missing file
+### 84. FIXED — a `void*`-returning `@extern` had its NULL result pointer-tagged, so a `== 0` check was unconditionally false — `IO.open` did not throw on a missing file
 
 The single highest-impact instance is in the stdlib and is user-visible today:
 
@@ -144,6 +144,27 @@ discipline; see `docs/design/ffi-pointer-discipline.md`.
 Related in-family: `load8` returns a raw untagged i64 that reads back as a
 denormal double unless laundered through integer arithmetic (`& 255`). Same root
 theme — the extern boundary does not have one consistent tagging rule.
+
+**Resolution (2026-07-31).** Took Fix A (the narrow one), not option 2, because
+option 2 int-tags *every* void* return and several stdlib functions return a
+void*-derived buffer through a `: String` signature and depend on TAG_PTR
+(`string.sf` char_at/slice, `io.sf` File.read/read_line/read_all) — int-tagging
+those would print numbers. New runtime helper `__val_tag_ptr_nullable`
+(`base_nanbox.ll`, `wasm_base_32.ll`) maps a NULL to int-tagged 0
+(`9221401712017801216`, the exact word `IntLit(0)` compares as) and leaves a
+non-NULL pointer as normal TAG_PTR. The `i8*` extern-return path
+(`intrinsics_body.sf`) now calls it via `emit_tag_ptr_nullable`
+(`types_body.sf`, with an identity-mode ptrtoint fallback so the bootstrap never
+references the symbol); the ~50 other `emit_tag_ptr` sites are untouched.
+Verified: `IO.open` on an existing file opens, on a missing file throws; `test_file`
+newly passes; zero regressions.
+
+Still open, same family (guards against a NULL void* return that this fix's
+mechanism now makes work, but the call sites weren't updated): `File.read_line`
+EOF guard (`io.sf`), `string.sf` `_strstr(...) != 0` (inverted, though codegen
+intercepts `contains` as a builtin so it's shadowed). Option 2 / `Ptr<T>`
+(`docs/design/ffi-pointer-discipline.md`) remains the systematic long-term
+answer and Fix A does not block it.
 
 ### 83. FIXED — `__float_to_string` bitcast an int-tagged value, so `.to_string()` on a whole-number Float printed `nan`
 

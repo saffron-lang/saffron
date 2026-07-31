@@ -214,7 +214,13 @@
             saffron_ret_str = this.type_to_string(this.func_ret_types.get(name))
         }
         if (llvm_ret == "i8*") {
-            var as_int: String = this.emit_tag_ptr(raw)
+            // NULL-tagging matters here: a void* extern that returns NULL on
+            // failure (fopen, fgets, strstr) is guarded with `== 0` in Saffron,
+            // and plain emit_tag_ptr turns NULL into TAG_PTR|0, which that guard
+            // never matches (BUGS #84). A non-NULL result keeps TAG_PTR, so the
+            // String-returning void* wrappers (char_at, slice, File.read) are
+            // unaffected and last_type stays String for interpolation.
+            var as_int: String = this.emit_tag_ptr_nullable(raw)
             this.last_type = AST.Type.StringType
             return as_int
         }
