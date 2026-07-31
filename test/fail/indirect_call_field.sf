@@ -1,0 +1,25 @@
+// A field access directly on the result of an indirect call must be REJECTED,
+// not silently answered with 0.
+//
+// `Fun` carries no return type, so the static type of an indirect call's result
+// is genuinely unrecoverable in codegen. The MemberAccess fallback used to
+// `return "0"` for that case — emitting no GEP and no load at all, and handing
+// back the integer zero as though it were the field's value. `f(1).v` printed 0
+// while the very same object read through an annotated variable printed 7, so the
+// object was always constructed correctly; only the offset resolution failed, and
+// it failed silently.
+//
+// Reporting is the fix available without a language change (giving `Fun` a return
+// type). This is M2 from docs/design/compiler-rewrite.md: codegen must not spell
+// "unknown" as something concrete. See test/pass/indirect_call_field.sf for the
+// annotated form that must keep working.
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun mk(): Fun { return fun (x: Int): Box { return Box(7) } }
+
+var f: Fun = mk()
+IO.println(f(1).v.to_string())   // field on an indirect call result — error
