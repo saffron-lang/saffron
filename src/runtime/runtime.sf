@@ -656,11 +656,95 @@ fun __any_iter_get(v: Int, index: Int): Int {
     if (as_list != 0) {
         return __list_get(as_list, index)
     }
-    // Not a GC collection. A String is the remaining iterable — __str_get does
-    // its own bounds check and returns a one-character String. Anything else
-    // falls through to it and reports an index error, which is the same outcome
-    // the list path gave before.
+    // Not a List or a Map. A String is the remaining iterable, and __str_get
+    // does its own bounds check, but do not fall through to it blindly: a class
+    // instance is also a GC pointer, and reading one as a C string prints raw
+    // struct bytes and then trips a bogus IndexError. Reject it instead.
+    //
+    // This is reachable from user code: `for (x in Bag())` over a class that
+    // defines its own `length()` gets past codegen, since there is no iterator
+    // protocol and `length()` is all the desugaring requires (BUGS #62). A class
+    // without `length()` is still the cleaner compile error.
+    // The pointer-plausibility guard is the same one __rt_as_list_ptr uses, and
+    // it is load-bearing rather than defensive: __rt_untag_ptr only masks off the
+    // low 48 bits, so a float's mantissa would come back as a wild address and
+    // the `raw - 8` magic read would fault. Only a TAG_PTR value or a bare heap
+    // pointer may be dereferenced here.
+    var upper: Int = v >> 48
+    var raw: Int = 0
+    if (upper == 32760) {
+        raw = __rt_untag_ptr(v)
+    } else if (upper == 0 and v > 65536) {
+        raw = v
+    }
+    if (raw != 0) {
+        var magic: Int = load64(raw - 8)
+        if (magic == 6557403441622859503 and __rt_gc_type_tag(raw) != 1) {
+            // A verified GC object that is neither string (1), list (2) nor map
+            // (3) — class instances get per-class tags starting at 10.
+            __not_iterable_error()
+            return __rt_nil()
+        }
+    }
     return __str_get(v, index)
+}
+
+// `for (x in obj)` where obj is neither a List, a String nor a Map. Fatal, like
+// every other runtime error (they route to __runtime_error_fatal and are not
+// catchable).
+fun __not_iterable_error() {
+    // "TypeError: for-in requires a List, String or Map"
+    var msg: Int = rt_malloc(49)
+    store8(msg, 84)       // T
+    store8(msg + 1, 121)  // y
+    store8(msg + 2, 112)  // p
+    store8(msg + 3, 101)  // e
+    store8(msg + 4, 69)   // E
+    store8(msg + 5, 114)  // r
+    store8(msg + 6, 114)  // r
+    store8(msg + 7, 111)  // o
+    store8(msg + 8, 114)  // r
+    store8(msg + 9, 58)   // :
+    store8(msg + 10, 32)  // (space)
+    store8(msg + 11, 102) // f
+    store8(msg + 12, 111) // o
+    store8(msg + 13, 114) // r
+    store8(msg + 14, 45)  // -
+    store8(msg + 15, 105) // i
+    store8(msg + 16, 110) // n
+    store8(msg + 17, 32)  // (space)
+    store8(msg + 18, 114) // r
+    store8(msg + 19, 101) // e
+    store8(msg + 20, 113) // q
+    store8(msg + 21, 117) // u
+    store8(msg + 22, 105) // i
+    store8(msg + 23, 114) // r
+    store8(msg + 24, 101) // e
+    store8(msg + 25, 115) // s
+    store8(msg + 26, 32)  // (space)
+    store8(msg + 27, 97)  // a
+    store8(msg + 28, 32)  // (space)
+    store8(msg + 29, 76)  // L
+    store8(msg + 30, 105) // i
+    store8(msg + 31, 115) // s
+    store8(msg + 32, 116) // t
+    store8(msg + 33, 44)  // ,
+    store8(msg + 34, 32)  // (space)
+    store8(msg + 35, 83)  // S
+    store8(msg + 36, 116) // t
+    store8(msg + 37, 114) // r
+    store8(msg + 38, 105) // i
+    store8(msg + 39, 110) // n
+    store8(msg + 40, 103) // g
+    store8(msg + 41, 32)  // (space)
+    store8(msg + 42, 111) // o
+    store8(msg + 43, 114) // r
+    store8(msg + 44, 32)  // (space)
+    store8(msg + 45, 77)  // M
+    store8(msg + 46, 97)  // a
+    store8(msg + 47, 112) // p
+    store8(msg + 48, 0)
+    __runtime_error_fatal(msg)
 }
 
 // Format a map as {key: value, ...}. Keys are always strings; values go
