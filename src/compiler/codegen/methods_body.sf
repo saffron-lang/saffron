@@ -451,13 +451,31 @@
     // its fallback for a non-variable receiver (a constructor call, `this.f`, a
     // method result), and it likewise accepts get_expr_type's answer only when
     // it names a declared class.
-    var gi_class: String = ""
+    //
+    // The lookup goes through generic_base_name: class_fields, class_methods and
+    // the ClassName__method symbols are all keyed by the *bare* name, while a
+    // variable's declared type carries its arguments. Testing
+    // `class_fields.has("Box<String>")` is always false, so before this every
+    // generic receiver skipped this arm and fell straight into the list path
+    // that segfaults (BUGS #95).
+    // `gi_recv_type` keeps the full spelling ("Box<String>") because that is what
+    // resolves the method's type parameters; `gi_class` is the bare name used for
+    // every table and symbol lookup.
+    var gi_recv_type: String = ""
     if (obj_name.length() > 0) {
-        gi_class = this.get_var_type_str(obj_name)
+        gi_recv_type = this.get_var_type_str(obj_name)
     }
+    var gi_class: String = this.generic_base_name(gi_recv_type)
     if (!this.class_fields.has(gi_class)) {
-        var gi_inferred: String = this.get_expr_type(object)
-        if (this.class_fields.has(gi_inferred)) { gi_class = gi_inferred } else { gi_class = "" }
+        var gi_inferred_full: String = this.get_expr_type(object)
+        var gi_inferred: String = this.generic_base_name(gi_inferred_full)
+        if (this.class_fields.has(gi_inferred)) {
+            gi_class = gi_inferred
+            gi_recv_type = gi_inferred_full
+        } else {
+            gi_class = ""
+            gi_recv_type = ""
+        }
     }
     if (gi_class.length() > 0 and this.class_methods.has(gi_class)) {
         var gi_methods: List = this.class_methods.get(gi_class)
@@ -473,11 +491,24 @@
             this.called_functions.push(gi_target)
             var gi_local: String = this.fresh_local()
             this.emit_indent(gi_local + " = call i64 @" + gi_target + "(i64 " + gi_recv + ", i64 " + gi_key + ")")
-            // The declared return type, when known. Falling back to Any rather
-            // than to the receiver's class: getItem returns an *element*, and
-            // claiming the container type would misroute the next dispatch.
+            // The declared return type, when known, with the receiver's class
+            // type arguments substituted in: `class Box<T>` declaring
+            // `fun getItem(k: Int): T` returns a String for a `Box<String>`.
+            // Without that step last_type would be the bare "T", which names no
+            // representation and makes every downstream dispatch miss.
+            //
+            // Falling back to Any rather than to the receiver's class: getItem
+            // returns an *element*, and claiming the container type would
+            // misroute the next dispatch.
             if (this.func_ret_types.has(gi_target)) {
-                this.last_type = this.func_ret_types.get(gi_target)
+                var gi_ret: AST.Type = this.func_ret_types.get(gi_target)
+                var gi_ret_str: String = this.type_to_string(gi_ret)
+                var gi_subst: String = this.substitute_class_type_params(gi_ret_str, gi_recv_type)
+                if (gi_subst != gi_ret_str) {
+                    this.last_type = this.str_to_type(gi_subst)
+                } else {
+                    this.last_type = gi_ret
+                }
             } else {
                 this.last_type = AST.Type.AnyType
             }
@@ -3209,39 +3240,14 @@
             var wake_discard: String = this.fresh_local()
             this.emit_indent(wake_discard + " = call i64 @" + wake_name + "(i64 " + obj + ")")
             this.called_functions.push(wake_name)
-            var ns_ret_str: String = this.type_to_string(this.last_type)
-            if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
-                if (obj_name.length() > 0) {
-                    var recv_type: String = this.get_var_type_str(obj_name)
-                    if (recv_type.contains("<") and recv_type.contains(">")) {
-                        var rg_start: Float = recv_type.index_of("<")
-                        var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
-                        if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
-                            this.last_type = this.str_to_type(rg_inner)
-                        }
-                    }
-                }
-            }
+            this.resolve_generic_method_ret(obj_name)
             return ns_result
         }
         var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
-        // Resolve generic type parameter in return type (e.g. T -> String)
-        var ns_ret_str: String = this.type_to_string(this.last_type)
-        if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
-            // Looks like a type parameter — resolve from receiver's generic type args
-            if (obj_name.length() > 0) {
-                var recv_type: String = this.get_var_type_str(obj_name)
-                if (recv_type.contains("<") and recv_type.contains(">")) {
-                    var rg_start: Float = recv_type.index_of("<")
-                    var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
-                    if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
-                        this.last_type = this.str_to_type(rg_inner)
-                    }
-                }
-            }
-        }
+        this.resolve_generic_method_ret(obj_name)
         return ns_result
     }
+
 
     // Universal methods (last resort, after class methods checked)
     if (method == "floor") {
@@ -3348,6 +3354,17 @@
     fun gen_get_field(object: AST.Expr, field: String): String {
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
+    // The receiver's full spelling ("Box<String>") is what binds the class's type
+    // parameters, so it is kept for the substitution at the bottom of this
+    // function; `class_name` itself has to be the bare name, since class_fields,
+    // class_struct_names and get_field_index are all keyed that way. Without the
+    // strip, a `Box<String>` receiver missed class_fields, fell back to
+    // current_class, and read a field index off the wrong class (BUGS #95).
+    var gf_recv_type: String = class_name
+    if (class_name.contains("<") and !this.class_fields.has(class_name)) {
+        var gf_bare: String = this.generic_base_name(class_name)
+        if (this.class_fields.has(gf_bare)) { class_name = gf_bare }
+    }
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         // Try resolve_class_type to handle module-qualified types (e.g. "Func.BasicBlock")
         var resolved: String = this.resolve_class_type(class_name)
@@ -3375,8 +3392,11 @@
         var gf_result: LLVMTypes.Value = this.llvm_block_builder.call("__field_load", LLVMTypes.Type.I64, gf_arg_vals)
         this.llvm_values.set(result, gf_result)
     }
-    // Infer field type from class declaration
-    this.last_type = this.str_to_type(this.get_field_type(class_name, field))
+    // Infer field type from class declaration, substituting the receiver's type
+    // arguments: `var v: T` on a `Box<String>` loads a String, and dispatch on
+    // the result needs to know that (BUGS #95).
+    var gf_ftype: String = this.get_field_type(class_name, field)
+    this.last_type = this.str_to_type(this.substitute_class_type_params(gf_ftype, gf_recv_type))
     return result
     }
 
@@ -3514,3 +3534,26 @@
     }
     return 0
 }
+
+    /// Replace a class type parameter in `last_type` with what the receiver's
+    /// declared type says it is: on a `Box<String>`, a method registered as
+    /// returning "T" actually returns a String.
+    ///
+    /// This used to guess: it treated any return type of one or two uppercase
+    /// characters (excluding "IO"/"OS") as a type parameter, and substituted the
+    /// *entire* contents of the receiver's angle brackets. That was wrong twice
+    /// over — it missed a spelled-out parameter like `Element`, and on a
+    /// `Pair<Int,String>` it set last_type to the string "Int,String", which
+    /// names nothing. Now the declared parameter list decides which names are
+    /// parameters and positional matching decides what each one binds to
+    /// (BUGS #95).
+    fun resolve_generic_method_ret(obj_name: String) {
+        if (obj_name.length() == 0) { return }
+        var recv_type: String = this.get_var_type_str(obj_name)
+        if (!recv_type.contains("<")) { return }
+        var ret_str: String = this.type_to_string(this.last_type)
+        var subst: String = this.substitute_class_type_params(ret_str, recv_type)
+        if (subst != ret_str) {
+            this.last_type = this.str_to_type(subst)
+        }
+    }

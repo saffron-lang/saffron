@@ -462,7 +462,7 @@
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
             FunDecl(n, p, r, b, d) => {}
             EnumDecl(n, v, d) => {}
-            ClassDecl(n, p, f, m, d) => {}
+            ClassDecl(n, __tps, p, f, m, d) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {

@@ -1,0 +1,97 @@
+// BUGS #95 — a class's declared generic parameters must survive parsing.
+//
+// `class Box<T>` states what `T` is at every use site: a `Box<String>` binds it
+// to String. The parser used to consume and *discard* those names, so `T` did
+// not exist anywhere after parsing. Nothing could then type a method returning
+// it: `b.unwrap()` on a `Box<String>` inferred as Any and warned "cannot infer
+// type", and `b[0]` fell through subscript dispatch into the list path, which
+// calls __list_length on the instance pointer and reads a class struct as a list
+// header — SIGSEGV.
+//
+// Every assertion below calls a *String-only* method on the result. That is the
+// point of the test: a wrong or missing return type is not necessarily a crash,
+// it can also be a silently-dropped call, and only comparing the value catches
+// that (see test/pass/nullable_recv_dispatch.sf for the same reasoning).
+
+import "@test" as Test
+
+class Box<T> {
+    var v: T
+    fun init(v: T) { this.v = v }
+    fun unwrap(): T { return this.v }
+    fun getItem(key: Int): T { return this.v }
+}
+
+// Two parameters, and getItem returns the *second* one — a positional binding a
+// "take whatever is inside the angle brackets" shortcut gets wrong.
+class Pair<K, V> {
+    var a: K
+    var b: V
+    fun init(a: K, b: V) { this.a = a; this.b = b }
+    fun first(): K { return this.a }
+    fun second(): V { return this.b }
+    fun getItem(key: Int): V { return this.b }
+}
+
+// A spelled-out parameter name, not a single letter. The old heuristic only
+// recognised one- and two-character uppercase names.
+class Holder<Element> {
+    var e: Element
+    fun init(e: Element) { this.e = e }
+    fun get_it(): Element { return this.e }
+}
+
+// A parameter used inside another generic: `List<T>`, not a bare `T`.
+class Bag<T> {
+    var items: List<T>
+    fun init(items: List<T>) { this.items = items }
+    fun all(): List<T> { return this.items }
+}
+
+var b: Box<String> = Box("hello")
+
+// Method returning the parameter directly.
+Test.assert_eq(b.unwrap().to_upper(), "HELLO", "Box<String>.unwrap() is a String")
+Test.assert_eq(b.unwrap().length(), 5, "and String methods dispatch on it")
+
+// Field declared with the parameter as its type.
+Test.assert_eq(b.v.to_upper(), "HELLO", "Box<String>.v is a String")
+
+// Subscript overload returning the parameter.
+Test.assert_eq(b[0].to_upper(), "HELLO", "Box<String>[0] is a String")
+
+var bi: Box<Int> = Box(7)
+Test.assert_eq(bi.unwrap() + 1, 8, "Box<Int>.unwrap() is an Int")
+Test.assert_eq(bi[0] + 2, 9, "Box<Int>[0] is an Int")
+
+// Positional binding: K is Int, V is String.
+var p: Pair<Int, String> = Pair(3, "yo")
+Test.assert_eq(p.first() + 1, 4, "Pair<Int,String>.first() binds K to Int")
+Test.assert_eq(p.second().to_upper(), "YO", "and .second() binds V to String")
+Test.assert_eq(p.getItem(0).to_upper(), "YO", "getItem returns V, the second arg")
+Test.assert_eq(p[0].to_upper(), "YO", "subscript agrees with the explicit call")
+
+// Reversed, to prove the positions are read and not merely the first argument.
+var q: Pair<String, Int> = Pair("hi", 4)
+Test.assert_eq(q.first().to_upper(), "HI", "Pair<String,Int>.first() binds K to String")
+Test.assert_eq(q.second() + 1, 5, "and .second() binds V to Int")
+
+// A multi-character parameter name.
+var h: Holder<String> = Holder("held")
+Test.assert_eq(h.get_it().to_upper(), "HELD", "a spelled-out parameter resolves too")
+
+// A parameter nested inside another generic.
+var g: Bag<String> = Bag(["a", "b"])
+Test.assert_eq(g.all().length(), 2, "Bag<String>.all() is a List")
+Test.assert_eq(g.all()[0].to_upper(), "A", "and its elements are Strings")
+
+// A non-generic class is unaffected.
+class Plain {
+    var s: String
+    fun init(s: String) { this.s = s }
+    fun get_s(): String { return this.s }
+}
+var pl: Plain = Plain("plain")
+Test.assert_eq(pl.get_s().to_upper(), "PLAIN", "a non-generic class still works")
+
+Test.summary()
