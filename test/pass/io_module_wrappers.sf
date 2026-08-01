@@ -1,0 +1,37 @@
+// An int-returning runtime call reached through the `@io` module wrapper must
+// come back int-tagged.
+//
+// runtime.sf is compiled with --identity-mode, so `__io_file_size` hands back a
+// raw i64 into NaN-boxed value space (BUGS #23). Before io.sf re-tagged at the
+// boundary, `Files.file_size` on an 11-byte file printed `5.43e-323` and
+// `Files.file_exists` was false for a file that existed — a silent wrong answer,
+// since a raw `1` does not compare equal to a NaN-boxed `1`.
+import "@test" as Test
+import "@io" as Files
+
+var probe: String = "/tmp/saffron_io_module_wrappers.probe"
+Files.write_file(probe, "hello world")
+
+Test.assert_eq(Files.file_size(probe), 11, "file_size is the byte count, not a subnormal")
+Test.assert(Files.file_exists(probe), "file_exists is true for a file that exists")
+Test.assert(!Files.file_exists("/nonexistent/saffron/path"), "file_exists is false for a missing path")
+Test.assert(Files.is_dir("/tmp"), "is_dir is true for a directory")
+Test.assert(!Files.is_dir(probe), "is_dir is false for a regular file")
+
+// A size past the subnormal range, so a passing assertion is not an accident of
+// small numbers happening to round back.
+var big: String = "/tmp/saffron_io_module_wrappers.big"
+var chunk: String = "0123456789"
+Files.write_file(big, chunk.repeat(1000))
+Test.assert_eq(Files.file_size(big), 10000, "a five-digit size survives the boundary")
+
+var moved: String = "/tmp/saffron_io_module_wrappers.moved"
+Test.assert(Files.rename(probe, moved), "rename reports success")
+Test.assert(!Files.file_exists(probe), "the old name is gone after a rename")
+Test.assert(Files.file_exists(moved), "the new name exists after a rename")
+
+Test.assert(Files.delete_file(moved), "delete_file reports success")
+Test.assert(!Files.file_exists(moved), "the file is gone after delete_file")
+Test.assert(Files.delete_file(big), "cleanup")
+
+Test.summary()

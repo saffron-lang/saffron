@@ -445,9 +445,14 @@ fun check_duplicate_aliases(source: String, file_path: String) {
     }
 }
 
+// `os`/`@os` used to be listed here, which meant src/lib/os.sf was never loaded
+// as a module: every `OS.foo()` call worked only because codegen hard-wired the
+// alias `OS` to the `__os_` symbol prefix. That made `OS` a reserved name rather
+// than an ordinary alias — `import "@os" as Platform` failed outright with
+// "undefined variable 'Platform'" — and it meant a function added to os.sf in
+// Saffron could never be called, since the prefix outranked the module. os.sf is
+// now an ordinary stdlib module like io.sf, which was never listed here.
 fun is_builtin_module(imp_path: String): Bool {
-    if (imp_path == "@os") { return true }
-    if (imp_path == "os") { return true }
     return false
 }
 

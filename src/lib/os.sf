@@ -1,57 +1,67 @@
 //! OS module — operating system interaction.
 //! Usage: import "@os" as OS
+//!
+//! The runtime functions below are called by bare name rather than through
+//! `@extern` declarations, which is deliberate and load-bearing. An
+//! `@extern("i64 __os_cwd()")` return value is NaN-box *int*-tagged on the way
+//! back, but every string-returning `__os_*` in `src/runtime/runtime.sf` has
+//! already pointer-tagged its result (`__rt_tag_ptr`). Declaring them as externs
+//! therefore re-tagged an already-tagged pointer, and `OS.path_sep()` came back
+//! as a bare integer that printed as an address and compared unequal to "/".
+//! A bare call takes the value through unchanged, which is what `src/lib/io.sf`
+//! has always done with its `__io_*` counterparts.
+//!
+//! Bare calls only link because these names are in codegen's known-function
+//! table (`codegen.sf`, `output_body.sf`) — otherwise they get module-prefix
+//! mangled to `@os___os_cwd` (BUGS #85). Adding a new one here means adding it
+//! there and to `runtime_declares()` in `utils_body.sf`.
 
-@extern("i64 __os_args()") fun _args(): Int
-@extern("i64 __os_exec(void*)") fun _exec(cmd: Int): Int
-@extern("i64 __os_cwd()") fun _cwd(): Int
-@extern("i64 __os_path_sep()") fun _path_sep(): Int
-@extern("i64 __os_platform()") fun _platform(): Int
-@extern("i64 __os_env(void*)") fun _env(name: Int): Int
-@extern("i64 __io_file_exists(void*)") fun _file_exists(path: Int): Int
-@extern("void __io_mkdir(i64)") fun _mkdir(path: Int)
-@extern("i64 __io_walk_dir(void*)") fun _walk_dir(path: Int): Int
 @extern("void exit(i32)") fun _exit(code: Int)
-@extern("i64 __os_system(void*)") fun _system(cmd: String): Int
+
+// Re-tag a raw i64 coming back from the runtime. See the identical helper in
+// src/lib/io.sf for why this is needed (BUGS #23: runtime.sf is compiled with
+// --identity-mode, so an int-returning `__os_*` hands back an untagged i64 that
+// reads as a subnormal double and compares unequal to any literal). Duplicated
+// rather than imported because io.sf and os.sf are both loadable as modules and
+// a cross-import would collide their module globals.
+fun _retag(n: Int): Int {
+    return n + 0
+}
 
 /// Return the command-line arguments as a list of strings.
 fun args(): List<String> {
-    return _args()
+    return __os_args()
 }
 
 /// Execute a shell command and return its stdout as a string.
 fun exec(cmd: String): String {
-    return _exec(cmd)
+    return __os_exec(cmd)
 }
 
 /// Run a command with stdout/stderr passed through to the terminal.
 /// Returns the exit code (0 on success), decoded from the raw `wait()` status.
-///
-/// CAVEAT: the returned value is not NaN-boxed, so `OS.system(c) == 0` is
-/// always false even when the command succeeded (it prints as 0 but compares
-/// unequal). Until that codegen gap is closed, declare your own
-/// `@extern("i32 system(i8*)")` when you need to branch on the result.
 fun system(cmd: String): Int {
-    return _system(cmd)
+    return _retag(__os_system(cmd))
 }
 
 /// Return the current working directory.
 fun cwd(): String {
-    return _cwd()
+    return __os_cwd()
 }
 
 /// Return the platform path separator ("/" on Unix, "\\" on Windows).
 fun path_sep(): String {
-    return _path_sep()
+    return __os_path_sep()
 }
 
 /// Return the platform name (e.g. "darwin", "linux").
 fun platform(): String {
-    return _platform()
+    return __os_platform()
 }
 
-/// Read an environment variable by name.
+/// Read an environment variable by name. Returns "" if unset.
 fun env(name: String): String {
-    return _env(name)
+    return __os_env(name)
 }
 
 /// Exit the process with the given code.
@@ -61,15 +71,55 @@ fun exit(code: Int) {
 
 /// Return true if a file exists at the given path.
 fun file_exists(path: String): Bool {
-    return _file_exists(path) == 1
+    return _retag(__io_file_exists(path)) == 1
 }
 
 /// Create a directory (and parents) at the given path.
 fun mkdir(path: String) {
-    _mkdir(path)
+    __io_mkdir(path)
 }
 
 /// List the contents of a directory recursively.
 fun list_dir(path: String): List<String> {
-    return _walk_dir(path)
+    return __io_walk_dir(path)
 }
+
+/// Set an environment variable for this process and its children.
+///
+/// Overwrites an existing value. Returns true on success.
+///
+/// ```saffron
+/// import "@os" as OS
+/// OS.set_env("SAFFRON_MODE", "debug")
+/// OS.env("SAFFRON_MODE")   // "debug"
+/// ```
+fun set_env(name: String, value: String): Bool {
+    return _retag(__os_set_env(name, value)) == 1
+}
+
+/// Return the current user's home directory, or "" if `$HOME` is unset.
+fun home(): String {
+    return __os_home()
+}
+
+/// Join path segments with the platform separator.
+///
+/// Does not normalize: segments are joined as given, so a segment with its own
+/// separator passes through unchanged. Use `@path` for normalization.
+///
+/// ```saffron
+/// import "@os" as OS
+/// OS.join_path(["usr", "local", "bin"])   // "usr/local/bin"
+/// ```
+fun join_path(parts: List<String>): String {
+    var sep: String = path_sep()
+    var out: String = ""
+    var i: Int = 0
+    while (i < parts.length()) {
+        if (i > 0) { out = out + sep }
+        out = out + parts[i]
+        i = i + 1
+    }
+    return out
+}
+

@@ -7327,8 +7327,8 @@ class Codegen {
         var rt: StringBuilder = StringBuilder()
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
-        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__io_file_size", "__io_read_binary", "__io_read_stdin", "__io_readline", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env", "__str_get", "__io_println", "__io_print"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__io_file_size(i64)", "i64 @__io_read_binary(i64, i64, i64)", "i64 @__io_read_stdin(i64)", "i64 @__io_readline()", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)", "i64 @__str_get(i64, i64)", "i64 @__io_println(i64)", "i64 @__io_print(i64)"]
+        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__io_file_size", "__io_read_binary", "__io_is_dir", "__io_rename", "__io_delete_file", "__os_set_env", "__os_home", "__io_read_stdin", "__io_readline", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env", "__os_system", "__str_get", "__io_println", "__io_print"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__io_file_size(i64)", "i64 @__io_read_binary(i64, i64, i64)", "i64 @__io_is_dir(i64)", "i64 @__io_rename(i64, i64)", "i64 @__io_delete_file(i64)", "i64 @__os_set_env(i64, i64)", "i64 @__os_home()", "i64 @__io_read_stdin(i64)", "i64 @__io_readline()", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)", "i64 @__os_system(i64)", "i64 @__str_get(i64, i64)", "i64 @__io_println(i64)", "i64 @__io_print(i64)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.str_in_list(this.defined_funcs,names[di])) {
@@ -9263,12 +9263,18 @@ class Codegen {
         // known-function set, so the bare-call path mangled them (BUGS #85).
         this.known_functions.push("__io_file_size")
         this.known_functions.push("__io_read_binary")
+        this.known_functions.push("__io_is_dir")
+        this.known_functions.push("__io_rename")
+        this.known_functions.push("__io_delete_file")
+        this.known_functions.push("__os_set_env")
+        this.known_functions.push("__os_home")
         this.known_functions.push("__os_exec")
         this.known_functions.push("__os_args")
         this.known_functions.push("__os_cwd")
         this.known_functions.push("__os_path_sep")
         this.known_functions.push("__os_platform")
         this.known_functions.push("__os_env")
+        this.known_functions.push("__os_system")
         this.known_functions.push("__runtime_error")
         this.known_functions.push("__runtime_error_fatal")
         this.known_functions.push("__null_pointer_error")
@@ -11336,17 +11342,39 @@ class Codegen {
             }
             // Tag results from builtin runtime functions that return raw values.
             // String-returning functions: tag raw pointer as string
-            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform") {
+            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform" or __mp_func == "__os_home") {
                 var __tag_ptr: String = this.fresh_local()
                 this.emit_indent(__tag_ptr + " = inttoptr i64 " + __mp_local + " to i8*")
                 var __tagged: String = this.emit_tag_ptr(__tag_ptr)
                 this.last_type = AST.Type.StringType
                 return __tagged
             }
-            // Bool-returning functions: tag raw 0/1 as bool
-            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists") {
+            // Bool-returning functions: tag raw 0/1 as bool. This path bypasses
+            // the stdlib wrapper in io.sf/os.sf entirely — `IO.is_dir(p)` lowers
+            // straight to `@__io_is_dir` — so a predicate missing from this list
+            // surfaces its raw runtime int and prints `1`/`0` instead of
+            // `true`/`false`, and `== true` on it is false.
+            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists" or __mp_func == "__io_is_dir" or __mp_func == "__io_rename" or __mp_func == "__io_delete_file" or __mp_func == "__os_set_env") {
                 var __tagged: String = this.emit_tag_bool(__mp_local)
                 this.last_type = AST.Type.BoolType
+                return __tagged
+            }
+            // NOTE: no arm for list-returning functions (`__io_walk_dir`,
+            // `__os_args`). Tagging the returned list pointer here segfaults —
+            // `__gc_is_heap_ptr` (gc.ll:615) rejects any NaN-tagged value as a
+            // heap pointer, so a tagged `__list_new()` result stops being traced
+            // and is swept while live. That is the caveat recorded in BUGS #23.
+            // Lists deliberately travel untagged; `__str_split` is the precedent
+            // and is also untagged at its call site. `IO.list_dir(d)[0]` reading
+            // back as a subnormal double is a separate defect (BUGS #89) that
+            // needs the element, not the container, addressed.
+            //
+            // Int-returning functions: tag the raw count. `IO.file_size(p)`
+            // printed `5.43e-323` for an 11-byte file without this, and
+            // `== 11` on it was false — the silent half of the same bug.
+            if (__mp_func == "__io_file_size" or __mp_func == "__io_read_binary" or __mp_func == "__os_system") {
+                var __tagged: String = this.emit_tag_int(__mp_local)
+                this.last_type = AST.Type.IntType
                 return __tagged
             }
             return __mp_local
@@ -13300,7 +13328,9 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "__io_")
-    gen.module_prefixes.set("OS", "__os_")
+    // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
+    // its alias comes from alias_map like every other import; wiring OS here made
+    // it a reserved name and shadowed the module's own Saffron functions.
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
@@ -13341,6 +13371,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
     gen.known_functions.push("__io_file_size")
     gen.known_functions.push("__io_read_binary")
+    gen.known_functions.push("__io_is_dir")
+    gen.known_functions.push("__io_rename")
+    gen.known_functions.push("__io_delete_file")
+    gen.known_functions.push("__os_set_env")
+    gen.known_functions.push("__os_home")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
@@ -13349,6 +13384,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
+    gen.known_functions.push("__os_system")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
@@ -13791,7 +13827,9 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "__io_")
-    gen.module_prefixes.set("OS", "__os_")
+    // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
+    // its alias comes from alias_map like every other import; wiring OS here made
+    // it a reserved name and shadowed the module's own Saffron functions.
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
@@ -13839,6 +13877,11 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
     gen.known_functions.push("__io_file_size")
     gen.known_functions.push("__io_read_binary")
+    gen.known_functions.push("__io_is_dir")
+    gen.known_functions.push("__io_rename")
+    gen.known_functions.push("__io_delete_file")
+    gen.known_functions.push("__os_set_env")
+    gen.known_functions.push("__os_home")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
@@ -13847,6 +13890,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
+    gen.known_functions.push("__os_system")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
@@ -14409,7 +14453,9 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "__io_")
-    gen.module_prefixes.set("OS", "__os_")
+    // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
+    // its alias comes from alias_map like every other import; wiring OS here made
+    // it a reserved name and shadowed the module's own Saffron functions.
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
@@ -14457,6 +14503,11 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
     gen.known_functions.push("__io_file_size")
     gen.known_functions.push("__io_read_binary")
+    gen.known_functions.push("__io_is_dir")
+    gen.known_functions.push("__io_rename")
+    gen.known_functions.push("__io_delete_file")
+    gen.known_functions.push("__os_set_env")
+    gen.known_functions.push("__os_home")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
@@ -14465,6 +14516,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
+    gen.known_functions.push("__os_system")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals

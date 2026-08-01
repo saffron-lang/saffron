@@ -403,9 +403,12 @@ fun read_file(path: String): String {
 /// opened.
 ///
 /// Implemented on the `_b_*` stdio externs rather than on the runtime's
-/// `__io_file_size` / `__io_read_binary`: those two are absent from codegen's
-/// known-function table, so calling them from inside this module gets them
-/// module-prefix-mangled to `@io___io_file_size` and they fail to link.
+/// `__io_file_size` / `__io_read_binary`. That was originally forced — both were
+/// absent from codegen's known-function table, so calling them from inside this
+/// module got them module-prefix-mangled to `@io___io_file_size` and they failed
+/// to link (BUGS #85, since fixed; `file_size` below calls the runtime directly).
+/// It stays on the `_b_*` path because that path also carries the byte count out
+/// of band, which is the point of this function.
 fun read_file_bytes(path: String): Bytes {
     var n: Int = 0
     var buf: Int = _io_malloc(1)
@@ -438,15 +441,33 @@ fun write_file_bytes(path: String, data: Bytes) {
     _b_fclose(fp)
 }
 
+// Re-tag a raw i64 coming back from the runtime.
+//
+// `src/runtime/runtime.sf` is compiled with --identity-mode, where the tag
+// helpers are no-ops, so an int-returning `__io_*` hands back an untagged i64
+// into NaN-boxed value space (BUGS #23). It reads back as a subnormal double:
+// `file_size` printed `5.43e-323` for an 11-byte file, and `file_exists` was
+// `false` for a file that existed, because a raw `1` does not compare equal to
+// a NaN-boxed `1`. Arithmetic forces the value back through the int path and
+// re-tags it — the same trick `Bytes.get` uses with `& 255`, and the reason it
+// is spelled as a call here rather than inlined at each site is so the next
+// wrapper added does not silently omit it.
+//
+// This is a boundary patch, not a fix: BUGS #23 is that the runtime should tag
+// on the way out. Remove this when it does.
+fun _retag(n: Int): Int {
+    return n + 0
+}
+
 /// Get the size of a file in bytes. Returns 0 if the file doesn't exist.
 fun file_size(path: String): Int {
-    return __io_file_size(path)
+    return _retag(__io_file_size(path))
 }
 
 /// Read a file as raw binary into a pre-allocated buffer.
 /// Returns the number of bytes read.
 fun read_binary(path: String, buf: Int, max_size: Int): Int {
-    return __io_read_binary(path, buf, max_size)
+    return _retag(__io_read_binary(path, buf, max_size))
 }
 
 /// Write content to a file, creating or overwriting it.
@@ -461,7 +482,7 @@ fun append_file(path: String, content: String) {
 
 /// Return true if a file exists at the given path.
 fun file_exists(path: String): Bool {
-    return __io_file_exists(path) == 1
+    return _retag(__io_file_exists(path)) == 1
 }
 
 /// Create a directory (and parents) at the given path.
@@ -478,3 +499,26 @@ fun walk_dir(path: String): List<String> {
 fun list_dir(path: String): List<String> {
     return __io_walk_dir(path)
 }
+
+/// Return true if the path exists and is a directory.
+///
+/// A path that does not exist, or that exists as a regular file, is false — the
+/// two are not distinguished. Use `file_exists` to tell them apart.
+fun is_dir(path: String): Bool {
+    return _retag(__io_is_dir(path)) == 1
+}
+
+/// Rename or move a file. Returns true on success.
+///
+/// Fails (returns false) across filesystems, since it is a `rename(2)`, not a
+/// copy-then-delete.
+fun rename(from: String, to: String): Bool {
+    return _retag(__io_rename(from, to)) == 1
+}
+
+/// Delete a file. Returns true on success, false if it did not exist or could
+/// not be removed.
+fun delete_file(path: String): Bool {
+    return _retag(__io_delete_file(path)) == 1
+}
+

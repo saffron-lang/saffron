@@ -202,3 +202,35 @@ fun map_range(value: Float, in_min: Float, in_max: Float, out_min: Float, out_ma
 fun is_close(a: Float, b: Float, tolerance: Float): Bool {
     return _fabs(a - b) <= tolerance
 }
+
+/// Return the sum of a list of numbers. An empty list sums to 0.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.sum([1, 2, 3, 4, 5])  // 15
+/// ```
+fun sum(values: List<Float>): Float {
+    var total: Float = 0
+    var i: Int = 0
+    while (i < values.length()) {
+        total = total + values[i]
+        i = i + 1
+    }
+    return total
+}
+
+/// Return the arithmetic mean of a list of numbers.
+///
+/// An empty list averages to 0 rather than raising: there is no NaN spelling in
+/// the surface language to return instead, and every caller of an empty-list
+/// average wants a neutral value.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.avg([2, 4, 6])  // 4
+/// ```
+fun avg(values: List<Float>): Float {
+    var n: Int = values.length()
+    if (n == 0) { return 0 }
+    return sum(values) / n
+}

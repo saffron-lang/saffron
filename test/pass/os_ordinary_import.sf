@@ -1,0 +1,46 @@
+// `os` must be an ordinary stdlib module, not a reserved name.
+//
+// `OS` used to be hard-wired in codegen's module_prefixes to the `__os_` symbol
+// prefix, and `os`/`@os` were listed in is_builtin_module, so src/lib/os.sf was
+// never loaded at all. Two consequences this test pins down: any alias other
+// than `OS` failed with "undefined variable", and a function written in Saffron
+// in os.sf could never be called because the prefix outranked the module.
+import "@test" as Test
+import "@os" as Platform
+import "os" as OS
+
+// A non-`OS` alias resolves — this used to be a codegen error.
+Test.assert(Platform.path_sep() == "/" or Platform.path_sep() == "\\", "aliased import resolves")
+
+// Both spellings of the import path reach the same module.
+Test.assert_eq(Platform.path_sep(), OS.path_sep(), "\"@os\" and \"os\" are the same module")
+
+// A string-returning OS function must come back pointer-tagged, not as a bare
+// address. os.sf calls the runtime by bare name for exactly this reason — see
+// the header comment there.
+Test.assert(OS.path_sep() == "/" or OS.path_sep() == "\\", "path_sep compares equal to a literal")
+Test.assert_eq(OS.path_sep().length(), 1, "path_sep is one character")
+
+// join_path is pure Saffron in os.sf with no runtime symbol behind it, so it
+// only links when the module is genuinely loaded.
+Test.assert_eq(OS.join_path(["usr", "local", "bin"]), "usr" + OS.path_sep() + "local" + OS.path_sep() + "bin", "join_path is reachable")
+Test.assert_eq(OS.join_path([]), "", "join_path of nothing")
+Test.assert_eq(OS.join_path(["only"]), "only", "join_path of one segment")
+
+// Runtime-backed functions still work through the module wrapper.
+Test.assert(OS.cwd().length() > 0, "cwd through the module")
+var probe: String = OS.join_path([OS.cwd(), "os_ordinary_import.probe"])
+IO.write_file(probe, "x")
+Test.assert(OS.file_exists(probe), "file_exists through the module")
+IO.delete_file(probe)
+Test.assert(!OS.file_exists("/nonexistent/saffron/path"), "file_exists is false for a missing path")
+
+// An int-returning runtime call reached through a module wrapper must come back
+// int-tagged, not as a raw i64 that reads as a subnormal double (BUGS #23).
+Test.assert(Platform.system("exit 0") == 0, "system's exit code compares equal to 0")
+Test.assert(Platform.system("exit 3") == 3, "a nonzero exit code survives")
+Test.assert(Platform.set_env("SAFFRON_OS_TEST", "on"), "set_env reports success")
+Test.assert_eq(Platform.env("SAFFRON_OS_TEST"), "on", "set_env round-trips through env")
+Test.assert(Platform.home().length() > 0, "home is non-empty")
+
+Test.summary()
