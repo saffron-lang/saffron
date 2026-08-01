@@ -9,22 +9,7 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
-### 92. `Time.now()` returns an untagged double
-
-```saffron
-import "time" as Time
-var t = Time.now()
-IO.println(t.to_string())        // 2.45057e-321 — the raw bits, not the time
-```
-
-The value is correct but arrives untagged, so anything that interprets it (a
-`.to_string()`, a comparison, arithmetic against a tagged Float) reads the bit
-pattern instead of the number. Found while instrumenting #38's scheduler; the
-scheduler itself is unaffected because it reaches `sf_time_now()` through an
-`@extern("double ...")` declaration, where the `double` C type drives the
-conversion rather than the module-dispatch path.
-
-### 91. A cross-module `@extern` is called without being declared
+### 91. FIXED — an `@extern` reached through a module alias was called by its Saffron name, which has no definition
 
 ```saffron
 import "@scheduler" as Scheduler
@@ -32,14 +17,23 @@ IO.println(Scheduler.get_yield_reason().to_string())
 // use of undefined value '@stdlib_scheduler_get_yield_reason'
 ```
 
-`get_yield_reason` is an `@extern` in `src/lib/scheduler.sf`. Reached through a
-module alias, codegen emits a call to the *Saffron-level* symbol
-(`@stdlib_scheduler_get_yield_reason`) rather than the C symbol the `@extern`
-names, and never emits a `declare` for it either — so the IR fails verification.
-Same family as the known `@stdlib_scheduler_enqueue` failure. This blocks probing
-scheduler state from a test program, which is why #38 had to be diagnosed by
-instrumenting `scheduler.sf` in place. Repro kept at `/tmp/a38probe.sf` /
-`/tmp/m38/` while this is open.
+`get_yield_reason` is `@extern("i64 __sched_get_yield_reason()")`. Reached through
+a module alias, codegen emitted a call to the *Saffron-level* symbol rather than
+the C symbol the `@extern` names, and emitted no `declare` for it either, so the
+IR failed verification.
+
+The mechanism is the same one behind #38: `gen_method_call`'s "Universal module
+dispatch" arm (`methods_body.sf:1259`) intercepts every alias with a non-empty
+prefix, and it consulted neither `extern_sigs` nor `intrinsic_funcs`. The arm
+that does both sits at `:1630` and so never saw a prefixed alias — it only ever
+ran for empty-prefix builtins. Fixed by hoisting the intrinsic and extern checks
+to the top of the universal arm, before `called_functions.push`, so the extern's
+C symbol is what gets declared.
+
+This is why #38 had to be diagnosed by instrumenting `scheduler.sf` in place:
+probing scheduler state from a test program was impossible. Regression test at
+`test/pass/module_extern_dispatch.sf`, which also covers a plain function and an
+extern with an argument through the same arm.
 
 ### 90. `run_tests.sh` only checks the exit code, so a test can pass while producing almost no output
 

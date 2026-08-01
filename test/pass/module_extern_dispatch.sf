@@ -1,0 +1,33 @@
+// An `@extern` or `@intrinsic` reached through a module alias must lower to its
+// C symbol, not to the Saffron-level name (BUGS #91).
+//
+// `gen_method_call`'s "Universal module dispatch" arm intercepts every alias
+// with a non-empty prefix, and it did not consult `extern_sigs` — the arm that
+// does is further down and so never saw one. `Scheduler.get_yield_reason()`
+// therefore emitted `call i64 @stdlib_scheduler_get_yield_reason`, a symbol with
+// no definition and no `declare`, and the IR failed verification with "use of
+// undefined value". Same shape as the coroutine defect in the same arm (#38).
+//
+// The failure was a hard compile error, so the assertions here matter less than
+// the fact that this file compiles at all — but check the values too, since a
+// wrong-but-linking call is the next failure mode.
+import "@test" as Test
+import "@scheduler" as Scheduler
+
+// get_yield_reason is `@extern("i64 __sched_get_yield_reason()")`. With no task
+// suspended the yield state is clear, so the reason is 0.
+var reason: Int = Scheduler.get_yield_reason()
+Test.assert_eq(reason, 0, "an @extern through a module alias returns its C result")
+
+// enqueue is a plain Saffron function in the same module — the non-extern path
+// through the same dispatch arm must still work.
+Scheduler._reset_for_test()
+Scheduler.enqueue(0)
+Test.assert(true, "a plain function through the same alias still dispatches")
+
+// has_stored_result is another @extern, this one taking an argument, so the
+// parameter path is covered too.
+var stored: Int = Scheduler.has_stored_result(0)
+Test.assert_eq(stored, 0, "an @extern with an argument through a module alias")
+
+Test.summary()
