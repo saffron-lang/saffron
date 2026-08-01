@@ -1112,6 +1112,56 @@ class Codegen {
         return result
     }
 
+    /// `typ` with a `Nil` member dropped from a union: "String|Nil" → "String".
+    /// A non-union, or a union with no Nil member, comes back unchanged.
+    ///
+    /// This exists for *method dispatch*, which needs the type a receiver has
+    /// once it is known non-nil. The checker already narrows `String|Nil` to
+    /// `String` inside a `!= nil` guard and rejects every unguarded call
+    /// ("cannot call .length() on nullable 'r'; add a nil check first"), but
+    /// that narrowing lives in the checker's own env and never reaches
+    /// `typed_vars` — so codegen still sees "String|Nil". The dispatch arms
+    /// match on exact names ("String", "List<...>", "Map<...>"), so the union
+    /// spelling matched nothing and fell through to the catch-all `else`, which
+    /// assumes List. `__list_length` does `inttoptr` on the value as given: a
+    /// List is stored untagged, a String is NaN-tagged, so it dereferenced
+    /// 0x7FF8... and segfaulted. Other arms (to_upper, trim, ...) missed their
+    /// String test the same way and silently emitted nothing at all.
+    ///
+    /// Because the checker guarantees non-nil at every call site, dropping Nil
+    /// here cannot mask a real nil access — it only tells dispatch what the
+    /// checker already proved (BUGS #93).
+    fun strip_nil_type_str(typ: String): String {
+        if (typ == "Nil") { return typ }
+        if (!typ.contains("|")) { return typ }
+        var parts: List<String> = typ.split("|")
+        var kept: List<String> = []
+        var i: Float = 0
+        while (i < parts.length()) {
+            if (parts[i] != "Nil") { kept.push(parts[i]) }
+            i = i + 1
+        }
+        // Only a single surviving member is a usable dispatch target. A genuine
+        // multi-member union ("Int|String") stays as it was: it has no single
+        // right arm, and picking one would be the same guess that caused #93.
+        if (kept.length() == 1) { return kept[0] }
+        return typ
+    }
+
+    /// The receiver type for builtin method dispatch: the variable's annotation
+    /// when it has one, else the type codegen just inferred, with a nullable
+    /// wrapper stripped. Ten dispatch arms in `methods_body.sf` open with this
+    /// exact three-step preamble; centralising it means a fix lands in all of
+    /// them at once rather than in whichever one is being read (BUGS #93).
+    fun dispatch_recv_type(obj_name: String, fallback: AST.Type): String {
+        var t: String = this.type_to_string(fallback)
+        if (obj_name.length() > 0) {
+            var annotated: String = this.get_var_type_str(obj_name)
+            if (annotated.length() > 0) { t = annotated }
+        }
+        return this.strip_nil_type_str(t)
+    }
+
     // Resolve a type string to the class name registered in class_fields.
     // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
     // when class_fields only has "Thing".
@@ -12470,11 +12520,7 @@ class Codegen {
 
     // --- List method dispatch (type-aware, replaces builtin_methods for List) ---
     if (!is_user_class) {
-        var __list_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var __lot: String = this.get_var_type_str(obj_name)
-            if (__lot.length() > 0) { __list_obj_type = __lot }
-        }
+        var __list_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         var __list_is_any: Bool = __list_obj_type == "Any"
         var __list_any_skip: Bool = false
         if (__list_is_any) {
@@ -12583,11 +12629,7 @@ class Codegen {
 
     // --- Map method dispatch (type-aware, replaces builtin_methods for Map) ---
     if (!is_user_class) {
-        var __map_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var __mot: String = this.get_var_type_str(obj_name)
-            if (__mot.length() > 0) { __map_obj_type = __mot }
-        }
+        var __map_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         var __map_type_match: Bool = __map_obj_type.starts_with("Map") or __map_obj_type == "Any"
         if (__map_type_match and method == "keys") {
             var __mk_local: String = this.fresh_local()
@@ -12618,11 +12660,7 @@ class Codegen {
 
     // --- String method dispatch (type-aware, replaces builtin_methods for String) ---
     if (!is_user_class) {
-        var __str_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var __sot: String = this.get_var_type_str(obj_name)
-            if (__sot.length() > 0) { __str_obj_type = __sot }
-        }
+        var __str_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         var __str_is_any: Bool = __str_obj_type == "Any"
         var __str_any_skip: Bool = false
         if (__str_is_any) {
@@ -12753,11 +12791,7 @@ class Codegen {
     // are registered for documentation/future dispatch but shouldn't override
     // the inline builtin_methods emission.
     if (!is_user_class and this.builtin_methods.has(method)) {
-        var bd_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var bd_ot: String = this.get_var_type_str(obj_name)
-            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
-        }
+        var bd_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         if (bd_obj_type == "Any") {
             var fcm_class: String = this.find_class_for_method(method)
             if (fcm_class.length() > 0 and fcm_class != "String" and fcm_class != "List" and fcm_class != "Map" and fcm_class != "Int" and fcm_class != "Float" and fcm_class != "Bool") {
@@ -12767,11 +12801,7 @@ class Codegen {
     }
     if (!is_user_class and this.builtin_methods.has(method)) {
         // Warn when dispatching on untyped value
-        var bd_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var bd_ot: String = this.get_var_type_str(obj_name)
-            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
-        }
+        var bd_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         if (bd_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching '" + method + "' on untyped value (type inference failed)")
         }
@@ -12801,11 +12831,7 @@ class Codegen {
     }
     if (!is_user_class and method == "set" and args.length() == 2) {
         // Determine if object is a List or Map to dispatch correctly
-        var set_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var sot: String = this.get_var_type_str(obj_name)
-            if (sot.length() > 0) { set_obj_type = sot }
-        }
+        var set_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         if (set_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'set' on untyped value (type inference failed)")
         }
@@ -12858,11 +12884,7 @@ class Codegen {
         return "0"
     }
     if (!is_user_class and method == "has" and args.length() > 0) {
-        var has_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var has_ot: String = this.get_var_type_str(obj_name)
-            if (has_ot.length() > 0) { has_obj_type = has_ot }
-        }
+        var has_obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         if (has_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
         }
@@ -12881,11 +12903,7 @@ class Codegen {
         return local
     }
     if (!is_user_class and method == "get" and args.length() > 0) {
-        var get_recv_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0) {
-            var get_ot: String = this.get_var_type_str(obj_name)
-            if (get_ot.length() > 0) { get_recv_type = get_ot }
-        }
+        var get_recv_type: String = this.dispatch_recv_type(obj_name, this.last_type)
         if (get_recv_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
         }
@@ -12996,6 +13014,12 @@ class Codegen {
             slice_saved_type = this.typed_vars.get(obj_name)
             slice_obj_type = this.type_to_string(slice_saved_type)
         }
+        // `slice_saved_type` is kept as the AST node so a List's element type
+        // survives to `last_type` below; only the *dispatch* spelling needs Nil
+        // dropped. A "String|Nil" receiver used to miss both the List and the
+        // String arm and take the Any path, which defaults to a list slice on a
+        // string pointer (BUGS #93).
+        slice_obj_type = this.strip_nil_type_str(slice_obj_type)
         if (slice_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'slice' on untyped value (type inference failed)")
         }
@@ -13035,15 +13059,24 @@ class Codegen {
     }
     // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
     // Prefer typed_vars annotation over last_type (source of truth for variable types).
-    var obj_type: String = this.type_to_string(this.last_type)
-    if (obj_name.length() > 0) {
-        var ot: String = this.get_var_type_str(obj_name)
-        if (ot.length() > 0) { obj_type = ot }
-    }
+    var obj_type: String = this.dispatch_recv_type(obj_name, this.last_type)
 
     if (!is_user_class and method == "length") {
-        if (obj_type == "Any") {
-            IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+        // A receiver that is neither Any, String, List nor Map is *unresolved*,
+        // not a list. The old `else` sent every such spelling to
+        // `__list_length`, which does `inttoptr` on the value as given — fine
+        // for a List (stored untagged), a segfault for a NaN-tagged String. That
+        // is how a "String|Nil" receiver crashed (BUGS #93). `__any_length`
+        // reads the GC type tag and picks list/map/strlen at runtime, so an
+        // unresolved receiver is exactly its job; route it there and keep the
+        // static call for the types we actually know.
+        var length_unresolved: Bool = obj_type != "Any" and obj_type != "String" and !obj_type.starts_with("List") and !obj_type.starts_with("Map")
+        if (obj_type == "Any" or length_unresolved) {
+            if (obj_type == "Any") {
+                IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+            } else {
+                IO.println("[codegen] Warning: dispatching 'length' on unresolved receiver type '" + obj_type + "' (runtime dispatch)")
+            }
             // Use runtime dispatch (__any_length) for unknown types
             this.called_functions.push("__any_length")
             var raw: String = this.fresh_local()

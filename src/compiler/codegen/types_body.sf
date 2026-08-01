@@ -581,6 +581,56 @@
         return result
     }
 
+    /// `typ` with a `Nil` member dropped from a union: "String|Nil" → "String".
+    /// A non-union, or a union with no Nil member, comes back unchanged.
+    ///
+    /// This exists for *method dispatch*, which needs the type a receiver has
+    /// once it is known non-nil. The checker already narrows `String|Nil` to
+    /// `String` inside a `!= nil` guard and rejects every unguarded call
+    /// ("cannot call .length() on nullable 'r'; add a nil check first"), but
+    /// that narrowing lives in the checker's own env and never reaches
+    /// `typed_vars` — so codegen still sees "String|Nil". The dispatch arms
+    /// match on exact names ("String", "List<...>", "Map<...>"), so the union
+    /// spelling matched nothing and fell through to the catch-all `else`, which
+    /// assumes List. `__list_length` does `inttoptr` on the value as given: a
+    /// List is stored untagged, a String is NaN-tagged, so it dereferenced
+    /// 0x7FF8... and segfaulted. Other arms (to_upper, trim, ...) missed their
+    /// String test the same way and silently emitted nothing at all.
+    ///
+    /// Because the checker guarantees non-nil at every call site, dropping Nil
+    /// here cannot mask a real nil access — it only tells dispatch what the
+    /// checker already proved (BUGS #93).
+    fun strip_nil_type_str(typ: String): String {
+        if (typ == "Nil") { return typ }
+        if (!typ.contains("|")) { return typ }
+        var parts: List<String> = typ.split("|")
+        var kept: List<String> = []
+        var i: Float = 0
+        while (i < parts.length()) {
+            if (parts[i] != "Nil") { kept.push(parts[i]) }
+            i = i + 1
+        }
+        // Only a single surviving member is a usable dispatch target. A genuine
+        // multi-member union ("Int|String") stays as it was: it has no single
+        // right arm, and picking one would be the same guess that caused #93.
+        if (kept.length() == 1) { return kept[0] }
+        return typ
+    }
+
+    /// The receiver type for builtin method dispatch: the variable's annotation
+    /// when it has one, else the type codegen just inferred, with a nullable
+    /// wrapper stripped. Ten dispatch arms in `methods_body.sf` open with this
+    /// exact three-step preamble; centralising it means a fix lands in all of
+    /// them at once rather than in whichever one is being read (BUGS #93).
+    fun dispatch_recv_type(obj_name: String, fallback: AST.Type): String {
+        var t: String = this.type_to_string(fallback)
+        if (obj_name.length() > 0) {
+            var annotated: String = this.get_var_type_str(obj_name)
+            if (annotated.length() > 0) { t = annotated }
+        }
+        return this.strip_nil_type_str(t)
+    }
+
     // Resolve a type string to the class name registered in class_fields.
     // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
     // when class_fields only has "Thing".
