@@ -3219,11 +3219,14 @@ function called from sync code still returns its value.
 `test_async.sf` was green for the entire life of this bug while emitting 2 of its
 ~12 expected lines. Filed separately as #90.
 
-**Still open, unblocked by this fix:** `Async.await` does not exist in
-`src/lib/async.sf`, though `CLAUDE.md` documents it and both
-`src/lib/promise.sf:10,26` and `test/async_coop.sf:16-18` call it — they fail to
-link (`_stdlib_async_await` undefined), which is why `async_coop` is at exit 1.
-Adding it was blocked on this bug and no longer is.
+**Follow-on, now also fixed:** `Async.await` did not exist in
+`src/lib/async.sf`, though `CLAUDE.md` documented it and both
+`src/lib/promise.sf:10,26` and `test/async_coop.sf:16-18` called it — they failed
+to link (`_stdlib_async_await` undefined), which is why `async_coop` was at exit
+1. Adding it was blocked on this bug precisely because it would have linked and
+then silently returned frame handles. Added as a one-line forward to
+`task.await()`; `async_coop` and `Promise.all` both work now. Covered by
+`test/pass/async_await_function.sf`.
 
 ### 37. Method dispatch that matches no branch returns a silent zero
 

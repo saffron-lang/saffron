@@ -1,0 +1,45 @@
+// `Async.await(task)` — the functional spelling of `task.await()`.
+//
+// This existed in the docs and in two callers (`src/lib/promise.sf`,
+// `test/async_coop.sf`) before it existed in `src/lib/async.sf`, so both failed
+// to link with `_stdlib_async_await` undefined. Adding it was blocked on BUGS
+// #38, which would have made it link and then silently hand back coroutine
+// frame handles instead of results — the link error was the kinder failure.
+//
+// So this covers two things at once: that the function exists, and that a result
+// forwarded out of it survives with its tag intact across both Int and String.
+import "@test" as Test
+import "@async" as Async
+import "@promise" as Promise
+
+fun ten(n: Int): Int {
+    Async.sleep(0.01)
+    return n * 10
+}
+
+var t1: Task<Int> = Task.spawn(fun () => ten(1))
+var r1: Int = Async.await(t1)
+Test.assert_eq(r1, 10, "Async.await returns the task's result")
+
+// The tag matters, not just the digits: an untagged 10 still prints "10" but
+// compares false against 10. `assert_eq` above catches it; this makes the
+// intent explicit so a future regression is readable.
+Test.assert(r1 == 10, "the awaited Int is tagged, so == fires")
+
+fun greet(): String {
+    Async.sleep(0.01)
+    return "hello"
+}
+var t2: Task<String> = Task.spawn(fun () => greet())
+var r2: String = Async.await(t2)
+Test.assert_eq(r2, "hello", "Async.await preserves a String result")
+
+// Promise.all is the caller that could not link at all before this.
+var p1: Task<Int> = Task.spawn(fun () => ten(2))
+var p2: Task<Int> = Task.spawn(fun () => ten(3))
+var all: List<Int> = Promise.all([p1, p2])
+Test.assert_eq(all.length(), 2, "Promise.all returns one result per task")
+Test.assert_eq(all[0], 20, "Promise.all's first result")
+Test.assert_eq(all[1], 30, "Promise.all's second result")
+
+Test.summary()

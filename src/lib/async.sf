@@ -11,6 +11,19 @@ fun sleep(duration: Float) {
     __suspend(1, duration)
 }
 
+/// Await a single task and return its result. The functional spelling of
+/// `task.await()`, for symmetry with `gather`/`race` and for use in expression
+/// position where a method call reads awkwardly.
+///
+/// This was documented in CLAUDE.md and called from `promise.sf` and
+/// `test/async_coop.sf` long before it existed — those failed to link
+/// (`_stdlib_async_await` undefined). Adding it was blocked on BUGS #38: it
+/// would have linked and then silently returned frame handles instead of
+/// results, which is a worse failure than a link error.
+fun await(task: Int): Any {
+    return task.await()
+}
+
 /// Await all tasks in a list, return their results as a list.
 /// Like Python's asyncio.gather() — runs all concurrently, collects results in order.
 fun gather(tasks: List<Int>): List<Int> {
