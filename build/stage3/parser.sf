@@ -2226,7 +2226,8 @@ class Parser {
     ///
     ///   { var src = coll
     ///     var i = 0
-    ///     while (i < src.length()) { var item = src[i]; i = i + 1; body } }
+    ///     while (i < src.length()) {
+    ///         var item = src.__iter_get(i); i = i + 1; body } }
     ///
     /// The temporaries are gensym'd. They used to be the fixed names
     /// `__for_list` / `__for_i`, which meant an inner loop redeclared the outer

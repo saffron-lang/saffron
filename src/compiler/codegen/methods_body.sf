@@ -1065,10 +1065,9 @@
         } else {
             this.emit_indent(__ig_res + " = call i64 @__any_iter_get(i64 " + __ig_obj + ", i64 " + __ig_idx + ")")
         }
-        // The element's type is whatever the collection holds, and the receiver
-        // here is the desugaring's `Any`-typed temporary, so there is nothing
-        // more precise to claim. gen_for_in_element_type below narrows it when
-        // the static type IS known.
+        // The element's type is whatever the collection holds: T for a List<T>,
+        // String for a String, List<Any> for a Map, and Any when the receiver is
+        // the desugaring's untyped temporary.
         this.last_type = this.iter_element_type(object)
         return __ig_res
     }
