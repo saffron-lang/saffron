@@ -2,8 +2,8 @@
 
 ## For-in loops
 
-`for-in` walks a collection by index. It is not built on a protocol — the parser
-rewrites it into a `while` loop over `length()` and `[i]`:
+`for-in` walks a collection by position. It is not built on a protocol — the
+parser rewrites it into a `while` loop over `length()` and a per-element read:
 
 ```saffron
 for (item in [10, 20, 30]) {
@@ -11,8 +11,8 @@ for (item in [10, 20, 30]) {
 }
 ```
 
-That means it works on exactly the receivers that support `length()` and integer
-indexing:
+That means it works on exactly the receivers the compiler knows how to count and
+step through — Lists, Strings and Maps:
 
 ```saffron
 // Lists — element by element
@@ -26,21 +26,31 @@ for (ch in "abc") {
 }
 ```
 
-### Maps do not work yet
+### Maps
 
-`for-in` over a Map **segfaults** (BUGS #62), with or without a type annotation,
-because a Map has no integer indexing for the desugaring to use. Go through
-`keys()` instead:
+Iterating a Map yields one `[key, value]` pair per entry, in insertion order:
 
 ```saffron
 var ages: Map<String, Int> = {"ada": 36, "alan": 41}
-var names: List<String> = ages.keys()
-for (name in names) {
-    IO.println(name)
+
+for (entry in ages) {
+    IO.println("${entry[0]} is ${entry[1]}")
+}
+
+// The array pattern destructures the pair
+for ([name, age] in ages) {
+    IO.println("${name} is ${age}")
 }
 ```
 
-`ages.get(name)` returns `Int|Nil`, so nil-check it before using it as an `Int`.
+The pair is typed `List<Any>` rather than `List<String|Int>`, because `is` does
+not work on union types (BUGS #69) — a union element type would type check and
+then silently take the wrong branch.
+
+`keys()` and `values()` are consistently ordered, so walking them by index is
+still available if you want the key and value separately typed. Note that
+`ages.get(name)` returns `Int|Nil`, so it needs a nil check before use as an
+`Int`; the value from a `for-in` pair does not.
 
 ## The iterator protocol is not implemented
 
@@ -58,8 +68,8 @@ interface Iterable<T> {
 ```
 
 Nothing implements them. `iter()` does not exist on any builtin collection, and
-`for-in` does not call it. Both ways of reaching the protocol fail, and they fail
-differently (BUGS #62):
+`for-in` does not call it — the builtins are special-cased instead. Both ways of
+reaching the protocol fail, and they fail differently (BUGS #62):
 
 ```saffron
 // A manual cursor loop compiles, exits 0, and prints NOTHING.
@@ -76,8 +86,8 @@ while (iter.has_next()) {
 for (i in IntRange(0, 5)) { ... }
 ```
 
-Use `for-in` over a List or String, or a plain `while` loop with your own index,
-until the protocol is implemented.
+Use `for-in` over a List, String or Map, or a plain `while` loop with your own
+index, until the protocol is implemented.
 
 ## The `@iter` module
 

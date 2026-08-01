@@ -139,6 +139,7 @@ declare i64 @__os_system(i64)
 declare i64 @__str_get(i64, i64)
 declare i64 @__io_println(i64)
 declare i64 @__io_print(i64)
+declare i64 @__any_iter_get(i64, i64)
 @__debug_location = external global i8*
 declare i64 @__val_nil()
 declare i1 @__val_is_int(i64)

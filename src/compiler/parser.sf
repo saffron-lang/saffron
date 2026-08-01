@@ -2244,7 +2244,20 @@ class Parser {
         var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
         var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
+        // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
+        // For a List or String the two are the same thing, but for a Map `m[k]`
+        // is a *key* lookup: the loop's integer cursor went to __map_get as a
+        // key, which missed every time on a Map<String,_> (yielding nil) and
+        // would have looked up the keys 0, 1, 2... on a Map<Int,_> rather than
+        // walking the entries. "element at position i of an iteration" and
+        // "value for key k" are different operations that only looked alike
+        // because Lists happen to be indexable.
+        //
+        // Spelled as a MethodCall on a reserved name rather than a new AST.Expr
+        // variant deliberately: a variant would need arms at ~30 match sites,
+        // and a missing arm yields an indeterminate value rather than an error
+        // (BUGS #76), so the variant is the riskier encoding of the same thing.
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "")
         var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)

@@ -1,0 +1,93 @@
+// `for (entry in someMap)` must walk the map's entries (BUGS #62).
+//
+// The for-in desugaring is index-driven, and its element read used to be an
+// ordinary `src[i]`. For a List or a String that is the same thing as "the i'th
+// element", but for a Map `m[k]` is a *key* lookup — so the loop handed its
+// integer cursor to __map_get as a key. On a Map<String,_> that missed every
+// time (originally a segfault, later a silent nil), and on a Map<Int,_> it would
+// have looked up the keys 0, 1, 2... instead of walking the entries.
+//
+// The element read is now `__iter_get`, which dispatches on the receiver's GC
+// type tag at runtime. A Map yields a two-element [key, value] list, which is
+// what CLAUDE.md has always documented.
+import "@test" as Test
+
+var m: Map<String, Int> = {"one": 1, "two": 2, "three": 3}
+
+// keys()/values() are consistently ordered, so the entry order is the insertion
+// order and can be asserted directly.
+var seen_keys: List<String> = []
+var key_total: Int = 0
+for (entry in m) {
+    seen_keys.push(entry[0])
+    key_total = key_total + entry[1]
+}
+Test.assert_eq(seen_keys.length(), 3, "for-in visits every entry exactly once")
+Test.assert_eq(seen_keys[0], "one", "the first entry's key")
+Test.assert_eq(seen_keys[2], "three", "the last entry's key")
+Test.assert_eq(key_total, 6, "the values are the map's values, not nil")
+
+// The array-pattern form destructures the [key, value] pair.
+var pairs: List<String> = []
+for ([k, v] in m) {
+    pairs.push("${k}=${v}")
+}
+Test.assert_eq(pairs.length(), 3, "the array pattern visits every entry")
+Test.assert_eq(pairs[1], "two=2", "the pattern binds key and value in order")
+
+// A Map<Int, _> is the case that would have silently looked up keys 0/1/2
+// rather than walking entries — and whose keys deliberately do NOT start at 0,
+// so a cursor-as-key regression cannot accidentally pass.
+var counts: Map<Int, String> = {}
+counts.set(10, "ten")
+counts.set(20, "twenty")
+var int_keys: Int = 0
+var labels: List<String> = []
+for ([ik, label] in counts) {
+    int_keys = int_keys + ik
+    labels.push(label)
+}
+Test.assert_eq(int_keys, 30, "integer keys come back as keys, not as the cursor")
+Test.assert_eq(labels.length(), 2, "both entries are visited")
+Test.assert_eq(labels[0], "ten", "the value belongs to its key")
+
+// An empty map iterates zero times rather than reading past the end.
+var empty: Map<String, Int> = {}
+var empty_count: Int = 0
+for (e in empty) { empty_count = empty_count + 1 }
+Test.assert_eq(empty_count, 0, "an empty map yields no entries")
+
+// The List and String paths must be unchanged — they went through the same
+// element read and are what the desugaring was originally written for.
+var xs: List<Int> = [4, 5, 6]
+var xs_total: Int = 0
+for (x in xs) { xs_total = xs_total + x }
+Test.assert_eq(xs_total, 15, "list for-in still sums correctly")
+
+var chars: List<String> = []
+for (c in "abc") { chars.push(c) }
+Test.assert_eq(chars.length(), 3, "string for-in still yields one char per step")
+Test.assert_eq(chars[1], "b", "the characters are in order")
+
+// Nested loops share no cursor: the temporaries are gensym'd, and a map in the
+// outer position exercises the new element read on both levels.
+var nested: Int = 0
+for (e2 in m) {
+    for (x2 in xs) {
+        nested = nested + 1
+    }
+}
+Test.assert_eq(nested, 9, "a nested loop over a map and a list runs 3x3")
+
+// Iteration over a map held in an `Any`-typed binding: no static type is
+// available, which is the case that made this reachable through iter.sf's
+// map/filter/reduce and the reason the dispatch is a runtime one.
+fun count_entries(coll: Any): Int {
+    var n: Int = 0
+    for (e3 in coll) { n = n + 1 }
+    return n
+}
+Test.assert_eq(count_entries(m), 3, "for-in over an Any-typed map works")
+Test.assert_eq(count_entries(xs), 3, "for-in over an Any-typed list works")
+
+Test.summary()

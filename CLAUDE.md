@@ -134,9 +134,10 @@ let Some(value) = Option.Some(42)
 ### Control Flow
 
 ```saffron
-// For-in is index-based (desugars to length() + [i]), NOT protocol-based.
-// Works over Lists and Strings (char by char). Maps SEGFAULT (BUGS #62) and
-// custom types are a compile error (BUGS #62) — there is no iterator protocol.
+// For-in is index-based (desugars to length() + an element read), NOT
+// protocol-based. Works over Lists, Strings (char by char) and Maps (yielding
+// a [key, value] pair). Custom types are a compile error — "type 'X' has no
+// method 'length'" — because there is no iterator protocol (BUGS #62).
 for (item in [1, 2, 3]) {
     if (item == 2) continue
     IO.println(item)
@@ -267,14 +268,19 @@ m.has("b")       // true
 m.keys()         // ["a", "b", "c"]
 m.values()       // [1, 2, 3]
 
-// Iteration: `for (entry in m)` SEGFAULTS (BUGS #62). Walk keys()/values()
-// together by index — they are consistently ordered.
-var ks: List<String> = m.keys()
-var vs: List<Int> = m.values()
-for (i = 0; i < ks.length(); i = i + 1) {
-    IO.println("${ks[i]} = ${vs[i]}")
+// Iteration yields a [key, value] pair per entry, in insertion order.
+for (entry in m) {
+    IO.println("${entry[0]} = ${entry[1]}")
+}
+for ([k, v] in m) {         // the array pattern destructures the pair
+    IO.println("${k} = ${v}")
 }
 ```
+
+The pair is typed `List<Any>`, not `List<K|V>` — `is` is broken on unions (BUGS
+#69), so a union element type would type check and then take the wrong branch.
+`m.keys()` and `m.values()` are consistently ordered if you prefer to walk them
+by index.
 
 `m.get(k)` returns `Int|Nil`, and `is` is broken on union types: `v is Int` and
 `v is Nil` both evaluate false, so those branches are silently dead (BUGS #69).
