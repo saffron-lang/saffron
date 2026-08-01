@@ -11710,6 +11710,21 @@ class Codegen {
                 else if (__mp_func.ends_with("_max_memory")) { __mp_func = "__mem_get_limit" }
                 else if (__mp_func.ends_with("_live_bytes")) { __mp_func = "__mem_live_bytes" }
             }
+            // An @extern or @intrinsic must be recognised HERE, not only in the
+            // module-prefix arm further down at :1630 — this arm intercepts
+            // every alias with a non-empty prefix, so that arm never sees one.
+            // Falling through emitted `call i64 @stdlib_scheduler_get_yield_reason`:
+            // the Saffron-level symbol, which has no definition and no `declare`,
+            // so the IR failed verification with "use of undefined value". Same
+            // shape as the coroutine defect in this arm (BUGS #91, #38).
+            // Registered before called_functions.push so the extern's C symbol,
+            // not this name, is what gets declared.
+            if (this.str_in_list(this.intrinsic_funcs, __mp_func)) {
+                return this.gen_intrinsic_call(__mp_func, args)
+            }
+            if (this.extern_sigs.has(__mp_func)) {
+                return this.gen_extern_call(__mp_func, args)
+            }
             this.called_functions.push(__mp_func)
 
             // Check if this is a class constructor: class_fields has the method name
