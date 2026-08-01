@@ -180,6 +180,53 @@ immediate parent's `init` arity and forwards correctly. Verified: `Puppy("Max")`
 with `init` only on `Animal` constructs and prints `Max: Yip`; the `List<Animal>`
 polymorphism test runs end to end. Zero regressions.
 
+### 89. Every `src/lib/string.sf` method that takes a `String` segfaults, because the module's own `String` class is shadowed by the builtin type
+
+**Reproduction:**
+
+```saffron
+import "@string" as Str
+var s = Str.String("hello world")
+IO.println(s.length())      // 11 — fine
+IO.println(s.contains("ell"))  // Segmentation fault
+```
+
+`length()` works because it only touches `this`. `contains` does not:
+
+```saffron
+fun contains(sub: String): Bool {
+    return _strstr(this._ptr, sub._ptr) != 0
+}
+```
+
+The annotation `sub: String` is intended to mean the class declared 20 lines
+above it, but `String` resolves to the builtin type instead — the class does not
+shadow it. A string literal has no `_ptr` field, so `sub._ptr` reads a field off
+a value that has no fields and the process dies. Passing an actual class instance
+works, confirming the diagnosis:
+
+```saffron
+var sub = Str.String("ell")
+s.contains(sub)   // true
+```
+
+This is not one method. Every method in the file that takes a `String` parameter
+does `<param>._ptr`: `contains`, `starts_with`, `ends_with`, `index_of`, `split`,
+`replace`, plus the operator overloads `add`, `eq`, `lt`, `gt` — 18 `._ptr`
+accesses in all. So the module is unusable for anything but `length()`,
+`char_at()` and the no-argument transforms.
+
+Nothing imports `@string` today (it arrived in `7a7302c` as a "String class
+prototype" and never got wired up), so this is latent rather than actively
+breaking callers — but it loads and instantiates without complaint, which makes
+it a trap for the next person who tries to use it.
+
+Two possible repairs, and the choice is a language question, not a stdlib one:
+either a class declaration shadows a builtin type name of the same name inside
+its own module, or it cannot and the parameters must be spelled as a distinct
+type. The second is a rename; the first is a scoping rule with consequences well
+beyond this file. Filed rather than patched for that reason.
+
 ### 86. A block-syntax parameter (`{ x => ... }`) gets no type, so every field read on it silently returns 0 or `""`
 
 ```saffron
@@ -2574,9 +2621,19 @@ from the type checker then trigger `runtimeError()` which corrupts VM state duri
 
 
 
-### 21. `type` is a reserved keyword — can't use as parameter/variable name
+### 21. FIXED — `type` was a reserved keyword, unusable as a parameter/variable name
 
-`type` is tokenized as `TOKEN_TYPE` for type alias declarations. Code that uses `type` as a parameter name (e.g. `fun define(name: String, type: String)`) gets a parse error. Consider making it a contextual keyword (only reserved at statement start).
+`type` was tokenized as `TOKEN_TYPE` for type alias declarations, so code using it
+as a parameter name (e.g. `fun define(name: String, type: String)`) was a parse
+error. The suggested fix was to make it contextual, reserved only at statement
+start.
+
+**Resolution.** That is what the lexer now does — there is no `type` keyword token
+at all. `parser.sf:1290` recognises it with `is_ident_named("type")` at statement
+start only, so it is an ordinary identifier everywhere else. Verified against
+`build/saffronc` on 2026-07-31: `type` works as a parameter, a local, a class
+field (declaration, `this.type` write and `.type` read), a `for-in` loop
+variable, and a map key, while `type Name = String` still declares an alias.
 
 
 ### 22. Cross-module global variable access emits undefined LLVM local — FIXED
