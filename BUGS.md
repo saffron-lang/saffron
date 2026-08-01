@@ -9,6 +9,47 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 94. FIXED — `obj[key]` on a class declaring `getItem` was compiled as a list read
+
+```saffron
+class Dict {
+    var items: List<String>
+    fun init() { this.items = ["first", "second", "third"] }
+    fun getItem(key: Int): String { return this.items[key] }
+}
+var d = Dict()
+IO.println(d[0])   // segfault
+```
+
+`Indexable<K, V>` in `src/lib/prelude.sf` has declared this protocol since the
+prelude was written, and `test/pass/getitem_overload.sf` has tested it for just as
+long, but **nothing ever implemented it**: `getItem` appeared nowhere in the
+compiler. `gen_index_get` handled Map, then String, then fell through to a
+catch-all list path that called `__list_length` on the instance pointer, reading a
+class struct as a list header — SIGSEGV.
+
+Structurally the same defect as #93: a receiver type no arm recognises silently
+takes the List arm. The checker was the milder half of it — `IndexGet` ran
+`extract_list_element_type` on a class and got "Any", harmless in itself but it
+told the following dispatch nothing.
+
+Fixed by adding a `getItem` arm to `gen_index_get`
+(`src/compiler/codegen/methods_body.sf`), placed *above* the receiver evaluation
+so it is decided before any IR is emitted (the preamble hazard of #70), and by
+reading `ClassName__getItem`'s registered return type in the checker's `IndexGet`
+case. Class resolution mirrors `gen_binary`'s operator-overload path, including
+its fallback for a non-variable receiver, so `Dict()[0]` works too.
+
+`setItem` is deliberately **not** implemented: unlike `getItem` it is specified
+nowhere — not in the prelude, not in any test — so there is no contract to
+implement against. `obj[k] = v` on a class remains whatever `IndexSet` already
+did.
+
+Regression test: `test/pass/getitem_overload_typed.sf` (13 assertions — values,
+computed keys, a constructor-call receiver, a non-String element type, and
+untouched List/Map/String indexing). `test/pass/getitem_overload.expected` pins
+the original repro's output.
+
 ### 93. FIXED — a method call on a nil-guarded nullable receiver dispatched as a List, or was dropped entirely
 
 ```saffron

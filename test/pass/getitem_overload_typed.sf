@@ -1,0 +1,58 @@
+// Subscript overloading: `obj[key]` dispatches to a class's `getItem` (BUGS #94).
+//
+// `Indexable<K, V>` in src/lib/prelude.sf has specified this protocol since the
+// prelude was written, but nothing implemented it. `gen_index_get` handled Map,
+// then String, then fell through to a catch-all list path that called
+// `__list_length` on the instance pointer — reading a class struct as a list
+// header, SIGSEGV. Same shape as BUGS #93: an unhandled receiver type silently
+// taking the List arm.
+//
+// test/pass/getitem_overload.sf is the original repro and only prints. This file
+// checks the *values*, and in particular that getItem's declared return type
+// reaches the checker: if `d[0]` came back as Any, the assertions below would
+// still run but the next dispatch on the result would be a coin flip.
+import "@test" as Test
+
+class Dict {
+    var items: List<String>
+    fun init() { this.items = ["first", "second", "third"] }
+    fun getItem(key: Int): String { return this.items[key] }
+}
+
+var d = Dict()
+Test.assert_eq(d[0], "first", "obj[0] dispatches to getItem")
+Test.assert_eq(d[2], "third", "obj[2] dispatches to getItem")
+
+// The result is typed String, not Any: a String method must dispatch on it
+// statically. This is what the checker change buys.
+Test.assert_eq(d[0].to_upper(), "FIRST", "getItem's return type reaches dispatch")
+Test.assert_eq(d[1].length(), 6, "length() on a getItem result is a strlen, not a list read")
+
+// A computed key, so the index is not a literal.
+var i: Int = 1
+Test.assert_eq(d[i], "second", "a variable index works")
+Test.assert_eq(d[i + 1], "third", "an arithmetic index works")
+
+// A non-variable receiver: the class must be resolved from the expression, the
+// same fallback gen_binary needs for `Vec2(1,2) + Vec2(3,4)`.
+Test.assert_eq(Dict()[0], "first", "a constructor-call receiver resolves")
+
+// A getItem returning a non-String, to be sure nothing hardcodes String.
+class Squares {
+    var n: Int
+    fun init() { this.n = 0 }
+    fun getItem(key: Int): Int { return key * key }
+}
+var sq = Squares()
+Test.assert_eq(sq[4], 16, "getItem returning Int")
+Test.assert_eq(sq[3] + 1, 10, "an Int getItem result is usable in arithmetic")
+
+// Plain List and Map indexing must be untouched by the new arm.
+var xs: List<Int> = [10, 20, 30]
+Test.assert_eq(xs[1], 20, "list indexing still works")
+Test.assert_eq(xs[-1], 30, "negative list indexing still works")
+var m: Map<String, Int> = {"a": 1}
+Test.assert_eq(m["a"], 1, "map indexing still works")
+Test.assert_eq("hello"[1], "e", "string indexing still works")
+
+Test.summary()

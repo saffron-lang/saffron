@@ -10919,6 +10919,53 @@ class Codegen {
             return local
         }
     }
+    // Subscript overloading: obj[key] → obj.getItem(key) when the receiver is a
+    // user class declaring `getItem`. `Indexable` in src/lib/prelude.sf has
+    // specified this protocol all along, but nothing ever implemented it: the
+    // arms above handle Map and String and everything else fell through to the
+    // list path below, which calls __list_length on the instance pointer and
+    // reads a class struct as a list header — SIGSEGV. That is what crashed
+    // test/pass/getitem_overload.sf (BUGS #94).
+    //
+    // Resolved before `gen_arg_value(object)` runs: emitting the receiver first
+    // and deciding dispatch after is the preamble hazard that BUGS #70 is about.
+    // Class resolution mirrors gen_binary's operator-overload path, including
+    // its fallback for a non-variable receiver (a constructor call, `this.f`, a
+    // method result), and it likewise accepts get_expr_type's answer only when
+    // it names a declared class.
+    var gi_class: String = ""
+    if (obj_name.length() > 0) {
+        gi_class = this.get_var_type_str(obj_name)
+    }
+    if (!this.class_fields.has(gi_class)) {
+        var gi_inferred: String = this.get_expr_type(object)
+        if (this.class_fields.has(gi_inferred)) { gi_class = gi_inferred } else { gi_class = "" }
+    }
+    if (gi_class.length() > 0 and this.class_methods.has(gi_class)) {
+        var gi_methods: List = this.class_methods.get(gi_class)
+        if (gi_methods.contains("getItem")) {
+            var gi_recv: String = this.gen_arg_value(object)
+            var gi_key: String = this.gen_arg_value(index)
+            var gi_target: String = gi_class + "__getItem"
+            if (this.func_prefix_map.has(gi_target)) {
+                gi_target = this.func_prefix_map.get(gi_target)
+            } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions, this.current_prefix + gi_target)) {
+                gi_target = this.current_prefix + gi_target
+            }
+            this.called_functions.push(gi_target)
+            var gi_local: String = this.fresh_local()
+            this.emit_indent(gi_local + " = call i64 @" + gi_target + "(i64 " + gi_recv + ", i64 " + gi_key + ")")
+            // The declared return type, when known. Falling back to Any rather
+            // than to the receiver's class: getItem returns an *element*, and
+            // claiming the container type would misroute the next dispatch.
+            if (this.func_ret_types.has(gi_target)) {
+                this.last_type = this.func_ret_types.get(gi_target)
+            } else {
+                this.last_type = AST.Type.AnyType
+            }
+            return gi_local
+        }
+    }
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
     // String indexing: s[i] → __str_get(s, i), a one-character String.
