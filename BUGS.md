@@ -57,6 +57,52 @@ back on.
 
 Introduced in `70c7ee9` (2026-05-26).
 
+**`IO` had the same reserved-name defect, in a narrower form** (found by asking
+whether `IO` was really safe to keep hard-wired; fixed as part of the same
+change). `IO` genuinely needs a hard-wired prefix — a file with no imports still
+calls `IO.println`, so there is no import statement to derive an alias from — but
+the three `module_prefixes.set("IO", "__io_")` calls ran *after*
+`gen.module_prefixes = alias_map`, so they overwrote an explicit alias too.
+Binding the name `IO` to the module with `import "@io" as IO` therefore sent every
+call to a runtime symbol instead:
+
+```saffron
+import "@io" as IO
+var f: IO.File = IO.open("/tmp/x", "r")   // ld: symbol not found: ___io_open
+```
+
+Five functions are written in Saffron in `src/lib/io.sf` with no runtime symbol
+behind them — `open`, `bytes_alloc`, `bytes_from_string`, `read_file_bytes`,
+`write_file_bytes` — so each failed at link time with an undefined `___io_<name>`
+and no diagnostic. Naming the alias anything else (`as Files`) worked, which is
+what made this easy to miss and why it survived #88's first pass.
+
+Fixed by guarding the hard-wiring with `if (!alias_map.has("IO"))`, so an explicit
+import reaches the module exactly as any other alias does while the implicit
+spelling keeps the runtime prefix. Regression test at
+`test/pass/io_explicit_alias.sf`.
+
+Two other repairs were considered and rejected. Routing an unknown `__io_<m>` to
+`stdlib_io_<m>` inside the dispatch path would also redirect `IO.println` — the
+most-called function in the language — onto the module wrapper, changing its
+arity and tagging contract for every program. Deriving the fallback from
+`func_prefix_map` is worse: that map is global and keyed on the bare method name,
+so two modules that both define `open` collide there and `IO.open` could route
+into an unrelated module.
+
+**A third defect, exposed by the above** — once `import "@io" as IO` reached the
+module, `IO.println` reached io.sf's own `println`, which printed
+`2.12529e-314`. The wrapper forwarded through an `@extern("void
+__io_println_any(i64)")`, and every `i64` extern parameter is untagged on the way
+out (`gen_extern_call`, deliberately — BUGS #24). `__io_println_any` dispatches on
+the NaN-box tag, so the extern stripped the very tag the callee reads and the tag
+bits landed in the payload. `print` had it too. Both now call `__io_println` /
+`__io_print` by bare name, matching what `read_file` already did and what os.sf
+was converted to above; both names had to be added to `known_functions` as well,
+or the bare-call path prefixes them to `stdlib_io___io_println` (the #85 shape).
+`println_str` keeps its extern — `puts` is typed `void*`, so it untags a pointer,
+which is correct.
+
 **Resolution (2026-07-31).** os.sf is an ordinary module. Regression test at
 `test/pass/os_ordinary_import.sf` covers a non-`OS` alias resolving, `"os"` and
 `"@os"` reaching the same module, and `join_path` — pure Saffron with no runtime
