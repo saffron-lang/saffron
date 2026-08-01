@@ -34,7 +34,8 @@ for (var i = 0; i < 5; i = i + 1) {
 
 ## For-in loops
 
-`for-in` walks a collection by index, so it works over lists and strings:
+`for-in` walks a collection by position, so it works over lists, strings and
+maps:
 
 ```saffron
 // Lists
@@ -46,16 +47,11 @@ for (item in [10, 20, 30]) {
 for (ch in "abc") {
     IO.println(ch)  // a, b, c
 }
-```
 
-Maps do **not** work — `for-in` over a Map segfaults (BUGS #62). Iterate
-`keys()` instead:
-
-```saffron
+// Maps — one [key, value] pair per entry
 var m: Map<String, Int> = {"a": 1, "b": 2}
-var ks: List<String> = m.keys()
-for (k in ks) {
-    IO.println(k)
+for ([k, v] in m) {
+    IO.println("${k} = ${v}")   // a = 1, b = 2
 }
 ```
 

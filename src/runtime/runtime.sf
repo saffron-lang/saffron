@@ -614,6 +614,55 @@ fun __rt_as_map_ptr(v: Int): Int {
     return raw
 }
 
+// Element at *position* i of an iteration over `v` — the `for-in` desugaring's
+// element read, distinct from an index/key lookup (BUGS #62).
+//
+// `for (x in coll)` desugars to an index-driven while loop, and the element read
+// used to be an ordinary `coll[i]`. For a List or a String that is the same thing
+// as "the i'th element", but for a Map it is not: `m[k]` is a *key* lookup, so on
+// a Map the loop passed its integer cursor to __map_get as a key. On a
+// Map<String,_> that missed every time and yielded nil; on a Map<Int,_> it would
+// silently look up the keys 0, 1, 2... instead of walking the entries. The two
+// operations only looked alike because Lists happen to be indexable.
+//
+// Dispatching here rather than in codegen is what makes `for-in` work over an
+// `Any`-typed or generic receiver, where the static type is unavailable — the
+// same reason __any_length exists. A Map yields a two-element `[key, value]`
+// list, which is what `for ([k, v] in m)` destructures and what CLAUDE.md has
+// always documented.
+fun __any_iter_get(v: Int, index: Int): Int {
+    var as_map: Int = __rt_as_map_ptr(v)
+    if (as_map != 0) {
+        var count: Int = load64(as_map)
+        if (index < 0 or index >= count) {
+            __index_error(index, count)
+            return __rt_nil()
+        }
+        var keys: Int = load64(as_map + 16)
+        var vals: Int = load64(as_map + 24)
+        var pair: Int = __list_new()
+        // Keys are stored already NaN-boxed; __map_key_box tags only the ones
+        // that need it, the same treatment __map_keys gives them.
+        __list_push(pair, __map_key_box(load64(keys + index * 8)))
+        __list_push(pair, load64(vals + index * 8))
+        // Returned RAW, not __rt_tag_ptr'd. Containers travel untagged
+        // everywhere (__list_new and __map_keys both hand back a bare pointer)
+        // because __gc_is_heap_ptr rejects any NaN-tagged value as a heap
+        // pointer, so tagging this would get the pair swept while it is live
+        // (BUGS #23). Elements get tagged; the container holding them does not.
+        return pair
+    }
+    var as_list: Int = __rt_as_list_ptr(v)
+    if (as_list != 0) {
+        return __list_get(as_list, index)
+    }
+    // Not a GC collection. A String is the remaining iterable — __str_get does
+    // its own bounds check and returns a one-character String. Anything else
+    // falls through to it and reports an index error, which is the same outcome
+    // the list path gave before.
+    return __str_get(v, index)
+}
+
 // Format a map as {key: value, ...}. Keys are always strings; values go
 // through __rt_elem_to_string so nested lists and maps render properly.
 fun __map_to_string(map: Int): Int {

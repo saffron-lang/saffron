@@ -1038,6 +1038,41 @@
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
     var obj_name: String = this.get_variable_name(object)
 
+    // `__iter_get` — the for-in desugaring's element read (BUGS #62). Nothing
+    // stops a user from spelling the name (there is no reserved-identifier rule
+    // in the lexer), which is why __any_iter_get is total: it discriminates on
+    // the receiver's GC type tag and falls through to a bounds-checked
+    // __str_get, rather than trusting that the receiver is a collection.
+    //
+    // Decided HERE, above every arm that emits IR. `Alias.method()` dispatch
+    // further down runs an unconditional gen_arg_value on the receiver before it
+    // has decided anything, so an arm added below it emits a stray load for a
+    // slot no prologue allocates — the same preamble hazard that made `super`
+    // fail LLVM verification (BUGS #70).
+    //
+    // Static Map receivers could emit __map_* directly, but there is no reason
+    // to: __any_iter_get discriminates by GC type tag, which also covers the
+    // Any-typed and generic receivers where no static type is available — the
+    // case that made the bug reachable through iter.sf's map/filter/reduce.
+    if (method == "__iter_get" and args.length() == 1) {
+        var __ig_obj: String = this.gen_arg_value(object)
+        var __ig_idx_tagged: String = this.gen_arg_value(args[0])
+        var __ig_idx: String = this.emit_untag_index(__ig_idx_tagged, this.last_type)
+        this.called_functions.push("__any_iter_get")
+        var __ig_res: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(__ig_res, "i64", "__any_iter_get", "i64 " + __ig_obj + ", i64 " + __ig_idx))
+        } else {
+            this.emit_indent(__ig_res + " = call i64 @__any_iter_get(i64 " + __ig_obj + ", i64 " + __ig_idx + ")")
+        }
+        // The element's type is whatever the collection holds, and the receiver
+        // here is the desugaring's `Any`-typed temporary, so there is nothing
+        // more precise to claim. gen_for_in_element_type below narrows it when
+        // the static type IS known.
+        this.last_type = this.iter_element_type(object)
+        return __ig_res
+    }
+
     // Self method calls: this.method(args)
     var obj_kind_early: String = this.classify_expr(object)
     if (obj_kind_early == "this" and this.current_class.length() > 0) {

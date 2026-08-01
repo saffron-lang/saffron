@@ -459,6 +459,40 @@
         return parts[1]
     }
 
+    // The type an iteration over `coll` yields per step — the static counterpart
+    // of what __any_iter_get computes at runtime (BUGS #62).
+    //
+    // A List<T> yields T, a String yields String (one character), and a Map<K,V>
+    // yields List<Any> because the runtime hands back a two-element [key, value]
+    // pair whose two slots have different types. `List<K|V>` would be more
+    // precise but `is` is broken on union types (BUGS #69), so it would type
+    // check and then silently take the wrong branch — Any is the honest answer
+    // until that is fixed.
+    //
+    // Any receiver whose type is unknown, generic, or not iterable yields Any.
+    // That is not a diagnostic here: `for-in` over a non-iterable is a checker
+    // concern, and reporting it from a type helper would fire on every
+    // Any-typed receiver that works fine at runtime.
+    fun iter_element_type(coll: AST.Expr): AST.Type {
+        var name: String = this.get_variable_name(coll)
+        var ts: String = ""
+        if (name.length() > 0) {
+            ts = this.get_var_type_str(name)
+        }
+        if (ts.length() == 0) { return AST.Type.AnyType }
+        if (ts == "String") { return AST.Type.StringType }
+        if (ts.starts_with("Map")) {
+            return this.make_generic_type("List", [AST.Type.AnyType])
+        }
+        if (ts.starts_with("List<")) {
+            var inner: String = ts.slice(5, ts.length() - 1)
+            var parts: List<String> = this.split_respecting_generics(inner, ",")
+            if (parts.length() < 1) { return AST.Type.AnyType }
+            return this.str_to_type(parts[0])
+        }
+        return AST.Type.AnyType
+    }
+
     // Extract the key type string from a Map<K, V> type annotation.
     // e.g. "Map<String,AST.Type>" → "String"
     //      "Map<Int,String>"      → "Int"

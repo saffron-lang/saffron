@@ -1782,7 +1782,7 @@ an unbounded heap; the fix belongs in making the shadow stack coroutine-aware
 (re-push roots on resume, root via the frame pointer, or make `llvm.coro` frames
 traced objects).
 
-### 62. `for (entry in someMap)` compiles to a list index loop and segfaults; the documented iterator protocol is never used
+### 62. FIXED (map half) — `for (entry in someMap)` compiled to a list index loop and segfaulted; the documented iterator protocol is still never used
 
 **Reproduction:**
 
@@ -1868,6 +1868,73 @@ identically — map literal directly in the loop header, a `var` with an explici
 too, because the desugaring never consults the receiver's type at all. A narrow
 stopgap that would at least stop the crash: have the desugaring recognise a
 statically-known Map receiver and emit the `keys()` form.
+
+**Resolution (2026-07-31): the Map half is fixed; the iterator protocol is
+still absent.** `for (entry in m)` now walks the entries and yields a
+`[key, value]` pair, which is what `CLAUDE.md` always documented. The repro at
+the top of this entry prints `one` / `two`.
+
+The diagnosis above was wrong on one point worth recording, because it is the
+kind of error that sends a fix to the wrong layer. It claimed the Map branch of
+`gen_index_get` was "gated on `typed_vars` knowing the object is a Map — it is
+`Any` here, so the branch is skipped". It is not skipped: `"Any"` is the parser's
+*inference sentinel*, not a claim that the type is unknown, so `__for_src` gets
+the receiver's real type and the emitted IR contained `__map_get` all along. The
+element read was reaching the Map path and doing the wrong thing there, rather
+than falling through to the list path.
+
+The actual defect is that "element at position i of an iteration" and "value for
+key k" are different operations that the desugaring spelled the same way. On a
+`Map<String,_>` the integer cursor missed every key (nil, and originally a
+segfault via the `e[0]` read of the result); on a `Map<Int,_>` it would have
+looked up the keys 0, 1, 2… instead of walking the entries — silently plausible,
+and the more dangerous of the two.
+
+The fix separates the two operations:
+
+- **`parser.sf` `desugar_for_in`** emits `src.__iter_get(i)` instead of `src[i]`.
+  Spelled as a `MethodCall` on a reserved name rather than a new `AST.Expr`
+  variant deliberately: a variant needs arms at ~30 match sites and a missing arm
+  yields an indeterminate value rather than an error (#76), so it is the riskier
+  encoding of the same thing.
+- **`runtime.sf` `__any_iter_get`** discriminates on the receiver's GC type tag
+  via the existing `__rt_as_map_ptr` / `__rt_as_list_ptr`, returning a
+  `[key, value]` list for a Map, `__list_get` for a List, and a bounds-checked
+  `__str_get` otherwise. Runtime dispatch rather than static, for the same reason
+  `__any_length` exists: it is what makes `for-in` work over an `Any`-typed or
+  generic receiver, which is the case that made this reachable through
+  `iter.sf`'s `map`/`filter`/`reduce`. The pair is returned **untagged**, like
+  every other container — `__gc_is_heap_ptr` rejects NaN-tagged values, so
+  tagging it would get it swept while live (#23).
+- **`methods_body.sf`** handles `__iter_get` above every arm that emits IR, since
+  the `Alias.method()` dispatch below it runs an unconditional `gen_arg_value` on
+  the receiver (the preamble hazard that made `super` fail verification, #70).
+- **`checker.sf` / `types_body.sf`** type the element: `T` for a `List<T>`,
+  `String` for a String, and `List<Any>` for a Map. Not `List<K|V>` — that would
+  type check and then silently take the wrong branch, since `is` is broken on
+  union types (#69).
+
+`__any_iter_get` also had to go into `known_functions` at all three sites in
+`codegen.sf`. Without it the auto-declare loop in `output_body.sf` emitted
+`declare i64 @__any_iter_get(i64)` at its default arity of 1, redefining the
+two-argument declare from `runtime_declares()`; STAGE 2 caught it as an invalid
+redefinition. Exactly the shape of #85, and worth noting that stage 1 passed —
+only the gen4 fixed-point check failed.
+
+`m.length()` was never actually broken, despite the entry implying it: a Map
+dispatches to `__list_length`, which happens to be correct because `count` is the
+first field of both headers. Left alone rather than "fixed", since changing it
+would be churn with no behaviour change.
+
+**Still open, and the reason this entry is only half-fixed:** there is no
+iterator protocol. `for (x in Countdown(3))` over a custom type remains
+`[codegen] Error: type 'Countdown' has no method 'length'` — a clear compile
+error rather than a crash, but the protocol six documents once promised does not
+exist. Adding it means real `iter()` methods on the builtins plus a desugaring to
+`has_next()`/`next()`, and the silent-no-op hole below (a `MethodCall` on an
+`Any` receiver resolving to nothing) has to be closed first or the protocol form
+will keep failing quietly. That belongs with the resolve pass
+(`docs/design/compiler-rewrite.md`, stage 2).
 
 Six documents asserted the protocol works — `CLAUDE.md`,
 `docs/src/tutorial/iterators.md` (an entire page), `docs/src/introduction.md`,

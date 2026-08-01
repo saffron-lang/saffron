@@ -1701,6 +1701,23 @@ class NullChecker {
     fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): String {
         var obj_type: String = this.infer_expr(obj)
 
+        // `__iter_get` — the for-in desugaring's element read (BUGS #62). It is
+        // not a real method on anything, so it has to be answered before the
+        // per-type method tables below, which would report it as unknown.
+        //
+        // A Map yields List<Any>, not List<K|V>: the runtime hands back a
+        // two-element [key, value] pair whose slots have different types, and a
+        // union would type check and then silently take the wrong branch, since
+        // `is` is broken on unions (BUGS #69).
+        if (method == "__iter_get") {
+            if (obj_type == "String") { return "String" }
+            if (obj_type == "Map" or obj_type.starts_with("Map<")) { return "List<Any>" }
+            if (obj_type.starts_with("List<")) {
+                return this.extract_list_element_type(obj_type)
+            }
+            return "Any"
+        }
+
         // Desugar receiver closures for method calls too
         // Check both "ClassName__method:idx" and "method:idx" patterns
         var obj_name: String = match (obj) {
