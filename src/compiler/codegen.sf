@@ -61,6 +61,12 @@ class Codegen {
     // this before falling back to module_globals. Empty at top level / module
     // init, where a `var` really is a global.
     var current_fn_locals: Map<String, Bool>
+    // Locals of the function currently being emitted that live in a heap cell
+    // instead of an alloca, because a nested lambda both captures and writes to
+    // them (BUGS #51 defect B). gen_lambda consults this to decide whether the
+    // env slot gets the cell pointer or a snapshot of its contents. Saved and
+    // restored around each function body, like current_fn_locals.
+    var boxed_locals: Map<String, Bool>
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
@@ -146,6 +152,7 @@ class Codegen {
         this.register_only = false
         this.in_function = false
         this.current_fn_locals = {}
+        this.boxed_locals = {}
         this.intrinsic_funcs = []
         this.extern_sigs = {}
         this.defined_funcs = []

@@ -61,6 +61,12 @@ class Codegen {
     // this before falling back to module_globals. Empty at top level / module
     // init, where a `var` really is a global.
     var current_fn_locals: Map<String, Bool>
+    // Locals of the function currently being emitted that live in a heap cell
+    // instead of an alloca, because a nested lambda both captures and writes to
+    // them (BUGS #51 defect B). gen_lambda consults this to decide whether the
+    // env slot gets the cell pointer or a snapshot of its contents. Saved and
+    // restored around each function body, like current_fn_locals.
+    var boxed_locals: Map<String, Bool>
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
@@ -146,6 +152,7 @@ class Codegen {
         this.register_only = false
         this.in_function = false
         this.current_fn_locals = {}
+        this.boxed_locals = {}
         this.intrinsic_funcs = []
         this.extern_sigs = {}
         this.defined_funcs = []
@@ -4724,6 +4731,21 @@ class Codegen {
             lambda_params = params_str
         }
 
+        // Which of these captures the enclosing frame put in a heap cell. Computed
+        // before the closure body is emitted because both sides need it: the body
+        // must dereference a cell slot one extra level, and the env-store loop below
+        // must write the pointer rather than a snapshot. `boxed_locals` belongs to
+        // the *enclosing* function and is clobbered by gen_closure_function's own
+        // body emission, so it is read here while it is still in scope.
+        var boxed_caps: List<String> = []
+        var bci: Float = 0
+        while (bci < captures.length()) {
+            if (this.boxed_locals.has(captures[bci])) {
+                boxed_caps.push(captures[bci])
+            }
+            bci = bci + 1
+        }
+
         // Save current state
         var saved_sb: StringBuilder = this.sb
         var saved_terminated: Bool = this.block_terminated
@@ -4737,7 +4759,7 @@ class Codegen {
         this.sb = StringBuilder()
         if (captures.length() > 0) {
             // Custom gen: emit function header, extract captures from env, then body
-            this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures)
+            this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures, boxed_caps)
         } else {
             this.gen_function(lambda_name, params_str, ret_type, body)
         }
@@ -4762,13 +4784,32 @@ class Codegen {
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
             // Store VALUES of captured variables in env (copy semantics).
             // This allows closures to escape the enclosing stack frame safely.
+            //
+            // Except for a capture the enclosing frame boxed: that one gets the
+            // cell POINTER, so the closure and the enclosing scope address the same
+            // storage and a write inside the closure is visible outside it (BUGS
+            // #51 defect B). A snapshot is still right for every read-only capture
+            // — and is what makes an escaping closure safe, since the enclosing
+            // frame may be gone by the time it runs. The boxed cell is heap
+            // allocated for that same reason.
+            //
+            // `boxed_locals` is the enclosing function's set, consulted here rather
+            // than re-derived: the decision has to match the one that chose malloc
+            // over alloca, or the env would hold a pointer to a stack slot (a
+            // dangling escape) or an integer read as a pointer.
             var ci: Float = 0
             while (ci < captures.length()) {
-                var cap_val: String = this.fresh_local()
-                this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(captures[ci]))
+                var cap_name0: String = captures[ci]
                 var slot: String = this.fresh_local()
                 this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-                this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
+                if (this.str_in_list(boxed_caps, cap_name0)) {
+                    var cell_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_name0), "i64*")
+                    this.emit_indent("store i64 " + cell_as_int + ", i64* " + slot)
+                } else {
+                    var cap_val: String = this.fresh_local()
+                    this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(cap_name0))
+                    this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
+                }
                 ci = ci + 1
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
@@ -4872,7 +4913,7 @@ class Codegen {
         return result
     }
 
-    fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
+    fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>, boxed_caps: List<String>) {
         this.known_functions.push(name)
         // We are about to emit a function body, so `in_function` must be true for
         // the duration.
@@ -4978,8 +5019,23 @@ class Codegen {
         var ci: Float = 0
         while (ci < captures.length()) {
             var cap_name: String = captures[ci]
-            // Point directly at the env slot — no alloca, no copy
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+            if (this.str_in_list(boxed_caps, cap_name)) {
+                // The enclosing frame boxed this one, so the slot holds a pointer to
+                // a heap cell rather than a copy of the value. Load the pointer and
+                // let `%<cap>` be the cell — one more indirection than the snapshot
+                // case, and the reason a write here reaches the enclosing scope
+                // (BUGS #51 defect B). `%<cap>` is still an `i64*`, so gen_stmts
+                // loads and stores through it exactly as before.
+                var cell_slot: String = this.fresh_local()
+                this.emit_indent(cell_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+                var cell_int: String = this.fresh_local()
+                this.emit_indent(cell_int + " = load i64, i64* " + cell_slot)
+                var cell_ptr: String = this.val_to_typed_ptr(cell_int, "i64*")
+                this.emit_indent("%" + this.sanitize_name(cap_name) + " = bitcast i64* " + cell_ptr + " to i64*")
+            } else {
+                // Point directly at the env slot — no alloca, no copy
+                this.emit_indent("%" + this.sanitize_name(cap_name) + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+            }
             // Register captured variable in typed_vars
             // Use the outer scope's type if available (preserves generic class types)
             if (outer_typed_vars.has(cap_name)) {
@@ -5296,6 +5352,217 @@ class Codegen {
                 this.find_free_vars_stmts(cb, bound, free)
                 this.find_free_vars_expr(cv, bound, free)
             }
+        }
+    }
+
+    // Collect the names a nested lambda *assigns to*. This is the analysis behind
+    // boxed mutable captures (BUGS #51 defect B).
+    //
+    // A capture is stored into the closure's env as a `load i64` snapshot
+    // (gen_lambda) and `%<cap>` inside the closure GEPs the env slot
+    // (gen_closure_function), so a write is visible to later calls of that one
+    // closure instance but never reaches the enclosing frame, which keeps its own
+    // alloca. `count = 0` after two `bump()` calls was that: two storage locations
+    // for one variable.
+    //
+    // The fix needs the two to *be* one location, which means a heap cell the
+    // enclosing frame reads and writes through as well. Boxing every local would
+    // put a malloc and a double indirection on the hottest path in codegen, so the
+    // set is narrowed to exactly the locals that need it: captured by a nested
+    // lambda AND assigned inside it. A capture that is only read is unaffected —
+    // the snapshot is already correct for it — and a local no lambda touches never
+    // leaves its alloca.
+    //
+    // Only `enter_lambda` bodies are scanned. An assignment in the *enclosing*
+    // function's own body is an ordinary local write and must not force boxing;
+    // it is the write crossing the closure boundary that the snapshot loses.
+    fun collect_lambda_assigned_stmts(stmts: List<AST.Stmt>, out: List<String>, in_lambda: Bool) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.collect_lambda_assigned_stmt(stmts[i], out, in_lambda)
+            i = i + 1
+        }
+    }
+
+    fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
+        var sk: String = this.classify_stmt(stmt)
+        if (sk == "var") {
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init) => init
+                _ => AST.Expr.NilLit
+            }
+            this.collect_lambda_assigned_expr(vi, out, in_lambda)
+        } else if (sk == "expr") {
+            var ee: AST.Expr = match (stmt) { ExprStmt(e) => e
+                _ => AST.Expr.NilLit
+            }
+            this.collect_lambda_assigned_expr(ee, out, in_lambda)
+        } else if (sk == "return") {
+            var re: AST.Expr = match (stmt) { Return(v) => v
+                _ => AST.Expr.NilLit
+            }
+            this.collect_lambda_assigned_expr(re, out, in_lambda)
+        } else if (sk == "if") {
+            var ic: AST.Expr = match (stmt) { If(c, t, e) => c
+                _ => AST.Expr.NilLit
+            }
+            var it: List<AST.Stmt> = match (stmt) { If(c, t, e) => t
+                _ => []
+            }
+            var ie: List<AST.Stmt> = match (stmt) { If(c, t, e) => e
+                _ => []
+            }
+            this.collect_lambda_assigned_expr(ic, out, in_lambda)
+            this.collect_lambda_assigned_stmts(it, out, in_lambda)
+            this.collect_lambda_assigned_stmts(ie, out, in_lambda)
+        } else if (sk == "while") {
+            var wc: AST.Expr = match (stmt) { While(c, b) => c
+                _ => AST.Expr.NilLit
+            }
+            var wb: List<AST.Stmt> = match (stmt) { While(c, b) => b
+                _ => []
+            }
+            this.collect_lambda_assigned_expr(wc, out, in_lambda)
+            this.collect_lambda_assigned_stmts(wb, out, in_lambda)
+        } else if (sk == "block") {
+            var bs: List<AST.Stmt> = match (stmt) { Block(s) => s
+                _ => []
+            }
+            this.collect_lambda_assigned_stmts(bs, out, in_lambda)
+        } else if (sk == "try") {
+            var tb: List<AST.Stmt> = match (stmt) { TryCatch(t, cn, cb, fb) => t
+                _ => []
+            }
+            var cb2: List<AST.Stmt> = match (stmt) { TryCatch(t, cn, cb, fb) => cb
+                _ => []
+            }
+            var fb2: List<AST.Stmt> = match (stmt) { TryCatch(t, cn, cb, fb) => fb
+                _ => []
+            }
+            this.collect_lambda_assigned_stmts(tb, out, in_lambda)
+            this.collect_lambda_assigned_stmts(cb2, out, in_lambda)
+            this.collect_lambda_assigned_stmts(fb2, out, in_lambda)
+        } else if (sk == "throw") {
+            var te: AST.Expr = match (stmt) { Throw(v) => v
+                _ => AST.Expr.NilLit
+            }
+            this.collect_lambda_assigned_expr(te, out, in_lambda)
+        }
+        // FunDecl / EnumDecl / ClassDecl / break / continue / let_pattern: a
+        // named nested function is hoisted with by-value capture params, a
+        // separate mechanism from lambda envs, so it is deliberately not scanned
+        // here. Boxing for it would change the hoisted signature.
+    }
+
+    fun collect_lambda_assigned_expr(expr: AST.Expr, out: List<String>, in_lambda: Bool) {
+        match (expr) {
+            Lambda(p, r, b) => {
+                // Everything below this point is inside a closure boundary.
+                this.collect_lambda_assigned_stmts(b, out, true)
+            }
+            Assign(name, value) => {
+                if (in_lambda and name.length() > 0 and !this.str_in_list(out, name)) {
+                    out.push(name)
+                }
+                this.collect_lambda_assigned_expr(value, out, in_lambda)
+            }
+            Binary(l, o, r) => {
+                this.collect_lambda_assigned_expr(l, out, in_lambda)
+                this.collect_lambda_assigned_expr(r, out, in_lambda)
+            }
+            Logical(l, o, r) => {
+                this.collect_lambda_assigned_expr(l, out, in_lambda)
+                this.collect_lambda_assigned_expr(r, out, in_lambda)
+            }
+            Unary(o, r) => { this.collect_lambda_assigned_expr(r, out, in_lambda) }
+            Call(c, args) => {
+                this.collect_lambda_assigned_expr(c, out, in_lambda)
+                var i: Float = 0
+                while (i < args.length()) {
+                    this.collect_lambda_assigned_expr(args[i], out, in_lambda)
+                    i = i + 1
+                }
+            }
+            MethodCall(o, m, a) => {
+                this.collect_lambda_assigned_expr(o, out, in_lambda)
+                var mi: Float = 0
+                while (mi < a.length()) {
+                    this.collect_lambda_assigned_expr(a[mi], out, in_lambda)
+                    mi = mi + 1
+                }
+            }
+            MemberAccess(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            GetField(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            SetField(o, f, v) => {
+                this.collect_lambda_assigned_expr(o, out, in_lambda)
+                this.collect_lambda_assigned_expr(v, out, in_lambda)
+            }
+            IndexGet(o, idx) => {
+                this.collect_lambda_assigned_expr(o, out, in_lambda)
+                this.collect_lambda_assigned_expr(idx, out, in_lambda)
+            }
+            IndexSet(o, idx, v) => {
+                this.collect_lambda_assigned_expr(o, out, in_lambda)
+                this.collect_lambda_assigned_expr(idx, out, in_lambda)
+                this.collect_lambda_assigned_expr(v, out, in_lambda)
+            }
+            ListLit(elements) => {
+                var li: Float = 0
+                while (li < elements.length()) {
+                    this.collect_lambda_assigned_expr(elements[li], out, in_lambda)
+                    li = li + 1
+                }
+            }
+            TupleLit(elements) => {
+                var tli: Float = 0
+                while (tli < elements.length()) {
+                    this.collect_lambda_assigned_expr(elements[tli], out, in_lambda)
+                    tli = tli + 1
+                }
+            }
+            EnumConstruct(e, v, a) => {
+                var ei: Float = 0
+                while (ei < a.length()) {
+                    this.collect_lambda_assigned_expr(a[ei], out, in_lambda)
+                    ei = ei + 1
+                }
+            }
+            Match(s, a) => {
+                this.collect_lambda_assigned_expr(s, out, in_lambda)
+                var mi2: Float = 0
+                while (mi2 < a.length()) {
+                    var arm_body: AST.Expr = match (a[mi2]) { Arm(p, b) => b }
+                    this.collect_lambda_assigned_expr(arm_body, out, in_lambda)
+                    mi2 = mi2 + 1
+                }
+            }
+            BlockExpr(stmts, value) => {
+                this.collect_lambda_assigned_stmts(stmts, out, in_lambda)
+                this.collect_lambda_assigned_expr(value, out, in_lambda)
+            }
+            IfExpr(c, tb, tv, eb, ev) => {
+                this.collect_lambda_assigned_expr(c, out, in_lambda)
+                this.collect_lambda_assigned_stmts(tb, out, in_lambda)
+                this.collect_lambda_assigned_expr(tv, out, in_lambda)
+                this.collect_lambda_assigned_stmts(eb, out, in_lambda)
+                this.collect_lambda_assigned_expr(ev, out, in_lambda)
+            }
+            TryExpr(tb, tv, cn, cb, cv) => {
+                this.collect_lambda_assigned_stmts(tb, out, in_lambda)
+                this.collect_lambda_assigned_expr(tv, out, in_lambda)
+                this.collect_lambda_assigned_stmts(cb, out, in_lambda)
+                this.collect_lambda_assigned_expr(cv, out, in_lambda)
+            }
+            IsCheck(val, t) => { this.collect_lambda_assigned_expr(val, out, in_lambda) }
+            Yield(v) => { this.collect_lambda_assigned_expr(v, out, in_lambda) }
+            Variable(name) => {}
+            Ref(rkind, rname, rslot) => {}
+            IntLit(v) => {}
+            FloatLit(v) => {}
+            BoolLit(v) => {}
+            StringLit(s) => {}
+            NilLit => {}
+            This => {}
+            MapLit => {}
         }
     }
 
@@ -8831,6 +9098,29 @@ class Codegen {
                 allocated.push(aap[0])
                 aai = aai + 1
             }
+            // Same heap-cell treatment as the non-nested path below (BUGS #51
+            // defect B), and clearing the map is load-bearing even where nothing
+            // gets boxed: `boxed_locals` still holds the *enclosing* function's set
+            // while this body is emitted, so a lambda in here capturing a name that
+            // merely coincides with an outer boxed local would be handed a snapshot
+            // as though it were a cell pointer. Saved and restored like
+            // current_fn_locals above.
+            var saved_boxed2: Map<String, Bool> = this.boxed_locals
+            this.boxed_locals = {}
+            var boxed_names2: List<String> = []
+            if (!this.identity_mode) {
+                var assigned2: List<String> = []
+                this.collect_lambda_assigned_stmts(body, assigned2, false)
+                var bl2_i: Float = 0
+                while (bl2_i < var_names2.length()) {
+                    var bl2_n: String = var_names2[bl2_i]
+                    if (this.str_in_list(assigned2, bl2_n) and bl2_n != "self") {
+                        boxed_names2.push(bl2_n)
+                        this.boxed_locals.set(bl2_n, true)
+                    }
+                    bl2_i = bl2_i + 1
+                }
+            }
             pi3 = 0
             while (pi3 < var_names2.length()) {
                 var vn2: String = var_names2[pi3]
@@ -8841,7 +9131,14 @@ class Codegen {
                     aaj = aaj + 1
                 }
                 if (!already_alloc) {
-                    this.emit_indent("%" + this.sanitize_name(vn2) + " = alloca i64")
+                    if (this.str_in_list(boxed_names2, vn2)) {
+                        var cell_raw2: String = this.fresh_local()
+                        this.emit_indent(cell_raw2 + " = call i8* @__sf_malloc(i64 8)")
+                        this.emit_indent("%" + this.sanitize_name(vn2) + " = bitcast i8* " + cell_raw2 + " to i64*")
+                        this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn2))
+                    } else {
+                        this.emit_indent("%" + this.sanitize_name(vn2) + " = alloca i64")
+                    }
                     allocated.push(vn2)
                 }
                 pi3 = pi3 + 1
@@ -8858,6 +9155,7 @@ class Codegen {
             this.typed_vars = saved_typed_vars2
             this.gc_root_count = saved_gc_root_count2
             this.current_fn_locals = saved_fn_locals2
+            this.boxed_locals = saved_boxed2
             this.globals.push(nested_ir)
             return
         }
@@ -8988,6 +9286,41 @@ class Codegen {
             cfl_i = cfl_i + 1
         }
 
+        // Locals a nested lambda both captures and writes to must live in a heap
+        // cell rather than an alloca, so the closure's env can point *at* the same
+        // storage the enclosing frame reads (BUGS #51 defect B). Without this the
+        // variable has two homes — the frame's alloca and the env's snapshot — and
+        // a write inside the closure never reaches the enclosing scope: `count`
+        // read 0 after two `bump()` calls that each returned a correctly
+        // incremented value.
+        //
+        // Deliberately narrow. `%<name>` is an `i64*` either way, so every load and
+        // store site downstream is untouched; only how the pointer is produced
+        // changes. A capture that is merely read keeps its alloca (the env snapshot
+        // is already correct for it), and so does every local no lambda mentions —
+        // which is nearly all of them, and matters because this is the hottest
+        // path in codegen.
+        var boxed_locals: List<String> = []
+        if (!this.identity_mode) {
+            var assigned_in_lambda: List<String> = []
+            this.collect_lambda_assigned_stmts(body, assigned_in_lambda, false)
+            var bl_i: Float = 0
+            while (bl_i < var_names.length()) {
+                var bl_n: String = var_names[bl_i]
+                if (this.str_in_list(assigned_in_lambda, bl_n) and bl_n != "self") {
+                    if (this.current_fn_locals.has(bl_n) or !this.module_globals.has(this.current_prefix + bl_n)) {
+                        boxed_locals.push(bl_n)
+                    }
+                }
+                bl_i = bl_i + 1
+            }
+        }
+        // Identity mode (the bootstrap) is excluded: there is no GC and no boxing
+        // there, and the compiler's own source contains no capturing lambda that
+        // writes to a capture, so the analysis would only add risk to the one build
+        // that cannot exercise it. That is the identity-mode blind spot — the
+        // coverage for this has to come from user-program tests.
+
         // Emit all allocas in entry block (params + locals)
         i = 0
         while (i < param_list.length()) {
@@ -9004,15 +9337,52 @@ class Codegen {
             // (BUGS #59). current_fn_locals holds this body's own bindings, so
             // prefer it over module_globals here.
             if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self") {
-                this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
-                // Zero-initialize allocas for heap-typed locals before they become GC roots.
-                // This prevents the GC from reading uninitialized memory if it triggers
-                // between push_root and the first real store to this variable.
-                if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                if (this.str_in_list(boxed_locals, vn)) {
+                    // Heap cell instead of an alloca. Zeroed unconditionally, not
+                    // just for GC root types: malloc'd memory is uninitialized, and
+                    // a `var` read before its first store would otherwise surface
+                    // whatever was in the heap rather than the 0 an alloca'd slot
+                    // gets from the store below.
+                    var cell_raw: String = this.fresh_local()
+                    this.emit_indent(cell_raw + " = call i8* @__sf_malloc(i64 8)")
+                    this.emit_indent("%" + this.sanitize_name(vn) + " = bitcast i8* " + cell_raw + " to i64*")
                     this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                } else {
+                    this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
+                    // Zero-initialize allocas for heap-typed locals before they become GC roots.
+                    // This prevents the GC from reading uninitialized memory if it triggers
+                    // between push_root and the first real store to this variable.
+                    if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                        this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                    }
                 }
             }
             i = i + 1
+        }
+        // The env must hold the cell POINTER, not a snapshot of its contents, for
+        // any local boxed above. gen_lambda reads this to decide which of the two
+        // it stores; cleared after the body so a sibling function does not inherit
+        // this one's set.
+        //
+        // Two consequences of the cell being `__sf_malloc` (plain malloc) rather
+        // than GC memory, both deliberate. It is never swept, so the GC root pushed
+        // for it below stays a valid address for the whole process — which is what
+        // makes rooting a heap cell safe at all. And it is never freed, so a boxed
+        // local costs 8 leaked bytes per call to the enclosing function. Closures
+        // already leak their env array and closure pair the same way (gen_lambda),
+        // so this adds no new class of leak, only another instance of it.
+        //
+        // Not addressed here: a closure outliving its enclosing frame keeps the cell
+        // alive but not *rooted* — the frame pops its roots on return, so a heap
+        // value reachable only through the cell can be swept. That is exactly the
+        // pre-existing hole for the env array's own snapshots, so boxing neither
+        // creates nor widens it.
+        var saved_boxed: Map<String, Bool> = this.boxed_locals
+        this.boxed_locals = {}
+        var sb_i: Float = 0
+        while (sb_i < boxed_locals.length()) {
+            this.boxed_locals.set(boxed_locals[sb_i], true)
+            sb_i = sb_i + 1
         }
 
         // Store params into their allocas and track types
@@ -9179,6 +9549,7 @@ class Codegen {
         this.typed_vars = saved_tv
         this.in_function = false
         this.current_fn_locals = saved_fn_locals
+        this.boxed_locals = saved_boxed
         this.is_coroutine = saved_is_coro
     }
 
