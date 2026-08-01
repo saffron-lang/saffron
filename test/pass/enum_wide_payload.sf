@@ -1,0 +1,69 @@
+// BUGS #96 — a match arm must bind every field of a variant, not the first five.
+//
+// `extract_arm_bindings` was five unrolled `if (bind_count >= n)` lines, capped at
+// five "to avoid VM loop variable bug" — a workaround for the C VM in legacy/,
+// dead for a long time. Construction never had the cap (gen_enum_construct stores
+// arguments in a loop), so a six-field variant was built correctly and read back
+// with its last field never loaded. The binding kept whatever its slot held, which
+// reads as 0.
+//
+// That is a silent wrong value, not a crash, which is why it stayed hidden: it
+// only became visible when a 0 landed where a String belonged and the next
+// `starts_with` ran strncmp against a null pointer. `ClassDecl` gaining a sixth
+// field (`docstring`, pushed there by #95's `type_params`) is exactly that case,
+// and it segfaulted the compiler on every program containing a class.
+//
+// Each assertion below reads a *distinct* field, so a cap at any position shows up
+// as one specific failure rather than a general "enums are broken". The fields are
+// deliberately given values that are wrong-but-plausible if truncated to 0.
+
+import "@test" as Test
+
+enum Wide {
+    Six(a: String, b: String, c: String, d: String, e: String, f: String),
+    Seven(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int),
+    Mixed(name: String, items: List<String>, count: Int, label: String, flag: Bool, doc: String),
+    Nothing
+}
+
+// A six-field variant: the sixth field is the one the old cap dropped.
+var s: Wide = Wide.Six("A1", "B2", "C3", "D4", "E5", "F6")
+Test.assert_eq(match (s) { Six(a, b, c, d, e, f) => a
+    _ => "?" }, "A1", "field 1 of 6")
+Test.assert_eq(match (s) { Six(a, b, c, d, e, f) => e
+    _ => "?" }, "E5", "field 5 of 6 — the last one the old cap reached")
+Test.assert_eq(match (s) { Six(a, b, c, d, e, f) => f
+    _ => "?" }, "F6", "field 6 of 6 — read as 0 before #96")
+
+// Seven fields, to show the fix is a loop and not a cap moved by one.
+var n: Wide = Wide.Seven(11, 22, 33, 44, 55, 66, 77)
+Test.assert_eq(match (n) { Seven(a, b, c, d, e, f, g) => f
+    _ => 0 }, 66, "field 6 of 7")
+Test.assert_eq(match (n) { Seven(a, b, c, d, e, f, g) => g
+    _ => 0 }, 77, "field 7 of 7")
+
+// The shape that actually broke the compiler: a String last, behind a List. The
+// assertion calls a String method, because a truncated field is a null pointer and
+// only a method that dereferences it proves the load happened.
+var m: Wide = Wide.Mixed("cls", ["T", "U"], 2, "lbl", true, "@actor\ndoc")
+Test.assert_eq(match (m) { Mixed(name, items, count, label, flag, doc) => doc.starts_with("@actor")
+    _ => false }, true, "a trailing String is a live pointer, not 0")
+Test.assert_eq(match (m) { Mixed(name, items, count, label, flag, doc) => items.length()
+    _ => 0 }, 2, "and an interior List field still round-trips")
+Test.assert_eq(match (m) { Mixed(name, items, count, label, flag, doc) => label
+    _ => "?" }, "lbl", "as does the field before the last")
+
+// A no-field variant of the same enum still uses the tag-only path. Named
+// `nothing` rather than `e`: a match binding whose name matches a module global
+// emits a store to a local alloca that was never declared, which is its own bug
+// and not the one under test here.
+var nothing: Wide = Wide.Nothing
+Test.assert_eq(match (nothing) { Nothing => "none"
+    _ => "?" }, "none", "a fieldless variant is unaffected")
+
+// Destructuring goes through the same extraction (stmts_body.sf calls
+// extract_arm_bindings too), so it was capped identically.
+let Wide.Six(la, lb, lc, ld, le, lf) = Wide.Six("p", "q", "r", "s", "t", "u")
+Test.assert_eq(lf, "u", "let-destructuring reaches the sixth field too")
+
+Test.summary()

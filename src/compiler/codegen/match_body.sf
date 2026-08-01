@@ -312,12 +312,26 @@
         var total: Float = bind_count + 1
         var total_str: String = total.floor().to_string()
         var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
-        // Extract each field individually to avoid VM loop variable bug
-        if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
-        if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
-        if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
-        if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
-        if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
+        // One extraction per binding, however many there are.
+        //
+        // This used to be five unrolled `if (bind_count >= n)` lines, capped at
+        // five, "to avoid VM loop variable bug" — a workaround for the C VM in
+        // legacy/, which has been dead and unsupported for a long time. The cap
+        // outlived its reason and became a silent arity limit: gen_enum_construct
+        // stores every argument in a loop, so a six-field variant was built
+        // correctly and then read back with its sixth field never loaded. The
+        // binding kept whatever its alloca held, which reads as 0 — and a 0 where
+        // a String belongs is a null pointer the next strncmp/strlen dereferences.
+        //
+        // That is exactly how `ClassDecl` gaining `type_params` (BUGS #95) turned
+        // into a segfault in the codegen pre-scan: the sixth field is `docstring`,
+        // so `cd3.starts_with("@actor")` ran strncmp against NULL. No diagnostic,
+        // no wrong-looking IR — just a truncated payload (BUGS #96).
+        var bi: Float = 0
+        while (bi < bind_count) {
+            this.extract_one_field(bindings[bi], arr_ptr, total_str, bi + 1)
+            bi = bi + 1
+        }
     }
 
     fun extract_one_field(bname: String, arr_ptr: String, total_str: String, idx: Float) {

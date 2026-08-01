@@ -357,6 +357,34 @@ Rules:
    so the "compiler reported success right up to the assembler" failure
    (#37, verbatim) cannot recur.
 
+### I9b. No hand-unrolled loop over a variable-length structure.
+
+`extract_arm_bindings` bound the first **five** fields of an enum variant, as five
+copy-pasted `if (bind_count >= n)` lines, because a bug in the long-dead C VM made
+a loop over the index unreliable. Construction had no such limit. A sixth field was
+therefore stored and never loaded, and the binding kept its uninitialised slot,
+which reads as 0 — a null pointer wherever a String was declared (#96).
+
+The cap is not the interesting part; the shape is. An unrolled loop encodes a
+maximum in code that reads as if it had none, and nothing connects it to the
+producer that has no maximum. It was invisible until an unrelated change — adding
+`type_params` to `ClassDecl`, pushing `docstring` to sixth — made the compiler
+segfault on every program containing a class. Both halves of the diagnosis were
+wrong for a while: gen3 crashing where gen4 did not looked exactly like a gen2
+miscompilation, and a separate `send`-dispatch failure looked like a logic bug in
+the change under test. Both were this.
+
+Rules:
+
+1. Iterate. A `while` over `bindings.length()` is not slower in any way that
+   matters, and it cannot disagree with the producer about how many there are.
+2. Where an unrolled form is genuinely required (an IR shape that needs distinct
+   register names per slot), assert the length first and `internal_error` above it,
+   per I9. Silence is the defect, not the bound.
+3. A workaround for a dead backend is a bug with a comment on it. `legacy/`'s VM
+   has been unsupported for a long time; every "to avoid VM …" comment in the tree
+   is a candidate for the same treatment as this one.
+
 ### I10. One source of truth per fact. Duplication is generated, never copied.
 
 - **One `compile()` entry point**, taking an options record. The current 11
