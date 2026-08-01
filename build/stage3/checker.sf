@@ -1299,7 +1299,21 @@ class NullChecker {
             IndexGet(obj, index) => {
                 var list_type: String = this.infer_expr(obj)
                 this.infer_expr(index)
-                this.parse_type_node(this.extract_list_element_type(list_type))
+                // Subscript overloading: on a user class declaring `getItem`,
+                // `obj[k]` has getItem's declared return type, not an element
+                // type teased out of a generic argument the class does not have.
+                // extract_list_element_type answered "Any" for a class, which
+                // was harmless in itself but told the next dispatch nothing
+                // (BUGS #94; codegen side in methods_body.sf gen_index_get).
+                // Read the registered return type directly rather than calling
+                // infer_method_call, which would re-infer `obj` and `index` and
+                // so double every diagnostic they produce.
+                if (this.env.class_fields.has(list_type)
+                    and this.get_receiver_methods(list_type).contains("getItem")) {
+                    this.env.get_func_ret_type(list_type + "__getItem")
+                } else {
+                    this.parse_type_node(this.extract_list_element_type(list_type))
+                }
             }
             IndexSet(obj, index, value) => this.infer_type(value)
             MethodCall(obj, method, args) => this.parse_type_node(this.infer_method_call(obj, method, args))
