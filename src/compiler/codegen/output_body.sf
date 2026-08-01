@@ -163,6 +163,29 @@
                 allocated.push(aap[0])
                 aai = aai + 1
             }
+            // Same heap-cell treatment as the non-nested path below (BUGS #51
+            // defect B), and clearing the map is load-bearing even where nothing
+            // gets boxed: `boxed_locals` still holds the *enclosing* function's set
+            // while this body is emitted, so a lambda in here capturing a name that
+            // merely coincides with an outer boxed local would be handed a snapshot
+            // as though it were a cell pointer. Saved and restored like
+            // current_fn_locals above.
+            var saved_boxed2: Map<String, Bool> = this.boxed_locals
+            this.boxed_locals = {}
+            var boxed_names2: List<String> = []
+            if (!this.identity_mode) {
+                var assigned2: List<String> = []
+                this.collect_lambda_assigned_stmts(body, assigned2, false)
+                var bl2_i: Float = 0
+                while (bl2_i < var_names2.length()) {
+                    var bl2_n: String = var_names2[bl2_i]
+                    if (this.str_in_list(assigned2, bl2_n) and bl2_n != "self") {
+                        boxed_names2.push(bl2_n)
+                        this.boxed_locals.set(bl2_n, true)
+                    }
+                    bl2_i = bl2_i + 1
+                }
+            }
             pi3 = 0
             while (pi3 < var_names2.length()) {
                 var vn2: String = var_names2[pi3]
@@ -173,7 +196,14 @@
                     aaj = aaj + 1
                 }
                 if (!already_alloc) {
-                    this.emit_indent("%" + this.sanitize_name(vn2) + " = alloca i64")
+                    if (this.str_in_list(boxed_names2, vn2)) {
+                        var cell_raw2: String = this.fresh_local()
+                        this.emit_indent(cell_raw2 + " = call i8* @__sf_malloc(i64 8)")
+                        this.emit_indent("%" + this.sanitize_name(vn2) + " = bitcast i8* " + cell_raw2 + " to i64*")
+                        this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn2))
+                    } else {
+                        this.emit_indent("%" + this.sanitize_name(vn2) + " = alloca i64")
+                    }
                     allocated.push(vn2)
                 }
                 pi3 = pi3 + 1
@@ -190,6 +220,7 @@
             this.typed_vars = saved_typed_vars2
             this.gc_root_count = saved_gc_root_count2
             this.current_fn_locals = saved_fn_locals2
+            this.boxed_locals = saved_boxed2
             this.globals.push(nested_ir)
             return
         }
@@ -320,6 +351,41 @@
             cfl_i = cfl_i + 1
         }
 
+        // Locals a nested lambda both captures and writes to must live in a heap
+        // cell rather than an alloca, so the closure's env can point *at* the same
+        // storage the enclosing frame reads (BUGS #51 defect B). Without this the
+        // variable has two homes — the frame's alloca and the env's snapshot — and
+        // a write inside the closure never reaches the enclosing scope: `count`
+        // read 0 after two `bump()` calls that each returned a correctly
+        // incremented value.
+        //
+        // Deliberately narrow. `%<name>` is an `i64*` either way, so every load and
+        // store site downstream is untouched; only how the pointer is produced
+        // changes. A capture that is merely read keeps its alloca (the env snapshot
+        // is already correct for it), and so does every local no lambda mentions —
+        // which is nearly all of them, and matters because this is the hottest
+        // path in codegen.
+        var boxed_locals: List<String> = []
+        if (!this.identity_mode) {
+            var assigned_in_lambda: List<String> = []
+            this.collect_lambda_assigned_stmts(body, assigned_in_lambda, false)
+            var bl_i: Float = 0
+            while (bl_i < var_names.length()) {
+                var bl_n: String = var_names[bl_i]
+                if (this.str_in_list(assigned_in_lambda, bl_n) and bl_n != "self") {
+                    if (this.current_fn_locals.has(bl_n) or !this.module_globals.has(this.current_prefix + bl_n)) {
+                        boxed_locals.push(bl_n)
+                    }
+                }
+                bl_i = bl_i + 1
+            }
+        }
+        // Identity mode (the bootstrap) is excluded: there is no GC and no boxing
+        // there, and the compiler's own source contains no capturing lambda that
+        // writes to a capture, so the analysis would only add risk to the one build
+        // that cannot exercise it. That is the identity-mode blind spot — the
+        // coverage for this has to come from user-program tests.
+
         // Emit all allocas in entry block (params + locals)
         i = 0
         while (i < param_list.length()) {
@@ -336,15 +402,52 @@
             // (BUGS #59). current_fn_locals holds this body's own bindings, so
             // prefer it over module_globals here.
             if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self") {
-                this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
-                // Zero-initialize allocas for heap-typed locals before they become GC roots.
-                // This prevents the GC from reading uninitialized memory if it triggers
-                // between push_root and the first real store to this variable.
-                if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                if (this.str_in_list(boxed_locals, vn)) {
+                    // Heap cell instead of an alloca. Zeroed unconditionally, not
+                    // just for GC root types: malloc'd memory is uninitialized, and
+                    // a `var` read before its first store would otherwise surface
+                    // whatever was in the heap rather than the 0 an alloca'd slot
+                    // gets from the store below.
+                    var cell_raw: String = this.fresh_local()
+                    this.emit_indent(cell_raw + " = call i8* @__sf_malloc(i64 8)")
+                    this.emit_indent("%" + this.sanitize_name(vn) + " = bitcast i8* " + cell_raw + " to i64*")
                     this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                } else {
+                    this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
+                    // Zero-initialize allocas for heap-typed locals before they become GC roots.
+                    // This prevents the GC from reading uninitialized memory if it triggers
+                    // between push_root and the first real store to this variable.
+                    if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                        this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                    }
                 }
             }
             i = i + 1
+        }
+        // The env must hold the cell POINTER, not a snapshot of its contents, for
+        // any local boxed above. gen_lambda reads this to decide which of the two
+        // it stores; cleared after the body so a sibling function does not inherit
+        // this one's set.
+        //
+        // Two consequences of the cell being `__sf_malloc` (plain malloc) rather
+        // than GC memory, both deliberate. It is never swept, so the GC root pushed
+        // for it below stays a valid address for the whole process — which is what
+        // makes rooting a heap cell safe at all. And it is never freed, so a boxed
+        // local costs 8 leaked bytes per call to the enclosing function. Closures
+        // already leak their env array and closure pair the same way (gen_lambda),
+        // so this adds no new class of leak, only another instance of it.
+        //
+        // Not addressed here: a closure outliving its enclosing frame keeps the cell
+        // alive but not *rooted* — the frame pops its roots on return, so a heap
+        // value reachable only through the cell can be swept. That is exactly the
+        // pre-existing hole for the env array's own snapshots, so boxing neither
+        // creates nor widens it.
+        var saved_boxed: Map<String, Bool> = this.boxed_locals
+        this.boxed_locals = {}
+        var sb_i: Float = 0
+        while (sb_i < boxed_locals.length()) {
+            this.boxed_locals.set(boxed_locals[sb_i], true)
+            sb_i = sb_i + 1
         }
 
         // Store params into their allocas and track types
@@ -511,6 +614,7 @@
         this.typed_vars = saved_tv
         this.in_function = false
         this.current_fn_locals = saved_fn_locals
+        this.boxed_locals = saved_boxed
         this.is_coroutine = saved_is_coro
     }
 

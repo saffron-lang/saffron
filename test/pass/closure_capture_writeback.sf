@@ -1,0 +1,107 @@
+// A write to a captured variable inside a closure must reach the enclosing
+// function's frame (BUGS #51 defect B).
+//
+// A capture used to have two homes: the enclosing frame's alloca and a snapshot
+// of its value copied into the closure's heap env. Reads and writes inside the
+// closure went to the snapshot, so the counter below incremented correctly from
+// the closure's point of view — `bump()` returned 1 then 2 — while `count` in the
+// enclosing function stayed 0. The fix boxes a local that a nested lambda both
+// captures *and* assigns: it lives in a heap cell, and the env holds the cell
+// pointer rather than a copy, so there is one home again.
+//
+// Top level already worked, because a top-level `var` is a module global and the
+// closure addressed the global directly — which is why this needs to be tested
+// inside a `fun`, and why the top-level case is here too as a guard against
+// fixing one and breaking the other.
+import "@test" as Test
+
+fun int_writeback(): Int {
+    var count: Int = 0
+    var bump = fun (): Int => {
+        count = count + 1
+        return count
+    }
+    Test.assert_eq(bump(), 1, "first call sees its own increment")
+    Test.assert_eq(bump(), 2, "second call sees the first call's write")
+    return count
+}
+Test.assert_eq(int_writeback(), 2, "the enclosing frame sees both writes")
+
+// Floats take the same path but a different tag, and the tag is where the
+// original defect surfaced most visibly.
+fun float_writeback(): Float {
+    var total: Float = 0.5
+    var add = fun (x: Float) => {
+        total = total + x
+    }
+    add(1.0)
+    add(2.0)
+    return total
+}
+Test.assert_eq(float_writeback(), 3.5, "Float writes accumulate in the enclosing frame")
+
+// Each call to a factory must still get an independent cell. If the boxing were
+// hoisted or shared, the second counter would resume where the first left off.
+fun make_counter(): Fun {
+    var n: Int = 0
+    return fun (): Int => {
+        n = n + 1
+        return n
+    }
+}
+var first = make_counter()
+var second = make_counter()
+Test.assert_eq(first(), 1, "first counter starts at 1")
+Test.assert_eq(first(), 2, "first counter advances")
+Test.assert_eq(second(), 1, "second counter has its own cell")
+Test.assert_eq(first(), 3, "the two counters do not interfere")
+
+// A capture that is only *read* keeps its alloca — the env snapshot is already
+// correct for it — so this must be unaffected by the boxing decision.
+fun read_only_capture(): Int {
+    var base: Int = 10
+    var scaled = fun (m: Int): Int => base * m
+    return scaled(4)
+}
+Test.assert_eq(read_only_capture(), 40, "a read-only capture still resolves")
+
+// Two closures over the same boxed local share it: this is the observable
+// difference from the snapshot behaviour, not an incidental one.
+fun shared_cell(): Int {
+    var shared: Int = 0
+    var inc = fun () => { shared = shared + 1 }
+    var dec = fun () => { shared = shared - 10 }
+    inc()
+    inc()
+    dec()
+    return shared
+}
+Test.assert_eq(shared_cell(), -8, "two closures over one local share its storage")
+
+// Writes must also cross a loop and a conditional inside the closure body, since
+// the analysis walks statements structurally and could miss a nested assign.
+fun nested_stmt_writeback(): Int {
+    var acc: Int = 0
+    var run = fun (n: Int) => {
+        for (i = 0; i < n; i = i + 1) {
+            if (i != 1) {
+                acc = acc + i
+            }
+        }
+    }
+    run(4)
+    return acc
+}
+Test.assert_eq(nested_stmt_writeback(), 5, "a write nested in a loop and an if still boxes")
+
+// Top level: unchanged behaviour, guarding against a fix that only moved the bug.
+var top: Int = 0
+var top_bump = fun (): Int => {
+    top = top + 1
+    return top
+}
+Test.assert_eq(top_bump(), 1, "top-level closure write is visible")
+Test.assert_eq(top_bump(), 2, "top-level closure write persists")
+Test.assert_eq(top, 2, "the module global sees both writes")
+
+Test.summary()

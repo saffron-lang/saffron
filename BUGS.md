@@ -2170,7 +2170,7 @@ parent, which a forwarded `Dog__init` never registers, so the chain breaks at
 the second level. Independent of dispatch — reproduces by giving each level an
 explicit `init`, which works.
 
-### 51. Mutation of a captured variable is lost — captures are by value
+### 51. FIXED — mutation of a captured variable was lost (captures were by value)
 
 **Reproduction:**
 
@@ -2216,9 +2216,10 @@ So there is no single "captures are by value" bug:
    view of its counter is correct, and top-level captures are fully correct — so
    the `output_body.sf` analysis below explains the third row only.
 
-The practical consequence for the docs is unchanged: `CLAUDE.md`'s mutable-counter
-pattern still does not work as shown if the counter is a `Float` or the closure
-is nested in a function.
+The practical consequence for the docs, at the time of that re-verification, was
+that `CLAUDE.md`'s mutable-counter pattern did not work as shown if the counter
+was a `Float` or the closure was nested in a function. Both halves are fixed now
+— see the resolution below.
 
 `src/compiler/codegen/output_body.sf:26-85` hoists nested functions to top level
 with their free variables appended as ordinary by-value `i64` parameters
@@ -2227,8 +2228,9 @@ copy. Real mutable capture needs boxed cells — captures passed as pointers, wi
 the enclosing frame's variable promoted to a heap cell — which the comment at
 line 26 hints at ("capture POINTERS") but the code does not do.
 
-**`CLAUDE.md` shows a mutable-counter closure as a supported pattern, so the
-documentation is wrong here too.**
+**`CLAUDE.md` showed a mutable-counter closure as a supported pattern, so the
+documentation was wrong here too** — moot as of the fix below: the pattern now
+works as documented, in every scope and for both `Int` and `Float`.
 
 **Partial resolution (2026-07-31): defect A (the Float half) is fixed; defect B
 remains.** The `Float`-capture breakage was the same float tag/untag confusion as
@@ -2238,23 +2240,78 @@ Measured now, a `Float` capture behaves identically to an `Int` one: the closure
 sees its own writes (`1`, `2`) and the enclosing frame does not (`count = 0`) —
 i.e. only defect B is left, in both types.
 
-Defect B (write-back to an enclosing *function's* frame) is the real heap-boxing
-work and is **not yet done**. Diagnosis mapped it precisely: the env stores a
-`load i64` snapshot of each capture (`closures_body.sf` gen_lambda, the
-capture-store loop ~103-111), and inside the closure `%<cap>` aliases the env
-slot via GEP (gen_closure_function ~316-329) — so mutations persist across calls
-of one closure instance but never reach the enclosing frame, which keeps its own
-alloca. A fix must box a captured-AND-mutated local into a heap cell at its
-`VarDecl`, route the enclosing frame's own reads/writes (`stmts_body.sf`
-gen_var_decl, `expr_body.sf` Variable read and `Assign`) through the cell, and
-store the cell *pointer* in the env instead of the value. That touches the
-hottest path in codegen (every variable access) and — per the identity-mode
-blind spot — the bootstrap cannot exercise it (the compiler self-hosts in
-identity mode, where there is no boxing), so it needs a dedicated user-program
-test matrix rather than a green bootstrap. Left as its own change for that
-reason. Containment that keeps it tractable: box *only* locals that are both
-captured by a nested lambda and assigned, leaving every other variable on the
-current alloca path.
+Defect B (write-back to an enclosing *function's* frame) was the real heap-boxing
+work. Diagnosis mapped it precisely: the env stored a `load i64` snapshot of each
+capture (`closures_body.sf` gen_lambda, the capture-store loop ~103-111), and
+inside the closure `%<cap>` aliased the env slot via GEP (gen_closure_function
+~316-329) — so mutations persisted across calls of one closure instance but never
+reached the enclosing frame, which kept its own alloca.
+
+**FIXED 2026-07-31.** The repro at the top of this entry now prints `1`, `2`,
+`count = 2` for both `Int` and `Float`, so #51 is closed.
+
+The fix turned out to need far less than the diagnosis above predicted. It does
+*not* route the enclosing frame's reads and writes through anything new, and so it
+never touches `expr_body.sf` or `stmts_body.sf` — the hottest path in codegen is
+untouched. The reason is that `%<name>` is already an `i64*` in both worlds: an
+`alloca i64` and a `bitcast` of an 8-byte `__sf_malloc` cell are the same type, so
+every existing load and store site downstream works unchanged and only *how the
+pointer is produced* differs. What actually changed:
+
+- **`closures_body.sf`** — a three-function analysis walker
+  (`collect_lambda_assigned_stmts` / `_stmt` / `_expr`) that collects names
+  assigned *inside* a nested lambda. The expression walker is an exhaustive match
+  over all 30 `AST.Expr` variants, modelled on `find_free_vars_expr`; the `Lambda`
+  arm recurses with `in_lambda = true` and the `Assign` arm only records a name
+  when that flag is set. It deliberately skips nested `FunDecl`/`ClassDecl`/
+  `EnumDecl`, which have their own frames.
+- **`output_body.sf`** — `gen_function` computes the boxed set (captured *and*
+  assigned, per the containment below) and emits `__sf_malloc(8)` +
+  `bitcast` + `store i64 0` in place of the `alloca` for those names. The zeroing
+  is unconditional, unlike the existing GC-root-type-only zeroing, because
+  malloc'd memory is uninitialized where an alloca'd slot got its 0 from the
+  store below.
+- **`gen_lambda`** — the env-store loop writes the cell *pointer* for a boxed
+  capture instead of a `load` snapshot, and `gen_closure_function` dereferences
+  one extra level to make `%<cap>` the cell rather than the env slot.
+
+Containment, as planned: box *only* locals that are both captured by a nested
+lambda and assigned. A capture that is merely read keeps its alloca (the snapshot
+is already correct for it) and so does every local no lambda mentions, which is
+nearly all of them.
+
+Three things worth knowing about the result:
+
+- **Two closures over the same boxed local now share it.** That is the point, not
+  a side effect, but it is an observable behaviour change from the snapshot
+  semantics — covered explicitly in the regression test.
+- **A boxed local leaks 8 bytes per call** to its enclosing function, since
+  `__sf_malloc` is plain `malloc` and nothing frees the cell. Closures already
+  leak their env array and closure pair identically (gen_lambda), so this adds
+  another instance of an existing leak, not a new class of one. The upside is
+  that the cell is never swept, which is what makes pushing a GC root for its
+  address safe.
+- **Not fixed: a closure outliving its enclosing frame.** The cell survives, but
+  the frame pops its GC roots on return, so a heap value reachable *only* through
+  the cell can be swept. This is exactly the pre-existing hole for the env
+  array's own snapshots — boxing neither creates nor widens it.
+
+The analysis is gated on `!identity_mode`, per the identity-mode blind spot: the
+compiler self-hosts in identity mode where there is no boxing, and grep confirms
+the compiler's own source contains zero real capturing lambdas (all 5 `fun (`
+matches are inside comments). So the bootstrap can neither exercise nor break
+this, and the coverage is `test/pass/closure_capture_writeback.sf` — 14
+assertions over the Int and Float write-back, factory independence, read-only
+captures, two closures sharing one cell, a write nested inside a loop and an
+`if`, and the top-level case that already worked.
+
+Note there are **two** function-emission paths in `output_body.sf` and both
+needed handling: the main one, and a separate nested-`FunDecl` path (~144-180)
+that hoists to top level. Clearing `boxed_locals` in the nested path is
+load-bearing even though it rarely boxes anything, because the map otherwise
+still holds the *enclosing* function's set while the nested body is emitted — a
+lambda in there capturing a coincidentally-named variable would be handed a
+snapshot as though it were a cell pointer.
 
 ### 52. FIXED — indexing a list with a `Float`-typed value silently read element 0
 
