@@ -1,0 +1,64 @@
+// Method dispatch on a receiver whose declared type is nullable (BUGS #93).
+//
+// The checker narrows `String|Nil` to `String` inside a nil guard and rejects
+// every unguarded call, but that narrowing lives in the checker's own env and
+// never reaches codegen's `typed_vars`. Codegen therefore saw the literal
+// spelling "String|Nil", which matched no dispatch arm:
+//
+//   * `.length()` fell through to the catch-all `else`, which assumes List.
+//     `__list_length` does `inttoptr` on the value as given — a List is stored
+//     untagged, a String is NaN-tagged, so it dereferenced 0x7FF8... and
+//     segfaulted. This is what crashed test/nullable_narrowing.sf.
+//   * `.to_upper()`, `.trim()` and friends missed their String test the same
+//     way and emitted *nothing at all* — the receiver was loaded and discarded
+//     and the call site silently produced a null operand.
+//
+// The second failure mode is the dangerous one: it is not a crash, so a test
+// that only checks the exit code stays green. Every assertion here compares a
+// value for that reason.
+import "@test" as Test
+
+fun find(name: String): String|Nil {
+    if (name == "found") { return "hello world" }
+    return nil
+}
+
+fun find_list(name: String): List<Int>|Nil {
+    if (name == "found") { return [1, 2, 3] }
+    return nil
+}
+
+// --- String receiver, each guard style the checker accepts ---------------
+
+var r: String|Nil = find("found")
+if (r != nil) {
+    Test.assert_eq(r.length(), 11, "length() on a nil-guarded String|Nil")
+    Test.assert_eq(r.to_upper(), "HELLO WORLD", "to_upper() is not silently dropped")
+    Test.assert_eq(r.trim(), "hello world", "trim() is not silently dropped")
+    Test.assert_eq(r.slice(0, 5), "hello", "slice() picks the String arm, not the list arm")
+    Test.assert(r.contains("world"), "contains() dispatches as String")
+    Test.assert_eq(r.split(" ").length(), 2, "split() returns a real 2-element list")
+    Test.assert_eq(r.index_of("world"), 6, "index_of() on a narrowed receiver")
+}
+
+// `== nil` with an else branch narrows the same way.
+var r2: String|Nil = find("found")
+if (r2 == nil) {
+    Test.assert(false, "find(\"found\") must not be nil")
+} else {
+    Test.assert_eq(r2.length(), 11, "length() in the else branch of an == nil test")
+}
+
+// --- List receiver, so the fix did not simply hardcode String -----------
+
+var xs: List<Int>|Nil = find_list("found")
+if (xs != nil) {
+    Test.assert_eq(xs.length(), 3, "length() on a nil-guarded List<Int>|Nil")
+    Test.assert_eq(xs.slice(1, 3).length(), 2, "slice() still picks the list arm")
+}
+
+// The nil case must stay reachable and stay nil.
+var none: String|Nil = find("missing")
+Test.assert(none == nil, "the nil branch of a nullable return is still nil")
+
+Test.summary()

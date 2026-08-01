@@ -9,6 +9,52 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 93. FIXED — a method call on a nil-guarded nullable receiver dispatched as a List, or was dropped entirely
+
+```saffron
+fun find(name: String): String|Nil {
+    if (name == "found") { return "hello world" }
+    return nil
+}
+var r: String|Nil = find("found")
+if (r != nil) {
+    IO.println(r.length().to_string())   // segfault
+    IO.println(r.to_upper())             // silently emitted nothing
+}
+```
+
+The checker gets this right: it narrows `String|Nil` to `String` inside the
+guard, and it rejects the unguarded call outright ("cannot call .length() on
+nullable 'r' (type String|Nil); add a nil check first"). But that narrowing lives
+in the checker's own `env.narrowed` map and is never written back to codegen's
+`typed_vars`, so `gen_method_call` still saw the literal spelling `String|Nil`.
+
+Every builtin dispatch arm matches the receiver type by exact name — `"String"`,
+`starts_with("List")`, `starts_with("Map")` — so the union spelling matched
+nothing, and the two ways of missing produced two different failures:
+
+* `length` ended in a catch-all `else` that assumed List. `__list_length` does
+  `inttoptr` on the value exactly as passed; a List is stored untagged but a
+  String is NaN-tagged, so it dereferenced `0x7FF8...` and took SIGSEGV. This
+  crashed `test/nullable_narrowing.sf`.
+* `to_upper`, `trim`, `split`, `index_of` and the rest guard on
+  `type == "String"` with no fallback, so they emitted **nothing at all** — the
+  receiver was loaded and discarded and the call site produced a null operand.
+  That one is worse than the crash: it is invisible to any test that only checks
+  an exit code, which is most of them (cf. #90).
+
+Fixed by `strip_nil_type_str` + `dispatch_recv_type` in
+`src/compiler/codegen/types_body.sf`, threaded through the ten dispatch-preamble
+sites in `methods_body.sf`. Dropping `Nil` in codegen cannot mask a real nil
+access, because the checker has already proven non-nil at every call site that
+reaches here. A genuine multi-member union (`Int|String`) is left alone: it has
+no single correct arm, and guessing one is the bug being fixed. `length` on an
+unresolved receiver now routes to `__any_length`, which reads the GC type tag and
+picks list/map/strlen at runtime, instead of assuming List.
+
+Regression test: `test/pass/nullable_recv_dispatch.sf` — it compares values
+rather than exit codes, for the reason above.
+
 ### 91. FIXED — an `@extern` reached through a module alias was called by its Saffron name, which has no definition
 
 ```saffron
