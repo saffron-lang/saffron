@@ -1,0 +1,73 @@
+// A local variable named `t1` must not collide with codegen's own temporaries.
+//
+// fresh_local() hands out `%t<counter>`, and local names went into the IR
+// unchanged, so `var t1: Int = 5` emitted `%t1` alongside codegen's `%t1` and the
+// module failed to assemble with "multiple definition of local value named 't1'"
+// — no source location and no hint that the *name* was the problem. `t1`/`t2`
+// are ordinary names for tasks and temporaries, so this was easy to hit.
+import "@test" as Test
+
+fun sum_two(): Int {
+    var t1: Int = 5
+    var t2: Int = 7
+    return t1 + t2
+}
+Test.assert_eq(sum_two(), 12, "locals named t1/t2 compile and hold their values")
+
+// Parameters go through the same funnel, and get a `.arg` slot as well as an
+// alloca — two more chances to collide.
+fun scale(t3: Int, t40: Int): Int {
+    return t3 * t40
+}
+Test.assert_eq(scale(6, 7), 42, "parameters named t3/t40 keep their values")
+
+// Reassignment, so the alloca is genuinely loaded and stored rather than folded.
+var t9: Int = 1
+t9 = t9 + 10
+t9 = t9 * 2
+Test.assert_eq(t9, 22, "a top-level t9 survives reassignment")
+
+// Names that merely start with `t` and a digit are NOT temporaries and must not
+// be renamed away from their real spelling; they have to keep working either way.
+var t1x: String = "kept"
+var tone: Int = 3
+var t: Int = 4
+Test.assert_eq(t1x, "kept", "t1x is not a temp name")
+Test.assert_eq(tone + t, 7, "tone and t are not temp names")
+
+// A closure capturing a t-named local reaches sanitize_name through the capture
+// path too, which is a different call site from the alloca.
+fun make_adder(): Fun {
+    var t5: Int = 100
+    return fun (x: Int): Int => x + t5
+}
+var add100 = make_adder()
+Test.assert_eq(add100(23), 123, "a closure captures a local named t5")
+
+// Enough t-named locals in one frame to run past the counter values codegen
+// itself is handing out at this point in the function.
+fun many(): Int {
+    var t2: Int = 1
+    var t3: Int = 2
+    var t4: Int = 4
+    var t5: Int = 8
+    var t6: Int = 16
+    return t2 + t3 + t4 + t5 + t6
+}
+Test.assert_eq(many(), 31, "several t-named locals coexist in one frame")
+
+// A field named t1 is a struct offset rather than a local, but the method body
+// still allocates `%self` and temporaries around it.
+class Point {
+    var t1: Int
+    var t2: Int
+    fun init(t1: Int, t2: Int) {
+        this.t1 = t1
+        this.t2 = t2
+    }
+    fun total(): Int { return this.t1 + this.t2 }
+}
+var p = Point(30, 12)
+Test.assert_eq(p.total(), 42, "fields and init params named t1/t2 work")
+
+Test.summary()

@@ -275,6 +275,19 @@ class Codegen {
         if (name == "entry" or name == "end" or name == "loop" or name == "body") {
             return "v_" + name
         }
+        // ...and with fresh_local()'s temporaries, which are `%t<counter>`. A
+        // user variable named `t1` emitted `%t1` alongside codegen's own `%t1`
+        // and the module failed to assemble with "multiple definition of local
+        // value named 't1'" — no source location, no hint that the *name* was
+        // the problem. `t1`/`t2` are ordinary names for tasks or temporaries, so
+        // this was easy to hit; it is what blocked the #38 async repro.
+        //
+        // Renaming here rather than changing fresh_local()'s prefix keeps it to
+        // one edit: sanitize_name is the single funnel every local name goes
+        // through, whereas `%t` is baked into thousands of lines of expected IR.
+        if (this.is_temp_local_name(name)) {
+            return "v_" + name
+        }
         var sb: StringBuilder = StringBuilder()
         var i: Float = 0
         while (i < name.length()) {
@@ -287,6 +300,23 @@ class Codegen {
             i = i + 1
         }
         return sb.to_string()
+    }
+
+    /// True for exactly the names fresh_local() can produce: `t` followed by one
+    /// or more digits. `t`, `t1x` and `tone` are left alone — only the shapes
+    /// that can actually collide are renamed, so ordinary names keep the
+    /// spelling that appears in diagnostics and IR.
+    fun is_temp_local_name(name: String): Bool {
+        if (name.length() < 2) { return false }
+        if (name.char_at(0) != "t") { return false }
+        var i: Float = 1
+        while (i < name.length()) {
+            // Same digit test the lexer uses (lexer.sf:128), rather than a `<`
+            // comparison on Strings.
+            if (!"0123456789".contains(name.char_at(i))) { return false }
+            i = i + 1
+        }
+        return true
     }
 
     fun fresh_label(prefix: String): String {
