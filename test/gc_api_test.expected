@@ -1,0 +1,10 @@
+=== GC API Test ===
+allocs: 0
+after list: 3
+total bytes: 248
+threshold: 65536
+new threshold: 32768
+after collect: 9
+GC disabled
+GC re-enabled
+=== GC API Test Complete ===

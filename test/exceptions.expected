@@ -1,0 +1,10 @@
+before throw
+caught: something went wrong
+inner caught: inner error
+outer caught: rethrown
+no error here
+try body
+caught: oops
+finally runs
+6
+caught from function: too big!

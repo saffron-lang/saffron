@@ -1,0 +1,10 @@
+cls=
+in block!
+cls=test
+with cls!
+cls=named
+with named cls!
+h1 cls= id=
+Counter
+h1 cls=title id=
+Title
