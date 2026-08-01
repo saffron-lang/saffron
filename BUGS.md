@@ -9,6 +9,105 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 96. FIXED — a match arm bound at most five enum fields, silently truncating wider payloads
+
+```saffron
+enum S {
+    Six(a: String, b: List<String>, c: String, d: String, e: String, f: String),
+    Other
+}
+fun probe() {
+    var s: S = S.Six("A1", ["T"], "C3", "D4", "E5", "F6")
+    IO.println(match (s) { Six(a,b,c,d,e,f) => f
+        _ => "?" })     // printed 0, not "F6"
+}
+probe()
+```
+
+`extract_arm_bindings` (`codegen/match_body.sf`) was five unrolled lines —
+`if (bind_count >= 1) ... if (bind_count >= 5)` — commented "Extract each field
+individually to avoid VM loop variable bug". The VM in question is the C bytecode
+VM in `legacy/`, dead and unsupported. The workaround outlived its reason and had
+quietly become an arity limit.
+
+Nothing rejected a sixth field. `gen_enum_construct` stores every argument in a
+plain loop, so the payload was *built* correctly; only the read-back stopped at
+five. The sixth binding kept whatever its freshly-allocated slot held, which reads
+as 0. A 0 standing in for a String is a null pointer, and the next `starts_with`
+lowers to `strncmp(NULL, ...)` — so the failure surfaced as a SIGSEGV in an
+unrelated function rather than as a wrong value.
+
+This is what made #95 look like a gen2 miscompilation. `ClassDecl` gained
+`type_params` as its second field, pushing `docstring` to sixth; the codegen
+pre-scan's `cd3.starts_with("@actor")` then dereferenced NULL, and *any* program
+containing a class crashed the new compiler. gen3 segfaulted while gen4 did not,
+purely because the two were built by compilers on opposite sides of the cap.
+
+Fixed by replacing the unrolled chain with a `while` over `bind_count`.
+`extract_one_field` already took the index as a parameter, so the loop needed no
+other change.
+
+### 95. FIXED — the parser discarded a class's generic parameters, so no method returning one could be typed
+
+```saffron
+class Box<T> {
+    var v: T
+    fun init(v: T) { this.v = v }
+    fun unwrap(): T { return this.v }
+    fun getItem(key: Int): T { return this.v }
+}
+var b: Box<String> = Box("hello")
+var u = b.unwrap()     // [checker] Warning: u: cannot infer type
+IO.println(b[0])       // segfault
+```
+
+`parser.sf` consumed the `<T>` of a class header under a comment that said
+`// Skip generic type parameters` and threw the names away, and `ClassDecl` had no
+field to put them in. After parsing, `T` did not exist anywhere. A method
+declared `fun unwrap(): T` therefore registered "T" as its return type — a name
+with no representation — and every consumer had to cope with that or guess.
+
+The source states this information. `Box<String>` says what `T` is. Discarding it
+at the parser and then trying to recover it downstream is what made the types
+incomplete, and the two workarounds that grew in its place were both wrong:
+
+- **codegen `gen_method_call`** treated any return type of one or two uppercase
+  characters (excluding `IO`/`OS`) as a type parameter and substituted the
+  *entire* contents of the receiver's angle brackets. It missed a spelled-out
+  parameter like `Element`, and on a `Pair<Int,String>` it set `last_type` to the
+  string `"Int,String"`, which names nothing.
+- **codegen `gen_index_get`** (the #94 fix) looked up `class_fields.has("Box<String>")`
+  against a table keyed by the bare name, so the test was always false, the
+  `getItem` arm was skipped for **every generic class**, and the receiver fell
+  into the list path that #94 was filed about. #94 was fixed for `Dict` and still
+  broken for `Box<T>`.
+
+Fixed at the source of the loss:
+
+- `ast.sf` — `ClassDecl` gains `type_params: List<String>` as its second field.
+- `parser.sf` — the skip-loop collects the parameter names at depth 1 instead of
+  discarding them. A nested constraint (`T: Comparable<U>`) is still skipped;
+  only the parameter names participate in substitution. This also fixed a
+  pre-existing arity bug at what is now `parser.sf:2761`, where a `ClassDecl`
+  pattern bound 4 of 5 fields — latent rather than loud because of #76.
+- `checker.sf` and codegen both register `class_type_params`, keyed by the bare
+  class name like every other class table, and substitute positionally:
+  `substitute_class_type_params("T", "Box<String>")` → `"String"`,
+  `("List<V>", "Pair<Int,Str>")` → `"List<Str>"`. A parameter the annotation
+  leaves unbound comes back **unchanged**, not as `Any`, so a caller can tell
+  "resolved" from "the source did not say".
+- Substitution is applied at method calls, field reads (all five field-read paths
+  in `expr_body.sf`/`methods_body.sf`), and subscripts.
+- Every table lookup that took a receiver type now goes through
+  `generic_base_name`, so `Box<String>` resolves like `Box`.
+
+Regression test: `test/pass/generic_class_type_params.sf` (16 assertions —
+method/field/subscript, one and two parameters, reversed positions to prove the
+binding is positional, a multi-character parameter name, a parameter nested in
+`List<T>`, and an untouched non-generic class). Every assertion calls a
+type-specific method on the result, because a wrong return type is not
+necessarily a crash — it can also be a silently dropped call.
+
 ### 94. FIXED — `obj[key]` on a class declaring `getItem` was compiled as a list read
 
 ```saffron
@@ -49,6 +148,11 @@ Regression test: `test/pass/getitem_overload_typed.sf` (13 assertions — values
 computed keys, a constructor-call receiver, a non-String element type, and
 untouched List/Map/String indexing). `test/pass/getitem_overload.expected` pins
 the original repro's output.
+
+**This fix was incomplete as first committed** (`eac1ccc`): the class lookup used
+the receiver's full type spelling against tables keyed by the bare name, so a
+generic class (`Box<T>`) skipped the new arm entirely and still segfaulted. See
+#95, which fixes the root cause — the parser discarding `<T>` — and the lookup.
 
 ### 93. FIXED — a method call on a nil-guarded nullable receiver dispatched as a List, or was dropped entirely
 
