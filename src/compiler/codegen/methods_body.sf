@@ -1398,17 +1398,40 @@
             }
             // Tag results from builtin runtime functions that return raw values.
             // String-returning functions: tag raw pointer as string
-            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform") {
+            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform" or __mp_func == "__os_home") {
                 var __tag_ptr: String = this.fresh_local()
                 this.emit_indent(__tag_ptr + " = inttoptr i64 " + __mp_local + " to i8*")
                 var __tagged: String = this.emit_tag_ptr(__tag_ptr)
                 this.last_type = AST.Type.StringType
                 return __tagged
             }
-            // Bool-returning functions: tag raw 0/1 as bool
-            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists") {
+            // Bool-returning functions: tag raw 0/1 as bool. This path bypasses
+            // the stdlib wrapper in io.sf/os.sf entirely — `IO.is_dir(p)` lowers
+            // straight to `@__io_is_dir` — so a predicate missing from this list
+            // surfaces its raw runtime int and prints `1`/`0` instead of
+            // `true`/`false`, and `== true` on it is false.
+            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists" or __mp_func == "__io_is_dir" or __mp_func == "__io_rename" or __mp_func == "__io_delete_file" or __mp_func == "__os_set_env") {
                 var __tagged: String = this.emit_tag_bool(__mp_local)
                 this.last_type = AST.Type.BoolType
+                return __tagged
+            }
+            // NOTE: no arm for list-returning functions (`__io_walk_dir`,
+            // `__os_args`). Tagging the returned list pointer here segfaults —
+            // `__gc_is_heap_ptr` (gc.ll:615) rejects any NaN-tagged value as a
+            // heap pointer, so a tagged `__list_new()` result stops being traced
+            // and is swept while live. That is the caveat recorded in BUGS #23.
+            // Lists deliberately travel untagged; `__str_split` is the precedent
+            // and is also untagged at its call site. `IO.list_dir(d)[0]` reading
+            // back as a subnormal double had the same cause one level down —
+            // `__io_walk_dir` pushed untagged elements — and is fixed there, in
+            // runtime.sf, not here.
+            //
+            // Int-returning functions: tag the raw count. `IO.file_size(p)`
+            // printed `5.43e-323` for an 11-byte file without this, and
+            // `== 11` on it was false — the silent half of the same bug.
+            if (__mp_func == "__io_file_size" or __mp_func == "__io_read_binary" or __mp_func == "__os_system") {
+                var __tagged: String = this.emit_tag_int(__mp_local)
+                this.last_type = AST.Type.IntType
                 return __tagged
             }
             return __mp_local

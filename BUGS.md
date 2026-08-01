@@ -9,6 +9,135 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 88. FIXED — `OS` was a reserved name, not an import alias: `import "@os" as Platform` failed and os.sf's own functions were unreachable
+
+**Reproduction:**
+
+```saffron
+import "@os" as Platform
+IO.println(Platform.path_sep())
+```
+
+```
+[codegen] Error: undefined variable 'Platform'
+```
+
+The same file with `as OS` compiled and ran. So the alias in an `import ... as`
+was not actually an alias — one specific spelling was required, and only because
+codegen happened to have that spelling wired to a symbol prefix.
+
+Two mechanisms, both needed for the failure:
+
+1. `is_builtin_module` (`main.sf:448`) returned true for `"os"` and `"@os"`, and
+   is consulted at 13 sites that gate whether a module is loaded at all. So
+   `src/lib/os.sf` was **never loaded** — the alias never entered `alias_map`,
+   which is why any alias at all was an undefined variable. The name suggests a
+   C module behind it, but `resolve_import_path` maps both `"os"` and `"@os"` to
+   `src/lib/os.sf`; there is no C `os` module and never was. `io` was never
+   listed here, which is why `import "@io" as Files` always worked.
+2. `module_prefixes.set("OS", "__os_")` (three copies in `codegen.sf`, ~545,
+   ~1036, ~1654) hard-wired the literal identifier `OS` to the `__os_` prefix.
+   `module_prefixes` outranks the import alias in the lookup order
+   (`methods_body.sf:2727-2736`: `named_imports` → `module_prefixes` →
+   `func_prefix_map` → guessed prefix), so even with os.sf loaded, `OS.foo()`
+   lowered to `@__os_foo` rather than to the module's function.
+
+Consequence (2) is the worse one, and it is a trap for anyone extending the
+stdlib: a function *written in Saffron* in os.sf can never be called. It lowers
+to `@__os_<name>`, a runtime symbol that does not exist, and fails at link time.
+`OS.join_path` hit exactly this — the obvious "fix" is to reimplement it in the
+runtime, which is treating the symptom and pushes pure-Saffron logic into
+`runtime.sf` for no reason.
+
+**Fix:** drop both. `is_builtin_module` now returns false unconditionally (it has
+no other entries), and the three hard-wired `OS` prefixes are removed. `IO`, `GC`
+and `Reflect` keep theirs deliberately: `IO` is implicit in every file with no
+import statement to derive an alias from, so it has no `alias_map` entry to fall
+back on.
+
+Introduced in `70c7ee9` (2026-05-26).
+
+**Resolution (2026-07-31).** os.sf is an ordinary module. Regression test at
+`test/pass/os_ordinary_import.sf` covers a non-`OS` alias resolving, `"os"` and
+`"@os"` reaching the same module, and `join_path` — pure Saffron with no runtime
+symbol behind it, so it only links when the module is genuinely loaded. The
+compiler's own 13 `OS.*` call sites (`main.sf:6` does `import "os" as OS`) now go
+through the module instead of the prefix, so the bootstrap exercises the new path
+end to end.
+
+**Second defect, exposed by the first fix.** Routing `OS.*` through os.sf made
+`OS.path_sep()` return a bare address that printed as `105553182851136` and
+compared unequal to `"/"`. Not a regression in the new path — a latent defect in
+os.sf that the hard-wired prefix had been hiding, since it bypassed the module
+entirely. Every string-returning `__os_*` in `runtime.sf` already pointer-tags
+its result with `__rt_tag_ptr`, but os.sf reached them through
+`@extern("i64 __os_cwd()")` declarations, and an `i64` extern return is
+NaN-box *int*-tagged on the way back — so an already-tagged pointer got tagged a
+second time. `src/lib/io.sf` never had this because it calls its `__io_*`
+counterparts by bare name, which passes the value through unchanged. os.sf now
+does the same, and the `@extern` block is gone (only `exit` remains, a genuine
+libc symbol). `__os_system` had to join the known-function tables for its bare
+call to survive prefix mangling; the stale caveat on its docstring — that its
+result "reaches Saffron untagged" and "compares unequal to any literal" — is
+removed, because that was this bug, not a property of `system()`.
+
+**Third defect, also exposed, and wider than `os`: every int-returning stdlib
+wrapper reached through a module alias returned a subnormal double.** This one is
+BUGS #23 hitting the `@io` and `@os` module paths, and it was fully live before
+any of this work — `import "@io" as Files` then `Files.file_size(p)` printed
+`5.43472e-323` for an 11-byte file, and `Files.file_exists(p)` was **false for a
+file that exists**. The second is the dangerous one: a raw `1` does not compare
+equal to a NaN-boxed `1`, so the wrong answer is silent. It went unnoticed
+because `IO.file_size` — the implicit-namespace spelling — has its own tagging
+path in `methods_body.sf` and is correct, so only the module-alias spelling was
+affected, and nothing in the suite used it. De-specializing `os` moved
+`OS.file_exists` onto that broken path, which is how it surfaced.
+
+Patched at the boundary: a `_retag(n) => n + 0` helper in each of `io.sf` and
+`os.sf`, applied to `file_size`, `read_binary`, `file_exists`, `is_dir`,
+`rename`, `delete_file`, `set_env` and `system`. Arithmetic forces the value
+back through the int path and re-tags it — the same mechanism `Bytes.get`
+documents for `& 255`. Verified against a 3 MB file, so it is not an artifact of
+small values rounding back. It is a helper rather than an inline `+ 0` at each
+site so that the next wrapper added does not silently omit it. This is a patch,
+not a fix: the real repair is #23 (tag on the way out of the runtime), and the
+helper carries a comment saying to delete it then. Regression test at
+`test/pass/io_module_wrappers.sf`.
+
+The wrapper patch only covers the module-alias spelling. The implicit
+`IO.`/`OS.` namespace path has its own tagging table
+(`methods_body.sf:~1400-1430`), which had arms for string- and bool-returning
+runtime functions but none for int-returning ones — so `IO.file_size(p)` printed
+`5.43472e-323` and `== 11` was false there too. Added an int arm covering
+`__io_file_size`, `__io_read_binary` and `__os_system`.
+
+**Deliberately not added: a list arm.** Tagging the returned list pointer for
+`__io_walk_dir` / `__os_args` segfaults, which is #23's GC caveat firing exactly
+as documented — `__gc_is_heap_ptr` (`gc.ll:615`) rejects a NaN-tagged value as a
+heap pointer, so a tagged `__list_new()` result stops being traced and is swept
+while live. The container must stay untagged. `IO.list_dir(d)[0]` returning a
+subnormal was the same bug one level down: `__io_walk_dir` pushed *untagged*
+strings, where `__os_args` and `__str_split` both tag each element. Fixed there,
+in the runtime, per #23's "tag at the boundary in runtime.sf, never in codegen".
+
+**Two more defects found while re-running the stdlib suites** (both pre-existing,
+both in the blast radius, so both fixed rather than filed):
+
+- `__os_platform` returned `"macos"`. Everything that consumes it expects the
+  uname spelling `"darwin"`: `docs/src/stdlib/os.md` documents it that way, both
+  `stdlib_os` suites assert it, and `src/lib/tar.sf`'s `_is_macos()` compares
+  against `"darwin"` — so it was dead code that always returned false, and
+  `tar.sf` silently took the GNU branch on macOS, emitting `tar --transform` and
+  `stat -c` where BSD tar needs `-s` and `stat -f`. Now `"darwin"`. Still
+  hardcoded, so still wrong on Linux; real detection needs `uname(2)`, whose
+  `struct utsname` has no portable layout to hand-offset into from Saffron (the
+  same reason `__io_is_dir` probes with `opendir` rather than `stat`). That wants
+  a C helper and is its own change.
+- `test/stdlib_os.sf` asserted `OS.env(missing) == nil`. The documented contract
+  is an empty string, the return type is `String` (not `String|Nil`, so `nil` was
+  never a possible value), and `__os_env` returns a tagged `""` on a NULL
+  `getenv`. The test was wrong, not the implementation; corrected to expect `""`.
+
 ### 87. FIXED — a grandchild that declares no `init` called a zero-arg constructor and dropped its arguments
 
 **Reproduction:**
@@ -2541,6 +2670,16 @@ The raw `1` is reinterpreted as a subnormal double. Two distinct symptoms:
 Callers that need a correct integer can bypass the runtime and declare the libc
 function directly — `@extern` results are tagged properly (see
 `pantry/src/commands/run.sf` `_libc_system`).
+
+**Partially patched at the stdlib boundary (2026-07-31).** The specific example
+above no longer reproduces: `OS.system(cmd) == 0` works, as do `file_size`,
+`file_exists`, `is_dir`, `rename`, `delete_file` and `set_env` through the `@io`
+and `@os` module wrappers. Those call sites now route through a `_retag(n) =>
+n + 0` helper in `src/lib/io.sf` / `src/lib/os.sf` (BUGS #88). That is one
+boundary out of many, and it is the wrong layer — the root cause below is
+untouched, every other int-returning runtime function is still affected, and the
+helpers exist to be deleted when this is fixed properly. Do not read the working
+examples as this bug being closed.
 
 **Root cause:** `bootstrap.sh` passes `--identity-mode` when compiling
 `runtime.sf`, and `typed_ptr_to_val`/`ptr_to_val` in `codegen.sf` are pure width

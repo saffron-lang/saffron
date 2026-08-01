@@ -13,9 +13,13 @@ T.assert(cwd.length() > 0, "cwd is non-empty")
 OS.set_env("SAFFRON_TEST_VAR", "hello")
 T.assert_eq(OS.env("SAFFRON_TEST_VAR"), "hello", "set_env + env")
 
-// env returns nil for missing var
+// env returns "" for a missing var, not nil. This assertion used to expect nil,
+// which contradicted both the documented contract (docs/src/stdlib/os.md: "empty
+// string if not set") and the runtime, where __os_env returns a tagged empty
+// string on a NULL getenv. The return type is String, not String|Nil, so nil was
+// never a possible value; the test was wrong, not the implementation.
 var missing = OS.env("SAFFRON_DOES_NOT_EXIST_12345")
-T.assert_eq(missing, nil, "env returns nil for missing")
+T.assert_eq(missing, "", "env returns \"\" for missing")
 
 // exec
 var result = OS.exec("echo hi")

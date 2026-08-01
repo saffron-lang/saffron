@@ -1,20 +1,23 @@
 //! Time utilities using @extern for native compilation.
 
 @extern("double sf_time_now()") fun _time_now(): Float
+// The wall clock, distinct from sf_time_now's CLOCK_MONOTONIC. `timestamp()` used
+// to return the monotonic value, which is seconds since an arbitrary boot-relative
+// epoch — so it was a small number (uptime), not a Unix timestamp, and every date
+// derived from it was wrong. Anything that needs a calendar date must start here.
+@extern("i64 time(void*)") fun _time_epoch(ptr: Int): Int
 
 /// Return a high-resolution monotonic clock value in seconds.
+///
+/// Suitable for measuring durations, not for dates: the zero point is arbitrary.
+/// Use `timestamp()` for a wall-clock value.
 fun clock(): Float {
     return _time_now()
 }
 
-/// Return the current time in seconds (monotonic).
-fun now(): Float {
-    return _time_now()
-}
-
-/// Return the current Unix timestamp in seconds (monotonic clock).
+/// Return the current Unix timestamp in seconds (wall clock, UTC).
 fun timestamp(): Float {
-    return _time_now()
+    return _time_epoch(0)
 }
 
 /// Block the current thread for the given number of seconds (busy-wait).
@@ -33,4 +36,128 @@ fun measure(func: () => Any): Float {
     var start: Float = _time_now()
     func()
     return _time_now() - start
+}
+
+// ---------------------------------------------------------------------------
+// Calendar decomposition (UTC)
+// ---------------------------------------------------------------------------
+//
+// Deliberately self-contained rather than importing @datetime. datetime.sf
+// defines a `now()` of its own returning a DateTime, and module globals collide
+// on the bare name; the arithmetic below is a dozen lines, so duplicating it
+// costs less than the import does. It is the same civil-from-days algorithm
+// datetime.sf uses (howardhinnant.github.io/date_algorithms.html).
+
+/// Split a Unix timestamp into [year, month, day, hour, minute, second] (UTC).
+fun _civil(ts: Int): List<Int> {
+    var second: Int = ts % 60
+    var rem: Int = ts / 60
+    var minute: Int = rem % 60
+    rem = rem / 60
+    var hour: Int = rem % 24
+    var days: Int = rem / 24
+
+    var z: Int = days + 719468
+    var era: Int = z / 146097
+    if (z < 0) { era = (z - 146096) / 146097 }
+    var doe: Int = z - era * 146097
+    var yoe: Int = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    var y: Int = yoe + era * 400
+    var doy: Int = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    var mp: Int = (5 * doy + 2) / 153
+    var day: Int = doy - (153 * mp + 2) / 5 + 1
+    var month: Int = mp + 3
+    if (mp >= 10) { month = mp - 9 }
+    if (month <= 2) { y = y + 1 }
+
+    return [y, month, day, hour, minute, second]
+}
+
+// A negative `ts` argument means "use the current time". A sentinel rather than
+// two functions because no real Unix timestamp of interest is negative, and it
+// lets `Time.year()` and `Time.year(ts)` both work.
+fun _resolve(ts: Float): Int {
+    if (ts < 0) { return _time_epoch(0) }
+    return ts.floor()
+}
+
+fun _pad2(n: Int): String {
+    if (n < 10) { return "0${n}" }
+    return "${n}"
+}
+
+/// Return the UTC year of a timestamp, or of now if called with no argument.
+fun year(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[0]
+}
+
+/// Return the UTC month (1-12) of a timestamp, or of now.
+fun month(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[1]
+}
+
+/// Return the UTC day of month (1-31) of a timestamp, or of now.
+fun day(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[2]
+}
+
+/// Return the UTC hour (0-23) of a timestamp, or of now.
+fun hour(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[3]
+}
+
+/// Return the UTC minute (0-59) of a timestamp, or of now.
+fun minute(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[4]
+}
+
+/// Return the UTC second (0-59) of a timestamp, or of now.
+fun second(ts: Float = -1): Int {
+    var parts: List<Int> = _civil(_resolve(ts))
+    return parts[5]
+}
+
+/// Format a timestamp as an ISO 8601 UTC string, e.g. `2023-11-14T22:13:20Z`.
+///
+/// ```saffron
+/// import "@time" as Time
+/// Time.to_iso(1700000000)   // "2023-11-14T22:13:20Z"
+/// ```
+fun to_iso(ts: Float = -1): String {
+    var parts: List<Int> = _civil(_resolve(ts))
+    var y: String = "${parts[0]}"
+    var mo: String = _pad2(parts[1])
+    var d: String = _pad2(parts[2])
+    var h: String = _pad2(parts[3])
+    var mi: String = _pad2(parts[4])
+    var s: String = _pad2(parts[5])
+    return "${y}-${mo}-${d}T${h}:${mi}:${s}Z"
+}
+
+/// Return the current UTC date and time as a map.
+///
+/// Keys: `year`, `month`, `day`, `hour`, `minute`, `second`, `timestamp`.
+///
+/// ```saffron
+/// import "@time" as Time
+/// var n = Time.now()
+/// IO.println("${n.get("year")}")
+/// ```
+fun now(): Map<String, Int> {
+    var ts: Int = _time_epoch(0)
+    var parts: List<Int> = _civil(ts)
+    var m: Map<String, Int> = {}
+    m.set("year", parts[0])
+    m.set("month", parts[1])
+    m.set("day", parts[2])
+    m.set("hour", parts[3])
+    m.set("minute", parts[4])
+    m.set("second", parts[5])
+    m.set("timestamp", ts)
+    return m
 }

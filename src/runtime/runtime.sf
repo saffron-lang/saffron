@@ -30,8 +30,16 @@
 @extern("i32 pclose(void*)") fun rt_pclose(fp: Int): Int
 @extern("i32 access(void*, i32)") fun rt_access(path: Int, mode: Int): Int
 @extern("i32 mkdir(void*, i32)") fun rt_mkdir(path: Int, mode: Int): Int
+@extern("i32 rename(void*, void*)") fun rt_rename(from: Int, to: Int): Int
+@extern("i32 remove(void*)") fun rt_remove(path: Int): Int
+// is_dir is probed with opendir rather than stat: `struct stat` has no stable
+// layout to hand-offset into from Saffron, and its size differs across the four
+// IR bases. opendir succeeds only on a directory, which is exactly the question.
+@extern("void* opendir(void*)") fun rt_opendir(path: Int): Int
+@extern("i32 closedir(void*)") fun rt_closedir(dp: Int): Int
 @extern("void* getcwd(void*, i64)") fun rt_getcwd(buf: Int, size: Int): Int
 @extern("void* getenv(void*)") fun rt_getenv(name: Int): Int
+@extern("i32 setenv(void*, void*, i32)") fun rt_setenv(name: Int, value: Int, overwrite: Int): Int
 @extern("i64 write(i32, void*, i64)") fun rt_write(fd: Int, buf: Int, len: Int): Int
 @extern("i64 read(i32, void*, i64)") fun rt_read(fd: Int, buf: Int, count: Int): Int
 @extern("void exit(i32)") fun rt_exit(code: Int)
@@ -1221,7 +1229,15 @@ fun __io_walk_dir(path: Int): Int {
             }
         }
         if (len > 0) {
-            var entry: Int = rt_strdup(buf)
+            // Tag the entry, not the list. Each element is a string handed into
+            // NaN-boxed value space, so it needs TAG_PTR — `__os_args` and
+            // `__str_split` both do this and were the precedent; this function
+            // was the outlier, so `IO.list_dir(d)[0]` read back as a subnormal
+            // double. The list itself must stay untagged: `__gc_is_heap_ptr`
+            // (gc.ll:615) refuses to trace a NaN-tagged pointer, so tagging the
+            // container gets it swept while live (BUGS #23's caveat) — that was
+            // tried here first and segfaulted.
+            var entry: Int = __rt_tag_ptr(rt_strdup(buf))
             __list_push(list, entry)
         }
         line = rt_fgets(buf, 4096, fp)
@@ -1263,9 +1279,64 @@ fun __io_readline(): Int {
     return __rt_tag_ptr(buf)
 }
 
+fun __io_is_dir(path: Int): Int {
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return 0 }
+    var dp: Int = rt_opendir(rp)
+    if (dp == 0) { return 0 }
+    rt_closedir(dp)
+    return 1
+}
+
+fun __io_rename(from: Int, to: Int): Int {
+    var rf: Int = __rt_untag_ptr(from)
+    var rt2: Int = __rt_untag_ptr(to)
+    if (rf == 0) { return 0 }
+    if (rt2 == 0) { return 0 }
+    var rc: Int = rt_rename(rf, rt2)
+    if (rc == 0) { return 1 }
+    return 0
+}
+
+fun __io_delete_file(path: Int): Int {
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return 0 }
+    var rc: Int = rt_remove(rp)
+    if (rc == 0) { return 1 }
+    return 0
+}
+
 // =============================================================================
 // OS
 // =============================================================================
+
+fun __os_set_env(name: Int, value: Int): Int {
+    var rn: Int = __rt_untag_ptr(name)
+    var rv: Int = __rt_untag_ptr(value)
+    if (rn == 0) { return 0 }
+    if (rv == 0) { return 0 }
+    // overwrite=1: OS.set_env is documented as a set, not a set-if-absent.
+    var rc: Int = rt_setenv(rn, rv, 1)
+    if (rc == 0) { return 1 }
+    return 0
+}
+
+fun __os_home(): Int {
+    var name: Int = rt_malloc(5)
+    store8(name, 72)      // H
+    store8(name + 1, 79)  // O
+    store8(name + 2, 77)  // M
+    store8(name + 3, 69)  // E
+    store8(name + 4, 0)
+    var val: Int = rt_getenv(name)
+    rt_free(name)
+    if (val == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return __rt_tag_ptr(empty)
+    }
+    return __rt_tag_ptr(rt_strdup(val))
+}
 
 fun __os_cwd(): Int {
     var buf: Int = rt_malloc(4096)
@@ -1283,14 +1354,25 @@ fun __os_path_sep(): Int {
     return __rt_tag_ptr(s)
 }
 
+// "darwin", not "macos". Everything that consumes this expects the uname
+// spelling: docs/src/stdlib/os.md documents it as "darwin", src/lib/tar.sf's
+// `is_macos()` compares against "darwin" (so it was dead code, always false),
+// and both stdlib_os tests assert it. "macos" matched nothing.
+//
+// Still hardcoded, so still wrong on Linux — this fixes the spelling, not the
+// detection. Real detection needs `uname(2)`, whose `struct utsname` has no
+// layout Saffron can hand-offset into portably (the same reason `__io_is_dir`
+// probes with `opendir` instead of `stat`); it wants a C helper alongside
+// socket_native.c, which is its own change.
 fun __os_platform(): Int {
-    var s: Int = rt_malloc(6)
-    store8(s, 109)
-    store8(s + 1, 97)
-    store8(s + 2, 99)
-    store8(s + 3, 111)
-    store8(s + 4, 115)
-    store8(s + 5, 0)
+    var s: Int = rt_malloc(7)
+    store8(s, 100)      // d
+    store8(s + 1, 97)   // a
+    store8(s + 2, 114)  // r
+    store8(s + 3, 119)  // w
+    store8(s + 4, 105)  // i
+    store8(s + 5, 110)  // n
+    store8(s + 6, 0)
     return __rt_tag_ptr(s)
 }
 
@@ -1311,11 +1393,6 @@ fun __os_env(name: Int): Int {
 /// C `system()` yields a packed `wait()` status (a child exiting 1 comes back
 /// as 256), so decode it here: callers expect a shell-style exit code. A child
 /// killed by a signal has no exit status, so report 128 + signal as shells do.
-///
-/// NOTE: the value this returns reaches Saffron untagged, because `OS.*` calls
-/// are mangled directly to these externs and the i64 return is not NaN-boxed.
-/// It prints correctly but compares unequal to any literal. Callers that need
-/// `== 0` must use their own `@extern` declaration until that is fixed.
 fun __os_system(cmd: Int): Int {
     var rc: Int = __rt_untag_ptr(cmd)
     if (rc == 0) { return -1 }
