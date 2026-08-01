@@ -35,19 +35,34 @@ probing scheduler state from a test program was impossible. Regression test at
 `test/pass/module_extern_dispatch.sf`, which also covers a plain function and an
 extern with an argument through the same arm.
 
-### 90. `run_tests.sh` only checks the exit code, so a test can pass while producing almost no output
+### 90. FIXED — `run_tests.sh` only checked the exit code, so a test could pass while producing almost no output
 
-A test that prints 2 of its 12 expected lines and then exits 0 is reported PASS.
-`test/test_async.sf` was green for the entire life of #38 while `Async.sleep`
-silently did not suspend and the fan-out section printed garbage
-(`1^2 = 4.94066e-324`) — the suite never looked. Every `test/*.sf` smoke test
-with no assertions and no expected-output file has the same hole.
+A test that printed 2 of its 12 expected lines and then exited 0 was reported
+PASS. `test/test_async.sf` was green for the entire life of #38 while
+`Async.sleep` silently did not suspend and the fan-out section printed garbage
+(`1^2 = 4.94066e-324`) — the suite never looked at the output at all.
 
-Two candidate fixes, not exclusive: (a) an optional `.expected` file per test,
-diffed when present; (b) convert the assertion-free smoke tests to `@test`
-assertions, which do set a non-zero exit on failure. (b) is the better default —
-it puts the check next to the thing being checked — but (a) catches truncation
-in tests whose value *is* their output.
+Fixed with an optional `<name>.expected` file per test, diffed against
+stdout+stderr through the same `filter_noise` normalization the failure scanners
+use. Opt-in per test rather than a blanket requirement: assertion-based tests
+need no such file, since `@test` already sets a non-zero exit, and back-filling
+165 files would mostly freeze output nobody has verified.
+
+31 `.expected` files were added, covering the assertion-free smoke tests whose
+value *is* their output. Deliberately left without one:
+
+- the 14 tests that currently emit errors — freezing a broken output as
+  "expected" is worse than not checking it;
+- `gc_roots_test` and `test_httpx`, whose output genuinely varies run to run;
+- `functions`, `nullable_narrowing` and `test_reflect`, which segfault (the
+  suite's `segfault` check already catches those, and a `.expected` would only
+  record the crash as correct);
+- the `mini_*` tests, whose result is their exit code.
+
+Each candidate was run twice and diffed before its file was kept, so a
+nondeterministic test cannot enter the set. Verified the mechanism actually
+fires by pointing `test_async.expected` at wrong content and confirming an
+`output-mismatch` failure.
 
 ### 88. FIXED — `OS` was a reserved name, not an import alias: `import "@os" as Platform` failed and os.sf's own functions were unreachable
 

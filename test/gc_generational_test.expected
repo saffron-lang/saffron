@@ -1,0 +1,35 @@
+=== Generational GC Test Suite ===
+
+Test 1: Nursery initialization
+  Nursery capacity: 16384
+  PASS: Nursery sized correctly
+
+Test 2: Nursery bump allocation
+  Nursery used before: 56
+  Nursery used after:  144
+  PASS: Bump allocation grew nursery by 88 bytes
+
+Test 3: Nursery pointer detection
+  PASS: New allocation is in nursery
+
+Test 4: Minor GC on nursery full
+  Minor GCs before: 0
+  Minor GCs after:  1
+  PASS: Minor GC was triggered (1 collections)
+
+Test 5: Nursery reset after collection
+  Nursery used after loop: 6152
+  PASS: Nursery was reset (6152 < 16384)
+
+Test 6: List allocation through nursery
+  INFO: List may have gone to old gen (still correct)
+
+Test 7: Stats consistency
+  Total allocations: 76
+  Total bytes: 6456
+  Total freed: 16328
+  Major collections: 0
+  Minor collections: 1
+  PASS: Generational GC operational
+
+=== Generational GC Test Complete ===

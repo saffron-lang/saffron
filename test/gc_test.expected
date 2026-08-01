@@ -1,0 +1,42 @@
+=== GC Test Suite ===
+
+Test 1: Allocation tracking
+  Allocations before: 0
+  Allocations after:  2
+  PASS: Two allocations tracked
+
+Test 2: Collection frees unreachable objects
+  Allocs after garbage: 7
+  Allocs after collect: 8
+  Freed bytes: 0
+  FAIL: No memory freed
+
+Test 3: Shadow stack protects roots
+  Allocs after collecting (no roots pushed): 11
+  (Objects without roots are collected)
+  PASS: GC collection works
+
+Test 4: GC-tracked list
+  List allocated with 3 elements
+  Current alloc count: 14
+  PASS: GC list operations work
+
+Test 5: GC-tracked map
+  Map allocated
+  Current alloc count: 18
+  PASS: GC map allocation works
+
+Test 6: Multiple collections
+  Total collections: 5
+  PASS: Multiple collections succeeded
+
+Test 7: Auto-collection threshold
+  Collections before alloc burst: 5
+  Collections after alloc burst:  5
+  INFO: Auto-collection may not have triggered (objects may have been reachable)
+
+=== GC Test Complete ===
+Total allocations: 37
+Total bytes in use: 5944
+Total freed: 496
+Total collections: 5

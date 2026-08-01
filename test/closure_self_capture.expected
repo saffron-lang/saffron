@@ -1,0 +1,8 @@
+pos: (5,10)
+children: 2
+child 0 pos: (1,2)
+child 1 pos: (3,4)
+handler 0!
+handler 1!
+after move: (15,20)
+after move 2: (25,30)

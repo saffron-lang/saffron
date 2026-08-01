@@ -157,7 +157,7 @@ record_skip() {   # category name reason
 # contain the literal word "failed" ("[codegen] Warning: ... (type inference
 # failed)") and used to produce false negatives.
 filter_noise() {
-    grep -v '^\[codegen\] Warning' "$1" 2>/dev/null || true
+    grep -vE '^\[(codegen|checker)\] Warning' "$1" 2>/dev/null || true
 }
 
 # Classify a failed `saffron build`: compile error vs link error vs invalid IR.
@@ -236,6 +236,27 @@ run_positive_test() {   # file label
     if [[ $run_ec -ne 0 ]] && ! exit_code_is_result "$name"; then
         record_fail "nonzero-exit" "$label" "exit $run_ec" "$runlog"
         return
+    fi
+
+    # Expected-output check. Every test above this line is an exit-code check, so
+    # a test whose value *is* its output could truncate silently and still pass:
+    # `test_async.sf` was green for the entire life of BUGS #38 while emitting 2
+    # of its ~12 expected lines and garbage for the rest. A sibling `<name>.expected`
+    # file, when present, is diffed against stdout+stderr with codegen warnings
+    # stripped. Assertion-based tests need no such file — @test already sets a
+    # non-zero exit — so this stays opt-in per test rather than becoming a
+    # blanket requirement that would have to be back-filled for 165 files.
+    local expected="${f%.sf}.expected"
+    if [[ -f "$expected" ]]; then
+        # filter_noise strips trailing structure, so compare through the same
+        # normalization on both sides: `printf '%s\n' ""` emits a blank line,
+        # which would make an empty-output test differ from an empty .expected.
+        if ! diff -q <(filter_noise "$runlog") "$expected" >/dev/null 2>&1; then
+            local firstdiff
+            firstdiff=$(diff <(filter_noise "$runlog") "$expected" | head -3 | tr '\n' ' ' | cut -c1-100)
+            record_fail "output-mismatch" "$label" "$firstdiff" "$runlog"
+            return
+        fi
     fi
 
     record_pass "pass" "$label"
