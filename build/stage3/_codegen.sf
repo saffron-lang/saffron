@@ -11366,8 +11366,9 @@ class Codegen {
             // and is swept while live. That is the caveat recorded in BUGS #23.
             // Lists deliberately travel untagged; `__str_split` is the precedent
             // and is also untagged at its call site. `IO.list_dir(d)[0]` reading
-            // back as a subnormal double is a separate defect (BUGS #89) that
-            // needs the element, not the container, addressed.
+            // back as a subnormal double had the same cause one level down —
+            // `__io_walk_dir` pushed untagged elements — and is fixed there, in
+            // runtime.sf, not here.
             //
             // Int-returning functions: tag the raw count. `IO.file_size(p)`
             // printed `5.43e-323` for an 11-byte file without this, and
@@ -13327,7 +13328,20 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     // Each module's functions get prefixed via current_prefix during gen_stmt
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "__io_")
+    // `IO` keeps a hard-wired prefix because it is implicit: a file with no
+    // imports at all can still call IO.println, so there is no import statement
+    // to derive an alias from. But the hard-wiring must not overwrite one that
+    // IS there. `import "@io" as IO` used to be clobbered back to "__io_" here,
+    // which sent every call to a runtime symbol — so `IO.open(p, m)` became
+    // `@__io_open`, a function that does not exist, and the program failed at
+    // link time with an undefined symbol and no diagnostic. The same held for
+    // `bytes_alloc`, `bytes_from_string`, `read_file_bytes` and
+    // `write_file_bytes`: all four are written in Saffron in src/lib/io.sf and
+    // no runtime symbol backs them. Deferring to alias_map lets an explicit
+    // import reach the module, exactly as any other alias does.
+    if (!alias_map.has("IO")) {
+        gen.module_prefixes.set("IO", "__io_")
+    }
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
@@ -13385,6 +13399,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
     gen.known_functions.push("__os_system")
+    // The io.sf wrappers `println`/`print` call these by bare name (they cannot
+    // use an extern: an i64 extern param is untagged, which destroys the NaN-box
+    // tag `__io_println_any` dispatches on). Without them here the bare-call path
+    // prefixes them with the module name (stdlib_io___io_println) and the wrapper
+    // links against an undefined symbol — the same shape as BUGS #85. Both are
+    // already in runtime_declares().
+    gen.known_functions.push("__io_println")
+    gen.known_functions.push("__io_print")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
@@ -13826,7 +13848,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__reflect_number_to_string")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "__io_")
+    // `IO` keeps a hard-wired prefix because it is implicit: a file with no
+    // imports at all can still call IO.println, so there is no import statement
+    // to derive an alias from. But the hard-wiring must not overwrite one that
+    // IS there. `import "@io" as IO` used to be clobbered back to "__io_" here,
+    // which sent every call to a runtime symbol — so `IO.open(p, m)` became
+    // `@__io_open`, a function that does not exist, and the program failed at
+    // link time with an undefined symbol and no diagnostic. The same held for
+    // `bytes_alloc`, `bytes_from_string`, `read_file_bytes` and
+    // `write_file_bytes`: all four are written in Saffron in src/lib/io.sf and
+    // no runtime symbol backs them. Deferring to alias_map lets an explicit
+    // import reach the module, exactly as any other alias does.
+    if (!alias_map.has("IO")) {
+        gen.module_prefixes.set("IO", "__io_")
+    }
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
@@ -13891,6 +13926,14 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
     gen.known_functions.push("__os_system")
+    // The io.sf wrappers `println`/`print` call these by bare name (they cannot
+    // use an extern: an i64 extern param is untagged, which destroys the NaN-box
+    // tag `__io_println_any` dispatches on). Without them here the bare-call path
+    // prefixes them with the module name (stdlib_io___io_println) and the wrapper
+    // links against an undefined symbol — the same shape as BUGS #85. Both are
+    // already in runtime_declares().
+    gen.known_functions.push("__io_println")
+    gen.known_functions.push("__io_print")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
@@ -14452,7 +14495,20 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__reflect_number_to_string")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "__io_")
+    // `IO` keeps a hard-wired prefix because it is implicit: a file with no
+    // imports at all can still call IO.println, so there is no import statement
+    // to derive an alias from. But the hard-wiring must not overwrite one that
+    // IS there. `import "@io" as IO` used to be clobbered back to "__io_" here,
+    // which sent every call to a runtime symbol — so `IO.open(p, m)` became
+    // `@__io_open`, a function that does not exist, and the program failed at
+    // link time with an undefined symbol and no diagnostic. The same held for
+    // `bytes_alloc`, `bytes_from_string`, `read_file_bytes` and
+    // `write_file_bytes`: all four are written in Saffron in src/lib/io.sf and
+    // no runtime symbol backs them. Deferring to alias_map lets an explicit
+    // import reach the module, exactly as any other alias does.
+    if (!alias_map.has("IO")) {
+        gen.module_prefixes.set("IO", "__io_")
+    }
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
@@ -14517,6 +14573,14 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
     gen.known_functions.push("__os_system")
+    // The io.sf wrappers `println`/`print` call these by bare name (they cannot
+    // use an extern: an i64 extern param is untagged, which destroys the NaN-box
+    // tag `__io_println_any` dispatches on). Without them here the bare-call path
+    // prefixes them with the module name (stdlib_io___io_println) and the wrapper
+    // links against an undefined symbol — the same shape as BUGS #85. Both are
+    // already in runtime_declares().
+    gen.known_functions.push("__io_println")
+    gen.known_functions.push("__io_print")
     gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals

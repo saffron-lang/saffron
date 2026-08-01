@@ -1,0 +1,55 @@
+// `import "@io" as IO` must reach src/lib/io.sf, like any other alias.
+//
+// `IO` carries a hard-wired `__io_` prefix because it is implicit: a file with
+// no imports at all still calls IO.println, so there is no import statement to
+// derive an alias from. But the hard-wiring used to overwrite an explicit
+// alias too, so binding the name `IO` to the module sent every call to a
+// runtime symbol instead. `IO.open(p, m)` became `@__io_open`, which does not
+// exist — the program failed at link time with an undefined symbol and no
+// diagnostic, and so did `bytes_alloc`, `bytes_from_string`,
+// `read_file_bytes` and `write_file_bytes`, all four written in Saffron in
+// io.sf with no runtime symbol behind them. Naming the alias anything else
+// (`as Files`) worked, which is what made the defect easy to miss.
+import "@test" as Test
+import "@io" as IO
+
+var probe: String = "/tmp/saffron_io_explicit_alias.txt"
+IO.write_file(probe, "alpha\nbeta\ngamma\n")
+
+// The five functions that had no runtime symbol to fall back on.
+var handle: IO.File = IO.open(probe, "r")
+Test.assert(handle.is_open(), "open through an explicit IO alias returns an open file")
+Test.assert_eq(handle.read_line(), "alpha\n", "read_line reads the first line")
+Test.assert_eq(handle.read_line(), "beta\n", "read_line advances")
+handle.close()
+
+var buf: IO.Bytes = IO.bytes_alloc(4)
+Test.assert_eq(buf.length(), 4, "bytes_alloc honours the requested length")
+
+var from_str: IO.Bytes = IO.bytes_from_string("hi")
+Test.assert_eq(from_str.length(), 2, "bytes_from_string sizes to the string")
+Test.assert_eq(from_str.to_string(), "hi", "bytes_from_string round-trips")
+
+var bin_path: String = "/tmp/saffron_io_explicit_alias.bin"
+IO.write_file_bytes(bin_path, from_str)
+var read_back: IO.Bytes = IO.read_file_bytes(bin_path)
+Test.assert_eq(read_back.length(), 2, "write_file_bytes then read_file_bytes preserves the length")
+Test.assert_eq(read_back.to_string(), "hi", "the bytes survive the round-trip")
+
+// The runtime-backed functions must keep working through the same alias — the
+// fix must not trade one half of the module for the other.
+Test.assert_eq(IO.read_file(probe), "alpha\nbeta\ngamma\n", "read_file still resolves")
+Test.assert(IO.file_exists(probe), "file_exists still resolves")
+Test.assert_eq(IO.file_size(probe), 17, "file_size still resolves and is int-tagged")
+Test.assert(IO.is_dir("/tmp"), "is_dir still resolves")
+Test.assert(IO.delete_file(bin_path), "delete_file still resolves")
+Test.assert(IO.delete_file(probe), "cleanup")
+
+// println is the one that must NOT be redirected: the runtime `__io_println`
+// dispatches on the NaN-box tag, so it prints any type. The module's Saffron
+// `println` wrapper only forwards to it, but routing through the wrapper would
+// change the arity/tagging contract for the most-called function in the
+// language, so it stays on the runtime symbol.
+IO.println("println works through an explicit alias")
+
+Test.summary()

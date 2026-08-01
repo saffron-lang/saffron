@@ -370,8 +370,17 @@ fun open(path: String, mode: String): File {
 
 /// Print a value followed by a newline to stdout.
 /// Accepts Any type — runtime dispatch converts to string via __any_to_string.
+///
+/// Calls the runtime symbol by bare name rather than through the `_println_any`
+/// extern above, and that is load-bearing. `__io_println_any` dispatches on the
+/// argument's NaN-box tag, but every `i64` extern parameter is untagged on the
+/// way out (`gen_extern_call`, deliberately — BUGS #24), so routing through the
+/// extern stripped the very tag the callee reads. The tag bits then landed in
+/// the payload and `println("hello")` printed `2.12529e-314`. The same held for
+/// `print`. Only `println_str` can use an extern (`puts` is typed `void*`, so
+/// it untags a pointer, which is correct).
 fun println(value: Any) {
-    _println_any(value)
+    __io_println(value)
 }
 
 /// Print a string followed by a newline to stdout (typed variant).
@@ -381,7 +390,7 @@ fun println_str(value: String) {
 
 /// Print a value to stdout without a trailing newline.
 fun print(value: String) {
-    _print_str(value)
+    __io_print(value)
 }
 
 /// Read the entire contents of a file as a string.
