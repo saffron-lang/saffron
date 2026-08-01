@@ -67,6 +67,7 @@
                     this.known_functions.push(emit_name)
                     this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.extern_sigs.set(emit_name, c_sig)
+                    this.extern_param_types.set(emit_name, this.param_types_csv(params))
                 } else if (doc.starts_with("@extend:")) {
                     var ext_class: String = doc.slice(8, doc.length())
                     this.gen_extend_method(ext_class, name, params, ret_type, body)

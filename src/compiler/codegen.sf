@@ -69,6 +69,13 @@ class Codegen {
     var boxed_locals: Map<String, Bool>
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
+    // Saffron-level parameter types of each `@extern`, comma-joined, keyed by
+    // emit name. `extern_sigs` only carries the *C* signature, which cannot
+    // distinguish "an i64 holding a machine integer" from "an i64 holding an
+    // opaque NaN-boxed value" — and gen_extern_call must untag the first and
+    // pass the second through untouched. Only `Any` params are read from here;
+    // see the `Any` branch in gen_extern_call for why (BUGS #38).
+    var extern_param_types: Map<String, String>
     var defined_funcs: List<String>
     var builtin_methods: Map<String, String>
     var extend_map: Map<String, String>
@@ -155,6 +162,7 @@ class Codegen {
         this.boxed_locals = {}
         this.intrinsic_funcs = []
         this.extern_sigs = {}
+        this.extern_param_types = {}
         this.defined_funcs = []
         this.builtin_methods = {}
         this.extend_map = {}

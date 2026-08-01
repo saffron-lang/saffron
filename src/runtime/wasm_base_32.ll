@@ -709,10 +709,18 @@ extract_int:
   %sign_ext = ashr i64 %shift_left, 16
   ret i64 %sign_ext
 from_float:
-  ; Value has bits in upper 32 — it's a float from arithmetic. Convert to int.
-  ; Guard against NaN/Inf (exponent field all 1s)
+  ; Value has bits in upper 32 — a float from arithmetic, or a raw pointer.
+  ; A pointer reinterpreted as a double is a denormal (exponent field zero) and
+  ; `fptosi` of a denormal truncates to 0, which silently zeroes coroutine
+  ; handles; see the same guard in base_nanbox.ll (BUGS #38). wasm32 addresses
+  ; fit in 32 bits so this is unreachable there today, but the two bases must
+  ; not disagree on what an untag means.
   %exp_bits = lshr i64 %v, 52
   %exp_masked = and i64 %exp_bits, 2047
+  %is_denormal = icmp eq i64 %exp_masked, 0
+  br i1 %is_denormal, label %raw_int, label %check_special
+check_special:
+  ; Guard against NaN/Inf (exponent field all 1s)
   %is_special = icmp eq i64 %exp_masked, 2047
   br i1 %is_special, label %ret_zero, label %safe_convert
 safe_convert:

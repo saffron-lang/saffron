@@ -1021,6 +1021,72 @@
     return local
     }
 
+    /// Emit a call to the coroutine `target` and drive it to completion, returning
+    /// the local holding its result. A coroutine is emitted `define ptr ...
+    /// presplitcoroutine` and returns a *frame handle*, not a value, so a plain
+    /// `call i64` against it reads the handle as the result AND never runs the
+    /// suspension the callee asked for — that is BUGS #38 in both its symptoms
+    /// (`Async.gather` returning `2,8`, and `Async.sleep` not sleeping: nothing
+    /// reads __yield_reason, so reason 1 never reaches the scheduler's
+    /// sleep_queue).
+    ///
+    /// Two shapes, picked by whether the *caller* is itself a coroutine:
+    ///   - coro-calls-coro: suspend the caller between resumes, so the scheduler
+    ///     stays in control and a sibling task can run.
+    ///   - sync-calls-coro: spin the resume loop inline; there is no frame to
+    ///     suspend.
+    ///
+    /// Callers set last_type themselves — the return-type key differs per arm
+    /// (prefixed name, bare method, named-import target).
+    fun gen_coro_call(target: String, arg_strs: List<String>): String {
+        var hdl: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(hdl, "ptr", target, arg_strs.join(", ")))
+        } else {
+            this.emit_indent(hdl + " = call ptr @" + target + "(" + arg_strs.join(", ") + ")")
+        }
+        var hdl_i64: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_ptrtoint(hdl_i64, hdl))
+        } else {
+            this.emit_indent(hdl_i64 + " = ptrtoint ptr " + hdl + " to i64")
+        }
+        var check: String = this.fresh_label("await.check")
+        var loop: String = this.fresh_label("await.loop")
+        var done: String = this.fresh_label("await.done")
+        this.emit_terminator("br label %" + check)
+        this.start_block(check)
+        var d: String = this.fresh_local()
+        this.emit_indent(d + " = call i64 @__sched_coro_done(i64 " + hdl_i64 + ")")
+        var cmp: String = this.fresh_local()
+        this.emit_indent(cmp + " = icmp eq i64 " + d + ", 1")
+        if (this.is_coroutine) {
+            var yld: String = this.fresh_label("await.yield")
+            var cleanup: String = this.fresh_label("await.cleanup")
+            this.emit_terminator("br i1 " + cmp + ", label %" + done + ", label %" + yld)
+            this.start_block(yld)
+            // Suspend without touching __yield_reason/__yield_arg: the callee
+            // already set them, and the scheduler must see the child's reason
+            // (sleep, io, await) rather than a reason invented here.
+            var save: String = this.fresh_local()
+            this.emit_indent(save + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var susp: String = this.fresh_local()
+            this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save + ", i1 false)")
+            this.emit_terminator("switch i8 " + susp + ", label %__coro_suspend [i8 0, label %" + loop + " i8 1, label %" + cleanup + "]")
+            this.start_block(cleanup)
+            this.emit_terminator("br label %__coro_cleanup")
+        } else {
+            this.emit_terminator("br i1 " + cmp + ", label %" + done + ", label %" + loop)
+        }
+        this.start_block(loop)
+        this.emit_indent("call void @__sched_coro_resume(i64 " + hdl_i64 + ")")
+        this.emit_terminator("br label %" + check)
+        this.start_block(done)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* @__task_result")
+        return result
+    }
+
     fun resolve_namespace(obj_name: String, object: AST.Expr): String {
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
@@ -1170,6 +1236,16 @@
         while (__peai < args.length()) {
             __pe_args.push("i64 " + this.gen_arg_value(args[__peai]))
             __peai = __peai + 1
+        }
+        // Same coroutine hazard as the module-prefix arm below (BUGS #38): a
+        // re-exported or named-imported coroutine needs its frame driven, not a
+        // bare `call i64`. `import { sleep } from "@async"` reaches here.
+        if (this.str_in_list(this.coroutine_funcs, __pe_target)) {
+            var __pe_coro: String = this.gen_coro_call(__pe_target, __pe_args)
+            if (this.func_ret_types.has(__pe_target)) {
+                this.last_type = this.func_ret_types.get(__pe_target)
+            }
+            return __pe_coro
         }
         var __pe_result: String = this.fresh_local()
         this.emit_indent(__pe_result + " = call i64 @" + __pe_target + "(" + __pe_args.join(", ") + ")")
@@ -1423,6 +1499,23 @@
                     __mp_args.push("i64 " + __mp_nil_val)
                 }
             }
+            // Coroutine target: drive the frame instead of emitting `call i64`
+            // against a `ptr`-returning presplitcoroutine (BUGS #38). This arm
+            // catches every alias with a non-empty prefix, so it reaches here
+            // before the coro-aware arms further down at :1608/:1658 — those only
+            // ever ran for empty-prefix builtins (IO/OS/GC), which is why
+            // `Async.sleep` lowered to a bare call and never suspended.
+            if (this.str_in_list(this.coroutine_funcs, __mp_func)) {
+                var __mp_coro: String = this.gen_coro_call(__mp_func, __mp_args)
+                if (this.func_ret_types.has(__mp_func)) {
+                    this.last_type = this.func_ret_types.get(__mp_func)
+                } else if (this.func_ret_types.has(method)) {
+                    this.last_type = this.func_ret_types.get(method)
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return __mp_coro
+            }
             var __mp_local: String = this.fresh_local()
             this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
             if (this.func_ret_types.has(__mp_func)) {
@@ -1507,6 +1600,14 @@
         while (__pe2ai < args.length()) {
             __pe2_args.push("i64 " + this.gen_arg_value(args[__pe2ai]))
             __pe2ai = __pe2ai + 1
+        }
+        // Coroutine target — see the __pe_target arm above (BUGS #38).
+        if (this.str_in_list(this.coroutine_funcs, __pe2_target)) {
+            var __pe2_coro: String = this.gen_coro_call(__pe2_target, __pe2_args)
+            if (this.func_ret_types.has(__pe2_target)) {
+                this.last_type = this.func_ret_types.get(__pe2_target)
+            }
+            return __pe2_coro
         }
         var __pe2_r: String = this.fresh_local()
         this.emit_indent(__pe2_r + " = call i64 @" + __pe2_target + "(" + __pe2_args.join(", ") + ")")

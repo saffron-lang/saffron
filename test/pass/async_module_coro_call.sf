@@ -1,0 +1,68 @@
+// A coroutine reached through a module alias must have its frame driven, not be
+// called as a plain `call i64` (BUGS #38).
+//
+// A coroutine is emitted `define ptr @f(...) presplitcoroutine` and returns a
+// *frame handle*, not a value. The "Universal module dispatch" arm in
+// methods_body.sf matched every alias with a non-empty prefix and emitted a bare
+// `call i64` against it, so for `Async.*` two things broke at once:
+//
+//   1. the handle was read back as the result — `Async.gather([t])` yielded the
+//      pointer, printing things like `2,8` instead of the awaited values;
+//   2. the callee's `llvm.coro.suspend` was never driven, so nothing read
+//      __yield_reason and yield reason 1 never reached the scheduler's
+//      sleep_queue — `Async.sleep()` returned instantly and the task body ran
+//      straight through, synchronously, inside Task.spawn.
+//
+// Symptom (2) is the sneaky one: it has no error and no wrong value, it just
+// silently removes all concurrency. Both arms of the fix are covered here.
+import "@test" as Test
+import "@async" as Async
+
+// --- 1. gather returns the awaited values, not frame handles ---------------
+fun answer(): Int {
+    Async.sleep(0.01)
+    return 42
+}
+var a: Task<Int> = Task.spawn(fun () => answer())
+var b: Task<Int> = Task.spawn(fun () => answer())
+var rs: List<Int> = Async.gather([a, b])
+Test.assert_eq(rs.length(), 2, "gather returns one result per task")
+Test.assert_eq(rs[0], 42, "gather's first result is the awaited value")
+Test.assert_eq(rs[1], 42, "gather's second result is the awaited value")
+
+// A frame handle is a heap pointer, so the old bug showed up as small
+// pointer-derived integers here. Assert the value directly rather than trusting
+// that a wrong one would look obviously wrong.
+Test.assert(rs[0] == rs[1], "both tasks produced the same value")
+
+// --- 2. sleep actually suspends, so tasks interleave ----------------------
+// The ordering is the observable proof: if `Async.sleep` does not suspend, each
+// task runs to completion inside Task.spawn and the log reads
+// "start 1, end 1, start 2, end 2". Driving the frame properly parks task 1 in
+// the sleep_queue, letting task 2 start before task 1 finishes.
+var log: List<String> = []
+fun step(name: String): Int {
+    log.push("start " + name)
+    Async.sleep(0.05)
+    log.push("end " + name)
+    return 1
+}
+var s1: Task<Int> = Task.spawn(fun () => step("1"))
+var s2: Task<Int> = Task.spawn(fun () => step("2"))
+Async.gather([s1, s2])
+
+Test.assert_eq(log.length(), 4, "both tasks logged a start and an end")
+Test.assert_eq(log[0], "start 1", "task 1 starts first")
+Test.assert_eq(log[1], "start 2", "task 2 starts before task 1 finishes — sleep suspended")
+Test.assert(log[2] == "end 1" or log[2] == "end 2", "an end follows both starts")
+
+// --- 3. a module coroutine called from sync code still completes -----------
+// The sync-calls-coro shape spins the resume loop inline; there is no caller
+// frame to suspend. Calling a suspending function at top level exercises it.
+fun sync_reachable(): Int {
+    Async.sleep(0.01)
+    return 7
+}
+Test.assert_eq(sync_reachable(), 7, "a suspending function called from sync code returns its value")
+
+Test.summary()

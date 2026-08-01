@@ -1248,6 +1248,7 @@
             var xemit: String = prefix + name
             this.known_functions.push(xemit)
             this.extern_sigs.set(xemit, c_sig)
+            this.extern_param_types.set(xemit, this.param_types_csv(this.get_fun_params(stmt)))
             var xret: String = this.get_fun_ret(stmt)
             if (xret.length() > 0) { this.func_ret_types.set(xemit, this.str_to_type(xret)) }
             return nil

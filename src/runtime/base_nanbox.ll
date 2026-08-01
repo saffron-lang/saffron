@@ -257,10 +257,29 @@ check_raw:
 raw_int:
   ret i64 %v
 from_float:
-  ; A double. Guard NaN/Inf (exponent all ones) before fptosi, which is
-  ; undefined for them.
+  ; A fourth shape reaches here that the list above missed: a raw *pointer*.
+  ; Coroutine frame handles, GC heap pointers and closure envs are untagged
+  ; i64s that overflow 32 bits (macOS heap sits around 0x6000_0000_0000), so
+  ; they are neither NaN-boxed nor "small". Reinterpreting one as a double
+  ; gives a denormal — exponent field zero — and `fptosi` of a denormal
+  ; truncates to 0. That silently turned every coroutine handle into 0, and
+  ; `__sched_coro_done(0)` answers "done" by its null guard, so the scheduler
+  ; retired all three tasks of a two-task program without resuming any of them
+  ; (BUGS #38, third defect).
+  ;
+  ; A genuine Float never lands here with a zero exponent: 0.0 and every value
+  ; codegen produces has either the NaN tag or a non-zero exponent, and a true
+  ; denormal (|x| < 2.2e-308) converts to 0 anyway. So exponent == 0 with a
+  ; non-zero value means pointer — pass it through untouched.
   %exp_bits = lshr i64 %v, 52
   %exp_masked = and i64 %exp_bits, 2047
+  %is_denormal = icmp eq i64 %exp_masked, 0
+  br i1 %is_denormal, label %raw_ptr, label %check_special
+raw_ptr:
+  ret i64 %v
+check_special:
+  ; A double. Guard NaN/Inf (exponent all ones) before fptosi, which is
+  ; undefined for them.
   %is_special = icmp eq i64 %exp_masked, 2047
   br i1 %is_special, label %ret_zero, label %safe_convert
 safe_convert:

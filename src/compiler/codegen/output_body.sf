@@ -796,6 +796,7 @@
                         // with stmts_body.sf:64-69: same key, same value.
                         if (pr_doc.starts_with("@extern:")) {
                             this.extern_sigs.set(pr_emit, pr_doc.slice(8, pr_doc.length()))
+                            this.extern_param_types.set(pr_emit, this.param_types_csv(pr_params))
                             if (pr_ret.length() > 0) {
                                 this.func_ret_types.set(pr_emit, this.str_to_type(pr_ret))
                             }

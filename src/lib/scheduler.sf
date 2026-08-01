@@ -5,10 +5,26 @@
 @extern("i64 __sched_coro_done(i64)") fun coro_done(handle: Int): Int
 @extern("void __sched_coro_destroy(i64)") fun coro_destroy(handle: Int)
 @extern("i64 __sched_get_yield_reason()") fun get_yield_reason(): Int
-@extern("i64 __sched_get_yield_arg()") fun get_yield_arg(): Int
-@extern("i64 __sched_get_task_result()") fun get_task_result_global(): Int
+// `Any`, not `Int`: __yield_arg already holds a NaN-boxed value, and which type
+// it holds depends on the yield reason — a Float duration for reason 1, an fd for
+// 2, a task handle for 3/5. An `Int` annotation makes gen_extern_call re-box the
+// result with __val_tag_int, and for a Float that overwrites the exponent bits:
+// `Async.sleep(0.05)` reached `var duration: Float = get_yield_arg()` as NaN, so
+// `sleep_times.push(now + duration)` stored NaN, `NaN <= now` was never true, and
+// the task sat in sleep_queue forever — the program exited with the task never
+// resumed and no error. Int survived only because re-tagging an already
+// int-tagged value is idempotent. `Any` returns the payload untouched and lets
+// the receiving annotation do the one conversion (BUGS #38).
+@extern("i64 __sched_get_yield_arg()") fun get_yield_arg(): Any
+// `Any` on both the task-result reads and the `value` slot of store_result: a
+// task's result is an opaque NaN-boxed value the scheduler only ferries from
+// @__task_result into the C result table. An `Int` annotation makes codegen
+// untag it on the way in and hand it back untagged, so `task.await() == 42` was
+// false against a task returning 42 while `.to_string()` still printed "42"
+// (untag tolerates a raw int). A Float result was truncated outright (BUGS #38).
+@extern("i64 __sched_get_task_result()") fun get_task_result_global(): Any
 @extern("void __sched_reset_yield()") fun reset_yield()
-@extern("void __sched_store_result(i64, i64)") fun store_result(handle: Int, value: Int)
+@extern("void __sched_store_result(i64, i64)") fun store_result(handle: Int, value: Any)
 @extern("i64 __sched_has_stored_result(i64)") fun has_stored_result(handle: Int): Int
 @extern("i64 sf_tcp_poll(i64, i64, i64)") fun tcp_poll(fd: Int, events: Int, timeout_ms: Int): Int
 
@@ -16,7 +32,7 @@ var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
 var sleep_times: List<Float> = []
 var result_handles: List<Int> = []
-var result_values: List<Int> = []
+var result_values: List<Any> = []
 
 // Await waiters: task waiting for another task to complete
 var await_targets: List<Int> = []
@@ -36,7 +52,7 @@ var actor_wait_targets: List<Int> = []
 // `scheduler_tick()` for why that state is unrecoverable rather than transient.
 var deadlock_detected: Int = 0
 
-fun get_result(handle: Int): Int {
+fun get_result(handle: Int): Any {
     var i: Int = 0
     while (i < result_handles.length()) {
         if (result_handles[i] == handle) {
@@ -100,9 +116,8 @@ fun deadlock_flag(): Int {
 }
 
 /// Clear all scheduler state. Test-only: lets the liveness tests return the
-/// scheduler to a known-empty state between cases without depending on
-/// `List.remove()`, which is currently a no-op (see the note in
-/// `wake_actor_waiters`).
+/// scheduler to a known-empty state between cases in one step, rather than
+/// draining each queue with `List.remove()`.
 fun _reset_for_test() {
     run_queue = []
     sleep_queue = []
@@ -196,7 +211,7 @@ fun scheduler_tick(): Int {
     coro_resume(hdl)
 
     if (coro_done(hdl) == 1) {
-        var res: Int = get_task_result_global()
+        var res: Any = get_task_result_global()
         result_handles.push(hdl)
         result_values.push(res)
         store_result(hdl, res)
@@ -250,16 +265,6 @@ fun scheduler_run() {
     while (scheduler_tick() == 1) {}
 }
 
-// WARNING: the `.remove(i)` calls below are currently no-ops. The codegen for
-// `List.remove` passes a NaN-boxed index to the runtime's `__list_remove`, which
-// expects a raw i64, so the bounds check rejects it and returns nil without
-// shifting or shrinking the list (src/compiler/codegen/methods_body.sf:1661
-// omits the `emit_untag_int` that the index-get path at :418 performs). Every
-// queue-draining loop in this file is affected: woken tasks are pushed to
-// `run_queue` but never removed from their wait queue, so they are resumed
-// repeatedly and the wait queues grow without bound. This is a pre-existing
-// codegen bug — identical IR is produced by the checked-in gen2 — and fixing it
-// is out of scope here (src/compiler/** is owned elsewhere right now).
 fun wake_actor_waiters(actor_ptr: Int) {
     var i: Int = actor_wait_handles.length() - 1
     while (i >= 0) {
