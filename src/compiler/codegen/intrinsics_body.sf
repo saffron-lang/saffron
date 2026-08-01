@@ -159,6 +159,15 @@
         var c_name: String = parsed[0]
         var ret_c: String = parsed[1]
         var llvm_ret: String = this.normalize_c_type(ret_c)
+        // Saffron-level param types, positional. Only `Any` is consulted; every
+        // other annotation keeps the C-type-driven conversion below.
+        var saffron_ptypes: List<String> = []
+        if (this.extern_param_types.has(name)) {
+            var spt_csv: String = this.extern_param_types.get(name)
+            if (spt_csv.length() > 0) {
+                saffron_ptypes = spt_csv.split(",")
+            }
+        }
         var call_args: List<String> = []
         var i: Float = 0
         while (i < args.length()) {
@@ -168,7 +177,21 @@
                 ptype = parsed[i + 2]
             }
             var norm: String = this.normalize_c_type(ptype)
-            if (norm == "i8*") {
+            // An `Any` i64 param is an opaque box in transit: the C side only
+            // stores and returns it, so the value must arrive with its tag
+            // intact. Untagging it here destroys the type — the scheduler's
+            // `store_result(handle, value)` untagged a tagged 42 down to a raw
+            // 42, and `__sched_get_stored_result` handed that back untagged, so
+            // `task.await() == 42` was false while `.to_string()` still printed
+            // "42" (untag tolerates raw). A Float result was worse: `fptosi`
+            // truncated it. Mirrors the `Any` return branch below (BUGS #38).
+            var is_any_param: Bool = false
+            if (i < saffron_ptypes.length()) {
+                is_any_param = saffron_ptypes[i] == "Any"
+            }
+            if (norm == "i64" and is_any_param) {
+                call_args.push("i64 " + val)
+            } else if (norm == "i8*") {
                 var ptr: String = this.emit_untag_ptr(val)
                 call_args.push("i8* " + ptr)
             } else if (norm == "i8**") {

@@ -9,6 +9,52 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 92. `Time.now()` returns an untagged double
+
+```saffron
+import "time" as Time
+var t = Time.now()
+IO.println(t.to_string())        // 2.45057e-321 — the raw bits, not the time
+```
+
+The value is correct but arrives untagged, so anything that interprets it (a
+`.to_string()`, a comparison, arithmetic against a tagged Float) reads the bit
+pattern instead of the number. Found while instrumenting #38's scheduler; the
+scheduler itself is unaffected because it reaches `sf_time_now()` through an
+`@extern("double ...")` declaration, where the `double` C type drives the
+conversion rather than the module-dispatch path.
+
+### 91. A cross-module `@extern` is called without being declared
+
+```saffron
+import "@scheduler" as Scheduler
+IO.println(Scheduler.get_yield_reason().to_string())
+// use of undefined value '@stdlib_scheduler_get_yield_reason'
+```
+
+`get_yield_reason` is an `@extern` in `src/lib/scheduler.sf`. Reached through a
+module alias, codegen emits a call to the *Saffron-level* symbol
+(`@stdlib_scheduler_get_yield_reason`) rather than the C symbol the `@extern`
+names, and never emits a `declare` for it either — so the IR fails verification.
+Same family as the known `@stdlib_scheduler_enqueue` failure. This blocks probing
+scheduler state from a test program, which is why #38 had to be diagnosed by
+instrumenting `scheduler.sf` in place. Repro kept at `/tmp/a38probe.sf` /
+`/tmp/m38/` while this is open.
+
+### 90. `run_tests.sh` only checks the exit code, so a test can pass while producing almost no output
+
+A test that prints 2 of its 12 expected lines and then exits 0 is reported PASS.
+`test/test_async.sf` was green for the entire life of #38 while `Async.sleep`
+silently did not suspend and the fan-out section printed garbage
+(`1^2 = 4.94066e-324`) — the suite never looked. Every `test/*.sf` smoke test
+with no assertions and no expected-output file has the same hole.
+
+Two candidate fixes, not exclusive: (a) an optional `.expected` file per test,
+diffed when present; (b) convert the assertion-free smoke tests to `@test`
+assertions, which do set a non-zero exit on failure. (b) is the better default —
+it puts the check next to the thing being checked — but (a) catches truncation
+in tests whose value *is* their output.
+
 ### 88. FIXED — `OS` was a reserved name, not an import alias: `import "@os" as Platform` failed and os.sf's own functions were unreachable
 
 **Reproduction:**
@@ -3094,46 +3140,90 @@ Either the criterion or the script should change. Until then, promotion decision
 rest on the sample-program tests alone, and that should be stated honestly rather
 than implying a self-hosting check that isn't run.
 
-### 38. Forwarding an `await` through a wrapper function returns the handle, not the result
+### 38. FIXED — a coroutine reached through a module alias was called as a plain function, so `Async.sleep` never suspended and `Async.gather` returned frame handles
 
-`Async.gather()` — shipped, documented, and used by `@promise` — returns garbage.
-The awaited value comes back as the raw task handle rather than the task's
-result:
+Originally filed as "forwarding an `await` through a wrapper function returns the
+handle" — that framing was wrong. Nothing about *forwarding* or *wrappers* was
+special; the defect was in how a call through a module alias was lowered, and it
+was four independent bugs stacked on the same code path. Each one hid the next,
+which is why the symptom looked type-related for so long.
+
+**Symptoms as filed:**
 
 ```saffron
 fun mk_int(): Int { Async.sleep(0.01); return 42 }
 var t: Task<Int> = Task.spawn(fun () => mk_int())
-IO.println(t.await().to_string())          // 42            — correct
-// the same await one call frame deeper, inside a coroutine wrapper:
-IO.println(Async.await(t).to_string())     // 105553180263168 — the handle
+IO.println(Async.gather([t]).to_string())   // "105553180263168" — a frame handle
 ```
 
-**Not a typing problem.** This was first mistaken for one, because a String
-result printed as `5.21502e-310` (a tagged pointer read as a float) — the
-signature of #32/#37. It isn't: an **`Int`** fails identically, and `Int` needs
-no tag interpretation. Annotating `Task<Int>` / `Task<String>` changes the
-garbage but does not fix it. A generic `await<T>(task: Task<T>): T` does not fix
-it either. The value crossing the return boundary is simply the wrong value.
+Plus a quieter one with no error and no wrong value: `Async.sleep()` returned
+instantly, so `Task.spawn`ed bodies ran to completion synchronously inside
+`spawn` and *all concurrency silently disappeared*. `test/test_async.sf` printed
+`A start / A end / B start / B end` and the suite called it a PASS, because
+`run_tests.sh` only checks the exit code.
 
-Narrowed by elimination — these all work, so the defect is specifically *an
-await whose result is returned out of a suspending wrapper*:
-- a coroutine returning a String it built itself (no await crossing)
-- forwarding an awaited `Int` through a wrapper that suspends
-- `Task<String>` as a parameter type across a function boundary
-- `t.await()` inline at the call site, any result type
+**Defect 1 — the dispatch arm that swallowed every alias.**
+A function containing a suspend point is emitted `define ptr @f(...)
+presplitcoroutine` and returns a *frame handle*, not a value. Its callers must
+emit a resume loop (`__sched_coro_done` / `llvm.coro.suspend` /
+`__sched_coro_resume`) and then read `@__task_result`. `gen_method_call`'s
+"Universal module dispatch" arm (`methods_body.sf:1187`) intercepted every alias
+with a non-empty prefix and emitted a bare `call i64` without consulting
+`coroutine_funcs`. The coro-aware arms further down were therefore **dead code
+for `Async.*`** — only empty-prefix builtins (IO/OS/GC) ever reached them. That
+single miss produced both filed symptoms: the handle read back as the result,
+*and* the callee's suspension never driven, so nothing read `__yield_reason` and
+yield reason 1 never reached the scheduler's `sleep_queue`. Fixed by factoring
+the loop into `gen_coro_call` and calling it from all three dispatch arms,
+including the two `named_imports` arms (`import { sleep } from "@async"`).
 
-**Affected:** `Async.gather()` and `Async.race()` in `src/lib/async.sf`;
-`Promise.all()` / `Promise.race()` in `src/lib/promise.sf`, which call
-`Async.await`.
+**Defect 2 — `get_yield_arg(): Int` turned a Float duration into NaN.**
+`__yield_arg` holds an already-NaN-boxed value whose type depends on the yield
+reason: a Float duration for 1, an fd for 2, a task handle for 3/5. The `Int`
+annotation made `gen_extern_call` re-box it with `__val_tag_int`, and for a Float
+that overwrites the exponent bits. `Async.sleep(0.05)` arrived at
+`var duration: Float = get_yield_arg()` as **NaN**, so `sleep_times.push(now +
+duration)` stored NaN, `NaN <= now` was never true, and the task sat in
+`sleep_queue` forever — no error, no resume, program exits. `Int` had survived
+only because re-tagging an already int-tagged value is idempotent. Fixed by
+annotating it `Any`.
 
-**Also missing:** `Async.await` does not exist in `src/lib/async.sf` at all,
-though `CLAUDE.md:219` documents it and both `src/lib/promise.sf:10,26` and
-`test/async_coop.sf:16-18` call it. Those fail to link
-(`_stdlib_async_await` undefined) — which is why `async_coop` is at exit 1.
-Adding the function is a two-line change but is **blocked on this bug**: it
-would link and then silently return handles instead of results, so it must not
-be added until the forwarding path is fixed. Verified pre-existing on both the
-pre-#32 and pre-#37 baselines.
+**Defect 3 — `__val_untag_int` truncated every coroutine handle to 0.**
+The `from_float` fallback in `base_nanbox.ll` handled three input shapes
+(NaN-boxed, raw small int, tagged double) and missed a fourth: a **raw
+pointer**. A macOS heap address (~`0x6000_0000_0000`) is neither NaN-boxed nor
+"small", so it fell through to `bitcast`-to-double — a denormal — and `fptosi` of
+a denormal truncates to **0**. `__sched_coro_done(0)` then answers "done" via its
+null guard, so `scheduler_tick` retired all three tasks of a two-task program
+without resuming any of them. Fixed by returning the value untouched when the
+exponent field is zero: a genuine Float never lands there with a zero exponent,
+and a true denormal (|x| < 2.2e-308) converts to 0 anyway.
+
+**Defect 4 — an `Any` extern *parameter* was untagged on the way in.**
+`gen_extern_call` respected an `Any` *return* annotation (pass the payload
+through untouched) but had no equivalent on the parameter side: every i64 param
+was untagged. The scheduler's `store_result(handle, value)` therefore untagged a
+tagged 42 down to a raw 42, put that in the C result table, and
+`__sched_get_stored_result` handed it back untagged — so `task.await() == 42` was
+**false** for a task returning 42, while `.to_string()` still printed "42"
+(untag tolerates a raw int). A Float result was truncated outright. Fixed by
+recording each extern's Saffron parameter types in `extern_param_types` and
+passing `Any` i64 params through untouched, mirroring the return path.
+
+**Regression test:** `test/pass/async_module_coro_call.sf` — asserts `gather`
+returns the awaited values, that two sleeping tasks interleave (`start 1` then
+`start 2`, the observable proof that sleep suspends), and that a suspending
+function called from sync code still returns its value.
+
+**Suite blind spot this exposed:** `tools/run_tests.sh` only checks exit code 0.
+`test_async.sf` was green for the entire life of this bug while emitting 2 of its
+~12 expected lines. Filed separately as #90.
+
+**Still open, unblocked by this fix:** `Async.await` does not exist in
+`src/lib/async.sf`, though `CLAUDE.md` documents it and both
+`src/lib/promise.sf:10,26` and `test/async_coop.sf:16-18` call it — they fail to
+link (`_stdlib_async_await` undefined), which is why `async_coop` is at exit 1.
+Adding it was blocked on this bug and no longer is.
 
 ### 37. Method dispatch that matches no branch returns a silent zero
 

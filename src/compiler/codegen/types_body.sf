@@ -31,6 +31,25 @@
         return sb.to_string()
     }
 
+    /// The Saffron type names of `params`, comma-joined and positional
+    /// ("Int,Any,Float"). Unlike `params_to_string` this drops the names, so it
+    /// can be indexed straight against an extern's C parameter list.
+    fun param_types_csv(params: List<AST.Param>): String {
+        if (!(params is List)) {
+            return ""
+        }
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            sb.append(this.type_to_string(pt))
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
     fun str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
