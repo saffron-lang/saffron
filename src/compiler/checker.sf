@@ -162,6 +162,13 @@ class NullChecker {
     var current_class: String
     var class_parents: Map<String, String>
     var class_method_names: Map<String, String>
+    // The declared generic parameter names of each class, comma-joined:
+    // `class Box<T>` → "T", `class Pair<K, V>` → "K,V". Keyed by the bare class
+    // name, like every other class table. This is what lets a method declared
+    // `fun getItem(k: Int): T` be typed at a call site: the receiver's own type
+    // says `Box<String>`, so `T` is `String`. The parser used to discard these
+    // names, which is why such a method inferred as Any (BUGS #95).
+    var class_type_params: Map<String, String>
     // Only methods declared with an empty body are abstract, i.e. actually require
     // an implementation in a subclass. A parent method that HAS a body is inherited,
     // so demanding the child redeclare it is wrong. Keyed by class name, value is a
@@ -178,6 +185,7 @@ class NullChecker {
         this.current_class = ""
         this.class_parents = {}
         this.class_method_names = {}
+        this.class_type_params = {}
         this.class_abstract_methods = {}
         this.receiver_params = {}
         this.actor_classes = {}
@@ -746,9 +754,12 @@ class NullChecker {
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parent, fields, methods, doc) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
+                }
+                if (type_params.length() > 0) {
+                    this.class_type_params.set(name, type_params.join(","))
                 }
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
@@ -1020,7 +1031,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, parent, fields, methods, doc) => {
+            ClassDecl(name, __tps, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 if (parent.length() > 0) {
                     this.env.define_var(name + "__parent", this.parse_type_node(parent))
@@ -1300,17 +1311,24 @@ class NullChecker {
                 var list_type: String = this.infer_expr(obj)
                 this.infer_expr(index)
                 // Subscript overloading: on a user class declaring `getItem`,
-                // `obj[k]` has getItem's declared return type, not an element
-                // type teased out of a generic argument the class does not have.
-                // extract_list_element_type answered "Any" for a class, which
-                // was harmless in itself but told the next dispatch nothing
-                // (BUGS #94; codegen side in methods_body.sf gen_index_get).
-                // Read the registered return type directly rather than calling
+                // `obj[k]` has getItem's declared return type. That type may
+                // itself be a class type parameter — `class Box<T>` with
+                // `fun getItem(k: Int): T` — in which case the receiver's own
+                // declared type supplies the answer: `Box<String>` says `T` is
+                // `String`. class_method_ret_type does that substitution.
+                // extract_list_element_type is right for a real List and wrong
+                // here: it reads the first generic argument positionally, which
+                // has nothing to do with what getItem declares (BUGS #94/#95;
+                // codegen side in methods_body.sf gen_index_get).
+                //
+                // Read the registry directly rather than calling
                 // infer_method_call, which would re-infer `obj` and `index` and
-                // so double every diagnostic they produce.
-                if (this.env.class_fields.has(list_type)
-                    and this.get_receiver_methods(list_type).contains("getItem")) {
-                    this.env.get_func_ret_type(list_type + "__getItem")
+                // so double every diagnostic they produce. Class tables are
+                // keyed by the bare name, hence generic_base.
+                var idx_base: String = this.generic_base(list_type)
+                if (this.env.class_fields.has(idx_base)
+                    and this.get_receiver_methods(idx_base).contains("getItem")) {
+                    this.parse_type_node(this.class_method_ret_type(list_type, "getItem"))
                 } else {
                     this.parse_type_node(this.extract_list_element_type(list_type))
                 }
@@ -1379,9 +1397,12 @@ class NullChecker {
                 return this.get_class_field_type(this.current_class, field)
             }
         }
-        // variable.field → look up from variable's class type
-        if (this.env.class_fields.has(obj_type)) {
-            return this.get_class_field_type(obj_type, field)
+        // variable.field → look up from variable's class type. Keyed by the bare
+        // name, with the receiver's type arguments substituted into the field's
+        // declared type: `var v: T` on a `Box<String>` is a String (BUGS #95).
+        var ma_base: String = this.generic_base(obj_type)
+        if (this.env.class_fields.has(ma_base)) {
+            return this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type)
         }
         // Known module members
         if (obj_type == "Any") {
@@ -1513,6 +1534,81 @@ class NullChecker {
         // "List<String>" → "String"
         if (!typ.contains("<")) return "Any"
         return this.extract_nth_generic_arg(typ, 0)
+    }
+
+    // --- Class-level generic substitution (BUGS #95) ---
+
+    // The bare name of a possibly-generic type: "Box<String>" → "Box".
+    // Every class table — class_fields, class_method_names, class_type_params —
+    // is keyed by the bare name, but a variable's declared type carries its
+    // arguments, so a lookup with the full spelling always misses.
+    fun generic_base(typ: String): String {
+        if (!typ.contains("<")) return typ
+        return typ.slice(0, typ.index_of("<"))
+    }
+
+    // The declared type parameter names of `class_name`, or [] if it is not
+    // generic. Reads the bare name, so `Box<String>` resolves like `Box`.
+    fun get_class_type_params(class_name: String): List<String> {
+        var base: String = this.generic_base(class_name)
+        if (!this.class_type_params.has(base)) return []
+        var joined: String = this.class_type_params.get(base)
+        if (joined.length() == 0) return []
+        return joined.split(",")
+    }
+
+    // Substitute a class's type arguments into a type mentioning its parameters.
+    //
+    //   substitute_class_type_params("T", "Box<String>")        → "String"
+    //   substitute_class_type_params("List<V>", "Pair<Int,Str>") → "List<Str>"
+    //   substitute_class_type_params("Int", "Box<String>")      → "Int"
+    //
+    // The receiver's own declared type is the authority here: `Box<String>`
+    // states what `T` is, so nothing needs to be guessed from the argument list.
+    // A parameter the receiver leaves unbound (a bare `Box`, or a class with
+    // more parameters than arguments) comes back unchanged rather than as Any:
+    // an unsubstituted `T` is a signal that the annotation is incomplete, and
+    // the caller decides what to do with it.
+    fun substitute_class_type_params(typ: String, recv_type: String): String {
+        if (typ.length() == 0) return typ
+        var params: List<String> = this.get_class_type_params(recv_type)
+        if (params.length() == 0) return typ
+        if (!recv_type.contains("<")) return typ
+        // A whole-type match is the common case: `fun unwrap(): T`.
+        var pi: Float = 0
+        while (pi < params.length()) {
+            if (params[pi] == typ) {
+                var arg: String = this.extract_nth_generic_arg(recv_type, pi)
+                if (arg != "Any" and arg.length() > 0) return arg
+                return typ
+            }
+            pi = pi + 1
+        }
+        // Otherwise recurse into the arguments: `fun items(): List<T>`.
+        if (typ.contains("<")) {
+            var lt: Float = typ.index_of("<")
+            var base: String = typ.slice(0, lt)
+            var inner: String = typ.slice(lt + 1, typ.length() - 1)
+            var parts: List<String> = this.split_type_args(inner)
+            var out: List<String> = []
+            var i: Float = 0
+            while (i < parts.length()) {
+                out.push(this.substitute_class_type_params(parts[i], recv_type))
+                i = i + 1
+            }
+            return base + "<" + out.join(",") + ">"
+        }
+        return typ
+    }
+
+    // A method's registered return type with the receiver's type arguments
+    // substituted in. `full_name` is the "ClassName__method" registry key,
+    // built from the bare name; `recv_type` is the receiver's declared type,
+    // arguments and all.
+    fun class_method_ret_type(recv_type: String, method: String): String {
+        var base: String = this.generic_base(recv_type)
+        var ret: String = this.env.get_func_ret(base + "__" + method)
+        return this.substitute_class_type_params(ret, recv_type)
     }
 
     fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
@@ -1850,12 +1946,24 @@ class NullChecker {
         // Class method: look up return type from registered functions
         // Methods are registered as "ClassName__method" or just "method"
         if (obj_type != "Any") {
-            var full_name: String = obj_type + "__" + method
+            // The registry is keyed by the bare class name, so a `Box<String>`
+            // receiver has to be looked up as `Box__getItem`. The arguments are
+            // not dropped, though — they are exactly what resolves the method's
+            // type parameters below (BUGS #95).
+            var full_name: String = this.generic_base(obj_type) + "__" + method
             // Check generic constraints for class methods
             if (this.is_generic_func(full_name)) {
                 this.check_generic_constraints(full_name, args)
             }
             var ret: String = this.env.get_func_ret(full_name)
+            // A class type parameter is substituted from the receiver's own
+            // declared type — `Box<String>` says `T` is `String` — before
+            // falling back to inferring it from the argument list. The source
+            // states this; there is nothing to guess.
+            var class_subst: String = this.substitute_class_type_params(ret, obj_type)
+            if (class_subst != ret) {
+                return class_subst
+            }
             if (ret != "Any") {
                 // Resolve type params for generic method return types
                 if (this.is_type_param(ret)) {

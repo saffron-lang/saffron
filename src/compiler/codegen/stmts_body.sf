@@ -99,7 +99,17 @@
             EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+                // Registered before the body is generated: a method returning a
+                // class type parameter is typed by substituting the receiver's
+                // own type arguments, and that has to be known by the time any
+                // call site in this class is emitted (BUGS #95).
+                if (type_params.length() > 0) {
+                    this.class_type_params.set(name, type_params)
+                    if (this.current_prefix.length() > 0) {
+                        this.class_type_params.set(this.current_prefix + name, type_params)
+                    }
+                }
                 this.gen_class_decl_with_parent(name, parent, fields, methods)
             }
         }
@@ -179,8 +189,23 @@
         if (vtype.contains("<") and vtype.contains(">")) {
             var gt_start: Float = vtype.index_of("<")
             var gt_inner: String = vtype.slice(gt_start + 1, vtype.length() - 1)
-            // Only resolve if the generic arg is a single-letter type param (T, E, K, V)
-            if (gt_inner.length() <= 2 and gt_inner.length() > 0 and gt_inner == gt_inner.to_upper()) {
+            var gt_base_name: String = vtype.slice(0, gt_start)
+            // Whether `gt_inner` is an unbound type parameter. The class's own
+            // declared parameter list is the authority: `class Computed<T>` says
+            // "T" is a parameter and "String" is not, with no guessing about
+            // name shape. The one-or-two-uppercase-characters test below is the
+            // old heuristic, kept only for a class whose declaration this
+            // codegen instance never saw (a cross-module type whose params were
+            // not registered) — it misses a spelled-out `Element` and would
+            // misfire on a two-letter class name (BUGS #95).
+            var gt_is_param: Bool = false
+            if (this.class_type_params.has(gt_base_name)) {
+                var gt_params: List<String> = this.class_type_params.get(gt_base_name)
+                gt_is_param = gt_params.contains(gt_inner)
+            } else {
+                gt_is_param = gt_inner.length() <= 2 and gt_inner.length() > 0 and gt_inner == gt_inner.to_upper()
+            }
+            if (gt_is_param) {
                 // Try to infer from init expression's lambda return type
                 var inferred: String = this.infer_generic_from_init(init)
                 if (inferred.length() > 0 and inferred != "Any" and inferred != "Int") {
@@ -1006,7 +1031,7 @@
             }
             VarDecl(n, t, i, d) => {}
             FunDecl(n, p, r, b, d) => {}
-            ClassDecl(n, p, f, m, d) => {}
+            ClassDecl(n, __tps, p, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -1175,7 +1200,7 @@
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, p, f, m, d) => "class"
+            ClassDecl(n, __tps, p, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -1194,7 +1219,7 @@
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d) => "other"
-            ClassDecl(n, p, f, m, d) => "other"
+            ClassDecl(n, __tps, p, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"

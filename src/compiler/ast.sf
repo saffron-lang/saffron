@@ -72,7 +72,14 @@ enum Stmt {
     VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
     FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String),
     EnumDecl(name: String, variants: List<Variant>, docstring: String),
-    ClassDecl(name: String, parent: String, fields: List<Param>, methods: List<Stmt>, docstring: String),
+    // `type_params` holds the declared generic parameter names of `class Box<T>`
+    // — ["T"], or [] for a non-generic class. The parser used to consume and
+    // *discard* them ("// Skip generic type parameters"), so `T` did not exist
+    // anywhere after parsing and no method returning `T` could ever be typed:
+    // even a direct `b.getItem(0)` on a `Box<String>` warned "cannot infer type".
+    // The source supplies this information; throwing it away is what made the
+    // types incomplete (BUGS #95).
+    ClassDecl(name: String, type_params: List<String>, parent: String, fields: List<Param>, methods: List<Stmt>, docstring: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),

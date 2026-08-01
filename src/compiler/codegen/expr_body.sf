@@ -270,7 +270,13 @@
                         this.emit_indent(field_ptr + " = getelementptr %" + resolved_type + ", %" + resolved_type + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                         var result: String = this.fresh_local()
                         this.emit_indent(result + " = load i64, i64* " + field_ptr)
-                        this.last_type = this.str_to_type(this.get_field_type(resolved_type, field))
+                        // `resolved_type` is the bare/struct name (resolve_class_type
+                        // strips the generic arguments), which is what the field
+                        // tables are keyed by; `vtype` still has the arguments, and
+                        // those are what a field declared `var v: T` needs to become
+                        // a String on a `Box<String>` (BUGS #95).
+                        var gf_ft: String = this.get_field_type(resolved_type, field)
+                        this.last_type = this.str_to_type(this.substitute_class_type_params(gf_ft, vtype))
                         this.current_class = saved_class
                         return result
                     }
@@ -321,7 +327,10 @@
                     this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                     var result: String = this.fresh_local()
                     this.emit_indent(result + " = load i64, i64* " + field_ptr)
-                    this.last_type = this.str_to_type(this.get_field_type(ma_resolved, field))
+                    // Same split as the annotated-variable path above: the tables
+                    // want the bare name, the substitution wants the arguments.
+                    var ma_ft: String = this.get_field_type(ma_resolved, field)
+                    this.last_type = this.str_to_type(this.substitute_class_type_params(ma_ft, ma_type_str))
                     this.current_class = saved_class
                     return result
                 }
@@ -1695,7 +1704,10 @@
                     this.emit_indent(fp + " = getelementptr %" + vt_resolved + ", %" + vt_resolved + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                     var result: String = this.fresh_local()
                     this.emit_indent(result + " = load volatile i64, i64* " + fp)
-                    this.last_type = this.str_to_type(this.get_field_type(vt_resolved, m_field))
+                    // The declared type may name a class type parameter; the
+                    // receiver's own annotation (`vt`, arguments intact) binds it.
+                    var vt_ft: String = this.get_field_type(vt_resolved, m_field)
+                    this.last_type = this.str_to_type(this.substitute_class_type_params(vt_ft, vt))
                     return result
             }
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
@@ -1766,7 +1778,8 @@
                         this.emit_indent(fp + " = getelementptr %" + inner_struct + ", %" + inner_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                         var result: String = this.fresh_local()
                         this.emit_indent(result + " = load i64, i64* " + fp)
-                        this.last_type = this.str_to_type(this.get_field_type(inner_type, m_field))
+                        var it_ft: String = this.get_field_type(inner_type, m_field)
+                        this.last_type = this.str_to_type(this.substitute_class_type_params(it_ft, inner_type))
                         return result
                     }
                 }
@@ -1786,7 +1799,8 @@
                 this.emit_indent(fp + " = getelementptr %" + fb_struct + ", %" + fb_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = load i64, i64* " + fp)
-                this.last_type = this.str_to_type(this.get_field_type(fb_resolved, m_field))
+                var fb_ft: String = this.get_field_type(fb_resolved, m_field)
+                this.last_type = this.str_to_type(this.substitute_class_type_params(fb_ft, fb_type_str))
                 return result
             }
             // Nothing above could establish a class for the receiver, so the

@@ -581,6 +581,78 @@
         return result
     }
 
+    /// The bare name of a possibly-generic type: "Box<String>" → "Box",
+    /// "Map<String,List<Int>>" → "Map", "Dict" → "Dict".
+    ///
+    /// `class_fields`, `class_methods` and the `ClassName__method` symbol names
+    /// are all keyed by the bare name, but a variable's declared type carries its
+    /// arguments. Testing `class_fields.has("Box<String>")` is therefore always
+    /// false, which silently skipped dispatch for every generic receiver
+    /// (BUGS #94 second half).
+    fun generic_base_name(typ: String): String {
+        if (!typ.contains("<")) { return typ }
+        return typ.slice(0, typ.index_of("<"))
+    }
+
+    /// `typ` with the receiver's class type arguments substituted in:
+    ///
+    ///     substitute_class_type_params("T", "Box<String>")         → "String"
+    ///     substitute_class_type_params("List<V>", "Pair<Int,Str>")  → "List<Str>"
+    ///     substitute_class_type_params("Int", "Box<String>")        → "Int"
+    ///
+    /// A method declared `fun getItem(k: Int): T` registers "T" as its return
+    /// type, and "T" names no runtime representation — dispatch on the result
+    /// matches no arm. The receiver's declared type is the authority: the source
+    /// wrote `Box<String>`, so `T` is `String`, and nothing has to be inferred
+    /// from the argument list. A parameter the annotation leaves unbound (a bare
+    /// `Box`, or fewer arguments than parameters) comes back unchanged rather
+    /// than as Any, so the caller can tell the difference between "resolved" and
+    /// "the source did not say" (BUGS #95).
+    fun substitute_class_type_params(typ: String, recv_type: String): String {
+        if (typ.length() == 0) { return typ }
+        if (!recv_type.contains("<")) { return typ }
+        var base_name: String = this.generic_base_name(recv_type)
+        if (!this.class_type_params.has(base_name)) { return typ }
+        var params: List<String> = this.class_type_params.get(base_name)
+        if (params.length() == 0) { return typ }
+        var recv_args: List<String> = this.split_type_args(this.strip_generic_brackets(recv_type))
+        // Whole-type match: `fun unwrap(): T`.
+        var pi: Float = 0
+        while (pi < params.length()) {
+            if (params[pi] == typ) {
+                if (pi < recv_args.length()) {
+                    var arg: String = recv_args[pi]
+                    if (arg.length() > 0) { return arg }
+                }
+                return typ
+            }
+            pi = pi + 1
+        }
+        // Otherwise recurse into the arguments: `fun items(): List<T>`.
+        if (typ.contains("<")) {
+            var lt: Float = typ.index_of("<")
+            var tbase: String = typ.slice(0, lt)
+            var parts: List<String> = this.split_type_args(this.strip_generic_brackets(typ))
+            var out: List<String> = []
+            var i: Float = 0
+            while (i < parts.length()) {
+                out.push(this.substitute_class_type_params(parts[i], recv_type))
+                i = i + 1
+            }
+            return tbase + "<" + out.join(",") + ">"
+        }
+        return typ
+    }
+
+    /// The inside of the outermost `<...>`: "Map<String,Int>" → "String,Int".
+    /// A type with no arguments yields "".
+    fun strip_generic_brackets(typ: String): String {
+        if (!typ.contains("<")) { return "" }
+        var lt: Float = typ.index_of("<")
+        if (typ.length() - 1 <= lt + 1) { return "" }
+        return typ.slice(lt + 1, typ.length() - 1)
+    }
+
     /// `typ` with a `Nil` member dropped from a union: "String|Nil" → "String".
     /// A non-union, or a union with no Nil member, comes back unchanged.
     ///
