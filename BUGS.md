@@ -9,6 +9,53 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 97. FIXED — a module global assigned inside a closure was treated as a capture, emitting IR that did not verify
+
+```saffron
+var top: Int = 0
+var top_bump = fun (): Int => {
+    top = top + 1
+    return top
+}
+IO.println(top_bump())
+```
+
+```
+opt: output.ll:2649:25: error: use of undefined value '%top'
+    %t95 = load i64, i64* %top
+```
+
+`find_free_vars_expr`'s `Assign` arm counted a module-level `var` as a free
+variable of the enclosing lambda, so `gen_lambda` built an env for it. The env
+store loop then emitted `load i64, i64* %top` in the *enclosing* function — but
+`output_body.sf` deliberately skips the alloca for a name that is a module
+global, because a global is addressed as `@__g_top` from wherever it is
+mentioned. Nothing in the frame to load, hence an undefined value and a program
+the verifier rejects.
+
+The read side has always excluded globals: the `Variable` arm's second condition
+is `this.typed_vars.has(name) and !this.module_globals.has(name) and !...`. The
+`Assign` arm instead *opted them in*, with an explicit
+`or this.module_globals.has(this.current_prefix + name)`. So `top` alone was not
+a capture and `top = top + 1` was, which is the asymmetry that made this a bug
+rather than either half being wrong on its own.
+
+The store was always correct. `gen_assign` resolves the target to `@__g_` on its
+own (stmts_body.sf, the `current_fn_locals` check), so the `%top` slot the
+capture machinery set up was dead code inside the lambda; the failure landed in
+the enclosing function, which is why the error pointed away from the closure.
+
+Fixed in `codegen/closures_body.sf` by excluding module globals in the `Assign`
+arm exactly as the `Variable` arm does — checking both the bare and the prefixed
+key, since the bare form is what `module_globals` holds for a main-program global.
+
+Latent, not a regression. The same source at HEAD produces the same broken IR
+when compiled by a compiler built from it: the checked-in gen3 binary predated
+the #51-defect-B boxing work that made `Assign` captures reachable at all for a
+global, so the shape was unreachable in the binary while sitting in the source.
+Test: `test/pass/closure_capture_writeback.sf`, whose top-level section exists to
+catch exactly this.
+
 ### 96. FIXED — a match arm bound at most five enum fields, silently truncating wider payloads
 
 ```saffron

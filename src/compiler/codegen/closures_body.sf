@@ -546,7 +546,25 @@
             }
             Assign(name, value) => {
                 this.find_free_vars_expr(value, bound, free)
-                if (!this.str_in_list(bound,name) and !this.str_in_list(free,name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
+                // A module global is NOT a capture. It is addressed as
+                // `@__g_<name>` from wherever it is mentioned, so there is
+                // nothing in the enclosing frame to copy into the closure's env
+                // — and asking for one produces IR that does not verify: the env
+                // store loop emits `load i64, i64* %<name>` against an alloca
+                // the enclosing body never declared, because output_body.sf skips
+                // the alloca for exactly the names that are globals ("use of
+                // undefined value '%top'", BUGS #97).
+                //
+                // The read side (the `Variable` arm above) has always excluded
+                // them. This arm did not, so `g = g + 1` inside a lambda over a
+                // module-level `var g` captured while `g` alone did not — the
+                // asymmetry was the bug, not either half on its own. The store
+                // itself was always correct: gen_assign resolves the target to
+                // `@__g_` independently, which is why the emitted `%<name>` slot
+                // was dead in the lambda body and the failure landed in the
+                // *enclosing* function instead.
+                var mg_assign: Bool = this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
+                if (!this.str_in_list(bound,name) and !this.str_in_list(free,name) and !mg_assign and this.typed_vars.has(name)) {
                     free.push(name)
                 }
             }
