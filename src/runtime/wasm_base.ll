@@ -620,6 +620,10 @@ entry:
   ret i64 %safe
 }
 
+; @override wasm64 -- DRIFT (latent bug): tests 0x7FF8 (TAG_PTR) where the
+;   other three test 0x7FF9 (TAG_INT). Preserved verbatim so this generator's
+;   first output is a no-op; wasm64 is identity-discipline so nothing tagged
+;   reaches it today.
 define double @__val_untag_float(i64 %v) {
 entry:
   ; Check if value has int tag (top 16 bits == 0x7FF8)
@@ -655,6 +659,9 @@ entry:
 
 ; --- Type Checking ---
 
+; @override wasm64 -- wasm64 spells the same three-tag rejection with or/xor
+;   instead of and/xor. Semantically identical (verified by opt -O2: both fold
+;   to one range compare).
 define i1 @__val_is_float(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
@@ -698,38 +705,39 @@ entry:
 
 ; --- Heap Object Type ID ---
 
+; @override wasm64 -- CAPABILITY GAP, not drift: this base's __gc_alloc is a
+;   bare malloc that *discards* %type_tag, so there is no header to read the
+;   tag back from. Returning 0 makes __class_is_a answer false rather than
+;   loading garbage. `x is SomeClass` is therefore unanswerable on wasm64
+;   until this base grows real headers, the way wasm_base_32.ll already has.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  ret i64 0
+}
+
+; @override wasm64 -- wasm64 has no heap type tags at all (its __gc_alloc is a
+;   bare malloc with no header), so it cannot answer this and returns false.
 define i1 @__val_is_string(i64 %v) {
 entry:
   ; In identity mode, cannot distinguish — always false
   ret i1 false
 }
 
+; @override wasm64 -- wasm64 has no heap type tags at all (its __gc_alloc is a
+;   bare malloc with no header), so it cannot answer this and returns false.
 define i1 @__val_is_list(i64 %v) {
 entry:
   ret i1 false
 }
 
+; @override wasm64 -- wasm64 has no heap type tags at all (its __gc_alloc is a
+;   bare malloc with no header), so it cannot answer this and returns false.
 define i1 @__val_is_map(i64 %v) {
 entry:
   ret i1 false
 }
 
 ; @generated-values:end
-
-; Kept OUTSIDE the generated block on purpose: values.spec does not declare
-; __val_class_tag, so were it above the end marker the generator would delete it
-; on the next run.
-;
-; __val_class_tag: 0 means "no per-class tag available", and on wasm64 that is
-; always the truth: this base's __gc_alloc is a bare malloc that *discards*
-; %type_tag, so there is no header to read it back from. Returning 0 makes
-; __class_is_a answer false rather than loading garbage; `x is SomeClass` is
-; therefore still unanswerable on wasm64 until this base grows real headers, the
-; way wasm_base_32.ll already has.
-define i64 @__val_class_tag(i64 %v) {
-entry:
-  ret i64 0
-}
 
 ; =============================================================================
 ; to_string Helpers
