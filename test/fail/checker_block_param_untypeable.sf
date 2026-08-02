@@ -1,0 +1,30 @@
+// BUGS #86, the other half: when the type genuinely is NOT in the source, that is
+// an error, not a guess.
+//
+// `f: Fun` is a bare function type. It says "some function" and nothing about what
+// that function is called with. A block passed to it (`{ x => ... }`) therefore has
+// no possible source for `x`'s type — there is nowhere in the program that says
+// what `x` is.
+//
+// The old behaviour was to leave `x` untyped, let codegen resolve `x.v` against no
+// class, and answer 0. The program ran and printed a wrong number. This file must
+// now be REJECTED: "if a type can't be determined from the source, then the source
+// is incomplete/invalid".
+//
+// The fix for this program is to spell the callee's parameter `(Box) => String`
+// instead of `Fun`, which test/pass/checker_block_param_typed.sf covers.
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun apply_block(b: Box, f: Fun): String {
+    return f(b)
+}
+
+var box = Box(42)
+
+// ERROR: `x` has no type and none can be derived — `apply_block` declares its
+// second parameter as bare `Fun`.
+IO.println(apply_block(box) { x => "v=" + x.v.to_string() })
