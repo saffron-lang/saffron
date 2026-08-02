@@ -40476,6 +40476,7 @@ entry:
   %parent = alloca i64
   %fields = alloca i64
   %methods = alloca i64
+  %saved_class = alloca i64
   %v = alloca i64
   %try_body = alloca i64
   %catch_name = alloca i64
@@ -41409,92 +41410,95 @@ then3604:
 else3605:
   br label %endif3603
 endif3603:
-  store i64 0, i64* %t2
+  %t701 = load i64, i64* %self
+  %t702 = inttoptr i64 %t701 to %checker_NullChecker*
+  %t703 = getelementptr %checker_NullChecker, %checker_NullChecker* %t702, i32 0, i32 4
+  %t704 = load volatile i64, i64* %t703
+  store i64 %t704, i64* %saved_class
+  %t705 = load i64, i64* %self
+  %t706 = load i64, i64* %name
+  %t707 = inttoptr i64 %t705 to %checker_NullChecker*
+  %t708 = getelementptr %checker_NullChecker, %checker_NullChecker* %t707, i32 0, i32 4
+  store volatile i64 %t706, i64* %t708
+  %t709 = load i64, i64* %self
+  %t710 = load i64, i64* %methods
+  %t711 = call i64 @checker_NullChecker__check_stmts(i64 %t709, i64 %t710)
+  %t712 = load i64, i64* %self
+  %t713 = load i64, i64* %saved_class
+  %t714 = inttoptr i64 %t712 to %checker_NullChecker*
+  %t715 = getelementptr %checker_NullChecker, %checker_NullChecker* %t714, i32 0, i32 4
+  store volatile i64 %t713, i64* %t715
+  store i64 %t713, i64* %t2
   br label %match.end3537
 match.arm3546:
-  %t701 = inttoptr i64 %t1 to [4 x i64]*
-  %t702 = getelementptr [4 x i64], [4 x i64]* %t701, i64 0, i64 1
-  %t703 = load i64, i64* %t702
-  store i64 %t703, i64* %n
-  %t704 = getelementptr [4 x i64], [4 x i64]* %t701, i64 0, i64 2
-  %t705 = load i64, i64* %t704
-  store i64 %t705, i64* %v
-  %t706 = getelementptr [4 x i64], [4 x i64]* %t701, i64 0, i64 3
-  %t707 = load i64, i64* %t706
-  store i64 %t707, i64* %d
-  %t708 = call i64 @__map_new()
-  store i64 %t708, i64* %t2
+  %t716 = inttoptr i64 %t1 to [4 x i64]*
+  %t717 = getelementptr [4 x i64], [4 x i64]* %t716, i64 0, i64 1
+  %t718 = load i64, i64* %t717
+  store i64 %t718, i64* %n
+  %t719 = getelementptr [4 x i64], [4 x i64]* %t716, i64 0, i64 2
+  %t720 = load i64, i64* %t719
+  store i64 %t720, i64* %v
+  %t721 = getelementptr [4 x i64], [4 x i64]* %t716, i64 0, i64 3
+  %t722 = load i64, i64* %t721
+  store i64 %t722, i64* %d
+  %t723 = call i64 @__map_new()
+  store i64 %t723, i64* %t2
   br label %match.end3537
 match.arm3547:
-  %t709 = call i64 @__map_new()
-  store i64 %t709, i64* %t2
+  %t724 = call i64 @__map_new()
+  store i64 %t724, i64* %t2
   br label %match.end3537
 match.arm3548:
-  %t710 = call i64 @__map_new()
-  store i64 %t710, i64* %t2
+  %t725 = call i64 @__map_new()
+  store i64 %t725, i64* %t2
   br label %match.end3537
 match.arm3549:
-  %t711 = inttoptr i64 %t1 to [5 x i64]*
-  %t712 = getelementptr [5 x i64], [5 x i64]* %t711, i64 0, i64 1
-  %t713 = load i64, i64* %t712
-  store i64 %t713, i64* %try_body
-  %t714 = getelementptr [5 x i64], [5 x i64]* %t711, i64 0, i64 2
-  %t715 = load i64, i64* %t714
-  store i64 %t715, i64* %catch_name
-  %t716 = getelementptr [5 x i64], [5 x i64]* %t711, i64 0, i64 3
-  %t717 = load i64, i64* %t716
-  store i64 %t717, i64* %catch_body
-  %t718 = getelementptr [5 x i64], [5 x i64]* %t711, i64 0, i64 4
-  %t719 = load i64, i64* %t718
-  store i64 %t719, i64* %finally_body
-  %t720 = load i64, i64* %self
-  %t721 = inttoptr i64 %t720 to %checker_NullChecker*
-  %t722 = getelementptr %checker_NullChecker, %checker_NullChecker* %t721, i32 0, i32 0
-  %t723 = load volatile i64, i64* %t722
-  %t724 = call i64 @checker_TypeEnv__push_scope(i64 %t723)
-  %t725 = load i64, i64* %self
-  %t726 = load i64, i64* %try_body
-  %t727 = call i64 @checker_NullChecker__check_stmts(i64 %t725, i64 %t726)
-  %t728 = load i64, i64* %self
-  %t729 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t728)
-  %t730 = load i64, i64* %self
-  %t731 = inttoptr i64 %t730 to %checker_NullChecker*
-  %t732 = getelementptr %checker_NullChecker, %checker_NullChecker* %t731, i32 0, i32 0
-  %t733 = load volatile i64, i64* %t732
-  %t734 = call i64 @checker_TypeEnv__pop_scope(i64 %t733)
+  %t726 = inttoptr i64 %t1 to [5 x i64]*
+  %t727 = getelementptr [5 x i64], [5 x i64]* %t726, i64 0, i64 1
+  %t728 = load i64, i64* %t727
+  store i64 %t728, i64* %try_body
+  %t729 = getelementptr [5 x i64], [5 x i64]* %t726, i64 0, i64 2
+  %t730 = load i64, i64* %t729
+  store i64 %t730, i64* %catch_name
+  %t731 = getelementptr [5 x i64], [5 x i64]* %t726, i64 0, i64 3
+  %t732 = load i64, i64* %t731
+  store i64 %t732, i64* %catch_body
+  %t733 = getelementptr [5 x i64], [5 x i64]* %t726, i64 0, i64 4
+  %t734 = load i64, i64* %t733
+  store i64 %t734, i64* %finally_body
   %t735 = load i64, i64* %self
   %t736 = inttoptr i64 %t735 to %checker_NullChecker*
   %t737 = getelementptr %checker_NullChecker, %checker_NullChecker* %t736, i32 0, i32 0
   %t738 = load volatile i64, i64* %t737
   %t739 = call i64 @checker_TypeEnv__push_scope(i64 %t738)
   %t740 = load i64, i64* %self
-  %t741 = inttoptr i64 %t740 to %checker_NullChecker*
-  %t742 = getelementptr %checker_NullChecker, %checker_NullChecker* %t741, i32 0, i32 0
-  %t743 = load volatile i64, i64* %t742
-  %t744 = load i64, i64* %catch_name
-  %t745 = call i8* @__sf_malloc(i64 8)
-  %t746 = bitcast i8* %t745 to [1 x i64]*
-  %t747 = getelementptr [1 x i64], [1 x i64]* %t746, i64 0, i64 0
-  store i64 3, i64* %t747
-  %t748 = ptrtoint [1 x i64]* %t746 to i64
-  %t749 = call i64 @checker_TypeEnv__define_var(i64 %t743, i64 %t744, i64 %t748)
+  %t741 = load i64, i64* %try_body
+  %t742 = call i64 @checker_NullChecker__check_stmts(i64 %t740, i64 %t741)
+  %t743 = load i64, i64* %self
+  %t744 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t743)
+  %t745 = load i64, i64* %self
+  %t746 = inttoptr i64 %t745 to %checker_NullChecker*
+  %t747 = getelementptr %checker_NullChecker, %checker_NullChecker* %t746, i32 0, i32 0
+  %t748 = load volatile i64, i64* %t747
+  %t749 = call i64 @checker_TypeEnv__pop_scope(i64 %t748)
   %t750 = load i64, i64* %self
-  %t751 = load i64, i64* %catch_body
-  %t752 = call i64 @checker_NullChecker__check_stmts(i64 %t750, i64 %t751)
-  %t753 = load i64, i64* %self
-  %t754 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t753)
+  %t751 = inttoptr i64 %t750 to %checker_NullChecker*
+  %t752 = getelementptr %checker_NullChecker, %checker_NullChecker* %t751, i32 0, i32 0
+  %t753 = load volatile i64, i64* %t752
+  %t754 = call i64 @checker_TypeEnv__push_scope(i64 %t753)
   %t755 = load i64, i64* %self
   %t756 = inttoptr i64 %t755 to %checker_NullChecker*
   %t757 = getelementptr %checker_NullChecker, %checker_NullChecker* %t756, i32 0, i32 0
   %t758 = load volatile i64, i64* %t757
-  %t759 = call i64 @checker_TypeEnv__pop_scope(i64 %t758)
-  %t760 = load i64, i64* %self
-  %t761 = inttoptr i64 %t760 to %checker_NullChecker*
-  %t762 = getelementptr %checker_NullChecker, %checker_NullChecker* %t761, i32 0, i32 0
-  %t763 = load volatile i64, i64* %t762
-  %t764 = call i64 @checker_TypeEnv__push_scope(i64 %t763)
+  %t759 = load i64, i64* %catch_name
+  %t760 = call i8* @__sf_malloc(i64 8)
+  %t761 = bitcast i8* %t760 to [1 x i64]*
+  %t762 = getelementptr [1 x i64], [1 x i64]* %t761, i64 0, i64 0
+  store i64 3, i64* %t762
+  %t763 = ptrtoint [1 x i64]* %t761 to i64
+  %t764 = call i64 @checker_TypeEnv__define_var(i64 %t758, i64 %t759, i64 %t763)
   %t765 = load i64, i64* %self
-  %t766 = load i64, i64* %finally_body
+  %t766 = load i64, i64* %catch_body
   %t767 = call i64 @checker_NullChecker__check_stmts(i64 %t765, i64 %t766)
   %t768 = load i64, i64* %self
   %t769 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t768)
@@ -41503,44 +41507,59 @@ match.arm3549:
   %t772 = getelementptr %checker_NullChecker, %checker_NullChecker* %t771, i32 0, i32 0
   %t773 = load volatile i64, i64* %t772
   %t774 = call i64 @checker_TypeEnv__pop_scope(i64 %t773)
-  store i64 %t774, i64* %t2
+  %t775 = load i64, i64* %self
+  %t776 = inttoptr i64 %t775 to %checker_NullChecker*
+  %t777 = getelementptr %checker_NullChecker, %checker_NullChecker* %t776, i32 0, i32 0
+  %t778 = load volatile i64, i64* %t777
+  %t779 = call i64 @checker_TypeEnv__push_scope(i64 %t778)
+  %t780 = load i64, i64* %self
+  %t781 = load i64, i64* %finally_body
+  %t782 = call i64 @checker_NullChecker__check_stmts(i64 %t780, i64 %t781)
+  %t783 = load i64, i64* %self
+  %t784 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t783)
+  %t785 = load i64, i64* %self
+  %t786 = inttoptr i64 %t785 to %checker_NullChecker*
+  %t787 = getelementptr %checker_NullChecker, %checker_NullChecker* %t786, i32 0, i32 0
+  %t788 = load volatile i64, i64* %t787
+  %t789 = call i64 @checker_TypeEnv__pop_scope(i64 %t788)
+  store i64 %t789, i64* %t2
   br label %match.end3537
 match.arm3550:
-  %t775 = inttoptr i64 %t1 to [2 x i64]*
-  %t776 = getelementptr [2 x i64], [2 x i64]* %t775, i64 0, i64 1
-  %t777 = load i64, i64* %t776
-  store i64 %t777, i64* %value
-  %t778 = load i64, i64* %self
-  %t779 = load i64, i64* %value
-  %t780 = call i64 @checker_NullChecker__infer_expr(i64 %t778, i64 %t779)
-  store i64 %t780, i64* %t2
+  %t790 = inttoptr i64 %t1 to [2 x i64]*
+  %t791 = getelementptr [2 x i64], [2 x i64]* %t790, i64 0, i64 1
+  %t792 = load i64, i64* %t791
+  store i64 %t792, i64* %value
+  %t793 = load i64, i64* %self
+  %t794 = load i64, i64* %value
+  %t795 = call i64 @checker_NullChecker__infer_expr(i64 %t793, i64 %t794)
+  store i64 %t795, i64* %t2
   br label %match.end3537
 match.arm3551:
-  %t781 = inttoptr i64 %t1 to [3 x i64]*
-  %t782 = getelementptr [3 x i64], [3 x i64]* %t781, i64 0, i64 1
-  %t783 = load i64, i64* %t782
-  store i64 %t783, i64* %pattern
-  %t784 = getelementptr [3 x i64], [3 x i64]* %t781, i64 0, i64 2
-  %t785 = load i64, i64* %t784
-  store i64 %t785, i64* %value
-  %t786 = load i64, i64* %self
-  %t787 = load i64, i64* %value
-  %t788 = call i64 @checker_NullChecker__infer_expr(i64 %t786, i64 %t787)
-  store i64 %t788, i64* %t2
+  %t796 = inttoptr i64 %t1 to [3 x i64]*
+  %t797 = getelementptr [3 x i64], [3 x i64]* %t796, i64 0, i64 1
+  %t798 = load i64, i64* %t797
+  store i64 %t798, i64* %pattern
+  %t799 = getelementptr [3 x i64], [3 x i64]* %t796, i64 0, i64 2
+  %t800 = load i64, i64* %t799
+  store i64 %t800, i64* %value
+  %t801 = load i64, i64* %self
+  %t802 = load i64, i64* %value
+  %t803 = call i64 @checker_NullChecker__infer_expr(i64 %t801, i64 %t802)
+  store i64 %t803, i64* %t2
   br label %match.end3537
 match.arm3552:
-  %t789 = inttoptr i64 %t1 to [3 x i64]*
-  %t790 = getelementptr [3 x i64], [3 x i64]* %t789, i64 0, i64 1
-  %t791 = load i64, i64* %t790
-  store i64 %t791, i64* %ta_n
-  %t792 = getelementptr [3 x i64], [3 x i64]* %t789, i64 0, i64 2
-  %t793 = load i64, i64* %t792
-  store i64 %t793, i64* %ta_t
-  %t794 = call i64 @__map_new()
-  store i64 %t794, i64* %t2
+  %t804 = inttoptr i64 %t1 to [3 x i64]*
+  %t805 = getelementptr [3 x i64], [3 x i64]* %t804, i64 0, i64 1
+  %t806 = load i64, i64* %t805
+  store i64 %t806, i64* %ta_n
+  %t807 = getelementptr [3 x i64], [3 x i64]* %t804, i64 0, i64 2
+  %t808 = load i64, i64* %t807
+  store i64 %t808, i64* %ta_t
+  %t809 = call i64 @__map_new()
+  store i64 %t809, i64* %t2
   br label %match.end3537
 match.end3537:
-  %t795 = load i64, i64* %t2
+  %t810 = load i64, i64* %t2
   ret i64 0
 }
 
@@ -48101,7 +48120,7 @@ ifexpr.else4419:
   %t42 = load i64, i64* %self
   %t43 = load i64, i64* %tb
   %t44 = call i64 @checker_NullChecker__stmts_diverge(i64 %t42, i64 %t43)
-  %t45 = add i64 0, 105553515925056
+  %t45 = add i64 0, 105553514794112
   %t46 = load i64, i64* %self
   %t47 = load i64, i64* %eb
   %t48 = call i64 @checker_NullChecker__stmts_diverge(i64 %t46, i64 %t47)

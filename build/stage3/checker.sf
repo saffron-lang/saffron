@@ -1072,6 +1072,20 @@ class NullChecker {
                     this.env.define_var(name + "__parent", this.parse_type_node(parent))
                     this.class_parents.set(name, parent)
                 }
+                // Walk the method bodies. This arm used to stop at the fields, so
+                // no statement inside any method was checked at all — not
+                // nullability, not scalar mismatches, not return types, not
+                // exhaustiveness (BUGS #76). ~97% of the compiler's own bodies are
+                // methods, so "the checker reports nothing" meant "no checks ran".
+                //
+                // The FunDecl arm already handles a method correctly once
+                // current_class is set, and `this.field` resolves through
+                // class_fields rather than lexical scope, so no extra scope is
+                // needed here.
+                var saved_class: String = this.current_class
+                this.current_class = name
+                this.check_stmts(methods)
+                this.current_class = saved_class
             }
             EnumDecl(n, v, d) => {}
             Break => {}
