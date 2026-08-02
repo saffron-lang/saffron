@@ -48,7 +48,7 @@ fun escape_string(s: String): String {
 fun is_top_level_decl(stmt: AST.Stmt): Bool {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, doc) => true
-        ClassDecl(name, type_params, parent, fields, methods, doc) => true
+        ClassDecl(name, type_params, parents, fields, methods, doc) => true
         EnumDecl(name, variants, doc) => true
         ExprStmt(expr) => false
         VarDecl(name, type_ann, init, doc) => false
@@ -180,7 +180,7 @@ fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt
             VarDecl(n, t, i, d) => " {\n    " + format_stmt(single, 1) + "}"
             FunDecl(n, p, r, b, d) => " {\n    " + format_stmt(single, 1) + "}"
             EnumDecl(n, v, d) => " {\n    " + format_stmt(single, 1) + "}"
-            ClassDecl(n, tps, p, f, m, d) => " {\n    " + format_stmt(single, 1) + "}"
+            ClassDecl(n, tps, ps, f, m, d) => " {\n    " + format_stmt(single, 1) + "}"
             If(c, t, e) => " {\n    " + format_stmt(single, 1) + "}"
             While(c, b) => " {\n    " + format_stmt(single, 1) + "}"
             Block(s) => " {\n    " + format_stmt(single, 1) + "}"
@@ -317,7 +317,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append("}\n")
             sb.to_string()
         }
-        ClassDecl(name, type_params, parent, fields, methods, doc) => {
+        ClassDecl(name, type_params, parents, fields, methods, doc) => {
             var sb: StringBuilder = StringBuilder()
             if (doc.length() > 0 and !doc.starts_with("@")) {
                 sb.append(pad)
@@ -328,9 +328,17 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append(pad)
             sb.append("class ")
             sb.append(name)
-            if (parent.length() > 0) {
+            if (parents.length() > 0) {
                 sb.append(" extends ")
-                sb.append(parent)
+                // Every base, comma-joined, matching the surface syntax. Printing
+                // only parents[0] would have the formatter silently delete the
+                // 2nd and 3rd interface of a `extends A, B, C` on reformat.
+                var pi: Float = 0
+                while (pi < parents.length()) {
+                    if (pi > 0) { sb.append(", ") }
+                    sb.append(parents[pi])
+                    pi = pi + 1
+                }
             }
             sb.append(" {\n")
             // Fields

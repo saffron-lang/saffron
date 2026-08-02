@@ -202,20 +202,14 @@ entry:
 
 define i1 @__class_is_a(i64 %tag, i64 %target) {
 entry:
-  %cur = alloca i64
-  store i64 %tag, i64* %cur
-  br label %cia.loop
-cia.loop:
-  %c = load i64, i64* %cur
-  %z = icmp eq i64 %c, 0
-  br i1 %z, label %cia.no, label %cia.test
-cia.test:
-  %hit = icmp eq i64 %c, %target
-  br i1 %hit, label %cia.yes, label %cia.step
-cia.step:
-  %p = call i64 @__class_parent_tag(i64 %c)
-  store i64 %p, i64* %cur
-  br label %cia.loop
+  %z = icmp eq i64 %tag, 0
+  br i1 %z, label %cia.no, label %cia.tchk
+cia.tchk:
+  %tz = icmp eq i64 %target, 0
+  br i1 %tz, label %cia.no, label %cia.self
+cia.self:
+  %hit = icmp eq i64 %tag, %target
+  br i1 %hit, label %cia.yes, label %cia.no
 cia.yes:
   ret i1 1
 cia.no:

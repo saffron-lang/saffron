@@ -2048,13 +2048,17 @@ class Parser {
                 this.advance()
             }
         }
-        var parent: String = ""
+        // Every name after `extends`, in source order. This used to keep only
+        // the first and discard the rest, so `class Duck extends Flyable,
+        // Swimmable, Walkable` parsed as `extends Flyable` — the other two
+        // interfaces contributed no methods, no conformance and no `is` relation.
+        var parents: List<String> = []
         if (this.is_ident_named("extends")) {
             this.advance() // consume extends
-            parent = this.expect_ident()
+            parents.push(this.expect_ident())
             // Support multiple extends (interfaces): class Foo extends A, B, C
             while (this.match_kind(",")) {
-                this.expect_ident() // skip additional interfaces for now
+                parents.push(this.expect_ident())
             }
         }
         this.consume("{")
@@ -2123,7 +2127,7 @@ class Parser {
         if (field_defaults.length() > 0) {
             this.inject_field_defaults(methods, field_defaults)
         }
-        return AST.Stmt.ClassDecl(name, type_params, parent, fields, methods, docstring)
+        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring)
     }
 
     fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {
@@ -2881,7 +2885,7 @@ class Parser {
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d) => "other"
-            ClassDecl(n, tp, p, f, m, d) => "other"
+            ClassDecl(n, tp, ps, f, m, d) => "other"
             Return(v) => "other"
             If(c, t, e) => "if"
             While(c, b) => "other"

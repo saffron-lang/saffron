@@ -772,18 +772,26 @@
     }
 
     // The struct name that actually implements `method` for the class whose
-    // struct name is `struct_c` — walk the parent chain to the nearest class
-    // that declares it itself (class_own_methods). "" if none does.
+    // struct name is `struct_c` — the nearest class at or above it that declares
+    // the method itself (class_own_methods). "" if none does.
+    //
+    // Searches every base, not one chain, so a method supplied by the 2nd or 3rd
+    // interface of `extends A, B, C` has an owner. Bases are visited in
+    // declaration order at each level (all_ancestor_structs is breadth-first),
+    // matching the first-wins rule the forwarder emission uses.
     fun effective_method_owner(struct_c: String, method: String): String {
-        var cur: String = struct_c
-        var guard: Float = 0
-        while (guard < 64) {
-            if (this.class_own_methods.has(cur)) {
-                var own: List<String> = this.class_own_methods.get(cur)
-                if (own.contains(method)) { return cur }
+        if (this.class_own_methods.has(struct_c)) {
+            var own0: List<String> = this.class_own_methods.get(struct_c)
+            if (own0.contains(method)) { return struct_c }
+        }
+        var anc: List<String> = this.all_ancestor_structs(struct_c)
+        var ai: Float = 0
+        while (ai < anc.length()) {
+            if (this.class_own_methods.has(anc[ai])) {
+                var own: List<String> = this.class_own_methods.get(anc[ai])
+                if (own.contains(method)) { return anc[ai] }
             }
-            if (this.class_parent_of.has(cur)) { cur = this.class_parent_of.get(cur) } else { return "" }
-            guard = guard + 1
+            ai = ai + 1
         }
         return ""
     }
@@ -815,17 +823,11 @@
         while (ki < keys.length()) {
             var sc: String = keys[ki]
             if (sc != struct_ns) {
-                // Is sc a descendant of struct_ns?
-                var cur: String = sc
-                var is_desc: Bool = false
-                var g: Float = 0
-                while (g < 64) {
-                    if (this.class_parent_of.has(cur)) {
-                        cur = this.class_parent_of.get(cur)
-                        if (cur == struct_ns) { is_desc = true; g = 64 }
-                    } else { g = 64 }
-                    g = g + 1
-                }
+                // Is sc a descendant of struct_ns, through any of its bases? The
+                // single-chain walk this replaces missed a class whose relation to
+                // struct_ns runs through its 2nd or 3rd base, so a call typed at
+                // the interface did not dispatch to that implementor.
+                var is_desc: Bool = this.str_in_list(this.all_ancestor_structs(sc), struct_ns)
                 if (is_desc) {
                     var sc_owner: String = this.effective_method_owner(sc, method)
                     if (sc_owner.length() > 0 and sc_owner != ns_owner) {

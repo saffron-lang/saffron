@@ -50,6 +50,10 @@ Prerequisite for `protected`, stated rather than hidden: widen `ClassDecl.parent
 
 Sequencing consequence: `protected` is the **last** modifier to land, not because it is least wanted but because it is the only one gated on a structural change to inheritance representation. `public`/`private`/`internal` do not depend on it and ship first.
 
+**Update (2026-08-02): the widening is done — see BUGS #111.** The diagnosis above was accurate, with one correction: `test/pass/multi_inherit.sf` did not "exercise" the form, it *failed* on it (`[codegen] Error: type 'Duck' has no method 'swim'`), as did `test/pass/interfaces.sf` — multiple inheritance was not merely unsound for `protected`, it did not work at all past the first base. `class_parents` is now `Map<String, List<String>>`, `is_subtype_node` searches the full inheritance DAG breadth-first, conformance consults every base, and `__class_is_a` is a flattened ancestor-set table rather than a chain walk (a `switch` arm returns one value, so no walk can traverse a DAG). Field layout is deliberately unchanged: only `parents[0]` contributes fields, because parent field index i == child field index i can hold for exactly one base.
+
+So `protected` is no longer blocked on representation — the checker can now resolve `Duck` → `Swimmable` and a `protected` member on any base is answerable. The sequencing above still holds for a different reason: the widening changes how the compiler reads its own `ClassDecl`, so it has its own promotion gate (§5, #96/#100) which must close before `protected` work can begin on top of it.
+
 ### `internal`: package-scoped, on a boundary that already exists
 
 Kotlin's `internal` is module-scoped, where a Kotlin "module" is a compilation unit (Gradle module / Maven project). Saffron's closest true analogue is the **package** — a `pantry.toml` — not the file, since Saffron already calls a file a module.
@@ -313,6 +317,8 @@ Verified: bootstrap both stages; failure sets byte-identical to base (28 failure
 
 **Phase 7 — annotate the compiler's own source. Deferred, not part of this work.** See §9.
 
+**Phase 8+ — deferred features.** ~~Widen `ClassDecl.parent` to `List<String>`, which unblocks `protected` and closes L7's coverage hole.~~ **Done — it became Phase 3b and landed 2026-08-02** (BUGS #111): it is independent of visibility, and multiple inheritance was not merely unsound for `protected` but broken outright, so it was worth doing on its own account. What remains deferred here is `protected` itself and L7's coverage hole.
+
 Nothing in Phases 1, 2, 2b, 3 or 3b may use a visibility modifier in compiler source. Nothing at all may use one before the Phase 3 promotion.
 
 ### Ordering summary
@@ -377,7 +383,7 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 
 **Superseded by the Kotlin-parity decision — these are now IN scope, and were out of scope only in this document's first draft:**
 
-- ~~`protected`~~ — **in scope**, ships last of the four, gated on Phase 3b (§7).
+- ~~`protected`~~ — **in scope**, ships last of the four, as Phase 5b (§7). It was blocked on `ClassDecl.parent: String` and the parser discarding parents 2..n; **that block is removed** (BUGS #111), so the checker can now resolve a base at any position. It still waits on the widening's own promotion gate.
 - ~~a distinct `internal`~~ — **in scope**, package-scoped, gated on Phase 2b (§7).
 - ~~module-private fields~~ — **resolved**: the 24 underscore fields read by same-file free functions become `internal`, not "permanently public" (§2).
 
