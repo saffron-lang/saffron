@@ -631,6 +631,57 @@
         return fallback
     }
 
+    /// Register the SYMBOL of every `extend fun` in stmts[start..end) before any
+    /// body is lowered (BUGS #103).
+    ///
+    /// gen_extend_method below registers `Ctx__bx -> core_Ctx__bx` in
+    /// func_prefix_map only as it lowers that method, so a call generated BEFORE
+    /// the callee was lowered found nothing and resolve_method_symbol fell through
+    /// to an unprefixed guess — `@Ctx__bx` against a definition actually named
+    /// `@core_Ctx__bx`. That passes codegen and dies at link time. Two `extend
+    /// fun`s in different modules calling each other hit it in BOTH import orders,
+    /// each order naming the other direction's symbol, so no ordering fixed it.
+    ///
+    /// Invisible in a single file because there the prefix is "" and the guess is
+    /// accidentally right. It only breaks once the code lives in a module.
+    ///
+    /// Must run after class pre-registration: extend_class_prefix reads
+    /// class_struct_names to find the extended class's module.
+    fun prescan_extend_symbols(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var xi: Float = start
+        while (xi < end) {
+            var xdoc: String = this.get_fun_doc(stmts[xi])
+            if (xdoc.starts_with("@extend:")) {
+                var xname: String = this.get_fun_name(stmts[xi])
+                var xcls: String = xdoc.slice(8, xdoc.length())
+                if (xname.length() > 0 and xcls.length() > 0) {
+                    var xfull: String = xcls + "__" + xname
+                    var xprefixed: String = this.extend_class_prefix(xcls, prefix) + xfull
+                    this.func_prefix_map.set(xfull, xprefixed)
+                    if (!this.str_in_list(this.known_functions, xprefixed)) {
+                        this.known_functions.push(xprefixed)
+                    }
+                    if (!this.str_in_list(this.known_functions, xfull)) {
+                        this.known_functions.push(xfull)
+                    }
+                    // The receiver's method list too, or gen_method_call's
+                    // "type 'X' has no method 'y'" check rejects a call compiled
+                    // before the extend fun is lowered.
+                    if (this.class_methods.has(xcls)) {
+                        var xmethods: List<String> = this.class_methods.get(xcls)
+                        if (!this.str_in_list(xmethods, xname)) { xmethods.push(xname) }
+                    }
+                    var xret: String = this.get_fun_ret(stmts[xi])
+                    if (xret.length() > 0) {
+                        this.func_ret_types.set(xprefixed, this.str_to_type(xret))
+                        this.func_ret_types.set(xfull, this.str_to_type(xret))
+                    }
+                }
+            }
+            xi = xi + 1
+        }
+    }
+
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
     // Use target class's prefix (not source file's prefix)
