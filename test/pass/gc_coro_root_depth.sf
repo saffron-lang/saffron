@@ -1,4 +1,16 @@
+// The coroutine shadow stack must not grow without bound across spawn/await
+// rounds: each worker pushes roots on entry and must pop exactly those on exit.
+//
+// Graded on "exit 0 and no Runtime Error:" alone until BUGS #107, so a leak that
+// pushed one extra root per round would have printed 18 / 118 / 168 and still
+// counted as a pass. The check added below is an ASSERTION rather than a
+// `.expected` file on purpose: the invariant is that the three depths are EQUAL
+// to each other, not that they equal 18. The absolute number is a function of
+// frame layout and legitimately moves when unrelated codegen changes, so freezing
+// it would make ordinary work look like a regression while still not stating what
+// the test is actually for.
 import "@async" as Async
+import "@test" as Test
 
 @extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
 
@@ -11,12 +23,28 @@ fun worker(name: String): String {
 
 IO.println("depth before any spawn = " + ss_depth().to_string())
 
+var d50: Int = 0
+var d150: Int = 0
+var d200: Int = 0
+
 var i: Int = 0
 while (i < 200) {
     var t = Task.spawn(fun () => worker("w"))
     var r = t.await()
     i = i + 1
-    if (i == 50) { IO.println("after 50 rounds  = " + ss_depth().to_string()) }
-    if (i == 150) { IO.println("after 150 rounds = " + ss_depth().to_string()) }
-    if (i == 200) { IO.println("after 200 rounds = " + ss_depth().to_string()) }
+    if (i == 50) { d50 = ss_depth() IO.println("after 50 rounds  = " + d50.to_string()) }
+    if (i == 150) { d150 = ss_depth() IO.println("after 150 rounds = " + d150.to_string()) }
+    if (i == 200) { d200 = ss_depth() IO.println("after 200 rounds = " + d200.to_string()) }
 }
+
+// --- checks ---------------------------------------------------------------
+// A leak of even one root per round shows up as d150 - d50 == 100.
+Test.assert_eq(d150, d50, "shadow stack does not grow between round 50 and 150")
+Test.assert_eq(d200, d150, "shadow stack does not grow between round 150 and 200")
+
+// And the depth must be a plausible live depth, not zero (which would mean the
+// extern read nothing) and not proportional to the round count.
+Test.assert_gt(d200, 0, "the shadow stack depth is actually being read")
+Test.assert_lt(d200, 200, "the depth is not proportional to the number of rounds")
+
+Test.summary()
