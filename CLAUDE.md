@@ -397,7 +397,7 @@ class Circle extends Drawable {
 Multiple inheritance: `class Duck extends Flyable, Swimmable, Walkable { ... }`
 
 Every base contributes methods, and `is` answers true against each of them. Until
-BUGS #103 the parser discarded parents 2..n, so this form silently meant `extends
+BUGS #104 the parser discarded parents 2..n, so this form silently meant `extends
 Flyable`; `test/pass/multi_inherit.sf` is the regression test.
 
 **Only the first base contributes fields**, and only its `init` is forwarded. That
