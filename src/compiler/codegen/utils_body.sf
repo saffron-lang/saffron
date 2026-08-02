@@ -250,7 +250,7 @@
             return
         }
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
@@ -560,7 +560,7 @@
     fun stmt_has_yield(stmt: AST.Stmt): Bool {
         return match (stmt) {
             ExprStmt(e) => this.expr_has_yield(e)
-            VarDecl(n, t, init, d) => this.expr_has_yield(init)
+            VarDecl(n, t, init, d, v_vis) => this.expr_has_yield(init)
             Return(v) => this.expr_has_yield(v)
             If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
             While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
@@ -677,7 +677,7 @@
     fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
         match (stmt) {
             ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
-            VarDecl(n, t, init, d) => { this.collect_calls_from_expr(init, calls) }
+            VarDecl(n, t, init, d, v_vis) => { this.collect_calls_from_expr(init, calls) }
             Return(v) => { this.collect_calls_from_expr(v, calls) }
             If(c, tb, eb) => {
                 this.collect_calls_from_expr(c, calls)

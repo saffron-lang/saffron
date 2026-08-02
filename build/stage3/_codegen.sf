@@ -5402,7 +5402,7 @@ class Codegen {
 
     fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
         match (stmt) {
-            VarDecl(name, typ, init, doc) => {
+            VarDecl(name, typ, init, doc, v_vis) => {
                 this.find_free_vars_expr(init, bound, free)
                 bound.push(name)
             }
@@ -5695,7 +5695,7 @@ class Codegen {
     fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
         var sk: String = this.classify_stmt(stmt)
         if (sk == "var") {
-            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d) => init
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis) => init
                 _ => AST.Expr.NilLit
             }
             this.collect_lambda_assigned_expr(vi, out, in_lambda)
@@ -6238,7 +6238,7 @@ class Codegen {
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 if (!doc.starts_with("@import:")) {
                     this.gen_var_decl(stmt)
                 }
@@ -6371,19 +6371,19 @@ class Codegen {
     }
 
     fun get_var_name(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => n
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => n
             _ => ""
         }
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => t
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => t
             _ => ""
         }
     }
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { VarDecl(n, t, i, d) => i
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => i
             // Was `_ => ""`: a String default on a function declared to return
             // AST.Expr. Nothing rejected it because the checker never walked
             // method bodies (BUGS #76), and every caller pre-checks for a
@@ -6394,7 +6394,7 @@ class Codegen {
     }
 
     fun get_var_doc(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => d
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => d
             _ => ""
         }
     }
@@ -7410,7 +7410,7 @@ class Codegen {
             EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum_variants(name, variants)
             }
-            VarDecl(n, t, i, d) => {}
+            VarDecl(n, t, i, d, v_vis) => {}
             FunDecl(n, p, r, b, d) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
@@ -7438,10 +7438,10 @@ class Codegen {
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
-        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
+        var vname: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => n
             _ => ""
         }
-        var vdoc: String = match (stmt) { VarDecl(n, t, init, d) => d
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => d
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
@@ -7579,7 +7579,7 @@ class Codegen {
         return match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
-            VarDecl(n, t, i, d) => "var"
+            VarDecl(n, t, i, d, v_vis) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
@@ -7604,7 +7604,7 @@ class Codegen {
         var kind: Any = match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
-            VarDecl(n, t, i, d) => "other"
+            VarDecl(n, t, i, d, v_vis) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"
@@ -8499,7 +8499,7 @@ class Codegen {
             return
         }
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
@@ -8809,7 +8809,7 @@ class Codegen {
     fun stmt_has_yield(stmt: AST.Stmt): Bool {
         return match (stmt) {
             ExprStmt(e) => this.expr_has_yield(e)
-            VarDecl(n, t, init, d) => this.expr_has_yield(init)
+            VarDecl(n, t, init, d, v_vis) => this.expr_has_yield(init)
             Return(v) => this.expr_has_yield(v)
             If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
             While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
@@ -8926,7 +8926,7 @@ class Codegen {
     fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
         match (stmt) {
             ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
-            VarDecl(n, t, init, d) => { this.collect_calls_from_expr(init, calls) }
+            VarDecl(n, t, init, d, v_vis) => { this.collect_calls_from_expr(init, calls) }
             Return(v) => { this.collect_calls_from_expr(v, calls) }
             If(c, tb, eb) => {
                 this.collect_calls_from_expr(c, calls)
@@ -10282,7 +10282,7 @@ class Codegen {
             EnumDecl(n, v, d, e_vis) => true
             ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
-            VarDecl(n, t, i, d) => d.starts_with("@import:")
+            VarDecl(n, t, i, d, v_vis) => d.starts_with("@import:")
             Return(v) => false
             If(c, t, e) => false
             While(c, b) => false
@@ -10540,7 +10540,7 @@ class Codegen {
                     }
                     this.enum_defs.set(pr_ename, pr_vnames)
                 }
-                VarDecl(n, t, init, d) => {}
+                VarDecl(n, t, init, d, v_vis) => {}
                 ExprStmt(e) => {}
                 Return(v) => {}
                 If(c, t, e) => {}
@@ -15346,7 +15346,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -15478,7 +15478,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
                 _ => ""
             }
             if (gvname.length() > 0) {
@@ -16034,7 +16034,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -16161,7 +16161,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
                 _ => ""
             }
             if (gvname.length() > 0) {

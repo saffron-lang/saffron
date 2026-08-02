@@ -121,7 +121,7 @@ fun stmt_name(stmt: Any): String {
         FunDecl(name, params, ret_type, body, docstring) => name
         ClassDecl(name, type_params, parents, fields, methods, docstring) => name
         EnumDecl(name, variants, docstring, e_vis) => name
-        VarDecl(name, type_ann, initializer, docstring) => name
+        VarDecl(name, type_ann, initializer, docstring, v_vis) => name
         _ => ""
     }
 }
@@ -132,7 +132,7 @@ fun stmt_doc(stmt: Any): String {
         FunDecl(name, params, ret_type, body, docstring) => docstring
         ClassDecl(name, type_params, parents, fields, methods, docstring) => docstring
         EnumDecl(name, variants, docstring, e_vis) => docstring
-        VarDecl(name, type_ann, initializer, docstring) => docstring
+        VarDecl(name, type_ann, initializer, docstring, v_vis) => docstring
         _ => ""
     }
 }

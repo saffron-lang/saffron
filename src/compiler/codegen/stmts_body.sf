@@ -1,7 +1,7 @@
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 if (!doc.starts_with("@import:")) {
                     this.gen_var_decl(stmt)
                 }
@@ -134,19 +134,19 @@
     }
 
     fun get_var_name(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => n
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => n
             _ => ""
         }
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => t
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => t
             _ => ""
         }
     }
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { VarDecl(n, t, i, d) => i
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => i
             // Was `_ => ""`: a String default on a function declared to return
             // AST.Expr. Nothing rejected it because the checker never walked
             // method bodies (BUGS #76), and every caller pre-checks for a
@@ -157,7 +157,7 @@
     }
 
     fun get_var_doc(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => d
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => d
             _ => ""
         }
     }
@@ -1173,7 +1173,7 @@
             EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum_variants(name, variants)
             }
-            VarDecl(n, t, i, d) => {}
+            VarDecl(n, t, i, d, v_vis) => {}
             FunDecl(n, p, r, b, d) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
@@ -1201,10 +1201,10 @@
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
-        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
+        var vname: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => n
             _ => ""
         }
-        var vdoc: String = match (stmt) { VarDecl(n, t, init, d) => d
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => d
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
@@ -1342,7 +1342,7 @@
         return match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
-            VarDecl(n, t, i, d) => "var"
+            VarDecl(n, t, i, d, v_vis) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
@@ -1367,7 +1367,7 @@
         var kind: Any = match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
-            VarDecl(n, t, i, d) => "other"
+            VarDecl(n, t, i, d, v_vis) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"

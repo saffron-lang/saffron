@@ -51,7 +51,7 @@ fun is_top_level_decl(stmt: AST.Stmt): Bool {
         ClassDecl(name, type_params, parents, fields, methods, doc) => true
         EnumDecl(name, variants, doc, e_vis) => true
         ExprStmt(expr) => false
-        VarDecl(name, type_ann, init, doc) => false
+        VarDecl(name, type_ann, init, doc, v_vis) => false
         Return(value) => false
         If(cond, then_b, else_b) => false
         While(cond, body) => false
@@ -177,7 +177,7 @@ fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt
         var expr_str: String = match (single) {
             Return(value) => " => " + format_expr(value)
             ExprStmt(expr) => " => " + format_expr(expr)
-            VarDecl(n, t, i, d) => " {\n    " + format_stmt(single, 1) + "}"
+            VarDecl(n, t, i, d, v_vis) => " {\n    " + format_stmt(single, 1) + "}"
             FunDecl(n, p, r, b, d) => " {\n    " + format_stmt(single, 1) + "}"
             EnumDecl(n, v, d, e_vis) => " {\n    " + format_stmt(single, 1) + "}"
             ClassDecl(n, tps, ps, f, m, d) => " {\n    " + format_stmt(single, 1) + "}"
@@ -241,7 +241,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
     var pad: String = make_indent(indent)
     return match (stmt) {
         ExprStmt(expr) => pad + format_expr(expr) + "\n"
-        VarDecl(name, type_ann, init, doc) => {
+        VarDecl(name, type_ann, init, doc, v_vis) => {
             var sb: StringBuilder = StringBuilder()
             sb.append(pad)
             sb.append("var ")

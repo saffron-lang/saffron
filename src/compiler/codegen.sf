@@ -1269,7 +1269,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -1401,7 +1401,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
                 _ => ""
             }
             if (gvname.length() > 0) {
@@ -1957,7 +1957,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -2084,7 +2084,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
                 _ => ""
             }
             if (gvname.length() > 0) {

@@ -1058,7 +1058,7 @@ class NullChecker {
                     }
                 }
             }
-            VarDecl(n, t, i, d) => {}
+            VarDecl(n, t, i, d, v_vis) => {}
             ExprStmt(e) => {}
             Return(v) => {}
             If(c, t, e) => {}
@@ -1246,7 +1246,7 @@ class NullChecker {
 
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
@@ -2878,8 +2878,8 @@ class NullChecker {
                 var result: AST.Stmt = AST.Stmt.ExprStmt(rewritten)
                 result
             }
-            VarDecl(name, type_ann, init, doc) => {
-                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc)
+            VarDecl(name, type_ann, init, doc, v_vis) => {
+                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis)
             }
             Return(value) => {
                 AST.Stmt.Return(this.rewrite_receiver_expr(value, fields, methods))
