@@ -1,0 +1,24 @@
+// Helper for test/pass/visibility_response_collision.sf.
+//
+// Stands in for src/lib/http/client.sf, which declares `class Response` with a
+// String body. Lives under test/support/ rather than test/ or test/fail/
+// because both of those are globbed as tests by tools/run_tests.sh, and a
+// helper module cannot pass as a test on its own.
+//
+// `payload` is deliberately the same field NAME as the server Response's, with
+// a different declared TYPE. That is what makes the two distinguishable to the
+// checker: a bare-name field table can only hold one answer for `.payload`.
+
+class Response {
+    var status: Int
+    var payload: String
+
+    fun init() {
+        this.status = 200
+        this.payload = "client-body"
+    }
+}
+
+fun make_client_response(): Response {
+    return Response()
+}

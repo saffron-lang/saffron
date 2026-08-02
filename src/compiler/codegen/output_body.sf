@@ -638,7 +638,7 @@
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true
             EnumDecl(n, v, d) => true
-            ClassDecl(n, __tps, p, f, m, d) => true
+            ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
             VarDecl(n, t, i, d) => d.starts_with("@import:")
             Return(v) => false
@@ -804,14 +804,14 @@
                         }
                     }
                 }
-                ClassDecl(pr_cname, __tps, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc) => {
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
                     // Assign the type tag and record the parent here, not only in
-                    // gen_class_constructor / gen_class_decl_with_parent. Bodies
+                    // gen_class_constructor / gen_class_decl_with_parents. Bodies
                     // are lowered in the pass below, in source order, so `x is Dog`
                     // inside a function declared above `class Dog` would otherwise
                     // find no tag and fall back to the always-false warning —
@@ -822,15 +822,28 @@
                         this.class_type_ids.set(pr_type_name, this.next_class_type_id)
                         this.next_class_type_id = this.next_class_type_id + 1
                     }
-                    if (pr_parent.length() > 0) {
+                    if (pr_parents.length() > 0) {
                         // The parent's own struct name is known if it was already
                         // lowered (an imported base class); otherwise it is in this
                         // module and carries this module's prefix.
-                        var pr_pstruct: String = this.current_prefix + pr_parent
-                        if (this.class_struct_names.has(pr_parent)) {
-                            pr_pstruct = this.class_struct_names.get(pr_parent)
+                        var pr_pstructs: String = ""
+                        var pr_pall: List<String> = []
+                        var pr_ppi: Float = 0
+                        while (pr_ppi < pr_parents.length()) {
+                            var pr_one: String = this.current_prefix + pr_parents[pr_ppi]
+                            if (this.class_struct_names.has(pr_parents[pr_ppi])) {
+                                pr_one = this.class_struct_names.get(pr_parents[pr_ppi])
+                            }
+                            pr_pall.push(pr_one)
+                            if (pr_ppi == 0) { pr_pstructs = pr_one }
+                            pr_ppi = pr_ppi + 1
                         }
-                        this.class_parent_of.set(pr_type_name, pr_pstruct)
+                        // Primary base keeps its own single-valued table (field
+                        // layout, `super`, __class_parent_tag); the full set is
+                        // what __class_is_a and the BUGS #50 descendant search
+                        // read, since neither can follow one link per class.
+                        this.class_parent_of.set(pr_type_name, pr_pstructs)
+                        this.class_parents_of.set(pr_type_name, pr_pall)
                     }
                     if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)

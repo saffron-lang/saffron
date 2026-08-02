@@ -1,6 +1,18 @@
-//! String — the built-in string type.
-//! A String wraps a pointer to null-terminated UTF-8 bytes.
+//! CStr — a thin wrapper over a raw pointer to null-terminated UTF-8 bytes.
 //! All methods delegate to C standard library or runtime functions.
+//!
+//! This class is a prototype for `docs/design/runtime-v2.md` Phase D, in which the
+//! builtin `String` becomes an ordinary class and codegen's `builtin_methods` table
+//! goes away. It is NOT the builtin `String` and does not replace it. Nothing in the
+//! tree imports this module; user code should use the builtin `String`.
+//!
+//! It used to declare `class String`, which is what BUGS #89 was about: the builtin
+//! type name won name resolution, so `sub: String` inside the class meant the
+//! builtin, not the class 20 lines above. `sub._ptr` then read a field off a value
+//! with no fields, and every method taking a `String` segfaulted — 18 `._ptr`
+//! accesses across `contains`, `starts_with`, `ends_with`, `index_of`, `split`,
+//! `replace`, `add` and `eq`. The class is named `CStr` so its parameter types name
+//! it unambiguously; see BUGS #89 for why renaming beats a shadowing rule.
 
 @extern("i64 strlen(void*)") fun _strlen(ptr: Int): Int
 @extern("i64 strcmp(void*, void*)") fun _strcmp(a: Int, b: Int): Int
@@ -12,18 +24,31 @@
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
 
-@extern("i64 __str_split(i64, i64)") fun _split(str: Int, delim: Int): Int
-@extern("i64 __str_replace(i64, i64, i64)") fun _replace(str: Int, old: Int, new_: Int): Int
-@extern("i64 rt_str_trim(i64)") fun _trim(str: Int): Int
-@extern("i64 rt_str_to_upper(i64)") fun _to_upper(str: Int): Int
-@extern("i64 rt_str_to_lower(i64)") fun _to_lower(str: Int): Int
+// The string-returning runtime helpers are declared `: String`, not `: Int`. Each of
+// these has already pointer-tagged its result (`__rt_tag_ptr`) inside
+// `src/runtime/runtime.sf`; an `: Int` return makes codegen *int*-tag the value a
+// second time, and the caller then gets a bare integer that prints as an address.
+// Declared with the true return type, the pointer comes back through unchanged.
+// (This is the same hazard `src/lib/os.sf` documents at the top of the file.)
+@extern("i64 __str_split(i64, i64)") fun _split(str: Int, delim: Int): List<String>
+@extern("i64 __str_replace(i64, i64, i64)") fun _replace(str: Int, old: Int, new_: Int): String
+@extern("i64 rt_str_trim(i64)") fun _trim(str: Int): String
+@extern("i64 rt_str_to_upper(i64)") fun _to_upper(str: Int): String
+@extern("i64 rt_str_to_lower(i64)") fun _to_lower(str: Int): String
+@extern("i64 rt_str_repeat(i64, i64)") fun _repeat(str: Int, count: Int): String
+// These two return a genuine integer / boolean, so `: Int` is correct for them.
 @extern("i64 rt_str_index_of(i64, i64)") fun _index_of(str: Int, sub: Int): Int
-@extern("i64 rt_str_repeat(i64, i64)") fun _repeat(str: Int, count: Int): Int
 @extern("i64 __str_ends_with(i64, i64)") fun _ends_with(str: Int, suffix: Int): Int
-@extern("i64 __int_to_string(i64)") fun _int_to_string(val: Int): Int
 
-/// The String class — wraps a raw pointer to null-terminated bytes.
-class String {
+// A String-returning view of the raw pointer this class wraps: `rt_str_repeat(p, 1)`
+// copies the bytes once and changes nothing about them. `rt_str_trim` would have been
+// the shorter spelling and is wrong — it would silently strip surrounding whitespace
+// from a `to_string()`. The point of going through a declared `: String` extern is
+// that the already-tagged pointer is not re-tagged on the way back.
+@extern("i64 rt_str_repeat(i64, i64)") fun _copy_str(str: Int, count: Int): String
+
+/// Wraps a raw pointer to null-terminated bytes.
+class CStr {
     var _ptr: Int
 
     fun init(ptr: Int) {
@@ -45,12 +70,12 @@ class String {
     }
 
     /// Return true if this string contains the given substring.
-    fun contains(sub: String): Bool {
+    fun contains(sub: CStr): Bool {
         return _strstr(this._ptr, sub._ptr) != 0
     }
 
     /// Return true if this string starts with the given prefix.
-    fun starts_with(prefix: String): Bool {
+    fun starts_with(prefix: CStr): Bool {
         var plen: Int = _strlen(prefix._ptr)
         var i: Int = 0
         while (i < plen) {
@@ -63,12 +88,12 @@ class String {
     }
 
     /// Return true if this string ends with the given suffix.
-    fun ends_with(suffix: String): Bool {
+    fun ends_with(suffix: CStr): Bool {
         return _ends_with(this._ptr, suffix._ptr) != 0
     }
 
     /// Return the index of the first occurrence of sub, or -1 if not found.
-    fun index_of(sub: String): Int {
+    fun index_of(sub: CStr): Int {
         return _index_of(this._ptr, sub._ptr)
     }
 
@@ -98,12 +123,12 @@ class String {
     }
 
     /// Split this string by a delimiter, returning a list of substrings.
-    fun split(delim: String): List<String> {
+    fun split(delim: CStr): List<String> {
         return _split(this._ptr, delim._ptr)
     }
 
     /// Replace all occurrences of old with new_.
-    fun replace(old: String, new_: String): String {
+    fun replace(old: CStr, new_: CStr): String {
         return _replace(this._ptr, old._ptr, new_._ptr)
     }
 
@@ -112,23 +137,29 @@ class String {
         return _repeat(this._ptr, count)
     }
 
-    /// Convert a number to its string representation.
+    /// The bytes this CStr wraps, as a builtin String.
+    ///
+    /// This used to be `return this`, i.e. it handed back the CStr object itself
+    /// where its own signature promised a String. Copying the bytes through a
+    /// String-returning extern produces the value the signature describes.
     fun to_string(): String {
-        return this
+        return _copy_str(this._ptr, 1)
     }
 
-    /// Parse as a number. Returns 0 if not a valid number.
-    fun to_number(): Int {
-        return _int_to_string(this._ptr)
-    }
-
-    // --- Operator methods (Phase E preparation) ---
-
-    /// Concatenation operator.
-    @inline
-    fun add(other: String): String { return this._ptr + other._ptr }
-
-    /// Equality operator.
-    @inline
-    fun eq(other: String): Bool { return this._ptr == other._ptr }
+    // NOTE — three methods are deliberately NOT defined here, rather than defined
+    // wrongly, which is what they were:
+    //
+    //   to_number()  called `_int_to_string`, the integer→string direction. It is
+    //                the exact inverse of what the docstring claimed ("parse as a
+    //                number"), so it returned a pointer typed as a count. There is
+    //                no string→int helper in the runtime to delegate to.
+    //   add(other)   was `this._ptr + other._ptr`: the SUM OF TWO ADDRESSES, not a
+    //                concatenation. Any result was meaningless.
+    //   eq(other)    was `this._ptr == other._ptr`, pointer identity. Two CStrs over
+    //                equal bytes at different addresses compared unequal; `_strcmp`
+    //                is declared above and is what a real `eq` would use.
+    //
+    // Leaving them out is the honest state: a caller now gets "no method 'eq'" at
+    // compile time instead of a confident wrong answer at runtime. They come back
+    // when Phase D gives them real implementations.
 }

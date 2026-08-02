@@ -1,0 +1,10 @@
+// BUGS #24. `gen_extern_call`'s parameter loop ended in a bare `else` that
+// pushed `i64 <val>` for any C type it did not recognise, so an `i16` or `float`
+// declaration emitted a call whose argument types contradict its own `declare`.
+// The module then failed to assemble, and the failure was reported by `opt`
+// against generated IR with no reference to the `@extern` line that caused it.
+//
+// Must now be rejected at the declaration, naming the signature.
+@extern("i64 sf_unconvertible(i16, float)") fun narrow(a: Int, b: Float): Int
+
+IO.println(narrow(1, 2.0))

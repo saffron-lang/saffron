@@ -1,0 +1,36 @@
+// BUGS #23. `IO.readln()` and `IO.read_line()` are aliases of the runtime's
+// `__io_readline`, which returns an already-`__rt_tag_ptr`'d buffer. The value
+// was therefore correct; what was wrong was codegen's *static* type for it.
+//
+// Builtin-namespace dispatch mangles `IO.readln()` straight to `@__io_readln`
+// and never enters the wrapper in src/lib/io.sf, so the return type came from a
+// hardcoded list of string-returning runtime symbols in methods_body.sf. The
+// canonical `__io_readline` was on that list; the two aliases were not. So
+// `last_type` stayed `IntType`, interpolation picked `__int_to_string`, and both
+// aliases printed a raw heap address:
+//
+//     readln    len=5 val=[5721070080]
+//
+// Note the tell for this whole class of bug: `.length()` on the same value
+// returned 5, because `__any_length` sniffs the tag at *runtime* and the value
+// really was tagged. A static-type defect and a tagging defect look identical
+// from one call site and differ across two — which is exactly what this test
+// asserts. Interpolating the value must agree with calling length() on it.
+//
+// Holds whether stdin is a pipe, a file, or empty: at EOF the line is "" and
+// interpolating it gives "" (length 0), where the broken build gave a ~10-digit
+// address. No stdin content is required.
+import "@test" as Test
+
+var line = IO.readln()
+Test.assert_eq("${line}".length(), line.length(), "readln interpolates as a String, not as its address")
+
+var alias = IO.read_line()
+Test.assert_eq("${alias}".length(), alias.length(), "read_line interpolates as a String, not as its address")
+
+// The canonical spelling was never broken; assert it to keep the alias fix
+// anchored to the behaviour it was supposed to match.
+var canonical = IO.read_stdin(0)
+Test.assert_eq("${canonical}".length(), canonical.length(), "read_stdin agrees too")
+
+Test.summary()

@@ -9,6 +9,61 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 110. wasm32 never auto-invokes `fun main()`, so a main-only program silently prints nothing
+
+**Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
+seven tests — which means it also hides whatever else is wrong on that target.
+
+Minimal repro — a file whose entire contents are:
+
+```saffron
+fun main(): Int { IO.println("inside main"); return 0 }
+```
+
+prints `inside main` natively and **nothing at all** on wasm32. Adding an
+explicit `main()` call at top level makes both agree.
+
+`output_body.sf:1276` emits the `__saffron_boot` shim only when
+`has_top_level`, but `wasm_base_32.ll:2188`'s `_start` calls `@__saffron_boot()`
+unconditionally. A main-only program has no top-level statements, so no shim is
+emitted, `_start`'s call resolves to an undefined symbol, and
+`--import-undefined` turns it into a silent no-op import. Nothing fails; the
+module simply does nothing.
+
+The native path one screen away is correct, which is what makes this a drift
+rather than an oversight: line 1301 guards on
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, i.e.
+it has the explicit `__saffron_main` branch that the wasm path lacks. The fix is
+to give the wasm branch the same case.
+
+Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
+`tools/differential.sh` sweep share this one signature — wasm32 emits nothing —
+and none of them are value-layer bugs. Worth fixing before the remaining
+value-layer drift, since it currently makes wasm32 output unobservable for those
+seven programs.
+
+### 109. FIXED — `is String` / `is List` / `is Map` were unconditionally false on wasm32
+
+`__val_type_id` on wasm32 read the type id from `user+0`, which is the object's
+first *payload* word — for a list, its element count. Every wasm32 allocator
+stores the tag at `raw+0` and the magic at `raw+8` and returns `user = raw+16`,
+so the tag is at `user-16` and the magic at `user-8`: exactly where native puts
+them, and exactly where wasm32's own `__gc_get_type_tag` already looked. This
+reader was the one site not updated when the wasm32 GC header gained its tag and
+magic words — the work recorded as #39, which is listed as fixed but evidently
+did not reach every reader of that header.
+
+`__val_is_list` and `__val_is_map` had drifted separately — they still carried
+pre-`88297ca` identity-mode bodies — *and* routed through the broken reader, so
+one change fixed all three. Verified by probe: `String/List/Int` natively versus
+`other/other/Int` on wasm32 before, agreeing after.
+
+The fix was three deleted `@override` blocks and no new code, because
+`values.spec` (rewrite stage 9) had by then made the shared `@nanbox` body the
+default and each override the explicit exception. That is the generator paying
+for itself on its first real use: the drift became visible as three overrides
+whose `reason =` lines could not be written honestly.
+
 ### 104. relational operators on `Any`-typed operands compare untagged garbage
 
 **Severity: critical.** Silent wrong answers, and the answer depends on heap
@@ -236,6 +291,98 @@ diff against its own second run. Regression test:
 require only that stringification be a pure function of the value — one value
 twice, and two equal values — so they hold regardless of what the correct
 rendering is.
+### 111. FIXED — the parser discarded every base after the first, so `class Duck extends Flyable, Swimmable, Walkable` was `extends Flyable`
+
+`ClassDecl.parent` was a single `String`. The parser read the first name after
+`extends` and threw the rest away:
+
+```
+parent = this.expect_ident()
+// Support multiple extends (interfaces): class Foo extends A, B, C
+while (this.match_kind(",")) {
+    this.expect_ident() // skip additional interfaces for now
+}
+```
+`parser.sf:1975-1979`
+
+Multiple inheritance is a documented feature (CLAUDE.md, "Multiple inheritance:
+`class Duck extends Flyable, Swimmable, Walkable`") and it did not work at all
+past the first base. `test/pass/multi_inherit.sf` and `test/pass/interfaces.sf`
+were both **failing on `main`** for this reason, not passing for the wrong reason:
+
+```
+[codegen] Error: type 'Duck' has no method 'swim'
+[codegen] Error: type 'Document' has no method 'serialize'
+```
+
+Three consequences, one per layer. Codegen emitted method forwarders for
+`parents[0]` only, hence the errors above. The checker's `class_parents` was
+`Map<String, String>`, so `is_subtype_node` walked a single `X__parent` chain and
+`d is Swimmable` was statically false, generic constraint satisfaction only ever
+looked one level up, and conformance checked the abstract methods of the first
+base alone — an unimplemented requirement on base 2 or 3 was accepted silently.
+The runtime helper `__class_is_a` walked `__class_parent_tag` one link per step,
+and a `switch` arm returns exactly one value, so no depth of walking could reach
+base 2: multiple bases are a DAG, not a chain.
+
+**Fix.** `ClassDecl.parent: String` → `parents: List<String>`, arity-preserving
+(still six fields, so no #96 exposure) but a different payload shape, and every
+`ClassDecl(` match arm across `parser.sf`, `checker.sf`, `resolve.sf`,
+`codegen.sf`, five `codegen/*_body.sf`, `src/lib/{ast,formatter,lang}.sf` and
+`tools/gen_docs.sf` updated in the same commit.
+
+- Checker: `class_parents` holds the list; `inherits_from` is a breadth-first
+  search over the whole DAG with a visited set (a diamond visits its shared
+  ancestor once, a cyclic `extends` terminates) and replaces the chain walk in
+  `is_subtype_node` and the one-level check in `type_satisfies_constraint`;
+  conformance loops every base.
+- Codegen: forwarders are emitted for every base in declaration order, earlier
+  bases winning ties as an override already did; `__class_is_a` became a
+  flattened tag→ancestor-set nested switch built from a compile-time transitive
+  closure (`all_ancestor_structs`), which is also O(1) rather than O(depth);
+  `effective_method_owner` and `gen_virtual_dispatch`'s descendant test now
+  search all bases.
+
+**Field layout is deliberately unchanged.** Only `parents[0]` contributes fields
+and only its `init` is forwarded, because the invariant the whole lowering rests
+on — parent field index i == child field index i, every field an i64, which is
+what makes `init` forwarding and inherited field access correct with no vtable —
+can hold for exactly one base. A single-inheritance class therefore lays out
+byte-for-byte as before (no ABI break against the checked-in gen2), and a
+secondary base that declares fields gets a diagnostic rather than methods reading
+the primary base's slots at its own offsets. Interfaces, the overwhelmingly
+common case for `extends A, B, C`, are fieldless and unaffected.
+`__class_parent_tag` still reports the primary base; `class_parent_of` keeps its
+single-valued meaning and the new `class_parents_of` carries the full set.
+
+Two bugs surfaced only after the widening, both from a bodyless declaration being
+treated as a real method once more than one base was visible:
+
+- `test/fail/conformance.sf` stopped being rejected. The child's "what I can
+  offer" set gathered inherited names including abstract ones, so
+  `class Circle extends Shape` found `Shape.area()` inherited from Shape and let
+  the requirement satisfy itself. `inherited_method_names` now subtracts each
+  base's `class_abstract_methods`.
+- `class Both extends Requires, Provides` where `Requires.compute()` is bodyless
+  and `Provides.compute()` concrete compiled cleanly and returned 0 at runtime:
+  first-wins forwarding pointed `Both__compute` at `Requires__compute`, which has
+  no body. Forwarding now skips a base's abstract names, so the concrete later
+  base wins. Conformance also runs in a second pass after all forwarding, so the
+  requirement is not reported before the base that satisfies it is visible.
+
+Verified: bootstrap passes both stages including the gen4 fixed point.
+`test/pass/multi_inherit.sf` was rewritten to assert rather than print and now
+covers all of the above (28 assertions: methods and `is` against bases 1-3, an
+override on a non-first base, an abstract satisfied by the class itself, the
+abstract-plus-provider pair, a grandchild reaching its grandparent's 2nd and 3rd
+base, and a state-carrying primary base combined with fieldless interfaces); it
+fails on the base commit with seven `has no method` errors. Full suite: 26
+failures, a strict subset of the 28 on `main` — `pass/multi_inherit` and
+`pass/interfaces` fixed, nothing new.
+
+This is the prerequisite §1 of `docs/design/access-modifiers.md` names for
+`protected`, which it calls "currently unimplementable soundly" precisely because
+a `protected` member on `Swimmable` could not be resolved from `Duck`.
 
 ### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link
 
@@ -1097,90 +1244,99 @@ immediate parent's `init` arity and forwards correctly. Verified: `Puppy("Max")`
 with `init` only on `Animal` constructs and prints `Max: Yip`; the `List<Animal>`
 polymorphism test runs end to end. Zero regressions.
 
-### 89. Every `src/lib/string.sf` method that takes a `String` segfaults, because the module's own `String` class is shadowed by the builtin type
+### 89. FIXED — `src/lib/string.sf` declared `class String`, which the builtin `String` shadowed, so every method taking one read a field off a value with no fields
 
-**Reproduction:**
+Inside `class String`, parameters were spelled `sub: String`, `prefix: String`,
+`delim: String` — and the **builtin** `String` won name resolution, not the
+class declared twenty lines above. Each of those parameters was a builtin
+string, the body then did `sub._ptr`, and a builtin string has no `_ptr` field.
+Eighteen such reads across `contains`, `starts_with`, `ends_with`, `index_of`,
+`split`, `replace`, `add` and `eq`. Only `length()`, `char_at()` and the
+no-argument transforms worked, because those touch nothing but `this`.
 
-```saffron
-import "@string" as Str
-var s = Str.String("hello world")
-IO.println(s.length())      // 11 — fine
-IO.println(s.contains("ell"))  // Segmentation fault
-```
+It stayed hidden because nothing in the tree imports `@string`. The module is a
+`docs/design/runtime-v2.md` Phase D prototype, and a prototype with no callers
+gets no coverage; a shadowed type name produces no diagnostic at all.
 
-`length()` works because it only touches `this`. `contains` does not:
+Fixed by **renaming the class to `CStr`**, so its parameter types name it
+unambiguously. The alternative — a scoping rule where a class declaration
+shadows a builtin type name of the same name inside its own module — was
+rejected: it is a language-wide change to name resolution touching the checker,
+codegen and the import resolver, and its effect would be that `class String { }`
+anywhere silently retargets every `String` annotation in that module. That is a
+large new footgun bought to avoid a rename that breaks no caller, and the class
+is not a replacement for the builtin anyway. The same shadowing still exists in
+`src/lib/int.sf`, `float.sf`, `bool.sf`, `list.sf` and `map.sf`, all equally
+unimported and untested.
 
-```saffron
-fun contains(sub: String): Bool {
-    return _strstr(this._ptr, sub._ptr) != 0
-}
-```
+Two more defects surfaced once the methods could run. The string-returning
+runtime externs were declared `: Int`; each already pointer-tags its result with
+`__rt_tag_ptr`, so `: Int` made codegen int-tag a second time and `trim()`,
+`to_upper()`, `to_lower()` and `repeat()` returned bare integers that printed as
+addresses (`105553145500536` instead of `"hi"`) — the hazard `src/lib/os.sf`
+documents at the top of the file. And `to_string()` was `return this`, handing
+back the CStr where its own signature promised a String.
 
-The annotation `sub: String` is intended to mean the class declared 20 lines
-above it, but `String` resolves to the builtin type instead — the class does not
-shadow it. A string literal has no `_ptr` field, so `sub._ptr` reads a field off
-a value that has no fields and the process dies. Passing an actual class instance
-works, confirming the diagnosis:
+Three methods are now deliberately absent rather than present and wrong:
+`to_number()` called `_int_to_string`, the integer→string direction and the exact
+inverse of its docstring; `add(other)` was `this._ptr + other._ptr`, the sum of
+two addresses; `eq(other)` was pointer identity, so two CStrs over equal bytes at
+different addresses compared unequal. A caller now gets "no method 'eq'" at
+compile time instead of a confident wrong answer at runtime. They return when
+Phase D gives them implementations.
 
-```saffron
-var sub = Str.String("ell")
-s.contains(sub)   // true
-```
+Covered by `test/pass/checker_cstr_module.sf` — 16 assertions over exactly the
+methods that used to segfault, checking their *values*, since a
+pointer-comparison bug would still "run". The old repro spelling
+`Str.String("hello world")` is now `Str.CStr("hello world")`.
 
-This is not one method. Every method in the file that takes a `String` parameter
-does `<param>._ptr`: `contains`, `starts_with`, `ends_with`, `index_of`, `split`,
-`replace`, plus the operator overloads `add`, `eq`, `lt`, `gt` — 18 `._ptr`
-accesses in all. So the module is unusable for anything but `length()`,
-`char_at()` and the no-argument transforms.
+### 86. FIXED — a block-syntax parameter got no type, so every field read on it silently answered 0
 
-Nothing imports `@string` today (it arrived in `7a7302c` as a "String class
-prototype" and never got wired up), so this is latent rather than actively
-breaking callers — but it loads and instantiates without complaint, which makes
-it a trap for the next person who tries to use it.
+`apply_block(box) { x => "v=" + x.v.to_string() + " n=" + x.name }` compiled
+cleanly and printed `v=0 n=`. The same lambda written `fun (x: Box): String =>
+...` printed `v=42 n=hello`. No error — only a `dispatching '...' on untyped
+value` warning, which scrolls past in a build log.
 
-Two possible repairs, and the choice is a language question, not a stdlib one:
-either a class declaration shadows a builtin type name of the same name inside
-its own module, or it cannot and the parameters must be spelled as a distinct
-type. The second is a rename; the first is a scoping rule with consequences well
-beyond this file. Filed rather than patched for that reason.
+`parser.sf`'s `build_lambda` constructs every block parameter as
+`AST.Type.AnyType`, because a block has nowhere to write an annotation:
+`{ x => ... }` is only a name and a body. Nothing downstream ever filled it in,
+so codegen resolved `x.v` against no class and answered the guessed type's zero
+value — 0 for Int, `""` for String.
 
-### 86. A block-syntax parameter (`{ x => ... }`) gets no type, so every field read on it silently returns 0 or `""`
+A block's parameter types can come from exactly one place: the parameter it is
+being passed to. The checker now records, per callee parameter, the declared
+parameter types of any function-typed parameter in a `fun_param_sigs` side table
+keyed `"funcname:index"` / `"Class__method:index"` (the `receiver_params`
+convention), and rewrites the `Lambda` node's `Param`s with those types before
+codegen sees them. Three states are distinguished on purpose, because "we could
+not find a type" and "the source does not contain a type" are different bugs:
+an absent key means the parameter is not a function type; `"?"` means a bare
+`Fun`, which declares nothing about the callback and is therefore an **error**
+rather than a guess; otherwise the declared types are written in. Only `AnyType`
+parameters are touched, so an explicitly annotated lambda keeps its own types
+and a genuine mismatch is still reported as a mismatch.
 
-```saffron
-class Box {
-    var v: Int
-    var name: String
-    fun init(v: Int, name: String) { this.v = v; this.name = name }
-}
-fun apply_block(b: Box, f: Fun): String { return f(b) }
-var box = Box(42, "hello")
+Two details that cost a bootstrap to find. The signature must be rendered with
+the checker's own `type_to_str`, not `AST.type_to_string`, which collapses
+`GenericType(base, args)` to `base` and every `FuncType` to `"Fun"` — so
+`Fun<Box, String>` arrives already stripped and every callback looks bare. And
+method signatures are registered *only* under the receiver-qualified key, unlike
+`receiver_params` which also registers the bare method name: a bare key is
+ambiguous across classes (`Map.get(key)` vs `App.get(path, handler)`), and an
+ambiguous hit here does not merely fail to help, it raises an error against
+another class's signature.
 
-// block syntax — the parameter is untyped
-apply_block(box) { x => "v=" + x.v.to_string() + " n=" + x.name }
-//   -> "v=0 n="
+`Fun<A, B, R>` is currently the only spelling that can type a block. `(A, B) =>
+R` cannot, and that is a separate live defect: `parse_single_type` encodes it
+into the string `"Fun(A,B):R"` and then `parse_type_ast` discards it with
+`if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }`
+(src/compiler/parser.sf ~line 1014). Fixing that one line would make `(A) => R`
+work with no further checker change.
 
-// the same lambda, annotated
-apply_block(box, fun (x: Box): String => "v=" + x.v.to_string() + " n=" + x.name)
-//   -> "v=42 n=hello"
-```
-
-The object is fine — as the annotated call on the identical `box` shows. `x` simply
-has no type, so field-offset resolution falls through and answers 0, the same
-failure #56 has with an indirect call's result. Every warning it emits is a
-`dispatching '...' on untyped value` line, which is easy to scroll past.
-
-Found while verifying #64 against a live server: the handler was written
-`app.post("/echo") { req => ... }`, which is the form every example in
-`examples/http_server.sf` and the `@http/server` docstrings uses, and `req.body`,
-`req.method` and `req.path` were **all** empty. That first read as the #64 fix not
-working. It has nothing to do with HTTP — the repro above needs no server — but it
-means the documented, idiomatic way to write a handler cannot read the request at
-all, and there is no error.
-
-Fixing this needs the parameter's type to be inferred from the `Fun` parameter it
-is being passed to, which `Fun` cannot express (#56, same root). Until then a block
-parameter is only safe when the body does not touch a field. Workaround: use an
-annotated `fun (x: T): R =>` lambda.
+Covered by `test/pass/checker_block_param_typed.sf` (7 assertions, which check
+that the block form and the annotated form agree on identical input — the
+pre-fix compiler accepted the file) and `test/fail/checker_block_param_untypeable.sf`
+(a bare `Fun` callee must be rejected).
 
 ### 85. FIXED — `__io_file_size` and `__io_read_binary` were missing from the known-function tables, so calling them from a stdlib module emitted a bad symbol
 
@@ -3952,7 +4108,7 @@ no-op. That is why the prelude aliases it `Reactive`. Reproducing this needs the
 prelude auto-import path; a plain two-file program with the same shape works, so
 it is not yet isolated to a minimal case and is not separately filed.
 
-### 23. Runtime functions return untagged i64 into NaN-boxed value space
+### 23. FIXED — runtime alias functions declared the wrong static return type, so a String interpolated as an address
 
 `src/runtime/runtime.sf` is compiled with `--identity-mode`, where the tag/untag
 helpers are no-ops. A runtime function that returns an integer therefore hands
@@ -4013,7 +4169,38 @@ proposes deleting the allowlist and routing all FFI through one path. Note that
 `OS.foo(...)` mangles straight to `@__os_foo` and never enters the body in
 `src/lib/os.sf`, so a fix must go in `src/runtime/runtime.sf`.
 
-### 24. `@extern` boxes returns but not `i64` params — a `Ptr` type would close it
+**FIXED (2026-08-02) — the defect was the static type, not the tagging.**
+`IO.readln()` and `IO.read_line()` are runtime aliases of `__io_readline`, which
+was on codegen's hardcoded list of string-returning symbols while its two aliases
+were not. So `last_type` stayed `IntType` and interpolation picked
+`__int_to_string`: `"${IO.readln()}"` printed `[5721070080]`.
+
+The bytes were never wrong — `__rt_tag_ptr` was applied all along. That is the
+general tell worth remembering: `.length()` returned 5 on the very same value
+that interpolated as an address. **Length right + interpolation wrong ⇒ static
+type bug; both wrong ⇒ tagging bug.**
+
+Fixed by replacing three independent `or`-chains (string / bool / int, each
+having to remember every symbol, none covering the remainder) with one
+`runtime_ret_discipline(fn)` table returning `"string"`, `"bool"`, `"int"`,
+`"list"`, `"void"` or `""`. Naming `"list"` and `"void"` is half the value:
+list-returning runtime functions travel deliberately **untagged**, because
+`__gc_is_heap_ptr` (`gc.ll:615`) rejects NaN-tagged values as heap pointers.
+That was previously encoded as an *absence* from all three chains — indis­tin­guish­able
+from an oversight — and is now a stated discipline carrying its reason. Placed at
+~line 1146, above both the ~1640 preamble hazard and the prefixed-alias arm.
+
+Output with stdin `hello\nworld`: `readln len=5 val=[hello]` /
+`read_line len=5 val=[world]`. Regression test
+`test/pass/dispatch_readln_is_a_string.sf`, 3 assertions, stdin-independent (it
+holds at EOF).
+
+**Observed, not fixed:** `OS.mkdir()` still returns a raw 0, so `== 0` is false.
+It routes through the `stdlib_os_mkdir` Saffron wrapper, a different path from
+the builtin dispatch changed here.
+
+
+### 24. FIXED — the two ends of the `@extern` boundary disagreed on which C types they convert
 
 `gen_extern_call` (`src/compiler/codegen/intrinsics_body.sf:155`) unboxes every
 declared C parameter type *except* `i64`, which it passes through raw:
@@ -4262,7 +4449,39 @@ then silently returned frame handles. Added as a one-line forward to
 `task.await()`; `async_coop` and `Promise.all` both work now. Covered by
 `test/pass/async_await_function.sf`.
 
-### 37. Method dispatch that matches no branch returns a silent zero
+**FIXED (2026-08-02) — the two ends of the boundary now agree on which C types
+they convert.** The immediate fix this entry proposed (untag `i64` params) had
+already landed in `f758f42`. The residual defect was the same asymmetry in
+general form: the parameter loop and the return path each ended in a bare `else`
+assuming "anything unrecognised is already an i64", and the two `else`s covered
+**different sets of C types**. The param side handled `i64`/`i8*`/`i8**`/`i32`/
+`double`; the return side handled `void`/`i8*`/`i32`/`double`/`i64` — no `i8**`.
+
+So three declaration shapes silently emitted non-assembling IR: a `void**`
+return produced `__val_tag_int(i64 %t8)` applied to an `i8**`; an `i1` return did
+the same to an `i1`; and `i16`/`float` params emitted `i64 %v` against a
+contradicting `declare`.
+
+Each end now names the C types it can convert
+(`extern_param_type_supported` / `extern_ret_type_supported`) and raises a
+`has_errors` diagnostic quoting the offending signature otherwise. Deliberately
+**not** more conversions: a `float` param needs an `fptrunc`, an `i8**` return
+needs a real box, and each is its own tagging question that should be decided
+explicitly rather than by a fall-through.
+
+The three bad shapes went from an opaque `opt` type error against generated IR
+(`'%t8' defined with type 'ptr' but expected 'i64'`, reported to the user as
+"this is a compiler bug") to a named diagnostic at the declaration. Working cases
+are unchanged: `strlen("hello")` = 5, `sqrt(16.0)` = 4, `llabs` on Float- and
+Int-typed 64 = 64, `malloc`/`free`, and the `Any` i64 roundtrip still `== 42`.
+
+Swept all **46 files** in the tree declaring an `@extern` (175 return and 291
+parameter declarations): **zero false positives**. Negative tests
+`test/fail/dispatch_extern_unconvertible_param.sf` and
+`test/fail/dispatch_extern_unconvertible_return.sf`.
+
+
+### 37. FIXED — method dispatch that matched no branch deleted the call and returned a silent zero
 
 `gen_method_call` (`methods_body.sf`) ends with `this.last_type =
 AST.Type.IntType; return "0"` and emits an error *only* when `obj_type` is a
@@ -4354,6 +4573,57 @@ the remaining fall-through population is small enough to enumerate. It still
 needs its own measurement pass over the same four corpora before flipping, since
 a fall-through can also be reached by valid-but-unhandled builtin methods rather
 than only by bad types.
+
+**FIXED (2026-08-02) — with the measurement the entry kept asking for.** The
+terminal fall-through in `gen_method_call` is now a diagnostic. It set
+`last_type = IntType` and returned the literal `"0"` *without emitting a call*,
+so the method call was not mis-compiled, it was **deleted**: clean compile, no
+crash, wrong answer.
+
+The measurement this entry demanded was run first, with an instrumented gen3
+logging every fall-through with its category and receiver type:
+
+| Corpus | Files | Unreported fall-throughs |
+|---|---|---|
+| `test/`, `test/pass/`, `test/fail/`, `src/lib/` | 260 | **0** |
+| `turmeric`, `parsley`, `basil`, `pantry`, `examples` | 66 | **2** |
+| compiler's own 5 TUs (identity mode) | 5 | **0** |
+| **total** | **332** | **2** |
+
+Coverage was checked rather than assumed: 258 of 332 files actually reach
+codegen — 28 die in the parser, 15 in the checker, 7 on unresolved imports, and
+10 fail *in* codegen and so were measured.
+
+Because the radius is 2 files rather than hundreds, the staged rollout this entry
+contemplated was unnecessary and the full fix landed at once. A/B over all 325
+compilable files: **exactly 2 change accept→reject**, and both are the same real
+bug — `manifest.dependencies.delete(name)` on a `Map<String, Any>` in
+`pantry/src/commands/remove.sf` and `pantry/src/main.sf`. `Map` has no `delete`;
+**there is no `__map_delete` in `src/runtime/runtime.sf` at all**. A Map receiver
+is classified builtin, so the old user-class-only check skipped it, and
+`pantry remove <pkg>` compiled clean, emitted **zero `__map_*` instructions**,
+and removed nothing. No test covered it.
+
+Why the count is so low is itself the finding. It is not that this rarely
+happens — it is that the arms above are permissive to a fault. The prefixed-alias
+arm matches almost any receiver, and that same over-matching is what makes
+specialized arms below it dead code (#38, #91). One design problem, now measured
+from two sides.
+
+**Not fixed, and now a hard error rather than a silent no-op:** `Map.delete`
+still does not exist. Erroring is the correct first move, since the call never
+did anything, but `pantry/src/commands/remove.sf` now needs either a
+`__map_delete` helper in `src/runtime/runtime.sf` plus the four `.ll` bases, or a
+rewrite of that one call site.
+
+Negative tests: `test/fail/dispatch_dropped_call_on_any.sf` and
+`test/fail/dispatch_dropped_call_on_map.sf` — both rejected (rc=1) by the
+bootstrapped gen3, both **accepted** (rc=0) by the previous compiler.
+
+This is the fourth of five instances of one pattern: a resolution helper that
+cannot fail, so it guesses instead of reporting not-found (#22, #40, #78, #37,
+#103).
+
 
 ## Fixed
 
