@@ -35,7 +35,7 @@ fun find_vars(stmts: List<AST.Stmt>): List<AST.Stmt> {
     var results: List<AST.Stmt> = []
     for (stmt in stmts) {
         match (stmt) {
-            VarDecl(name, type_ann, initializer, docstring) => {
+            VarDecl(name, type_ann, initializer, docstring, v_vis) => {
                 if (!(docstring == "")) {
                     results.push(stmt)
                 }
@@ -214,7 +214,7 @@ fun render_var(stmt: AST.Stmt): String {
     out.push("")
 
     match (stmt) {
-        VarDecl(vname, type_ann, initializer, docstring) => {
+        VarDecl(vname, type_ann, initializer, docstring, v_vis) => {
             if (!(type_ann == "")) {
                 out.push("```saffron")
                 out.push("var ${vname}: ${type_ann}")

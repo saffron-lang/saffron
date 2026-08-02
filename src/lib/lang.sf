@@ -143,7 +143,7 @@ fun expr_to_source(expr: Any): String {
 /// Convert a statement back to source code.
 fun stmt_to_source(stmt: Any): String {
     return match (stmt) {
-        VarDecl(name, type_ann, init, doc) => "var " + name + ": " + type_ann + " = " + expr_to_source(init)
+        VarDecl(name, type_ann, init, doc, v_vis) => "var " + name + ": " + type_ann + " = " + expr_to_source(init)
         FunDecl(name, params, ret, body, doc) => "fun " + name + "(...) { ... }"
         ClassDecl(name, type_params, parents, fields, methods, doc) => "class " + name + " { ... }"
         EnumDecl(name, variants, doc, e_vis) => "enum " + name + " { ... }"

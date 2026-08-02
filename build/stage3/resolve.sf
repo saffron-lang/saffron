@@ -123,7 +123,7 @@ class Resolver {
 
     fun prescan_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.globals.set(name, this.current_prefix)
             }
             FunDecl(name, params, ret_type, body, doc) => {
@@ -165,14 +165,14 @@ class Resolver {
 
     fun resolve_stmt(stmt: AST.Stmt): AST.Stmt {
         return match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 // Resolve the initializer BEFORE declaring the name, so
                 // `var x = x` sees the outer x rather than itself.
                 var new_init: AST.Expr = this.resolve_expr(init)
                 if (this.scopes.length() > 0) {
                     this.declare(name, "local")
                 }
-                AST.Stmt.VarDecl(name, type_ann, new_init, doc)
+                AST.Stmt.VarDecl(name, type_ann, new_init, doc, v_vis)
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 this.funcs.set(name, this.current_prefix)

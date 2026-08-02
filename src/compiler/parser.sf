@@ -791,7 +791,7 @@ class Parser {
                 // nested literals and bumps the counter.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public"))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
@@ -1401,7 +1401,7 @@ class Parser {
             var alias_name: String = this.expect_ident()
             this.consume("=")
             var alias_target: String = this.parse_type()
-            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias")
+            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias", "public")
         }
 
         // Extension methods: extend fun ClassName.method(params): RetType { body }
@@ -1642,7 +1642,7 @@ class Parser {
         }
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        return AST.Stmt.VarDecl(name, type_ann, init, docstring)
+        return AST.Stmt.VarDecl(name, type_ann, init, docstring, "public")
     }
 
     fun parse_destructure(): AST.Stmt {
@@ -1683,11 +1683,11 @@ class Parser {
         var init: AST.Expr = this.parse_expr()
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, "", "public"))
         var i: Float = 0
         while (i < names.length()) {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
-            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
+            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, "", "public"))
             i = i + 1
         }
         return AST.Stmt.Block(stmts)
@@ -2270,7 +2270,7 @@ class Parser {
             }
             this.consume("=")
             var init_expr: AST.Expr = this.parse_expr()
-            var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+            var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "", "public")
             this.consume(";")
             var cond: AST.Expr = this.parse_expr()
             this.consume(";")
@@ -2301,7 +2301,7 @@ class Parser {
             var desugar_body: List<AST.Stmt> = []
             var pdi: Float = 0
             while (pdi < pat_names.length()) {
-                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), ""))
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), "", "public"))
                 pdi = pdi + 1
             }
             pdi = 0
@@ -2340,7 +2340,7 @@ class Parser {
         }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
-        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "", "public")
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
@@ -2383,8 +2383,8 @@ class Parser {
         var uid: String = this.next_for_uid()
         var list_var: String = "__for_src" + uid
         var idx_var: String = "__for_i" + uid
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "", "public")
+        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "", "public")
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
         // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
         // For a List or String the two are the same thing, but for a Map `m[k]`
@@ -2399,7 +2399,7 @@ class Parser {
         // variant deliberately: a variant would need arms at ~30 match sites,
         // and a missing arm yields an indeterminate value rather than an error
         // (BUGS #76), so the variant is the riskier encoding of the same thing.
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "")
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "", "public")
         var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
@@ -2721,7 +2721,7 @@ class Parser {
                 // (BUGS #41). Bind before the recursive parse_expr calls below.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public"))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
@@ -2884,7 +2884,7 @@ class Parser {
         // Otherwise return NilLit
         var kind: String = match (stmt) {
             ExprStmt(e) => "expr"
-            VarDecl(n, t, i, d) => "other"
+            VarDecl(n, t, i, d, v_vis) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, tp, ps, f, m, d) => "other"
