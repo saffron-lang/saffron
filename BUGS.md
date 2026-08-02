@@ -291,6 +291,98 @@ diff against its own second run. Regression test:
 require only that stringification be a pure function of the value — one value
 twice, and two equal values — so they hold regardless of what the correct
 rendering is.
+### 111. FIXED — the parser discarded every base after the first, so `class Duck extends Flyable, Swimmable, Walkable` was `extends Flyable`
+
+`ClassDecl.parent` was a single `String`. The parser read the first name after
+`extends` and threw the rest away:
+
+```
+parent = this.expect_ident()
+// Support multiple extends (interfaces): class Foo extends A, B, C
+while (this.match_kind(",")) {
+    this.expect_ident() // skip additional interfaces for now
+}
+```
+`parser.sf:1975-1979`
+
+Multiple inheritance is a documented feature (CLAUDE.md, "Multiple inheritance:
+`class Duck extends Flyable, Swimmable, Walkable`") and it did not work at all
+past the first base. `test/pass/multi_inherit.sf` and `test/pass/interfaces.sf`
+were both **failing on `main`** for this reason, not passing for the wrong reason:
+
+```
+[codegen] Error: type 'Duck' has no method 'swim'
+[codegen] Error: type 'Document' has no method 'serialize'
+```
+
+Three consequences, one per layer. Codegen emitted method forwarders for
+`parents[0]` only, hence the errors above. The checker's `class_parents` was
+`Map<String, String>`, so `is_subtype_node` walked a single `X__parent` chain and
+`d is Swimmable` was statically false, generic constraint satisfaction only ever
+looked one level up, and conformance checked the abstract methods of the first
+base alone — an unimplemented requirement on base 2 or 3 was accepted silently.
+The runtime helper `__class_is_a` walked `__class_parent_tag` one link per step,
+and a `switch` arm returns exactly one value, so no depth of walking could reach
+base 2: multiple bases are a DAG, not a chain.
+
+**Fix.** `ClassDecl.parent: String` → `parents: List<String>`, arity-preserving
+(still six fields, so no #96 exposure) but a different payload shape, and every
+`ClassDecl(` match arm across `parser.sf`, `checker.sf`, `resolve.sf`,
+`codegen.sf`, five `codegen/*_body.sf`, `src/lib/{ast,formatter,lang}.sf` and
+`tools/gen_docs.sf` updated in the same commit.
+
+- Checker: `class_parents` holds the list; `inherits_from` is a breadth-first
+  search over the whole DAG with a visited set (a diamond visits its shared
+  ancestor once, a cyclic `extends` terminates) and replaces the chain walk in
+  `is_subtype_node` and the one-level check in `type_satisfies_constraint`;
+  conformance loops every base.
+- Codegen: forwarders are emitted for every base in declaration order, earlier
+  bases winning ties as an override already did; `__class_is_a` became a
+  flattened tag→ancestor-set nested switch built from a compile-time transitive
+  closure (`all_ancestor_structs`), which is also O(1) rather than O(depth);
+  `effective_method_owner` and `gen_virtual_dispatch`'s descendant test now
+  search all bases.
+
+**Field layout is deliberately unchanged.** Only `parents[0]` contributes fields
+and only its `init` is forwarded, because the invariant the whole lowering rests
+on — parent field index i == child field index i, every field an i64, which is
+what makes `init` forwarding and inherited field access correct with no vtable —
+can hold for exactly one base. A single-inheritance class therefore lays out
+byte-for-byte as before (no ABI break against the checked-in gen2), and a
+secondary base that declares fields gets a diagnostic rather than methods reading
+the primary base's slots at its own offsets. Interfaces, the overwhelmingly
+common case for `extends A, B, C`, are fieldless and unaffected.
+`__class_parent_tag` still reports the primary base; `class_parent_of` keeps its
+single-valued meaning and the new `class_parents_of` carries the full set.
+
+Two bugs surfaced only after the widening, both from a bodyless declaration being
+treated as a real method once more than one base was visible:
+
+- `test/fail/conformance.sf` stopped being rejected. The child's "what I can
+  offer" set gathered inherited names including abstract ones, so
+  `class Circle extends Shape` found `Shape.area()` inherited from Shape and let
+  the requirement satisfy itself. `inherited_method_names` now subtracts each
+  base's `class_abstract_methods`.
+- `class Both extends Requires, Provides` where `Requires.compute()` is bodyless
+  and `Provides.compute()` concrete compiled cleanly and returned 0 at runtime:
+  first-wins forwarding pointed `Both__compute` at `Requires__compute`, which has
+  no body. Forwarding now skips a base's abstract names, so the concrete later
+  base wins. Conformance also runs in a second pass after all forwarding, so the
+  requirement is not reported before the base that satisfies it is visible.
+
+Verified: bootstrap passes both stages including the gen4 fixed point.
+`test/pass/multi_inherit.sf` was rewritten to assert rather than print and now
+covers all of the above (28 assertions: methods and `is` against bases 1-3, an
+override on a non-first base, an abstract satisfied by the class itself, the
+abstract-plus-provider pair, a grandchild reaching its grandparent's 2nd and 3rd
+base, and a state-carrying primary base combined with fieldless interfaces); it
+fails on the base commit with seven `has no method` errors. Full suite: 26
+failures, a strict subset of the 28 on `main` — `pass/multi_inherit` and
+`pass/interfaces` fixed, nothing new.
+
+This is the prerequisite §1 of `docs/design/access-modifiers.md` names for
+`protected`, which it calls "currently unimplementable soundly" precisely because
+a `protected` member on `Swimmable` could not be resolved from `Duck`.
 
 ### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link
 

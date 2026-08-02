@@ -129,7 +129,7 @@ class Resolver {
             FunDecl(name, params, ret_type, body, doc) => {
                 this.funcs.set(name, this.current_prefix)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 this.types.set(name, true)
             }
             EnumDecl(name, variants, doc) => {
@@ -188,7 +188,7 @@ class Resolver {
                 this.pop_scope()
                 AST.Stmt.FunDecl(name, params, ret_type, new_body, doc)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 // Methods get a scope holding the receiver plus the field
                 // names, so `name` inside a method resolves to the field and
                 // not to a like-named module global. Note the checker does not
@@ -212,7 +212,7 @@ class Resolver {
                     this.pop_scope()
                     mi = mi + 1
                 }
-                AST.Stmt.ClassDecl(name, type_params, parent, fields, new_methods, doc)
+                AST.Stmt.ClassDecl(name, type_params, parents, fields, new_methods, doc)
             }
             ExprStmt(expr) => {
                 AST.Stmt.ExprStmt(this.resolve_expr(expr))

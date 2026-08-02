@@ -158,7 +158,15 @@ enum Stmt {
     // even a direct `b.getItem(0)` on a `Box<String>` warned "cannot infer type".
     // The source supplies this information; throwing it away is what made the
     // types incomplete (BUGS #95).
-    ClassDecl(name: String, type_params: List<String>, parent: String, fields: List<Param>, methods: List<Stmt>, docstring: String),
+    // `parents` holds every name after `extends`, in source order:
+    // `class Duck extends Flyable, Swimmable, Walkable` → the three of them,
+    // and `[]` for a class with no base. This was a single `parent: String` and
+    // the parser threw away parents 2..n ("skip additional interfaces for
+    // now"), so `d.swim()` and `d.walk()` were codegen errors and the checker
+    // could not see that Duck derives from Swimmable at all. Order is
+    // load-bearing: parents[0] keeps the field layout and `init`-forwarding
+    // behaviour single inheritance has always had, and later parents only add.
+    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
