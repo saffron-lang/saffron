@@ -1010,10 +1010,53 @@
                     // every Bool field printed "true". Float had no arm at all and
                     // fell into __int_to_string via emit_untag_int, which reads a
                     // double's bits as an integer.
+                    //
+                    // The arm list is also the whole of the type coverage, and it
+                    // was missing List, Map and nested enum (BUGS #108). Those
+                    // three fell into the final `else`, which untags the payload as
+                    // an integer and formats it with __int_to_string — so a List
+                    // payload printed its heap ADDRESS in decimal, varying between
+                    // runs of one unchanged binary, and a nested enum printed the
+                    // low bits of its `tag << 56` immediate as 0. A String payload
+                    // is a heap pointer too and printed fine, which is what showed
+                    // this was a missing-formatter list rather than an inability to
+                    // handle heap payloads.
+                    //
+                    // The three arms added below call the SAME helpers the ordinary
+                    // `.to_string()` dispatch in methods_body.sf uses for these
+                    // types — __list_to_string, __map_to_string, and the payload
+                    // enum's own generated to_string. All three already return a
+                    // raw char*, which is exactly what __sb_append wants, so no
+                    // tag/untag step belongs on any of them. Routing through
+                    // __any_to_string was the alternative and is deliberately not
+                    // taken: it does not exist in wasm_base.ll, and a static type
+                    // is in hand here so the runtime dispatch buys nothing.
                     var field_str: String = ""
                     if (field_type == "String") {
                         var s_ptr: String = this.emit_untag_ptr(field_val)
                         field_str = this.ptr_to_val(s_ptr)
+                    } else if (field_type.starts_with("List")) {
+                        // __list_to_string accepts the value as stored: a list
+                        // literal reaches the payload slot as __list_new's raw
+                        // pointer, and the helper inttoptr's whatever it is given
+                        // — the same call shape as `"${a_list}"` on a bare local.
+                        this.called_functions.push("__list_to_string")
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @__list_to_string(i64 " + field_val + ")")
+                    } else if (field_type.starts_with("Map")) {
+                        this.called_functions.push("__map_to_string")
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @__map_to_string(i64 " + field_val + ")")
+                    } else if (this.enum_defs.has(field_type)) {
+                        // A nested enum formats itself. Its generated to_string
+                        // knows its own encoding — `tag << 56` for a fieldless
+                        // enum, the heap array otherwise — which is the whole
+                        // reason this cannot be open-coded here.
+                        var nested_ts: String = field_type + "__to_string"
+                        this.called_functions.push(nested_ts)
+                        this.called_function_arity.set(nested_ts, 1)
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @" + nested_ts + "(i64 " + field_val + ")")
                     } else if (field_type == "Bool") {
                         var b_raw: String = this.emit_untag_bool(field_val)
                         field_str = this.fresh_local()
