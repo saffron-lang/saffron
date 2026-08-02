@@ -1011,7 +1011,7 @@ silently breaking negative indexing.
 Suite: 43 failures vs. the 45-failure baseline, zero regressions, and
 `test/narrowing.sf` + `test/test_async.sf` now pass. `./bootstrap.sh` passes.
 
-### 81. `__gc_write_barrier` is defined but never called anywhere, so the remembered set is permanently empty
+### 81. FIXED — `__gc_write_barrier` was defined but never called anywhere, so the remembered set was permanently empty
 
 `__gc_write_barrier` (`src/runtime/gc.ll:1378`) maintains the remembered set that
 `__gc_minor_mark_roots` (`gc.ll:1520-1546`) depends on. It has exactly one
@@ -1126,7 +1126,7 @@ tools/gc_stress.sh m1.sf                  # len=19999  -- one element lost
 NURSERY=1073741824 tools/gc_stress.sh m1.sf   # len=20000  -- clean, so it IS the GC
 ```
 
-### 79. Coroutines never pop their GC roots — the shadow stack grows without bound and its top slots dangle into freed frames
+### 79. FIXED — coroutines never popped their GC roots, so the shadow stack grew without bound and its top slots dangled into freed frames
 
 `gen_fun`'s coroutine epilogue (`src/compiler/codegen/output_body.sf:413-438`) emits
 `llvm.coro.free` + `llvm.coro.end` but no `__gc_pop_roots`, and `gen_return` skips
@@ -1172,7 +1172,7 @@ after 50 rounds  = 13
 after 200 rounds = 13     (was 414)
 ```
 
-### 78. An absolute import path silently resolves to a nonexistent stdlib file
+### 78. FIXED — an absolute import path silently resolved to a nonexistent stdlib file
 
 `import "/abs/path/m.sf" as M` does not import anything. `resolve_import_path`
 (`src/compiler/main.sf:109`) tests for `@`, `./`, `../`, and bare paths with and
@@ -1303,7 +1303,7 @@ untagging happen in one place, "never in codegen, and never in both" — so it i
 worth checking the other `wasm_base_32.ll` `to_string` helpers for the same
 duplicated-untag shape rather than fixing only this one.
 
-### 76. The type checker never descends into class method bodies — every check is silently skipped inside a method
+### 76. FIXED — the type checker never descended into class method bodies, so every check was silently skipped inside a method
 
 `check_stmt`'s `ClassDecl` arm (`src/compiler/checker.sf:1023`) registers the
 class's fields and parent and then stops. It never walks `methods`. So **no
@@ -1390,6 +1390,28 @@ Note the related shape: the `match (stmt)` at `checker.sf:837-848` and
 arm in either — and this does not fail the build, because exhaustiveness
 checking is one of the things that does not run inside a method. The checker's
 own blind spot hides a hole in the checker.
+
+**FIXED** — recursion in `a902110`, the ~100 diagnostics it uncovers in
+`3138807` (landed first, so the recursion commit keeps the bootstrap green). The
+`ClassDecl` arm now saves `current_class`, sets it to the class name, runs
+`check_stmts(methods)` and restores it; the `FunDecl` arm already did the right
+thing under that flag, and `this.field` resolves through `class_fields` rather
+than lexical scope, so no extra scope push was needed. Four lines, exactly as
+measured above.
+
+Two things the measurement got right and one it got wrong. Right: the count
+(~100) and the dominant shape (one-armed `match` with no `_`, i.e. #73's
+mechanism sitting in ~100 places). Wrong: the split into "one site blocks gen4,
+~102 invisible" implied the ~102 were all mechanical fallbacks. Four were
+genuine defects that the recursion found and nothing else would have —
+`collect_calls_from_expr`/`_stmt` in `utils_body.sf` were missing recursive
+cases outright, so whole subtrees of the call graph went uncollected. That is
+the argument for this entry: the value was never the mechanical `_ => ...`
+arms, it was the handful of real holes they were camouflaging.
+
+Now that the checker runs inside methods, the compiler's own source is checked
+for the first time. Treat a fresh diagnostic in compiler source as real: there
+is no longer a "the checker doesn't look here" explanation available.
 
 ### 75. A value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under
 
@@ -1496,7 +1518,7 @@ tagged-vs-raw check like `__val_untag_int` already does) in the function prologu
 Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
 boundary.
 
-### 74. Builtin-namespace calls (`GC.*`) pass NaN-boxed arguments straight into `@extern` functions, and the matching getter re-masks the corruption so it reads back correct
+### 74. FIXED — builtin-namespace calls (`GC.*`) passed NaN-boxed arguments straight into `@extern` functions, and the matching getter re-masked the corruption so it read back correct
 
 Found while wiring `GC.set_max_memory()` for the `--max-memory` work. It is not
 specific to the new function — `GC.set_threshold()` has always had it — and it is
@@ -1709,7 +1731,7 @@ One consequence worth noting: `Int?` being genuinely `Int|Nil` means it now
 correctly *requires* a nil check, so `IO.println("${v}")` on an `Int?` is a
 diagnostic where the old broken spelling would have been a crash.
 
-### 71. A module-level `fun main` in an imported file collides with the entry point's `main`, and the program silently never runs
+### 71. FIXED — a module-level `fun main` in an imported file collided with the entry point's `main`, and the program silently never ran
 
 Codegen renamed *every* function called `main` to `__saffron_main`, regardless of
 which module it came from (`src/compiler/codegen/output_body.sf:3`), and the call
@@ -1745,7 +1767,7 @@ One related case is still open: with a *named* import (`import { main } from
 "./lib.sf"`) plus a local `fun main`, the program segfaults. That is the general
 named-import-shadows-a-local problem, not this rename bug, and is not fixed here.
 
-### 70. `super` is completely broken — every use emits `load i64, i64* %super` and the module fails to verify
+### 70. FIXED — `super` was completely broken; every use emitted `load i64, i64* %super` and the module failed to verify
 
 **FIXED for calls** (`super.method(args)`) by hoisting the `super` arm above the
 builtin-dispatch preamble, as the "Fix" section below prescribes. **Still broken
@@ -2160,7 +2182,7 @@ not a small fix — the error path itself allocates (`__runtime_error` calls
 on wasm at all. Decide whether fatal-by-design is the intended semantics before
 investing there.
 
-### 64. A request body over ~35 KB silently kills the server; `@http/server` reads only 8192 bytes and never checks for a short read
+### 64. FIXED — a request body over ~35 KB silently killed the server; `@http/server` read only 8192 bytes and never checked for a short read
 
 **Reproduction** — against any Saffron HTTP server (this is the playground's, but
 the server code is `@http/server`, not the playground's):
@@ -2229,7 +2251,7 @@ A/B measured against a live server with only `server.sf` differing — before, 2
 gets no response at all and 2 MB is truncated to exactly 65536 bytes; after, 5 B
 through 4 MB all arrive byte-exact.
 
-### 63. The moving minor GC invalidates receiver pointers held in SSA temps — a three-line program segfaults, and it is not async-specific
+### 63. FIXED — the moving minor GC invalidated receiver pointers held in SSA temps; a three-line program segfaulted, and it was not async-specific
 
 **The mechanism this entry originally described was wrong.** It said the GC's
 shadow stack roots locals by the address of a stack `alloca`, that a coroutine's
@@ -3040,7 +3062,7 @@ idx_type)` (`types_body.sf`) converts a statically-`Float` index via
 regressions. Note this is the same float tag/untag confusion as the Float half of
 #51 and #54; the fix here is confined to index positions.
 
-### 54. An `Int` literal in a `Float` position yields `nan`
+### 54. FIXED — an `Int` literal in a `Float` position yielded `nan`
 
 **Reproduction:**
 
@@ -3114,7 +3136,7 @@ function-reference branch emits a trampoline calling `@later` for an extern in
 *value* position (not call position), which is broken independently of
 declaration order.
 
-### 56. A field access on the result of an indirect call reads 0
+### 56. FIXED (as a diagnostic) — a field access on the result of an indirect call read 0
 
 **Reproduction:**
 
@@ -3165,7 +3187,7 @@ Tests: `test/fail/indirect_call_field.sf` (the direct access, must be rejected),
 `test/pass/indirect_call_field.sf` (the annotated form, plus a direct call whose
 declared return type needs no annotation).
 
-### 57. A repeated `--lib-path` duplicates every global in the output IR
+### 57. FIXED — a repeated `--lib-path` duplicated every global in the output IR
 
 **Reproduction:**
 
