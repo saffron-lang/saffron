@@ -1,0 +1,104 @@
+// oracle_enum_println.sf — IO.println(enum_value) must print the variant, not a
+// reinterpretation of its bit pattern.
+//
+// Found by the differential oracle on its first real run: test/pass/enums.sf and
+// test/pass/generics.sf are BOTH printing lines like `7.29112e-304` and
+// `5.21502e-310` today, on native, at -O0 and -O2 alike, and both are counted as
+// passing tests. They have no assertions and no .expected file, so nothing in
+// tools/run_tests.sh can see it.
+//
+// MECHANISM. A fieldless enum variant is represented as the immediate
+// `tag << 56`. Codegen's IO.println path passes that value straight through:
+//
+//     %t2 = shl i64 0, 56
+//     %t3 = call i64 @__io_println(i64 %t2)
+//
+// with no `Color__to_string` call and no int tag applied. `__io_println` inspects
+// the NaN-box tag bits, finds none of TAG_PTR/TAG_INT/TAG_SPEC set, and correctly
+// concludes the value is an unboxed double — so it formats the raw bit pattern as
+// a float. `0 << 56` is 0 and prints "0"; `1 << 56` is 0x0100000000000000, a
+// subnormal double, and prints "7.29112e-304".
+//
+// The interpolation path is CORRECT for the same value, because the lexer's
+// `"${e}"` desugaring inserts an explicit `.to_string()`:
+//
+//     %t7 = call i64 @Color__to_string(i64 %t6)
+//
+// So `IO.println("${Color.Red}")` prints "Red" while `IO.println(Color.Red)`
+// prints "0". Two code paths, one right and one wrong, for the same value — which
+// is the M5 "duplicated logic that drifts" mechanism from
+// docs/design/compiler-rewrite.md, and the same shape as BUGS #77 (branching on a
+// bool was right while printing it was wrong).
+//
+// This is closely related to BUGS #102 but is NOT the same bug. #102 was inside
+// the generated `to_string()` — it decoded a one-field enum's heap pointer as a
+// `tag << 56` immediate. This one never CALLS to_string() at all. #102's fix
+// makes to_string() correct, which is why the interpolation path above works; the
+// direct-println path bypasses it and is still wrong.
+//
+// Expected output is in the sibling .expected file and records CORRECT behaviour,
+// so this test fails until the println path is fixed.
+
+enum Color { Red, Green, Blue }
+
+// Fieldless variants, printed directly. This is the broken path.
+IO.println(Color.Red)
+IO.println(Color.Green)
+IO.println(Color.Blue)
+
+// The same three values through interpolation. This path works today, and having
+// both here means a regression in EITHER direction is visible in one test — a
+// "fix" that broke interpolation to match println would not look like a pass.
+IO.println("${Color.Red}")
+IO.println("${Color.Green}")
+IO.println("${Color.Blue}")
+
+// And through an explicit .to_string(), the third path.
+IO.println(Color.Red.to_string())
+IO.println(Color.Blue.to_string())
+
+// Via a variable, so the value has round-tripped through a global slot rather
+// than being consumed straight from the constructor.
+var c = Color.Green
+IO.println(c)
+IO.println("${c}")
+IO.println(c.to_string())
+
+// Payload-carrying variants, direct println. Kept distinct from the fieldless
+// case because their representation is a heap pointer rather than an immediate,
+// so they fail differently (or not at all) and the difference is diagnostic.
+enum Shape {
+    Circle(r: Float),
+    Square(side: Int),
+    Named(name: String)
+}
+
+IO.println(Shape.Circle(2.5))
+IO.println(Shape.Square(4))
+IO.println(Shape.Named("box"))
+IO.println("${Shape.Circle(2.5)}")
+IO.println("${Shape.Square(4)}")
+IO.println("${Shape.Named("box")}")
+
+// A fieldless variant of an enum that ALSO has payload variants. The tag is still
+// an immediate, but the enum's to_string() has to handle both shapes, so this is
+// the case where a partial fix is most likely to land wrong.
+enum Mixed {
+    Nothing,
+    Just(v: Int)
+}
+
+IO.println(Mixed.Nothing)
+IO.println(Mixed.Just(7))
+IO.println("${Mixed.Nothing}")
+IO.println("${Mixed.Just(7)}")
+
+// Inside a list, which goes through the list element formatter rather than
+// __io_println directly — a fourth path, and it is broken the SAME way: today
+// this prints `[0, 4.77831e-299]`. So the working path is specifically the one
+// that goes through an explicit `.to_string()` call, and every path that formats
+// an enum value without one is wrong. That narrows the fix to "apply the enum's
+// to_string() wherever an enum value reaches a formatter", rather than to any one
+// call site.
+IO.println([Color.Red, Color.Blue])
+IO.println([Mixed.Nothing, Mixed.Just(1)])

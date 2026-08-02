@@ -1,5 +1,12 @@
 //! Compiler diagnostics — lightweight logging for saffronc.
 //! No external dependencies (no @time, no @os) so it links cleanly in bootstrap.
+//!
+//! Located diagnostics take an `AST.Span` (see ast.sf) plus the file name and the
+//! source text of the unit that span refers to. A span does not carry its own
+//! file, because a span is only meaningful against the text it was lexed from and
+//! that text is held once per parse unit — the caller supplies both.
+
+import "./ast.sf" as AST
 
 var _verbosity: Float = 1
 var _internal_all: Bool = false
@@ -24,6 +31,82 @@ fun enable_internal(category: String) {
 
 fun error(phase: String, msg: String) {
     IO.println("[error:" + phase + "] " + msg)
+}
+
+// --- Located diagnostics ---
+
+/// `file:line:col` for a real span, or just `file` when the span is synthetic.
+///
+/// This is the prefix that lets an editor or `make`-style tool jump to the
+/// offending source, which a bare `[error:codegen] ...` line cannot.
+fun format_span(file: String, s: AST.Span): String {
+    if (!AST.span_is_real(s)) { return file }
+    return file + ":" + AST.span_to_string(s)
+}
+
+/// One line of the source text, 1-based, or "" when `line` is out of range.
+fun source_line(source: String, line: Float): String {
+    if (source.length() == 0) { return "" }
+    if (line < 1) { return "" }
+    var lines: List<String> = source.split("\n")
+    if (line > lines.length()) { return "" }
+    return lines[line - 1]
+}
+
+/// A caret run under the span: `^` for a synthetic or single-character span,
+/// `^~~~` widening to the span's length otherwise.
+fun caret_for(s: AST.Span): String {
+    var caret: String = "^"
+    var width: Float = AST.span_len(s)
+    var i: Float = 1
+    while (i < width) {
+        caret = caret + "~"
+        i = i + 1
+    }
+    return caret
+}
+
+/// Print a located diagnostic: a `file:line:col: label: message` header, then the
+/// source line, then a caret under the span.
+///
+/// `source` may be "" — the header still carries the location, which is the part
+/// a tool consumes. Passing the text just adds the human-readable excerpt.
+fun report(file: String, source: String, s: AST.Span, label: String, msg: String) {
+    IO.println(format_span(file, s) + ": " + label + ": " + msg)
+    var line: Float = AST.span_line(s)
+    var text: String = source_line(source, line)
+    if (text.length() == 0) { return }
+    var prefix: String = "  " + line.floor().to_string() + " | "
+    IO.println(prefix + text)
+    var col: Float = AST.span_col(s)
+    var padding: String = ""
+    var pi: Float = 0
+    while (pi < prefix.length() + col - 1) {
+        padding = padding + " "
+        pi = pi + 1
+    }
+    IO.println(padding + caret_for(s))
+}
+
+/// A located error. Sets nothing — the caller owns its own `has_errors` flag —
+/// so this stays usable from the parser, checker and codegen alike.
+fun error_at(file: String, source: String, s: AST.Span, msg: String) {
+    report(file, source, s, "error", msg)
+}
+
+/// A located warning, subject to the same verbosity gate as `warn`.
+fun warn_at(file: String, source: String, s: AST.Span, msg: String) {
+    if (_verbosity >= 1) {
+        report(file, source, s, "warning", msg)
+    }
+}
+
+/// A located internal-compiler-error. The wording matters: this is the
+/// I9 fall-through channel, and it must be distinguishable from a user error so
+/// that "the compiler reported success right up to the assembler" (BUGS #37)
+/// cannot recur silently.
+fun internal_error_at(file: String, source: String, s: AST.Span, msg: String) {
+    report(file, source, s, "internal compiler error", msg)
 }
 
 fun warn(phase: String, msg: String) {

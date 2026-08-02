@@ -1529,6 +1529,18 @@ class Codegen {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                 }
+                // A nested `fun` declared in THIS body shadows a like-named module
+                // global, so it must be answered as a function reference even though
+                // the module_globals guards below would otherwise divert to a load
+                // from @__g_. Tested first for exactly that reason (BUGS #80).
+                if (this.current_fn_locals.has("__nestedfn:" + name) and !this.typed_vars.has(name) and !this.named_imports.has(name)) {
+                    if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
+                        return this.gen_func_ref(this.current_prefix + name)
+                    }
+                    if (this.str_in_list(this.known_functions,name)) {
+                        return this.gen_func_ref(name)
+                    }
+                }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 // Skip for named imports — they should go through gen_call for direct dispatch
                 if (this.str_in_list(this.known_functions,name)) {
@@ -2898,6 +2910,18 @@ class Codegen {
                 Ref(rk, rn, rs) => rn
                 _ => ""
             }
+            // Nested-`fun` binding in this body wins over a like-named module
+            // global. Same rule as the Variable arm of gen_expr; this is the copy
+            // that `return cl` and `f(cl)` go through, and it was the one actually
+            // producing the null closure in BUGS #80.
+            if (this.current_fn_locals.has("__nestedfn:" + __vn) and !this.typed_vars.has(__vn) and !this.named_imports.has(__vn)) {
+                if (this.str_in_list(this.known_functions,this.current_prefix + __vn)) {
+                    return this.gen_func_ref(this.current_prefix + __vn)
+                }
+                if (this.str_in_list(this.known_functions,__vn)) {
+                    return this.gen_func_ref(__vn)
+                }
+            }
             if (this.str_in_list(this.known_functions,__vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
@@ -4249,6 +4273,48 @@ class Codegen {
         }
 
         // Indirect call: callee is a variable or expression holding a function pointer
+        //
+        // A name can be claimed by BOTH a `var` and a `fun` (`var a = 1` next to
+        // `fun a() {...}`). Nothing rejects that, and the direct-call branch above
+        // declines it because a binding exists, so `a()` fell through to here and
+        // loaded the *variable* as a closure pair. With `var a = 1` that pair
+        // pointer is the NaN-boxed integer 0x7FF9000000000001, and unpacking it
+        // dereferences that address — the exact fault address observed in
+        // test/functions.sf (BUGS #80).
+        //
+        // The recorded type settles it: an indirect call is only meaningful if the
+        // binding could hold a callable. `Fun` (and an unknown/`Any` type, which
+        // may be a lambda) stay indirect; anything concretely non-callable means
+        // the `fun` is what the programmer named, so dispatch directly and keep the
+        // value load out of it entirely.
+        if (callee_name.length() > 0 and this.str_in_list(this.known_functions,resolved_callee)) {
+            var cty: String = ""
+            if (this.typed_vars.has(callee_name)) {
+                cty = this.type_to_string(this.typed_vars.get(callee_name))
+            } else if (this.global_var_types.has(this.current_prefix + callee_name)) {
+                cty = this.global_var_types.get(this.current_prefix + callee_name)
+            } else if (this.global_var_types.has(callee_name)) {
+                cty = this.global_var_types.get(callee_name)
+            }
+            var callable: Bool = cty.length() == 0 or cty == "Any" or cty == "Fun" or cty.starts_with("Fun")
+            if (!callable) {
+                var direct: String = this.fresh_local()
+                var d_args: List<String> = []
+                var dai: Float = 0
+                while (dai < args.length()) {
+                    d_args.push("i64 " + this.gen_arg_value(args[dai]))
+                    dai = dai + 1
+                }
+                this.called_functions.push(resolved_callee)
+                this.emit_indent(direct + " = call i64 @" + resolved_callee + "(" + d_args.join(", ") + ")")
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.func_ret_types.get(resolved_callee)
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return direct
+            }
+        }
         var ptr_val: String = ""
         if (callee_name.length() == 0) {
             ptr_val = this.gen_arg_value(callee)
@@ -6157,6 +6223,23 @@ class Codegen {
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
                 this.pending_extend_class = ""
+                // A nested `fun f` binds `f` in the *enclosing body*, and that
+                // binding has to beat a like-named module global — the same
+                // innermost-wins rule `var` already gets from current_fn_locals
+                // (BUGS #59). Without this, `fun mk() { fun cl() {...}; return cl }`
+                // alongside a module-level `var cl` compiled `return cl` to a load
+                // from @__g_cl: the global, read before it is initialised, so `mk`
+                // handed back 0 and the caller's `cl()` dereferenced a null
+                // closure pair (BUGS #80). Recorded under a reserved key rather
+                // than the bare name so it can never be mistaken for a `var`
+                // binding by the alloca / GC-root sites that also read this map.
+                // current_fn_locals is saved and restored around every body, so
+                // the marker is scoped to this body for free, and gen_function
+                // restores the *same* map object — mutating it here survives the
+                // hoisting call below.
+                if (this.in_function) {
+                    this.current_fn_locals.set("__nestedfn:" + name, true)
+                }
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)

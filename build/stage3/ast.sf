@@ -1,3 +1,82 @@
+// A source region, as produced by the lexer and propagated by the parser.
+//
+// `line` and `col` are 1-based and name the FIRST character of the region;
+// `offset` is a 0-based byte offset into the same source text and `len` is the
+// region's length in bytes. Keeping both forms means a diagnostic can print a
+// line/caret without re-scanning, and a tool can slice the exact source text
+// without recounting lines.
+//
+// The file is deliberately NOT a field. A span is meaningful only relative to
+// the source text it was lexed from, and that text is held by whoever owns the
+// parse unit (Parser.source, or the driver's file table). Storing a filename on
+// every token would put one string copy per token on the heap for information
+// that is constant across the whole unit.
+//
+// `len == 0` with `line == 0` is the "no span" value — see `span_none()`. A real
+// token always has line >= 1, so the two cannot be confused.
+enum Span {
+    Span(line: Float, col: Float, offset: Float, len: Float)
+}
+
+/// The absence of a span. Distinguishable from any real span because the lexer's
+/// lines are 1-based, so a real span never has line 0.
+fun span_none(): Span {
+    return Span.Span(0, 0, 0, 0)
+}
+
+/// True when `s` names a real source region.
+fun span_is_real(s: Span): Bool {
+    return match (s) { Span(line, col, offset, len) => line >= 1 }
+}
+
+fun span_line(s: Span): Float {
+    return match (s) { Span(line, col, offset, len) => line }
+}
+
+fun span_col(s: Span): Float {
+    return match (s) { Span(line, col, offset, len) => col }
+}
+
+fun span_offset(s: Span): Float {
+    return match (s) { Span(line, col, offset, len) => offset }
+}
+
+fun span_len(s: Span): Float {
+    return match (s) { Span(line, col, offset, len) => len }
+}
+
+/// The smallest span covering both `a` and `b`.
+///
+/// This is what a parser uses to give a compound node the extent of everything
+/// it consumed: `span_merge(span_of_first_token, span_of_last_token)`. Either
+/// argument may be `span_none()`, in which case the other is returned unchanged
+/// — so a desugaring that has a span for only one side still propagates it
+/// rather than dropping to no-span.
+fun span_merge(a: Span, b: Span): Span {
+    if (!span_is_real(a)) { return b }
+    if (!span_is_real(b)) { return a }
+    var a_off: Float = span_offset(a)
+    var b_off: Float = span_offset(b)
+    // Start at whichever begins first, so the caller need not order the args.
+    var start: Span = a
+    var end_off: Float = b_off + span_len(b)
+    if (b_off < a_off) {
+        start = b
+        end_off = a_off + span_len(a)
+    }
+    var start_off: Float = span_offset(start)
+    var length: Float = end_off - start_off
+    if (length < 0) { length = 0 }
+    return Span.Span(span_line(start), span_col(start), start_off, length)
+}
+
+/// `line:col` — the prefix a diagnostic puts in front of its message. Callers
+/// prepend the filename; see `Diag.format_span` for the full rendering.
+fun span_to_string(s: Span): String {
+    if (!span_is_real(s)) { return "<unknown>" }
+    return span_line(s).floor().to_string() + ":" + span_col(s).floor().to_string()
+}
+
 enum Type {
     IntType,
     FloatType,
