@@ -1,0 +1,19 @@
+// BUGS #37. The terminal fall-through of gen_method_call sets last_type to Int
+// and returns the literal "0" without emitting any call. A method call on an
+// `Any`-typed receiver reached that point, so the call was SILENTLY DROPPED: the
+// program compiled clean, `f` emitted no `call` instruction at all, and the
+// expression evaluated to 0.
+//
+//     define i64 @f(i64 %x.arg) {
+//       ...
+//       %t2 = load i64, i64* %x
+//       ret i64 0          ; <- x.whatever() is simply not here
+//     }
+//
+// A dropped call is the worst possible failure mode: no diagnostic, no crash,
+// wrong answer. It must be a hard compile error.
+fun f(x: Any): Any {
+    return x.whatever()
+}
+
+IO.println("${f(1)}")

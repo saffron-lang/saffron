@@ -1,0 +1,11 @@
+// BUGS #37, the instance that was live in the tree. `Map` has no `delete` — there
+// is no `__map_delete` in src/runtime/runtime.sf at all — and a Map receiver is
+// classified as a builtin, so the "no such method" check above the fall-through
+// skipped it and the call was silently dropped.
+//
+// pantry/src/commands/remove.sf did exactly this. `pantry remove <pkg>` compiled
+// clean, emitted zero `__map_*` instructions for the delete, and removed nothing.
+// Two files in the tree were affected and no test covered either.
+var m: Map<String, Int> = {"a": 1}
+m.delete("a")
+IO.println("unreachable")
