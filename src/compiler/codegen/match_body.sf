@@ -129,13 +129,22 @@
                             var cnext: String = this.fresh_label("match.next")
                             this.emit_terminator("br i1 " + ctest + ", label %" + cthen + ", label %" + cnext)
                             this.start_block(cthen)
+                            // Same arm scoping as the enum path below (BUGS #106):
+                            // `is Dog(d)` binds `d` for this arm only, and `d` may
+                            // well name something in the enclosing scope.
+                            var cscope: List<String> = []
+                            if (cbinds.length() >= 1) { cscope.push(cbinds[0]) }
+                            var csaved: List<String> = this.save_arm_slots(cscope)
+                            var ctypes: List<String> = this.save_arm_types(cscope)
                             if (cbinds.length() >= 1) {
-                                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cbinds[0]))
+                                this.emit_indent("store i64 " + subj + ", i64* " + this.arm_slot_ref(cbinds[0]))
                                 this.typed_vars.set(cbinds[0], this.str_to_type(cname))
                             }
                             var cval: String = this.gen_arg_value(cbody)
                             if (ci == 0) { cls_type = this.last_type }
                             this.emit_indent("store i64 " + cval + ", i64* " + result_ptr)
+                            this.restore_arm_slots(cscope, csaved)
+                            this.restore_arm_types(cscope, ctypes)
                             this.emit_terminator("br label %" + cls_end)
                             this.start_block(cnext)
                         }
@@ -145,12 +154,18 @@
                 if (cls_wild >= 0) {
                     var wpat: AST.Pattern = this.get_arm_pattern(arms[cls_wild.floor()])
                     var wbinds: List<String> = this.get_pattern_bindings(wpat)
+                    var wscope: List<String> = []
+                    if (wbinds.length() >= 1) { wscope.push(wbinds[0]) }
+                    var wsaved: List<String> = this.save_arm_slots(wscope)
+                    var wtypes: List<String> = this.save_arm_types(wscope)
                     if (wbinds.length() >= 1) {
-                        this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(wbinds[0]))
+                        this.emit_indent("store i64 " + subj + ", i64* " + this.arm_slot_ref(wbinds[0]))
                     }
                     var wval: String = this.gen_arg_value(this.get_arm_body(arms[cls_wild.floor()]))
                     if (cls_wild == 0) { cls_type = this.last_type }
                     this.emit_indent("store i64 " + wval + ", i64* " + result_ptr)
+                    this.restore_arm_slots(wscope, wsaved)
+                    this.restore_arm_types(wscope, wtypes)
                 } else {
                     // No wildcard and nothing matched. Storing nil keeps this an
                     // indeterminate value rather than a fault — the same gap as
@@ -168,6 +183,8 @@
                 }
                 return cls_result
             }
+            var ue_saved: List<String> = this.save_arm_slots(first_bindings)
+            var ue_types: List<String> = this.save_arm_types(first_bindings)
             if (first_bindings.length() >= 1) {
                 // Array encoding: inttoptr → GEP for each binding
                 var num_slots: Float = first_bindings.length() + 1
@@ -181,7 +198,7 @@
                     this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.floor().to_string())
                     var extracted: String = this.fresh_local()
                     this.emit_indent(extracted + " = load i64, i64* " + field_slot)
-                    this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+                    this.emit_indent("store i64 " + extracted + ", i64* " + this.arm_slot_ref(bname))
                     bi = bi + 1
                 }
             }
@@ -190,6 +207,8 @@
             }
             var val: String = this.gen_arg_value(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+            this.restore_arm_slots(first_bindings, ue_saved)
+            this.restore_arm_types(first_bindings, ue_types)
             var result: String = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
             // LLVM lib parallel path: track unknown-enum match result
@@ -271,14 +290,30 @@
             // A NamedWildcard binds the subject itself, not a payload field, so
             // it is stored directly rather than GEP'd out of the enum's payload.
             var nw_name: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+            // Every name this arm binds — a NamedWildcard binds one too, and it
+            // shadows an enclosing variable exactly the same way.
+            var arm_names: List<String> = []
             if (nw_name.length() > 0) {
-                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(nw_name))
-                this.typed_vars.set(nw_name, this.str_to_type(enum_name))
+                arm_names.push(nw_name)
             }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b
                 _ => []
             }
             var bind_count: Float = bindings.length()
+            var bni: Float = 0
+            while (bni < bind_count) {
+                arm_names.push(bindings[bni])
+                bni = bni + 1
+            }
+            // Snapshot the slots and the static types BEFORE any payload store,
+            // so the enclosing scope's variable can be put back on the way out
+            // (BUGS #106).
+            var saved_slots: List<String> = this.save_arm_slots(arm_names)
+            var saved_types: List<String> = this.save_arm_types(arm_names)
+            if (nw_name.length() > 0) {
+                this.emit_indent("store i64 " + subj + ", i64* " + this.arm_slot_ref(nw_name))
+                this.typed_vars.set(nw_name, this.str_to_type(enum_name))
+            }
             if (bind_count > 0) {
                 this.extract_arm_bindings(bindings, subj, max_fields)
                 var bi: Float = 0
@@ -296,6 +331,13 @@
                 match_result_type = this.last_type
             }
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+            // Restore before the branch out, not after: `end_label` is shared by
+            // every arm, so a restore there would run with whichever arm's temps
+            // and would not dominate. The arm body's own value is already in
+            // result_ptr by now, so putting the outer variable back cannot
+            // disturb it.
+            this.restore_arm_slots(arm_names, saved_slots)
+            this.restore_arm_types(arm_names, saved_types)
             this.emit_terminator("br label %" + end_label)
             i = i + 1
         }
@@ -310,6 +352,180 @@
             this.llvm_values.set(result, match_res)
         }
         return result
+    }
+
+    // --- Match-arm binding scope (BUGS #106) ---
+    //
+    // A match arm's bindings are a scope of their own: they shadow whatever the
+    // enclosing scope calls by the same name, for the arm's extent only. Codegen
+    // has no scope chain, only one flat `%<name>` slot per name, so an arm
+    // binding used to be written straight into the enclosing variable's slot.
+    // That had two faces:
+    //
+    //   At module scope the outer variable is a global at `@__g_s`, so no
+    //   `%s` alloca exists at all (the alloca loops in output_body.sf skip names
+    //   that are module globals). `store i64 %tN, i64* %s` was invalid IR —
+    //   "use of undefined value '%s'", caught by `opt -passes=verify`. Loud.
+    //
+    //   Inside a function `%s = alloca i64` DOES exist, so the store landed in
+    //   the outer variable's slot. A `String`-declared local silently came to
+    //   hold a tagged Int: `IO.println(s)` printed the payload, `s.length()`
+    //   printed 0 (a small integer dereferenced as a char*), exit 0, no
+    //   diagnostic. Silent, and the reason this needed fixing.
+    //
+    // resolve.sf already has this right, which is worth knowing before reading the
+    // fix. `resolve_arms` pushes a scope per arm and `declare_pattern` declares
+    // each binding `"local"` in it, so the binding reaches codegen as
+    // `Ref("local", name, "")` and expr_body.sf loads it from `%<name>`. The arm
+    // IS scoped in the AST; what was missing was codegen honouring it. So the
+    // slot for an arm binding is always the local one — never `@__g_`, even when
+    // a module global shares the name — and the two gaps to close are:
+    //
+    //   1. At module scope that `%<name>` slot was never allocated, because
+    //      output_body.sf's top-level alloca loop skips any name that is a module
+    //      global. `ensure_arm_slots` below allocates it, in the block before the
+    //      switch so it dominates every arm. The enclosing `@__g_s` is then
+    //      untouched by construction, and a read of the outer `s` after the match
+    //      resolves to `Ref("global")` → `@__g_s` and is correct.
+    //
+    //   2. Inside a function the outer variable and the binding genuinely share
+    //      one `%<name>` alloca — both are locals of the same function and
+    //      codegen has no scope chain to separate them. Nothing structural can be
+    //      done per-slot here, so save/restore brackets the arm instead: snapshot
+    //      the slot on entry to the arm, put it back before the branch out. Only
+    //      one arm runs per match and each ends in an unconditional branch to the
+    //      match's end label, so the restore runs exactly once on the taken path.
+    //
+    // Renaming the binding to a unique slot would be the other shape of fix, and
+    // is what `test/oracle_stringify.sf` had to do by hand. It is not available
+    // from this file: the READ sites are emitted by expr_body.sf's `Ref`/`Variable`
+    // arms, which spell the slot `%<sanitize_name(name)>` with no indirection to
+    // redirect.
+
+    fun arm_slot_ref(name: String): String {
+        return "%" + this.sanitize_name(name)
+    }
+
+    /// True when `name` has no `%<name>` slot in the current frame — the
+    /// module-scope collision case, where the alloca loop skipped it as a global.
+    fun arm_slot_missing(name: String): Bool {
+        if (this.current_fn_locals.has(name)) { return false }
+        return this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)
+    }
+
+    /// Allocate the slots the enclosing frame did not. Must be called while the
+    /// pre-switch block is current, so the allocas dominate all arm blocks, and at
+    /// most once per name per function — `emitted_arm_slots` enforces that, since
+    /// two matches in one scope binding the same name would otherwise emit
+    /// `%s = alloca i64` twice and LLVM rejects the duplicate local name.
+    fun ensure_arm_slots(names: List<String>) {
+        var i: Float = 0
+        while (i < names.length()) {
+            var n: String = names[i]
+            if (this.arm_slot_missing(n) and !this.emitted_arm_slots.has(n)) {
+                this.emitted_arm_slots.set(n, true)
+                this.emit_indent("%" + this.sanitize_name(n) + " = alloca i64")
+                // Zeroed for the same reason the alloca loops zero GC-root
+                // locals: this slot becomes a save/restore source below, and an
+                // undef load is not something to hand to the GC or to strlen.
+                this.emit_indent("store i64 0, i64* %" + this.sanitize_name(n))
+            }
+            i = i + 1
+        }
+    }
+
+    /// Every name an arm pattern binds, in one list — a NamedWildcard binds one
+    /// too, and it shadows an enclosing variable exactly the same way.
+    fun arm_bound_names(pattern: AST.Pattern): List<String> {
+        var out: List<String> = []
+        var nw: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+        if (nw.length() > 0) { out.push(nw) }
+        var bs: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+        var i: Float = 0
+        while (i < bs.length()) {
+            out.push(bs[i])
+            i = i + 1
+        }
+        return out
+    }
+
+    /// Snapshot each binding's slot into a fresh temp. Emitted at the top of the
+    /// arm block, before the payload stores, so the temps dominate the restore.
+    fun save_arm_slots(bindings: List<String>): List<String> {
+        var saved: List<String> = []
+        var i: Float = 0
+        while (i < bindings.length()) {
+            var tmp: String = this.fresh_local()
+            this.emit_indent(tmp + " = load i64, i64* " + this.arm_slot_ref(bindings[i]))
+            saved.push(tmp)
+            i = i + 1
+        }
+        return saved
+    }
+
+    fun restore_arm_slots(bindings: List<String>, saved: List<String>) {
+        var i: Float = 0
+        while (i < bindings.length()) {
+            if (i < saved.length()) {
+                this.emit_indent("store i64 " + saved[i] + ", i64* " + this.arm_slot_ref(bindings[i]))
+            }
+            i = i + 1
+        }
+    }
+
+    /// The static side of the same shadowing. `typed_vars` and `string_vars` are
+    /// flat too, so registering a binding's type overwrote the enclosing
+    /// variable's: after the match, a `String` local was typed Int and method
+    /// dispatch on it silently picked the integer arms. "" marks a name that had
+    /// no entry, which is left alone on restore.
+    fun save_arm_types(bindings: List<String>): List<String> {
+        var prev: List<String> = []
+        var i: Float = 0
+        while (i < bindings.length()) {
+            if (this.typed_vars.has(bindings[i])) {
+                prev.push(this.type_to_string(this.typed_vars.get(bindings[i])))
+            } else {
+                prev.push("")
+            }
+            i = i + 1
+        }
+        return prev
+    }
+
+    fun restore_arm_types(bindings: List<String>, prev: List<String>) {
+        var i: Float = 0
+        while (i < bindings.length()) {
+            if (i < prev.length()) {
+                var pt: String = prev[i]
+                if (pt.length() > 0) {
+                    this.typed_vars.set(bindings[i], this.str_to_type(pt))
+                    // string_vars is consulted by is_string_variable to decide
+                    // whether `+` is concatenation. An Int binding over a String
+                    // local must not strip the local's entry, and a String
+                    // binding over an Int local must not add one.
+                    if (pt == "String") {
+                        if (!this.string_vars.contains(bindings[i])) {
+                            this.string_vars.push(bindings[i])
+                        }
+                    } else {
+                        this.drop_string_var(bindings[i])
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    fun drop_string_var(name: String) {
+        var kept: List<String> = []
+        var i: Float = 0
+        while (i < this.string_vars.length()) {
+            if (this.string_vars[i] != name) {
+                kept.push(this.string_vars[i])
+            }
+            i = i + 1
+        }
+        this.string_vars = kept
     }
 
     fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
@@ -346,7 +562,11 @@
         this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + idx.floor().to_string())
         var extracted: String = this.fresh_local()
         this.emit_indent(extracted + " = load i64, i64* " + field_slot)
-        this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+        // arm_slot_ref, not a bare `%<name>`: at module scope a name that is a
+        // module global has no alloca, and the bare form emitted a store against
+        // an undefined `%s` (BUGS #106's loud face). This is also the store site
+        // for `let Some(v) = ...`, where the global is likewise the right slot.
+        this.emit_indent("store i64 " + extracted + ", i64* " + this.arm_slot_ref(bname))
     }
 
     fun get_variant_field_type(enum_name: String, variant_name: String, field_idx: Float): String {
