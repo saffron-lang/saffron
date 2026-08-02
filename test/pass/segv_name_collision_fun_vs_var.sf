@@ -1,0 +1,125 @@
+// BUGS #80 — two ways a `fun` and a `var` could claim the same name, both of
+// which compiled to a load of the *variable* followed by an indirect call
+// through whatever it happened to hold.
+//
+// Nothing rejects a name being bound by both a `fun` and a `var`, and codegen
+// had no rule for which one wins. Both defects below therefore type checked,
+// linked, and then dereferenced a non-pointer:
+//
+//   Defect A — a nested `fun` returned by name, next to a module global of the
+//   same name. `fun mk() { fun cl() {...}; return cl }` with a top-level
+//   `var cl = mk()` compiled `return cl` to `load @__g_cl` — the global, read
+//   during its own initializer, so still 0. `mk()` handed back a null closure
+//   pair and the caller's `cl()` unpacked address 0.
+//
+//   Defect B — a top-level `var a = 1` next to `fun a()`. The direct-call
+//   branch declines when a binding of that name exists, so `a()` fell through
+//   to the indirect path and read `a`'s value as a closure-pair pointer. Under
+//   NaN boxing the integer 1 is 0x7FF9000000000001, and that is the address the
+//   process died on.
+//
+// Both are silent at compile time: a tagged integer is a perfectly well-typed
+// i64, so only the fault address betrays it. The rule now is the ordinary
+// innermost-wins one — a nested `fun` shadows a module global of its name, and a
+// call whose binding is concretely non-callable dispatches to the `fun`.
+
+import "@test" as Test
+
+// --- Defect A: nested fun returned by name, colliding with the global it
+// initializes. The original crash shape from test/functions.sf.
+fun make_a() {
+    fun collide_a() {
+        return "nested-a"
+    }
+    return collide_a
+}
+var collide_a = make_a()
+Test.assert_eq(collide_a(), "nested-a", "a nested fun returned by name beats the same-named global")
+
+// The capturing variant: the nested fun closes over a local, so it is hoisted
+// with capture params and reached through a trampoline rather than a bare
+// function pointer. Different emission path, same shadowing question.
+fun make_b() {
+    var inner: String = "captured"
+    fun collide_b() {
+        return inner
+    }
+    return collide_b
+}
+var collide_b = make_b()
+Test.assert_eq(collide_b(), "captured", "the capturing nested fun still closes over its local")
+
+// Calling the nested fun *directly* inside its own body always worked, because
+// that call never consults module_globals. Keep it covered so the new
+// shadowing branch cannot regress the case it sits in front of.
+var direct_log: List<String> = []
+fun make_c() {
+    fun collide_c() {
+        direct_log.push("direct")
+    }
+    collide_c()
+    return 0
+}
+var collide_c = make_c()
+Test.assert_eq(direct_log.length(), 1, "a nested fun called in place still runs")
+
+// A nested fun whose name does NOT collide must be unaffected by the fix.
+fun make_d() {
+    fun uncollided() {
+        return "plain"
+    }
+    return uncollided
+}
+var d_result = make_d()
+Test.assert_eq(d_result(), "plain", "a non-colliding nested fun is unchanged")
+
+// --- Defect B: a top-level var and a top-level fun sharing a name. The var
+// holds an Int, which is not callable, so `shared()` must reach the function.
+var shared: Int = 1
+fun shared(): String {
+    return "fun-won"
+}
+Test.assert_eq(shared(), "fun-won", "a call on a non-callable binding dispatches to the fun")
+Test.assert_eq(shared, 1, "and reading the name as a value still yields the var")
+
+// The same collision with arguments, to prove the direct dispatch forwards them
+// rather than dropping them into an env slot.
+var adder: Int = 7
+fun adder(x: Int, y: Int): Int {
+    return x + y
+}
+Test.assert_eq(adder(20, 22), 42, "the direct dispatch forwards its arguments")
+Test.assert_eq(adder, 7, "the colliding var is untouched")
+
+// A String-typed collision — the guard keys off "is this type callable", so a
+// non-Int non-callable must behave the same way.
+var labelled: String = "value"
+fun labelled(): Int {
+    return 5
+}
+Test.assert_eq(labelled(), 5, "a String-typed binding is still not callable")
+Test.assert_eq(labelled, "value", "and it keeps its own value")
+
+// The control: a variable that genuinely holds a lambda must STAY an indirect
+// call. This is the case the fix must not break — if the callable test were
+// simply "prefer the fun", or if it treated Fun as non-callable, this would
+// either misdispatch or fail to compile.
+var real_lambda = fun (x: Int): Int => x * 3
+Test.assert_eq(real_lambda(5), 15, "a lambda-valued binding is still called indirectly")
+
+// A lambda passed around and invoked through another binding, so the callable
+// path is exercised without any same-named fun in sight.
+fun apply_twice(f: Any, v: Int): Int {
+    return f(f(v))
+}
+Test.assert_eq(apply_twice(real_lambda, 2), 18, "an indirect call through a parameter is unaffected")
+
+// A function used as a first-class value with NO colliding var: the plain
+// func-ref path, which the new shadowing branch sits directly above.
+fun tripler(x: Int): Int {
+    return x * 3
+}
+var handed_off = tripler
+Test.assert_eq(handed_off(4), 12, "a plain function reference still becomes a callable value")
+
+Test.summary()
