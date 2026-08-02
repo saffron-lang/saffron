@@ -6,16 +6,26 @@ Verified absent beforehand: no `private`/`public`/`protected`/`internal` in `lex
 
 ## 1. The modifier set
 
-**Recommendation: `private` and `public` only. No `protected`. No separate `internal`.**
+**Decision (user, 2026-08-02): parity with Kotlin. Four modifiers — `public` (default), `private`, `internal`, `protected`.**
 
-One keyword, `private`, whose meaning is uniform: *not visible outside the enclosing definition*. The enclosing definition is determined by position, not by a second keyword:
+Kotlin's model is *position-dependent*: `private` does not mean one thing, it means "the narrowest enclosing declaration", which differs between top level and class body. Adopting it wholesale:
 
-| Position | `private` means |
-|---|---|
-| class / actor / interface member | visible only within that class body |
-| top level of a module | visible only within that module; not importable |
+| Modifier | On a top-level declaration | On a class / actor / interface member |
+|---|---|---|
+| `public` (default) | visible everywhere it can be imported | visible wherever the class is |
+| `internal` | visible inside the **package** | visible to clients in the package that can see the class |
+| `protected` | **error** — Kotlin forbids it at top level | visible in the class **and its subclasses** |
+| `private` | visible inside the **file** | visible inside **that class body only** |
 
-That is the systematic formulation. It gives module-level visibility without a third keyword, because "module-private" and "class-private" are the same rule applied at two nesting levels.
+Two consequences worth stating, because they contradict earlier drafts of this document:
+
+**`private` is not "same file" everywhere.** The user's "private is same file" is precisely Kotlin's *top-level* rule. For a class member Kotlin's `private` is narrower — the class body, not the file. Both halves are adopted. This resolves former open decision #1: a same-file free function may **not** read a `private` field, because in Kotlin it cannot. The 24 stdlib underscore fields read by same-module free functions (§2) therefore become `internal`, not `private` — which is a better answer than the "permanently public" compromise the earlier draft settled for.
+
+**File-scope and package-scope are two different boundaries and both already exist in the tree.** A module is a file: `module_prefix_from_file(file_path)` (`main.sf:630`). And a package is a `pantry.toml`: the compiler already reads `[package] name`/`entry` during import resolution (`main.sf:48-49`, `main.sf:475`), so `internal` keys off a boundary the compiler genuinely knows, not an invented one. Visibility identity must therefore be **structured** — an owning file *and* an owning package per declaration — not one opaque prefix string. Recording only the prefix would force later re-derivation of package membership, which is the M1 antipattern.
+
+### `protected` is in scope and blocked; it is now the critical path
+
+Kotlin parity means `protected` ships. It is currently **unimplementable soundly**, so the blocker below is promoted from "deferred Phase 8" into a prerequisite of the `protected` slice.
 
 ### Why not `protected`
 
@@ -36,11 +46,19 @@ So for `class Duck extends Flyable, Swimmable, Walkable` (the form CLAUDE.md doc
 
 A `protected` member declared on `Swimmable` therefore could not be resolved from `Duck` at all: the checker does not know `Duck` derives from `Swimmable`. `protected` would enforce correctly on the first parent and silently allow on the second and third — a visibility check that permits access it cannot resolve, which is exactly what I2 of `docs/design/compiler-rewrite.md` forbids ("`Unknown` may exist during unification; it may not appear in HIR", and its generalization: unknown must never be spelled as something concrete).
 
-Prerequisite for `protected`, stated rather than hidden: widen `ClassDecl.parent: String` → `parents: List<String>`, propagate through `class_parents`, `class_parent_of`, `is_subtype_node`, conformance checking, and codegen's field-prepending and `__class_parent_tag` switch. That is a separate feature with its own promotion gate. `protected` waits for it.
+Prerequisite for `protected`, stated rather than hidden: widen `ClassDecl.parent: String` → `parents: List<String>`, propagate through `class_parents`, `class_parent_of`, `is_subtype_node`, conformance checking, and codegen's field-prepending and `__class_parent_tag` switch. Under Kotlin parity this is no longer optional and no longer last — it is a **hard prerequisite of the `protected` slice**, and it is the single largest piece of work in this design. It carries its own promotion gate, because it widens a declaration node the compiler reads about its own AST (§5, #96/#100).
 
-### Why not a distinct `internal`
+Sequencing consequence: `protected` is the **last** modifier to land, not because it is least wanted but because it is the only one gated on a structural change to inheritance representation. `public`/`private`/`internal` do not depend on it and ship first.
 
-Because `private` at top level already *is* module-scoped. Adding `internal` would mean a third scope (package? workspace?) that the module system does not currently model as a boundary the checker can see — and, per §4, the checker cannot yet see the *module* boundary either. One boundary at a time.
+### `internal`: package-scoped, on a boundary that already exists
+
+Kotlin's `internal` is module-scoped, where a Kotlin "module" is a compilation unit (Gradle module / Maven project). Saffron's closest true analogue is the **package** — a `pantry.toml` — not the file, since Saffron already calls a file a module.
+
+Terminology hazard worth flagging loudly, because it will confuse anyone reading both languages: in this codebase "module" already means *file* (`module_prefix_from_file`, `module_boundaries`, `module_prefixes_list`). Kotlin's `internal` is *not* file-scoped. So `internal` in Saffron = **package-scoped** = the `pantry.toml` that owns the file. The design must never use the bare word "module" to describe `internal`'s scope; say "package".
+
+The boundary is real and already parsed: `main.sf:48-49` and `main.sf:475` read `<lib_dir>/<name>/pantry.toml` to resolve a bare import to a package entry point. What does **not** yet exist is a per-declaration mapping from file → owning package; that has to be built, and it belongs next to the file-prefix plumbing in Phase 2 rather than bolted on later.
+
+Open sub-question, deliberately not decided here: a file with no `pantry.toml` above it (a bare script, or `test/*.sf`) has no package. `internal` in such a file should most likely degrade to file-scope with a warning rather than silently mean "public" — spelling unknown as a concrete answer is I2's exact prohibition — but the honest options are enumerated in §11 for the owner rather than settled unilaterally.
 
 ### Default
 
@@ -71,7 +89,9 @@ Auto-private would break, concretely:
 
 The good news, which shapes §8: for top-level `_` *functions*, I found **zero** genuine cross-module callers. The one apparent hit (`_strcmp` in `semver.sf` and `string.sf`) is two independent declarations — `string.sf:6` is an `@extern("i64 strcmp(void*, void*)")`, `semver.sf:51` is a Saffron function. Likewise `_escape_sq` appears three times as three separate local definitions, and `_pad2`, `_to_hex`, `_is_digit`, `_shell_escape`, `_parse_response`, `_retag` are all duplicated-per-module rather than shared. The only qualified `Alias._member` spellings in the tree (`Net._raw_read`, `ModuleAlias._field`) are both inside comments.
 
-So: all 156 top-level underscore functions are safe to annotate `private` later; 66 of 90 underscore fields are safe; the remaining 24 fields are not, and stay public.
+So: all 156 top-level underscore functions are safe to annotate `private` later; 66 of 90 underscore fields are safe as `private`.
+
+**Kotlin parity changes the answer for the remaining 24.** The earlier draft left them permanently public for want of a middle scope. There is now one: the 24 fields read by same-file free functions become **`internal`** (package-scoped), or `public` where they are genuinely part of the API. That is the concrete payoff of the third modifier — `http/server.Response._is_stream`, `pantry_config.Project._deps`, `sorted_set.SortedSet._items` all get a real answer instead of an exemption. Their exact classification is Phase 6 work, per-module, and needs re-measuring then: the counts above are same-**file** counts, and `internal` asks a same-**package** question, which is a strictly wider net.
 
 Coexistence rule, stated so it can be tested: **`_` has no semantic weight.** An unannotated `_foo` is public. `test/pass/private_underscore_coexist.sf` asserts this so a future "let's just make `_` mean private" change trips a test rather than a customer.
 
@@ -343,9 +363,17 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 
 ## 11. Open decisions for the repo owner
 
-Recorded here rather than resolved, because they are judgment calls about what the language should mean:
+Recorded here rather than resolved, because they are judgment calls about what the language should mean.
 
-1. **May a same-module free function read a `private` field?** This design says no — class-private is class-private — which leaves 24 stdlib underscore fields permanently public (`http/server.Response._is_stream`, `pantry_config.Project._deps`, `sorted_set.SortedSet._items`). Saying yes means inventing module-private fields, a third scope.
-2. **Is Phase 2 (module plumbing) part of this work or its own project?** It is a genuine prerequisite for anything module-level, it fixes a real latent stdlib misattribution on its own, and it is the largest non-mechanical chunk here. Splitting it out ships class-member visibility much sooner.
+**Settled by the owner on 2026-08-02:**
+
+- ~~May a same-file free function read a `private` field?~~ **No** — Kotlin's rule. The 24 affected stdlib fields become `internal` (§2).
+- ~~Is Phase 2 in scope?~~ **Yes.** The whole plan is in scope; Phase 2 is a confirmed prerequisite, not a candidate for splitting out.
+- ~~Which modifiers?~~ **Kotlin parity**: `public`/`private`/`internal`/`protected` (§1).
+
+**Still open:**
+
+1. **`internal` in a file with no owning `pantry.toml`** — bare scripts and most of `test/`. Options: (a) degrade to file-scope with a warning; (b) hard error, "`internal` requires a package"; (c) treat the file as its own singleton package. (a) is the I2-consistent default and is what this document assumes, but (b) is defensible and stricter, and (c) silently makes `internal` mean `private` — which is spelling unknown as something concrete, so it is the weakest of the three.
+2. **`protected` and multiple inheritance.** Once `ClassDecl.parents` is a list, `class Duck extends Flyable, Swimmable` inherits `protected` members from several parents at once. Kotlin has no multiple inheritance, so parity gives no answer here — a name declared `protected` in two parents is a genuine ambiguity Saffron has to decide (error at the collision? first-parent wins? require qualification?).
 3. **L9's error/warn split** — error only when the initializer is syntactically a private constructor call, warn otherwise. Chosen to avoid #56's over-erroring; uniform error is the alternative, at the cost of some false rejections.
 4. **Is `test/fail_support/` acceptable** as a new directory, versus changing `run_tests.sh` to skip designated helpers in the fail glob?
