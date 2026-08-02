@@ -50481,7 +50481,7 @@ ifexpr.else4603:
   %t42 = load i64, i64* %self
   %t43 = load i64, i64* %tb
   %t44 = call i64 @checker_NullChecker__stmts_diverge(i64 %t42, i64 %t43)
-  %t45 = add i64 0, 105553548639168
+  %t45 = add i64 0, 105553523801184
   %t46 = load i64, i64* %self
   %t47 = load i64, i64* %eb
   %t48 = call i64 @checker_NullChecker__stmts_diverge(i64 %t46, i64 %t47)
