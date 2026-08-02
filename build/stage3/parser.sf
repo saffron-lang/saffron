@@ -75,6 +75,7 @@ class Parser {
         var kind: Lexer.TokenKind = this.current_kind()
         return match (kind) {
             TkIdent(name) => name
+            _ => ""
         }
     }
 
@@ -662,7 +663,7 @@ class Parser {
                             _ => false
                         }
                         if (kis_expr) {
-                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
@@ -693,7 +694,7 @@ class Parser {
                             _ => false
                         }
                         if (kis_expr) {
-                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
@@ -776,6 +777,15 @@ class Parser {
                     this.consume(")")
                     expr
                 }
+            }
+            // The caller has already checked that the current token can start a
+            // primary, so this arm is unreachable in practice. It still has to
+            // exist: a missing arm yields an indeterminate value rather than a
+            // diagnostic (BUGS #76), so "unreachable" silently became "returns
+            // garbage" for any token the check above let through by mistake.
+            _ => {
+                this.parse_error("expected a literal, name or '(' here")
+                AST.Expr.NilLit
             }
         }
     }
@@ -942,6 +952,19 @@ class Parser {
             this.consume(")")
             return AST.Pattern.VariantPattern(name, bindings)
         }
+        // A bare lowercase name with no payload list is a catch-all that binds
+        // the subject, not a variant reference — variants are capitalised. The
+        // AST has carried NamedWildcard for this since the start and the parser
+        // never produced it, so `x => ...` came out as VariantPattern("x", []).
+        // Codegen already treats an unknown variant name as a catch-all, which
+        // is why the compiler ran; the checker counted "x" as a matched variant
+        // and then reported every real variant as missing.
+        if (name.length() > 0) {
+            var first_ch: String = name.char_at(0)
+            if (first_ch == first_ch.to_lower() and first_ch != first_ch.to_upper()) {
+                return AST.Pattern.NamedWildcard(name)
+            }
+        }
         return AST.Pattern.VariantPattern(name, [])
     }
 
@@ -1093,7 +1116,7 @@ class Parser {
     fun is_ident_named(name: String): Bool {
         if (!this.match_kind_check("ident")) return false
         var kind: Lexer.TokenKind = this.current_kind()
-        var ident_name: String = match (kind) { TkIdent(n) => n }
+        var ident_name: String = match (kind) { TkIdent(n) => n    _ => "" }
         return ident_name == name
     }
 
@@ -1235,6 +1258,11 @@ class Parser {
             TkLtEq => "<="
             TkGt => ">"
             TkGtEq => ">="
+            // Callers only reach this after checking the token is an operator,
+            // so "" is unreachable rather than a real spelling. Naming it keeps
+            // the match exhaustive; without the arm the result was an
+            // indeterminate string, not an error (BUGS #76).
+            _ => ""
         }
     }
 
@@ -1246,7 +1274,8 @@ class Parser {
             var kind: Lexer.TokenKind = this.current_kind()
             var text: String = match (kind) {
                 TkDocComment(t) => t
-            }
+                _ => ""
+}
             this.advance()
             parts.push(text)
         }
@@ -1260,7 +1289,8 @@ class Parser {
             var kind: Lexer.TokenKind = this.current_kind()
             var text: String = match (kind) {
                 TkModuleDoc(t) => t
-            }
+                _ => ""
+}
             this.advance()
             parts.push(text)
         }
@@ -1374,7 +1404,7 @@ class Parser {
                     this.advance()
                     if (this.match_kind_check("string")) {
                         var darg_kind: Lexer.TokenKind = this.current_kind()
-                        var darg: String = match (darg_kind) { TkString(s) => s }
+                        var darg: String = match (darg_kind) { TkString(s) => s    _ => "" }
                         this.advance()
                         annotation = annotation + ":" + darg
                     }
@@ -1995,7 +2025,7 @@ class Parser {
                     this.advance()
                     if (this.match_kind_check("string")) {
                         var mdarg_kind: Lexer.TokenKind = this.current_kind()
-                        var mdarg: String = match (mdarg_kind) { TkString(s) => s }
+                        var mdarg: String = match (mdarg_kind) { TkString(s) => s    _ => "" }
                         this.advance()
                         method_annotation = method_annotation + ":" + mdarg
                     }
@@ -2021,11 +2051,11 @@ class Parser {
         // Find existing init method and prepend defaults to its body
         var i: Int = 0
         while (i < methods.length()) {
-            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n }
+            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n    _ => "" }
             if (mname == "init") {
-                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b }
-                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
-                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r }
+                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b    _ => [] }
+                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d) => p    _ => [] }
+                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r    _ => "" }
                 // Build new body: defaults + original body
                 var new_body: List<AST.Stmt> = []
                 var di: Int = 0
@@ -2060,13 +2090,13 @@ class Parser {
             this.consume("}")
             this.advance()
             var kind: Lexer.TokenKind = this.current_kind()
-            var path: String = match (kind) { TkString(s) => s }
+            var path: String = match (kind) { TkString(s) => s    _ => "" }
             this.advance()
             // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
             return AST.Stmt.ExprStmt(AST.Expr.NilLit)
         }
         var kind: Lexer.TokenKind = this.current_kind()
-        var path: String = match (kind) { TkString(s) => s }
+        var path: String = match (kind) { TkString(s) => s    _ => "" }
         this.advance()
         if (this.match_kind_check("as") or this.is_ident_named("as")) {
             this.advance()
@@ -2386,7 +2416,7 @@ class Parser {
         var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
         var kind_str: String = this.kind_name(next_kind)
         if (kind_str != "ident") { return false }
-        var name: String = match (next_kind) { TkIdent(n) => n }
+        var name: String = match (next_kind) { TkIdent(n) => n    _ => "" }
         if (name.length() == 0) { return false }
         // Uppercase = component
         var first: String = name.char_at(0)
@@ -2516,6 +2546,7 @@ class Parser {
             this.advance()
             return match (kind) {
                 TkString(s) => AST.Expr.StringLit(s)
+                _ => AST.Expr.NilLit
             }
         }
         // {expr} — brace-delimited expression value (map literals, lambdas, etc.)
@@ -2560,7 +2591,7 @@ class Parser {
                         var klast: AST.Stmt = lbody[lbody.length() - 1]
                         var kis_expr: Bool = match (klast) { ExprStmt(e) => true   _ => false }
                         if (kis_expr) {
-                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
@@ -2588,7 +2619,7 @@ class Parser {
                         var klast: AST.Stmt = lbody[lbody.length() - 1]
                         var kis_expr: Bool = match (klast) { ExprStmt(e) => true   _ => false }
                         if (kis_expr) {
-                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
@@ -2683,7 +2714,7 @@ class Parser {
                 if (interp_stmts.length() == 1) {
                     var interp_is_expr: Bool = match (interp_stmts[0]) { ExprStmt(e) => true   _ => false }
                     if (interp_is_expr) {
-                        var interp_expr: AST.Expr = match (interp_stmts[0]) { ExprStmt(e) => e }
+                        var interp_expr: AST.Expr = match (interp_stmts[0]) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
                         var interp_skip: Bool = match (interp_expr) { Call(c, a) => true   MethodCall(o, m, a) => true   Assign(n, v) => true   _ => false }
                         if (!interp_skip) {
                             stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [interp_expr])))
@@ -2705,7 +2736,7 @@ class Parser {
             else if (this.match_kind_check("string")) {
                 var kind: Lexer.TokenKind = this.current_kind()
                 this.advance()
-                var text: String = match (kind) { TkString(s) => s }
+                var text: String = match (kind) { TkString(s) => s    _ => "" }
                 stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(text)])))
             }
             else {
@@ -2781,9 +2812,10 @@ class Parser {
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
+            TypeAlias(ta_n, ta_t) => "other"
         }
         if (kind == "expr") {
-            return match (stmt) { ExprStmt(e) => e }
+            return match (stmt) { ExprStmt(e) => e   _ => AST.Expr.NilLit }
         }
         if (kind == "if") {
             return this.if_stmt_to_expr(stmt)
@@ -2792,9 +2824,9 @@ class Parser {
     }
 
     fun if_stmt_to_expr(stmt: AST.Stmt): AST.Expr {
-        var cond: AST.Expr = match (stmt) { If(c, t, e) => c }
-        var then_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => t }
-        var else_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => e }
+        var cond: AST.Expr = match (stmt) { If(c, t, e) => c    _ => AST.Expr.NilLit }
+        var then_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => t    _ => [] }
+        var else_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => e    _ => [] }
         // Only convert if there is an else branch (otherwise not value-producing)
         if (else_branch.length() == 0) {
             return AST.Expr.NilLit
@@ -2831,7 +2863,7 @@ class Parser {
         if (kind == "expr") { return true }
         if (kind == "if") {
             // Only if it has an else branch
-            var else_br: List<AST.Stmt> = match (stmt) { If(c, t, e) => e }
+            var else_br: List<AST.Stmt> = match (stmt) { If(c, t, e) => e    _ => [] }
             return else_br.length() > 0
         }
         return false

@@ -650,6 +650,7 @@
             TryCatch(t, n, c, f) => false
             Throw(v) => false
             LetPattern(p, v) => false
+            TypeAlias(ta_n, ta_t) => false
         }
     }
 
@@ -895,6 +896,7 @@
                 TryCatch(t, n, c, f) => {}
                 Throw(v) => {}
                 LetPattern(p, v) => {}
+                TypeAlias(ta_n, ta_t) => {}
             }
             pri = pri + 1
         }

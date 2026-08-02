@@ -268,6 +268,13 @@
             var arm_variant: String = match (pattern) { VariantPattern(v, b) => v
                 _ => ""
             }
+            // A NamedWildcard binds the subject itself, not a payload field, so
+            // it is stored directly rather than GEP'd out of the enum's payload.
+            var nw_name: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+            if (nw_name.length() > 0) {
+                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(nw_name))
+                this.typed_vars.set(nw_name, this.str_to_type(enum_name))
+            }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b
                 _ => []
             }

@@ -286,6 +286,7 @@
             }
             LetPattern(pattern, value) => {
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -412,6 +413,11 @@
     }
 
     fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
+        // A NamedWildcard is unconditionally a catch-all. It already answered
+        // true by accident — its name came out "" here, which is never a
+        // registered tag — but saying so directly is what the code means.
+        var is_named_wc: Bool = match (pattern) { NamedWildcard(n) => true   _ => false }
+        if (is_named_wc) return true
         var name: String = match (pattern) { VariantPattern(v, b) => v
             _ => ""
         }
@@ -419,20 +425,26 @@
     }
 
     fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
+        // Arm is MatchArm's only variant, so the default is unreachable — but it
+        // returned a String from a function declared to return AST.Pattern, which
+        // nothing rejected until the checker began walking method bodies.
         return match (arm) { Arm(p, b) => p
-            _ => ""
+            _ => AST.Pattern.WildcardPattern
         }
     }
 
     fun get_arm_body(arm: AST.MatchArm): AST.Expr {
         return match (arm) { Arm(p, b) => b
-            _ => ""
+            _ => AST.Expr.NilLit
         }
     }
 
     fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
         return match (pattern) { VariantPattern(v, b) => b
-            _ => ""
+            // A NamedWildcard binds one name, and it is the pattern's binding —
+            // omitting it here is why `x => ...` had no `x` in scope.
+            NamedWildcard(n) => [n]
+            _ => []
         }
     }
 
@@ -615,6 +627,34 @@
                 this.collect_calls_from_stmts(eb, calls)
                 this.collect_calls_from_expr(ev, calls)
             }
+            // These five used to be missing, so a call sited inside a match arm,
+            // a try/catch value, an enum payload, a lambda body or a yield was
+            // invisible to the caller that decides whether a function is a
+            // transitive coroutine (output_body.sf gen_function). expr_has_yield
+            // above already walks all of them; keep the two in step.
+            Match(subject, match_arms) => {
+                this.collect_calls_from_expr(subject, calls)
+                var mai: Float = 0
+                while (mai < match_arms.length()) {
+                    var arm: AST.MatchArm = match_arms[mai]
+                    var arm_body: AST.Expr = match (arm) { Arm(p, b) => b }
+                    this.collect_calls_from_expr(arm_body, calls)
+                    mai = mai + 1
+                }
+            }
+            TryExpr(tb, tv, cn, cb, cv) => {
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_expr(tv, calls)
+                this.collect_calls_from_stmts(cb, calls)
+                this.collect_calls_from_expr(cv, calls)
+            }
+            EnumConstruct(en, v, a) => { this.collect_calls_from_exprs(a, calls) }
+            Lambda(p, r, b) => { this.collect_calls_from_stmts(b, calls) }
+            Yield(v) => { this.collect_calls_from_expr(v, calls) }
+            TupleLit(e) => { this.collect_calls_from_exprs(e, calls) }
+            IsCheck(v, t) => { this.collect_calls_from_expr(v, calls) }
+            // Leaves: no sub-expression can hold a call.
+            _ => {}
         }
     }
 
@@ -655,6 +695,14 @@
                 this.collect_calls_from_stmts(f, calls)
             }
             Throw(v) => { this.collect_calls_from_expr(v, calls) }
+            // `let [a, b] = f()` holds a call in its value, and used to be
+            // missed here for the same reason as the expression arms above.
+            LetPattern(p, v) => { this.collect_calls_from_expr(v, calls) }
+            // Break, Continue, TypeAlias hold no expression. A nested FunDecl /
+            // EnumDecl / ClassDecl body is a *different* function's code, so its
+            // calls deliberately do not count as the enclosing function's — see
+            // mark_coroutines, which walks declarations itself.
+            _ => {}
         }
     }
 
@@ -697,6 +745,7 @@
                         cls_name = cn
                         cls_methods = cm
                     }
+                    _ => {}
                 }
                 var cmi: Float = 0
                 while (cmi < cls_methods.length()) {
