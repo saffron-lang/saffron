@@ -1,0 +1,200 @@
+// oracle_stringify.sf — value → string conversion for every payload shape.
+//
+// This is the regression corpus for BUGS #102 and #77, and it is written for the
+// differential oracle rather than for @test: every line PRINTS, so a wrong answer
+// is visible in stdout and gradeable by tools/differential.sh against a second
+// backend. An assertion-based version of this file would have caught #102 too,
+// but only if someone had thought to assert on the exact enum whose payload
+// shape was broken — and #102's whole character was that one-field enums were
+// wrong for every payload type except Int, which is the type anyone writing a
+// test by hand reaches for first.
+//
+// #102: an enum's auto-generated to_string() decoded a one-field enum's heap
+//   pointer as a `tag << 56` immediate. Every value of such an enum stringified
+//   as its FIRST variant with the low 56 bits of the pointer as the payload. So
+//   the tests below deliberately vary: number of variants, position of the
+//   variant used (not always the first), field count (0, 1, 2, 3), and payload
+//   type (Int, Float, String, Bool, List, nested enum).
+//
+// #77: __bool_to_string on wasm32 untagged an already-untagged value, so every
+//   `true` printed "false" while branching on the same value stayed correct.
+//   Half the cases looked right by accident because `false` rendered correctly.
+//   So every bool below is printed in BOTH polarities, and printed both directly
+//   and via interpolation, because those are two different code paths.
+
+// --- bools, both polarities, both paths ---
+
+IO.println(true)
+IO.println(false)
+IO.println("interp true=${true} false=${false}")
+var bt: Bool = true
+var bf: Bool = false
+IO.println(bt)
+IO.println(bf)
+IO.println("var interp bt=${bt} bf=${bf}")
+IO.println((1 < 2))
+IO.println((2 < 1))
+IO.println(true.to_string())
+IO.println(false.to_string())
+
+// A bool that is correct when branched on but wrong when printed is exactly #77.
+// Assert both readings of the same value so a divergence between them is visible
+// in a single test rather than requiring two.
+if (bt) { IO.println("branch-on-bt: taken") } else { IO.println("branch-on-bt: NOT taken") }
+if (bf) { IO.println("branch-on-bf: taken") } else { IO.println("branch-on-bf: NOT taken") }
+
+// --- numbers ---
+
+IO.println(0)
+IO.println(1)
+IO.println(-1)
+IO.println(42)
+IO.println(-42)
+IO.println(1000000)
+IO.println(0.0)
+IO.println(0.5)
+IO.println(-0.5)
+IO.println(3.25)
+IO.println("interp int=${7} float=${2.5} neg=${-3}")
+
+// --- strings ---
+
+IO.println("")
+IO.println("plain")
+IO.println("with spaces and, punctuation!")
+var s: String = "bound"
+IO.println(s)
+IO.println("interp str=${s}")
+
+// --- nil ---
+//
+// `IO.println(nil)` only. `"${nil}"` is rejected by the checker ("cannot call
+// .to_string() on nullable type Nil"), which is the correct behaviour and not
+// something this file should work around.
+IO.println(nil)
+
+// --- lists, varying element type ---
+
+IO.println([])
+IO.println([1, 2, 3])
+IO.println([1.5, 2.5])
+IO.println(["a", "b"])
+IO.println([true, false])
+IO.println([[1, 2], [3]])
+
+// --- enums: the #102 corpus ---
+//
+// Every enum value below is stringified via INTERPOLATION, i.e. `"${e}"`, never
+// via a bare `IO.println(e)`. That is deliberate and it is not a stylistic
+// choice: `IO.println(enum_value)` is separately broken today — it passes the
+// `tag << 56` immediate straight to __io_println with no to_string() call, so the
+// runtime formats the bit pattern as a subnormal double ("7.29112e-304").
+// test/oracle_enum_println.sf is the regression case for that, found by this
+// file. Using the bare form here too would make this file fail for that reason
+// instead of testing what it is for, which is the CONTENT of the generated
+// to_string() — the thing #102 got wrong.
+//
+// Zero fields. The degenerate case that worked, kept as the control.
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+IO.println("${Color.Red}")
+IO.println("${Color.Green}")
+IO.println("${Color.Blue}")
+
+// Exactly ONE field — the #102 case. One variant per payload type, and the
+// variant printed is NOT always the first, because #102 rendered everything as
+// the first variant and a first-variant-only test would have agreed with the bug.
+enum OneInt { OI(v: Int) }
+IO.println("${OneInt.OI(0)}")
+IO.println("${OneInt.OI(7)}")
+IO.println("${OneInt.OI(-7)}")
+
+enum OneFloat { OF(v: Float) }
+IO.println("${OneFloat.OF(1.5)}")
+IO.println("${OneFloat.OF(0.0)}")
+
+enum OneStr { OS(v: String) }
+IO.println("${OneStr.OS("payload")}")
+IO.println("${OneStr.OS("")}")
+
+enum OneBool { OB(v: Bool) }
+IO.println("${OneBool.OB(true)}")
+IO.println("${OneBool.OB(false)}")
+
+enum OneList { OL(v: List<Int>) }
+IO.println("${OneList.OL([1, 2])}")
+
+// Multiple one-field variants, so "which variant" is a real question and not
+// answerable by always saying "the first".
+enum Shape {
+    Circle(r: Float),
+    Square(side: Int),
+    Named(name: String)
+}
+IO.println("${Shape.Circle(2.5)}")
+IO.println("${Shape.Square(4)}")
+IO.println("${Shape.Named("box")}")
+
+// Two and three fields, mixed payload types.
+enum Pair { P(a: Int, b: Int) }
+IO.println("${Pair.P(1, 2)}")
+
+enum Mixed { M(n: Int, s: String, f: Float) }
+IO.println("${Mixed.M(1, "two", 3.5)}")
+
+enum Tagged {
+    Empty,
+    One(a: Int),
+    Two(a: Int, b: String)
+}
+IO.println("${Tagged.Empty}")
+IO.println("${Tagged.One(9)}")
+IO.println("${Tagged.Two(9, "nine")}")
+
+// Nested: an enum whose payload is another enum. If the inner to_string is wrong
+// the outer inherits it, so this catches a partial fix that only handled depth 1.
+enum Wrapper { W(inner: Color) }
+IO.println("${Wrapper.W(Color.Blue)}")
+
+// Enum bound to a variable, then stringified — the value has round-tripped
+// through a global slot rather than being consumed straight from the constructor.
+var sh = Shape.Named("stored")
+IO.println("${sh}")
+var ob = OneBool.OB(true)
+IO.println("${ob}")
+
+// Explicit .to_string(), the other correct path, on the shapes #102 broke.
+IO.println(OneStr.OS("explicit").to_string())
+IO.println(Shape.Square(11).to_string())
+IO.println(Color.Blue.to_string())
+
+// --- match on the same values, to pin down variant identity ---
+//
+// #102 made to_string() report the wrong variant while match still dispatched
+// correctly. Printing the match result next to the direct print puts the two
+// readings of one value side by side, so a disagreement is local.
+// The bindings below are named `mr`/`ms`/`mn` rather than the obvious `r`/`s`/`n`
+// to avoid a SEPARATE compiler bug that this file tripped over while being
+// written: a match-arm binding whose name collides with a module-global variable
+// emits `store i64 %tN, i64* %s` against a global that lives at `@__g_s`, which
+// is invalid IR ("use of undefined value '%s'"). Inside a function the same
+// collision is worse — it type checks, compiles, and silently overwrites the
+// outer variable's slot with the payload. See test/oracle_match_shadow.sf, which
+// is the dedicated regression case; this file works around it so that it can go
+// on testing stringification, which is what it is for.
+var m1 = match (Shape.Square(4)) {
+    Circle(mr) => "matched Circle ${mr}"
+    Square(ms) => "matched Square ${ms}"
+    Named(mn) => "matched Named ${mn}"
+}
+IO.println(m1)
+
+var m2 = match (OneBool.OB(false)) {
+    OB(mv) => "matched OB ${mv}"
+}
+IO.println(m2)
+
+IO.println("oracle_stringify done")

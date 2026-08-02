@@ -139,6 +139,34 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
     return _find_in_lib_paths(import_path, stdlib_dir)
 }
 
+// The one place an import is turned into a path that must exist.
+//
+// `resolve_import_path` cannot fail: `_find_in_lib_paths` ends in an
+// unconditional `stdlib_dir + "/" + name + ".sf"`, so an unsupported or
+// misspelled import spelling comes back as a plausible path to a file that is
+// not there. Nothing downstream stats it — `collect_modules` reads it as an
+// empty module, registers no declarations, and every use of the alias then
+// fails somewhere that never mentions the import (BUGS #78: three different
+// symptoms, one of which reports a match pattern binding the user never
+// declared).
+//
+// That guard was applied twice by hand, to `collect_modules` and to the entry
+// module's copy of the loop, and a third copy — the one that walks a package
+// dependency's `src/prelude.sf` imports — was left unguarded, so a prelude
+// could still resolve an import to nothing and fail opaquely. Three
+// near-identical copies of one loop is the M5 mechanism in
+// docs/design/compiler-rewrite.md: duplicated logic that drifts, where a fix
+// lands in some copies and not others. Resolution now happens here, once, so
+// there is no copy left that can skip the check.
+fun resolve_import_or_die(base_path: String, import_path: String, stdlib_dir: String): String {
+    var full_path: String = resolve_import_path(base_path, import_path, stdlib_dir)
+    if (!OS.file_exists(full_path)) {
+        IO.println("Error: cannot resolve import \"" + import_path + "\" in " + base_path + " (tried " + full_path + ")")
+        c_exit(1)
+    }
+    return full_path
+}
+
 fun get_stmt_doc(stmt: AST.Stmt): String {
     return match (stmt) {
         VarDecl(n, t, init, d) => d
@@ -596,17 +624,7 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
-            var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
-            // _find_in_lib_paths ends in an unconditional
-            // `stdlib_dir + "/" + name + ".sf"`, so an unresolvable import
-            // yields a path that does not exist. Nothing downstream noticed:
-            // collect_modules read it as an empty file, registered no
-            // declarations, and every use of the alias failed later in a way
-            // that never mentioned the import (BUGS #78). Say so here instead.
-            if (!OS.file_exists(full_path)) {
-                IO.println("Error: cannot resolve import \"" + imp_path + "\" in " + file_path + " (tried " + full_path + ")")
-                c_exit(1)
-            }
+            var full_path: String = resolve_import_or_die(file_path, imp_path, stdlib_dir)
             // Ensure path_to_prefix is populated before recursing
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
@@ -921,7 +939,7 @@ fun main(): Int {
                         var dp_alias: String = dp_keys[dpi]
                         var dp_path: String = dp_aliases.get(dp_alias)
                         if (!is_builtin_module(dp_path)) {
-                            var dp_full: String = resolve_import_path(pkg_prelude, dp_path, stdlib_dir)
+                            var dp_full: String = resolve_import_or_die(pkg_prelude, dp_path, stdlib_dir)
                             if (!path_to_prefix.has(dp_full)) {
                                 path_to_prefix.set(dp_full, path_based_prefix(dp_path, dp_full, stdlib_dir))
                             }
@@ -937,7 +955,7 @@ fun main(): Int {
                     while (dpj < dp_imports.length()) {
                         var dp_imp: String = dp_imports[dpj]
                         if (!is_builtin_module(dp_imp)) {
-                            var dp_imp_full: String = resolve_import_path(pkg_prelude, dp_imp, stdlib_dir)
+                            var dp_imp_full: String = resolve_import_or_die(pkg_prelude, dp_imp, stdlib_dir)
                             if (!path_to_prefix.has(dp_imp_full)) {
                                 path_to_prefix.set(dp_imp_full, path_based_prefix(dp_imp, dp_imp_full, stdlib_dir))
                             }
@@ -958,13 +976,7 @@ fun main(): Int {
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
-            var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
-            // Same unresolvable-import guard as in collect_modules; this is the
-            // entry module's copy of that loop (BUGS #78).
-            if (!OS.file_exists(full_path)) {
-                IO.println("Error: cannot resolve import \"" + imp_path + "\" in " + input_path + " (tried " + full_path + ")")
-                c_exit(1)
-            }
+            var full_path: String = resolve_import_or_die(input_path, imp_path, stdlib_dir)
             // Ensure path_to_prefix is populated before recursing
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))

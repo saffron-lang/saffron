@@ -1,5 +1,40 @@
 # Codegen Split Plan
 
+> **Status, 2026-08-02.** This document is stale in its premise and still
+> correct in its shape. It was written when the split was blocked on "Saffron's
+> self-hosted compiler does not yet support multi-file classes" and therefore
+> proposed working around that with free functions taking a `CodegenCtx`. That
+> workaround is no longer needed: `extend fun Class.method()` exists, parses
+> under the current gen2, and works across module boundaries — including a core
+> method calling an extension defined in another file, and including
+> `this.field` writes. So the "single class, free functions on a context"
+> contortion in the *Communication Pattern* section below, and the conclusion
+> that mutually recursive code "must be in the same file", can both be dropped:
+> `extend fun` splits the class directly, one file per unit, no orchestrator
+> wrappers.
+>
+> **One bug stands in the way, and it is precisely the mutual recursion this
+> document worried about — for a different reason than it guessed.** Two
+> extension methods in *different* modules that call each other fail to link:
+> the callee is emitted unprefixed (`@Ctx__bx`) while the definition is
+> prefixed (`@core_Ctx__bx`). The cause is that `gen_extend_method`
+> (`codegen/methods_body.sf:600`) registers a method's prefixed symbol only as
+> it lowers that method, and the call-site resolver
+> (`resolve_method_symbol`, `methods_body.sf:759`) falls back to returning the
+> *unprefixed* name when it finds nothing — a guess instead of a "not found".
+> A single file is unaffected because its prefix is `""`, which makes the guess
+> accidentally correct; import order papers over one-directional dependencies
+> and cannot help a cycle. See the stage 10 notes in `compiler-rewrite.md` for
+> the measurement and the fix shape (register every `@extend:` symbol in the
+> existing all-modules pre-pass at `codegen.sf:737`, then make the fallback a
+> diagnostic).
+>
+> The line counts and the file-boundary proposal below also predate the current
+> tree: the split already exists physically as nine `codegen/*_body.sf` files
+> totalling ~222 methods, assembled by `sed`. Stage 10 is about making those
+> nine files *real modules* rather than about deciding where the boundaries go
+> — the boundaries are already drawn and in use.
+
 ## Current State
 
 `src/compiler/codegen.sf` is ~2627 lines containing:

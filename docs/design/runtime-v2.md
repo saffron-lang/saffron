@@ -188,7 +188,14 @@ class List<T> {
 
 ### Phase C: NaN-Boxing (via LLVM lib)
 
-1. Complete base_nanbox.ll (copy missing symbols from base.ll)
+1. Complete base_nanbox.ll — **do not copy symbols from base.ll.** The value
+   layer (the 19 `__val_*` helpers plus `__rt_tag_ptr`) is generated into all
+   four bases from `src/runtime/values.spec` by
+   `tools/gen_runtime_values.py`; add the helper there with an `@identity` and
+   an `@nanbox` body and every base gets its correct version at once. Copying
+   is what produced BUGS #77, #82/#83 and #39. Any *other* missing symbol still
+   has to be added by hand, and should be considered for the spec if it turns
+   out to have per-discipline bodies.
 2. LLVM lib codegen uses NanBox wrapper: `nb.tag_int()`, `nb.tag_ptr()`
 3. All literals tagged at creation, arithmetic untags/retags
 4. Compile runtime without --identity-mode
@@ -212,7 +219,10 @@ class List<T> {
 1. Remove `coerce_to_string` from codegen
 2. Remove string-encoded data structures (class_fields string, etc.)
 3. Remove `identity_mode` (everything uses NaN-boxing)
-4. Remove `base.ll` (only base_nanbox.ll linked)
+4. Remove `base.ll` (only base_nanbox.ll linked). This also collapses the
+   `@identity` half of `values.spec`; if wasm64 is retired at the same time,
+   every remaining helper becomes `@both` and the spec's discipline axis
+   disappears entirely.
 5. Single dispatch path in gen_method_call (no special cases)
 
 ---

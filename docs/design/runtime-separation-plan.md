@@ -4,6 +4,17 @@
 
 Extract all inline runtime functions from `src/compiler/codegen.sf` into a standalone `src/runtime.ll` file. The codegen will emit only `declare` statements for runtime functions, and user programs will link against the precompiled runtime.
 
+> **Status note (2026-08-02).** This extraction happened, but into *four* bases
+> rather than one: `base.ll` (bootstrap, identity discipline), `base_nanbox.ll`
+> (native, nanbox), `wasm_base.ll` (wasm64, identity), `wasm_base_32.ll`
+> (wasm32, nanbox). The four were maintained by copy-paste and drifted; see
+> BUGS #39, #77, #82/#83. The value layer is now generated into all four from
+> `src/runtime/values.spec` via `tools/gen_runtime_values.py`, so a helper
+> defined once cannot disagree with itself across targets. The rest of each
+> base is still hand-written, and the differences there are largely genuine
+> (wasm libc shims, per-target GC header layouts). Add a shared value/tag
+> helper to the spec, never to a base.
+
 ---
 
 ## 1. Complete Inventory of Runtime Functions

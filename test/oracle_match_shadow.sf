@@ -1,0 +1,109 @@
+// oracle_match_shadow.sf — a match-arm binding must not clobber an outer variable
+// of the same name.
+//
+// Found by writing test/oracle_stringify.sf: a `Square(s)` arm next to an outer
+// `var s: String` produced invalid IR. It has two faces, one loud and one silent,
+// and the silent one is the reason this file exists.
+//
+// AT MODULE SCOPE — invalid IR, caught by the verifier:
+//
+//     var s: String = "bound"
+//     enum E { Sq(side: Int) }
+//     var m = match (E.Sq(4)) { Sq(s) => "got ${s}" }
+//
+//   The global is emitted as `@__g_s`, but the arm's binding store is emitted as
+//   `store i64 %tN, i64* %s` — a local that was never allocated. `opt -verify`
+//   rejects it: "use of undefined value '%s'". Loud, and therefore fine.
+//
+// INSIDE A FUNCTION — silent memory corruption, NO diagnostic:
+//
+//     fun f() {
+//         var s: String = "bound"
+//         var m = match (E.Sq(4)) { Sq(s) => "got ${s}" }
+//         IO.println(s)            // prints 4
+//         IO.println(s.length())   // prints 0
+//     }
+//
+//   Here `%s = alloca i64` DOES exist, so the arm's store lands in the outer
+//   variable's slot. `s` is statically String and now holds a tagged Int. The
+//   program compiles, runs, exits 0, and prints the wrong answer. `s.length()`
+//   reads 0 because the Int is being dereferenced as a string pointer.
+//
+// This is the exact bug shape the differential oracle was built to catch, and it
+// obstructed building the oracle — the match arms in oracle_stringify.sf had to
+// be renamed to work around it. It is a scoping bug, not a codegen-arithmetic
+// bug: the arm binding is registered in the enclosing scope instead of an arm
+// scope, so it aliases whatever is already there.
+//
+// Correct behaviour: the arm binding shadows the outer `s` for the arm's extent
+// only, and the outer `s` still reads "bound" afterwards. This file asserts that.
+// It is expected to FAIL until the scoping is fixed; it is checked in as the
+// regression case, with a .expected file recording the CORRECT output rather than
+// today's.
+
+import "@test" as Test
+
+enum Payload {
+    Num(side: Int),
+    Text(body: String)
+}
+
+// --- the silent case: function scope ---
+
+fun shadow_in_function(): String {
+    var s: String = "bound"
+    var m = match (Payload.Num(4)) {
+        Num(s) => "arm saw ${s}"
+        Text(s) => "arm saw ${s}"
+    }
+    // `s` must be untouched by the arm binding.
+    return "${m} | outer=${s}"
+}
+
+Test.assert_eq(shadow_in_function(), "arm saw 4 | outer=bound",
+               "match arm binding must not overwrite an outer variable")
+
+// The corruption is observable a second way, and this assertion is the one that
+// makes the failure unambiguous: if `s` really is still a String, its length is
+// 5. If the arm clobbered it with a tagged Int, length() reads 0.
+fun shadow_length(): Int {
+    var s: String = "bound"
+    var ignored = match (Payload.Num(4)) {
+        Num(s) => "${s}"
+        Text(s) => "${s}"
+    }
+    return s.length()
+}
+
+Test.assert_eq(shadow_length(), 5,
+               "an outer String survives a same-named match binding intact")
+
+// --- shadowing must still WORK, not merely be harmless ---
+//
+// A fix that renamed the binding to something unique would satisfy the two
+// assertions above while breaking the arm's own read. Pin that down too.
+fun arm_sees_payload(): String {
+    var v: String = "outer"
+    return match (Payload.Text("inner")) {
+        Num(v) => "num ${v}"
+        Text(v) => "text ${v}"
+    }
+}
+
+Test.assert_eq(arm_sees_payload(), "text inner",
+               "the arm binding, not the outer variable, is visible in the arm")
+
+// --- nested: two matches in sequence reusing the same binding name ---
+//
+// Each arm's binding must be scoped to its own arm. If they share a slot the
+// second match reads the first's payload.
+fun sequential_arms(): String {
+    var first = match (Payload.Num(1)) { Num(x) => "${x}" Text(x) => "${x}" }
+    var second = match (Payload.Num(2)) { Num(x) => "${x}" Text(x) => "${x}" }
+    return "${first},${second}"
+}
+
+Test.assert_eq(sequential_arms(), "1,2",
+               "sequential match arms do not share a binding slot")
+
+Test.summary()

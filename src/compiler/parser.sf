@@ -49,7 +49,7 @@ class Parser {
 
     fun current_kind(): Lexer.TokenKind {
         var tok: Lexer.Token = this.current()
-        return match (tok) { Token(kind, line, col) => kind }
+        return match (tok) { Token(kind, line, col, offset, len) => kind }
     }
 
     fun advance(): Lexer.Token {
@@ -118,29 +118,104 @@ class Parser {
 
     fun current_line(): String {
         var tok: Lexer.Token = this.current()
-        var line: Float = match (tok) { Token(kind, line, col) => line }
+        var line: Float = match (tok) { Token(kind, line, col, offset, len) => line }
         return line.floor().to_string()
     }
 
     fun current_line_num(): Float {
         var tok: Lexer.Token = this.current()
-        return match (tok) { Token(kind, line, col) => line }
+        return match (tok) { Token(kind, line, col, offset, len) => line }
     }
 
     fun prev_line_num(): Float {
         var tok: Lexer.Token = this.tokens[this.pos - 1]
-        return match (tok) { Token(kind, line, col) => line }
+        return match (tok) { Token(kind, line, col, offset, len) => line }
     }
 
     fun current_col(): String {
         var tok: Lexer.Token = this.current()
-        var col: Float = match (tok) { Token(kind, line, col) => col }
+        var col: Float = match (tok) { Token(kind, line, col, offset, len) => col }
         return col.floor().to_string()
     }
 
     fun current_token_str(): String {
         var kind: Lexer.TokenKind = this.current_kind()
         return this.kind_name(kind)
+    }
+
+    // --- Spans ---
+    //
+    // The parser is where a Token's inline position fields become an AST.Span.
+    // Every node that records a span gets it from one of these three, so there
+    // is one place that knows the Token layout and one place that decides what
+    // "the span of this construct" means.
+
+    /// The span of an arbitrary token.
+    fun token_span(tok: Lexer.Token): AST.Span {
+        return match (tok) {
+            Token(kind, line, col, offset, len) => AST.Span.Span(line, col, offset, len)
+        }
+    }
+
+    /// The span of the token the parser is about to consume. This is the right
+    /// span for "the thing I am complaining about is here".
+    fun current_span(): AST.Span {
+        return this.token_span(this.current())
+    }
+
+    /// The span of the token most recently consumed. This is the right span for
+    /// "the construct I just finished parsing ends here" — pair it with the span
+    /// captured before the construct started and merge the two.
+    fun prev_span(): AST.Span {
+        if (this.pos <= 0) { return AST.span_none() }
+        return this.token_span(this.tokens[this.pos - 1])
+    }
+
+    /// The span running from `start` through the last token consumed — the extent
+    /// of a construct whose first token's span the caller saved before parsing it.
+    fun span_from(start: AST.Span): AST.Span {
+        return AST.span_merge(start, this.prev_span())
+    }
+
+    /// Render a span as `line:col`, or as the current token's position when the
+    /// span is synthetic. Used by the diagnostic printers below.
+    fun span_prefix(s: AST.Span): String {
+        if (!AST.span_is_real(s)) { return "<unknown>" }
+        return "line " + AST.span_line(s).floor().to_string()
+            + ", col " + AST.span_col(s).floor().to_string()
+    }
+
+    /// Print `message` located at `s`, with the source line and a caret under the
+    /// span's first character. Shared by parse_error and any future
+    /// located-warning path so the two cannot render differently.
+    fun report_at(s: AST.Span, label: String, message: String) {
+        IO.println("[" + this.span_prefix(s) + "] " + label + ": " + message)
+        if (this.source.length() == 0) { return }
+        if (!AST.span_is_real(s)) { return }
+        var line_num: Float = AST.span_line(s)
+        var lines: List<String> = this.source.split("\n")
+        if (line_num <= 0 or line_num > lines.length()) { return }
+        var src_line: String = lines[line_num - 1]
+        var prefix: String = "  " + line_num.floor().to_string() + " | "
+        IO.println(prefix + src_line)
+        var col: Float = AST.span_col(s)
+        var padding: String = ""
+        var pi: Float = 0
+        while (pi < prefix.length() + col - 1) {
+            padding = padding + " "
+            pi = pi + 1
+        }
+        // Underline the whole span, not just its first character: a caret run as
+        // wide as the token shows which token was meant when several sit on one
+        // line. A synthetic (len 0) span still gets a single caret.
+        var caret: String = "^"
+        var span_width: Float = AST.span_len(s)
+        var ci: Float = 1
+        while (ci < span_width) {
+            caret = caret + "~"
+            ci = ci + 1
+        }
+        IO.println(padding + caret)
     }
 
     fun parse_error(message: String) {
@@ -156,24 +231,28 @@ class Parser {
             }
             return
         }
-        IO.println("[line " + this.current_line() + ", col " + this.current_col() + "] Error: " + message)
-        if (this.source.length() > 0) {
-            var line_num: Float = this.current_line_num()
-            var lines: List<String> = this.source.split("\n")
-            if (line_num > 0 and line_num <= lines.length()) {
-                var src_line: String = lines[line_num - 1]
-                var prefix: String = "  " + line_num.floor().to_string() + " | "
-                IO.println(prefix + src_line)
-                var col: Float = match (this.current()) { Token(kind, line, col) => col }
-                var padding: String = ""
-                var pi: Float = 0
-                while (pi < prefix.length() + col - 1) {
-                    padding = padding + " "
-                    pi = pi + 1
-                }
-                IO.println(padding + "^")
+        this.report_at(this.current_span(), "Error", message)
+        this.had_error = true
+    }
+
+    /// Report a parse error at an explicit span rather than at the current token.
+    ///
+    /// Needed whenever the parser detects the problem after having consumed the
+    /// construct at fault — by then `current()` is the token *after* it, and
+    /// reporting there points past the mistake.
+    fun parse_error_at(s: AST.Span, message: String) {
+        this.error_count = this.error_count + 1
+        if (this.error_count > 20) {
+            if (this.error_count == 21) {
+                IO.println("Too many errors (20+), stopping.")
             }
+            this.had_error = true
+            while (!this.match_kind_check("eof")) {
+                this.advance()
+            }
+            return
         }
+        this.report_at(s, "Error", message)
         this.had_error = true
     }
 
@@ -1218,7 +1297,7 @@ class Parser {
         // Comparison: <expr.method(), <expr), <expr + ...
         if (ident_pos + 1 >= this.tokens.length()) { return false }
         var next_tok: Lexer.Token = this.tokens[ident_pos + 1]
-        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c, o, ln) => k }
         var next_str: String = this.kind_name(next_kind)
         // After a tag name: >, />, or attribute name (ident), or = (shorthand)
         if (next_str == ">" or next_str == "/" or next_str == "ident" or next_str == "=") { return true }
@@ -1485,7 +1564,7 @@ class Parser {
     fun peek_is(expected: String): Bool {
         if (this.pos + 1 >= this.tokens.length()) return false
         var next_tok: Lexer.Token = this.tokens[this.pos + 1]
-        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c, o, ln) => k }
         return this.kind_name(next_kind) == expected
     }
 
@@ -2417,7 +2496,7 @@ class Parser {
         // Current token is <. Check if NEXT token (pos+1) is an HTML element or component.
         if (this.pos + 1 >= this.tokens.length()) { return false }
         var next_tok: Lexer.Token = this.tokens[this.pos + 1]
-        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c, o, ln) => k }
         var kind_str: String = this.kind_name(next_kind)
         if (kind_str != "ident") { return false }
         var name: String = match (next_kind) { TkIdent(n) => n    _ => "" }
