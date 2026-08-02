@@ -12,3 +12,7 @@ build/stage4/
 build/guard.sf
 build/guard.ll
 build/guard_lib/
+
+# Python bytecode from tools/*.py
+__pycache__/
+*.pyc

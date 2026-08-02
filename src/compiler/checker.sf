@@ -300,8 +300,8 @@ class NullChecker {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
             var ptype: String = this.type_node_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -915,7 +915,7 @@ class NullChecker {
 
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
                 // not an AST.Type node. type_node_to_string() matched a String
                 // against AST.Type patterns and fell through to the first arm, so
@@ -929,7 +929,7 @@ class NullChecker {
                 var rpi: Float = 0
                 while (rpi < params.length()) {
                     var p: AST.Param = params[rpi]
-                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
                     var pt_str: String = this.type_node_to_string(pt)
                     if (pt_str.starts_with("Fun[")) {
                         // Record: "funcname:index" → receiver class name
@@ -944,10 +944,10 @@ class NullChecker {
                 // parameters, so a block-syntax argument can be typed (BUGS #86).
                 this.register_fun_param_sigs(name, params)
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -976,24 +976,24 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mn
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mn
                         _ => ""
                     }
                     // A bodyless method is abstract: it is a requirement on
                     // subclasses. A method with a body is inherited as-is.
                     var method_body: List<AST.Stmt> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mb
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mb
                         _ => []
                     }
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
                     var method_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mr
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mr
                         _ => "Any"
                     }
                     var method_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mp
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mp
                         _ => []
                     }
                     if (method_name.length() > 0) {
@@ -1026,23 +1026,23 @@ class NullChecker {
                     var ami: Float = 0
                     while (ami < methods.length()) {
                         var am_name: String = match (methods[ami]) {
-                            FunDecl(mn, mp, mr, mb, md) => mn
+                            FunDecl(mn, mp, mr, mb, md, f_vis) => mn
                             _ => ""
                         }
                         if (am_name.length() > 0 and am_name != "init") {
                             var am_params: List<AST.Param> = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md) => mp
+                                FunDecl(mn, mp, mr, mb, md, f_vis) => mp
                                 _ => []
                             }
                             var am_ret: String = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md) => mr
+                                FunDecl(mn, mp, mr, mb, md, f_vis) => mr
                                 _ => "Nil"
                             }
                             var api: Float = 0
                             while (api < am_params.length()) {
                                 var ap: AST.Param = am_params[api]
-                                var ap_name: String = match (ap) { Param(n, t, d) => n }
-                                var ap_type: AST.Type = match (ap) { Param(n, t, d) => t }
+                                var ap_name: String = match (ap) { Param(n, t, d, p_vis) => n }
+                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis) => t }
                                 var ap_type_str: String = this.type_node_to_string(ap_type)
                                 if (ap_type_str != "Any" and !this.is_sendable(ap_type_str)) {
                                     this.warn("actor '" + name + "' method '" + am_name + "' parameter '" + ap_name + "' has non-Sendable type '" + ap_type_str + "'")
@@ -1058,7 +1058,7 @@ class NullChecker {
                     }
                 }
             }
-            VarDecl(n, t, i, d) => {}
+            VarDecl(n, t, i, d, v_vis) => {}
             ExprStmt(e) => {}
             Return(v) => {}
             If(c, t, e) => {}
@@ -1069,7 +1069,7 @@ class NullChecker {
             TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -1246,7 +1246,7 @@ class NullChecker {
 
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
@@ -1292,7 +1292,7 @@ class NullChecker {
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // Register method with class prefix if inside a class
                 var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {
@@ -1322,8 +1322,8 @@ class NullChecker {
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
-                    var pname: String = match (p) { Param(n, t, d) => n }
-                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
                     this.env.define_var(pname, pt)
                     j = j + 1
                 }
@@ -1373,7 +1373,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parents, fields, methods, doc) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis) => {
                 // Unlike register_decl this runs only over the statements being
                 // checked, never over the imported list, so the class here is
                 // the one whose body is about to be walked. Setting the bare key
@@ -1411,7 +1411,7 @@ class NullChecker {
                 this.check_stmts(methods)
                 this.current_class = saved_class
             }
-            EnumDecl(n, v, d) => {}
+            EnumDecl(n, v, d, e_vis) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -1435,7 +1435,7 @@ class NullChecker {
             LetPattern(pattern, value) => {
                 this.infer_expr(value)
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -2813,7 +2813,7 @@ class NullChecker {
         var i: Float = 0
         while (i < params.length()) {
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
             var sig: String = this.fun_param_sig_of(pt)
             if (sig != "!") {
                 this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
@@ -2847,9 +2847,13 @@ class NullChecker {
         var changed: Bool = false
         var i: Float = 0
         while (i < params.length()) {
-            var pname: String = match (params[i]) { Param(n, t, d) => n }
-            var pt: AST.Type = match (params[i]) { Param(n, t, d) => t }
-            var pdef: AST.Expr = match (params[i]) { Param(n, t, d) => d }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis) => d }
+            // Rebuilding an existing Param below, so carry its visibility across
+            // rather than resetting to "public": this rewrite exists only to fill in
+            // an inferred type and must not otherwise alter the declaration.
+            var pvis: String = match (params[i]) { Param(n, t, d, p_vis) => p_vis }
             if (this.is_any_type(pt) and pname != "self") {
                 if (i < declared.length()) {
                     var declared_str: String = declared[i].trim()
@@ -2875,7 +2879,7 @@ class NullChecker {
                         + " so a block can be typed from it.")
                 }
             }
-            new_params.push(AST.Param.Param(pname, pt, pdef))
+            new_params.push(AST.Param.Param(pname, pt, pdef, pvis))
             i = i + 1
         }
         if (changed) {
@@ -2892,7 +2896,7 @@ class NullChecker {
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
         if (params.length() > 0) {
-            var first_param_name: String = match (params[0]) { Param(n, t, d) => n }
+            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis) => n }
             if (first_param_name == "self") return nil
         }
 
@@ -2911,7 +2915,7 @@ class NullChecker {
 
         // Build new params: prepend 'self' parameter
         var new_params: List<AST.Param> = []
-        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit))
+        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public"))
         var pi: Float = 0
         while (pi < params.length()) {
             new_params.push(params[pi])
@@ -2936,8 +2940,8 @@ class NullChecker {
                 var result: AST.Stmt = AST.Stmt.ExprStmt(rewritten)
                 result
             }
-            VarDecl(name, type_ann, init, doc) => {
-                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc)
+            VarDecl(name, type_ann, init, doc, v_vis) => {
+                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis)
             }
             Return(value) => {
                 AST.Stmt.Return(this.rewrite_receiver_expr(value, fields, methods))
