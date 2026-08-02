@@ -915,7 +915,7 @@ class NullChecker {
 
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
                 // not an AST.Type node. type_node_to_string() matched a String
                 // against AST.Type patterns and fell through to the first arm, so
@@ -976,24 +976,24 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mn
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mn
                         _ => ""
                     }
                     // A bodyless method is abstract: it is a requirement on
                     // subclasses. A method with a body is inherited as-is.
                     var method_body: List<AST.Stmt> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mb
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mb
                         _ => []
                     }
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
                     var method_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mr
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mr
                         _ => "Any"
                     }
                     var method_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mp
+                        FunDecl(mn, mp, mr, mb, md, f_vis) => mp
                         _ => []
                     }
                     if (method_name.length() > 0) {
@@ -1026,16 +1026,16 @@ class NullChecker {
                     var ami: Float = 0
                     while (ami < methods.length()) {
                         var am_name: String = match (methods[ami]) {
-                            FunDecl(mn, mp, mr, mb, md) => mn
+                            FunDecl(mn, mp, mr, mb, md, f_vis) => mn
                             _ => ""
                         }
                         if (am_name.length() > 0 and am_name != "init") {
                             var am_params: List<AST.Param> = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md) => mp
+                                FunDecl(mn, mp, mr, mb, md, f_vis) => mp
                                 _ => []
                             }
                             var am_ret: String = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md) => mr
+                                FunDecl(mn, mp, mr, mb, md, f_vis) => mr
                                 _ => "Nil"
                             }
                             var api: Float = 0
@@ -1292,7 +1292,7 @@ class NullChecker {
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // Register method with class prefix if inside a class
                 var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {

@@ -31,7 +31,7 @@
             LetPattern(pattern, value) => {
                 this.gen_let_pattern(pattern, value)
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // Capture and clear pending_extend_class to prevent stale state
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
@@ -163,7 +163,7 @@
     }
 
     fun get_fun_doc(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => d
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => d
             _ => ""
         }
     }
@@ -679,25 +679,25 @@
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => n
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => n
             _ => ""
         }
     }
 
     fun get_fun_params(stmt: AST.Stmt): List<AST.Param> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => p
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => p
             _ => []
         }
     }
 
     fun get_fun_ret(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => r
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => r
             _ => ""
         }
     }
 
     fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => b
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => b
             _ => ""
         }
     }
@@ -1174,7 +1174,7 @@
                 this.register_enum_variants(name, variants)
             }
             VarDecl(n, t, i, d, v_vis) => {}
-            FunDecl(n, p, r, b, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
@@ -1343,7 +1343,7 @@
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
             VarDecl(n, t, i, d, v_vis) => "var"
-            FunDecl(n, p, r, b, d) => "fun"
+            FunDecl(n, p, r, b, d, f_vis) => "fun"
             EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
@@ -1368,7 +1368,7 @@
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
             VarDecl(n, t, i, d, v_vis) => "other"
-            FunDecl(n, p, r, b, d) => "other"
+            FunDecl(n, p, r, b, d, f_vis) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"

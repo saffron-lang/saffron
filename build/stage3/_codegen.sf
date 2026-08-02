@@ -5418,7 +5418,7 @@ class Codegen {
                 this.find_free_vars_stmts(body, bound, free)
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
-            FunDecl(n, p, r, b, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
             EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
@@ -6268,7 +6268,7 @@ class Codegen {
             LetPattern(pattern, value) => {
                 this.gen_let_pattern(pattern, value)
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // Capture and clear pending_extend_class to prevent stale state
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
@@ -6400,7 +6400,7 @@ class Codegen {
     }
 
     fun get_fun_doc(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => d
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => d
             _ => ""
         }
     }
@@ -6916,25 +6916,25 @@ class Codegen {
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => n
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => n
             _ => ""
         }
     }
 
     fun get_fun_params(stmt: AST.Stmt): List<AST.Param> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => p
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => p
             _ => []
         }
     }
 
     fun get_fun_ret(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => r
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => r
             _ => ""
         }
     }
 
     fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => b
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => b
             _ => ""
         }
     }
@@ -7411,7 +7411,7 @@ class Codegen {
                 this.register_enum_variants(name, variants)
             }
             VarDecl(n, t, i, d, v_vis) => {}
-            FunDecl(n, p, r, b, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
@@ -7580,7 +7580,7 @@ class Codegen {
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
             VarDecl(n, t, i, d, v_vis) => "var"
-            FunDecl(n, p, r, b, d) => "fun"
+            FunDecl(n, p, r, b, d, f_vis) => "fun"
             EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
@@ -7605,7 +7605,7 @@ class Codegen {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
             VarDecl(n, t, i, d, v_vis) => "other"
-            FunDecl(n, p, r, b, d) => "other"
+            FunDecl(n, p, r, b, d, f_vis) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"
@@ -8519,7 +8519,7 @@ class Codegen {
             Return(value) => {
                 this.collect_vars_expr(value, names, types)
             }
-            FunDecl(n, p, r, b, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
             EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
@@ -8816,7 +8816,7 @@ class Codegen {
             Block(s) => this.stmts_have_yield(s)
             TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
             Throw(v) => this.expr_has_yield(v)
-            FunDecl(n, p, r, b, d) => false
+            FunDecl(n, p, r, b, d, f_vis) => false
             _ => false
         }
     }
@@ -10278,7 +10278,7 @@ class Codegen {
 
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
-            FunDecl(n, p, r, b, d) => true
+            FunDecl(n, p, r, b, d, f_vis) => true
             EnumDecl(n, v, d, e_vis) => true
             ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
@@ -10420,7 +10420,7 @@ class Codegen {
         while (pri < program.length()) {
             var pr_stmt: AST.Stmt = program[pri]
             match (pr_stmt) {
-                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
                         if (!this.str_in_list(this.known_functions,pr_emit)) {

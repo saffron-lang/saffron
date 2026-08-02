@@ -636,7 +636,7 @@
 
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
-            FunDecl(n, p, r, b, d) => true
+            FunDecl(n, p, r, b, d, f_vis) => true
             EnumDecl(n, v, d, e_vis) => true
             ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
@@ -778,7 +778,7 @@
         while (pri < program.length()) {
             var pr_stmt: AST.Stmt = program[pri]
             match (pr_stmt) {
-                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
                         if (!this.str_in_list(this.known_functions,pr_emit)) {

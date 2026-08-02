@@ -1444,7 +1444,7 @@ class Parser {
             if (this.match_kind_check("{")) {
                 ext_body = this.parse_block_stmts()
             }
-            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class)
+            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class, "public")
         }
 
         // Check for decorator: @intrinsic, @extern("..."), or general @name / @name("...")
@@ -1820,7 +1820,7 @@ class Parser {
             while (ppi < body.length()) { new_body.push(body[ppi]); ppi = ppi + 1 }
             body = new_body
         }
-        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring)
+        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring, "public")
     }
 
     fun parse_one_param(params: List<AST.Param>, pattern_prepend: List<AST.Stmt>, idx: Float) {
@@ -2136,11 +2136,18 @@ class Parser {
         // Find existing init method and prepend defaults to its body
         var i: Int = 0
         while (i < methods.length()) {
-            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n    _ => "" }
+            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => n    _ => "" }
             if (mname == "init") {
-                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b    _ => [] }
-                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d) => p    _ => [] }
-                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r    _ => "" }
+                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => b    _ => [] }
+                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => p    _ => [] }
+                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => r    _ => "" }
+                // Rebuilding an *existing* init: carry its own visibility across
+                // rather than resetting it to "public". Today the parser only ever
+                // produces "public", so this is behaviour-identical -- but once
+                // Phase 4 adds the syntax, a hardcoded "public" here would silently
+                // strip `private init`, which is the one declaration §6a of
+                // access-modifiers.md most wants to honour.
+                var mvis: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => f_vis    _ => "public" }
                 // Build new body: defaults + original body
                 var new_body: List<AST.Stmt> = []
                 var di: Int = 0
@@ -2153,13 +2160,13 @@ class Parser {
                     new_body.push(mbody[bi])
                     bi = bi + 1
                 }
-                methods[i] = AST.Stmt.FunDecl("init", mparams, mret, new_body, "")
+                methods[i] = AST.Stmt.FunDecl("init", mparams, mret, new_body, "", mvis)
                 return nil
             }
             i = i + 1
         }
         // No init found — create one with just the defaults
-        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, ""))
+        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, "", "public"))
     }
 
     fun parse_import(): AST.Stmt {
@@ -2885,7 +2892,7 @@ class Parser {
         var kind: String = match (stmt) {
             ExprStmt(e) => "expr"
             VarDecl(n, t, i, d, v_vis) => "other"
-            FunDecl(n, p, r, b, d) => "other"
+            FunDecl(n, p, r, b, d, f_vis) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, tp, ps, f, m, d) => "other"
             Return(v) => "other"

@@ -38,7 +38,7 @@ fun walk_stmts(stmts: List<Any>, visitor: Any) {
 /// Recursively visit child statements within a statement.
 fun walk_children(stmt: Any, visitor: Any) {
     match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => {
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => {
             walk_stmts(body, visitor)
         }
         ClassDecl(name, type_params, parents, fields, methods, docstring) => {
@@ -73,7 +73,7 @@ fun find_functions(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            FunDecl(name, params, ret_type, body, docstring) => {
+            FunDecl(name, params, ret_type, body, docstring, f_vis) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -118,7 +118,7 @@ fun find_enums(stmts: List<Any>): List<Any> {
 /// Get the name of a declaration statement.
 fun stmt_name(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => name
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => name
         ClassDecl(name, type_params, parents, fields, methods, docstring) => name
         EnumDecl(name, variants, docstring, e_vis) => name
         VarDecl(name, type_ann, initializer, docstring, v_vis) => name
@@ -129,7 +129,7 @@ fun stmt_name(stmt: Any): String {
 /// Get the docstring of a declaration statement.
 fun stmt_doc(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => docstring
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => docstring
         ClassDecl(name, type_params, parents, fields, methods, docstring) => docstring
         EnumDecl(name, variants, docstring, e_vis) => docstring
         VarDecl(name, type_ann, initializer, docstring, v_vis) => docstring
@@ -140,7 +140,7 @@ fun stmt_doc(stmt: Any): String {
 /// Get the return type of a function declaration.
 fun fun_ret_type(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => ret_type
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => ret_type
         _ => ""
     }
 }
@@ -148,7 +148,7 @@ fun fun_ret_type(stmt: Any): String {
 /// Get the params of a function declaration.
 fun fun_params(stmt: Any): List<Any> {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => params
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => params
         _ => []
     }
 }
@@ -156,7 +156,7 @@ fun fun_params(stmt: Any): List<Any> {
 /// Get the body of a function declaration.
 fun fun_body(stmt: Any): List<Any> {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => body
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => body
         _ => []
     }
 }
@@ -164,7 +164,7 @@ fun fun_body(stmt: Any): List<Any> {
 /// Check if a statement is a function declaration.
 fun is_fun(stmt: Any): Bool {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => true
+        FunDecl(name, params, ret_type, body, docstring, f_vis) => true
         _ => false
     }
 }

@@ -270,7 +270,7 @@
             Return(value) => {
                 this.collect_vars_expr(value, names, types)
             }
-            FunDecl(n, p, r, b, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
             EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
@@ -567,7 +567,7 @@
             Block(s) => this.stmts_have_yield(s)
             TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
             Throw(v) => this.expr_has_yield(v)
-            FunDecl(n, p, r, b, d) => false
+            FunDecl(n, p, r, b, d, f_vis) => false
             _ => false
         }
     }

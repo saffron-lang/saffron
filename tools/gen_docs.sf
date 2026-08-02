@@ -115,7 +115,7 @@ fun render_function(stmt: AST.Stmt): String {
 
     // Extract signature from the FunDecl fields
     match (stmt) {
-        FunDecl(fn_name, params, ret_type, body, docstring) => {
+        FunDecl(fn_name, params, ret_type, body, docstring, f_vis) => {
             var sig = "fun ${fn_name}(${params})"
             if (!(ret_type == "")) {
                 sig = sig + ": ${ret_type}"
