@@ -194,7 +194,11 @@ Two hazards, both with precedent in `BUGS.md`, both must be designed for:
 
 Parser touch points:
 - statement dispatch (`parser.sf:1420ff`): `is_ident_named("private")` / `("public")` before the `var`/`fun`/`class`/`enum`/`interface`/`actor` tests, consuming the modifier and threading it down.
-- class-body loop (`parse_class_decl_with_doc`, `parser.sf:1985-2041`): the loop advances only inside its `var` / `@` / `fun` branches. **A token it recognizes in none of them does not advance the cursor — the loop spins forever.** So `private` must be handled in that loop before anything else, or a `private var` inside a class hangs the compiler. Needs verification against gen2's behavior; do not discover it by compiling.
+- class-body loop (`parse_class_decl_with_doc`, `parser.sf:2020`; loop at `:2068`): **verified 2026-08-02 by reading the loop, not by compiling.** The condition tests only `}` and `eof`; the body has exactly three branches (`match_kind_check("var")`, `is_ident_named("@")`, `match_kind_check("fun")`), each of which advances, and **there is no `else` and no unconditional advance**. So a member token matching none of the three spins forever: `private var x: Int` inside a class body would **hang the compiler**, not produce a parse error. `private` must therefore be handled in that loop *before* the three existing tests.
+
+  Systematic fix worth taking while in there, rather than just dodging this instance: add an unconditional `else` that emits a diagnostic. The hang is not specific to visibility — *any* future member syntax hits it, and a hang is the worst possible failure mode because it has no error message to grep for. Do it as its own commit so it is reviewable separately from the feature.
+
+  Relevant sites for threading visibility through, verified at the post-#111 tree: fields constructed at `:2101`, methods at `:2119` / `:2122` via `parse_fun_decl_with_doc`, and the node returned at `:2129`. Note the `extends` list at `:2055-2062` is now correct (it collects every base) — do not "fix" it.
 
 ## 6. Coverage by declaration kind, and the leakage check
 
