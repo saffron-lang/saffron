@@ -38,7 +38,7 @@ A `protected` member declared on `Swimmable` therefore could not be resolved fro
 
 Prerequisite for `protected`, stated rather than hidden: widen `ClassDecl.parent: String` → `parents: List<String>`, propagate through `class_parents`, `class_parent_of`, `is_subtype_node`, conformance checking, and codegen's field-prepending and `__class_parent_tag` switch. That is a separate feature with its own promotion gate. `protected` waits for it.
 
-**Update (2026-08-02).** That widening is done — see BUGS #103. The everything-above-this-line diagnosis was accurate, with one correction: `test/pass/multi_inherit.sf` did not "exercise" the form, it *failed* on it (`[codegen] Error: type 'Duck' has no method 'swim'`), as did `test/pass/interfaces.sf`. `class_parents` is now `Map<String, List<String>>`, `is_subtype_node` searches the full inheritance DAG breadth-first, conformance consults every base, and `__class_is_a` is a flattened ancestor-set table rather than a chain walk (a `switch` arm returns one value, so no walk can traverse a DAG). Field layout is unchanged by design: only `parents[0]` contributes fields, because parent-index == child-index can hold for exactly one base. `protected` is therefore no longer blocked on representation — the checker can now resolve `Duck` → `Swimmable`. It remains gated on its own promotion, since the widening changes how the compiler reads its own `ClassDecl`.
+**Update (2026-08-02).** That widening is done — see BUGS #104. The everything-above-this-line diagnosis was accurate, with one correction: `test/pass/multi_inherit.sf` did not "exercise" the form, it *failed* on it (`[codegen] Error: type 'Duck' has no method 'swim'`), as did `test/pass/interfaces.sf`. `class_parents` is now `Map<String, List<String>>`, `is_subtype_node` searches the full inheritance DAG breadth-first, conformance consults every base, and `__class_is_a` is a flattened ancestor-set table rather than a chain walk (a `switch` arm returns one value, so no walk can traverse a DAG). Field layout is unchanged by design: only `parents[0]` contributes fields, because parent-index == child-index can hold for exactly one base. `protected` is therefore no longer blocked on representation — the checker can now resolve `Duck` → `Swimmable`. It remains gated on its own promotion, since the widening changes how the compiler reads its own `ClassDecl`.
 
 ### Why not a distinct `internal`
 
@@ -280,7 +280,7 @@ Phases, in order. The promotion point is marked.
 
 **Phase 7 — annotate the compiler's own source. Deferred, not part of this work.** See §9.
 
-**Phase 8+ — deferred features.** Widen `ClassDecl.parent` to `List<String>`, which unblocks `protected` and closes L7's coverage hole. **Done ahead of the phases it was numbered after** (BUGS #103), since it is independent of visibility and multiple inheritance was outright broken meanwhile.
+**Phase 8+ — deferred features.** Widen `ClassDecl.parent` to `List<String>`, which unblocks `protected` and closes L7's coverage hole. **Done ahead of the phases it was numbered after** (BUGS #104), since it is independent of visibility and multiple inheritance was outright broken meanwhile.
 
 Nothing in Phases 1, 2 or 3 may use `private` in compiler source. Nothing at all may use it before the Phase 3 promotion.
 
@@ -323,7 +323,7 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 
 ## 9. Explicitly out of scope
 
-- **`protected`** — was blocked on `ClassDecl.parent: String` and the parser discarding parents 2..n; that block is removed (BUGS #103), but `protected` itself is still out of scope here and still §1's recommendation to omit.
+- **`protected`** — was blocked on `ClassDecl.parent: String` and the parser discarding parents 2..n; that block is removed (BUGS #104), but `protected` itself is still out of scope here and still §1's recommendation to omit.
 - **Module-private *fields*** — the 24 underscore fields read by same-module free functions would need it; they stay public instead. A third scope is a separate design.
 - **Private enum variants** — incoherent against exhaustiveness plus #76's indeterminate-value semantics (§6a).
 - **`Fun`-mediated leaks (L8)** — structurally impossible; blocked on #56.

@@ -9,7 +9,7 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
-### 103. FIXED — the parser discarded every base after the first, so `class Duck extends Flyable, Swimmable, Walkable` was `extends Flyable`
+### 104. FIXED — the parser discarded every base after the first, so `class Duck extends Flyable, Swimmable, Walkable` was `extends Flyable`
 
 `ClassDecl.parent` was a single `String`. The parser read the first name after
 `extends` and threw the rest away:
