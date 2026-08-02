@@ -792,9 +792,18 @@
         this.block_terminated = false
         this.reset_locals()
 
-        // Extract tag based on encoding
+        // Extract tag based on encoding.
+        //
+        // The threshold is `== 0`, not `<= 1`. gen_enum_construct (expr_body.sf)
+        // and gen_match (match_body.sf) both switch to the heap [tag, f0, ...]
+        // array as soon as ANY variant has a field, so a one-field enum is an
+        // array too. This used to read `<= 1` and so decoded a one-field enum's
+        // heap pointer as a `tag << 56` immediate: `lshr ptr, 56` yields 0 for
+        // any real pointer, which is variant 0's tag, so every value of such an
+        // enum stringified as its FIRST variant regardless of what it was, and
+        // the "payload" it printed was the low 56 bits of the pointer.
         var tag_val: String = ""
-        if (max_fields <= 1) {
+        if (max_fields == 0) {
             tag_val = this.fresh_local()
             this.emit_indent(tag_val + " = lshr i64 %self, 56")
         } else {
@@ -862,8 +871,11 @@
                 while (fi < num_fields) {
                     // Extract field value
                     var field_val: String = ""
-                    if (max_fields <= 1) {
-                        // Simple encoding: value = self & 0x00FFFFFFFFFFFFFF
+                    if (max_fields == 0) {
+                        // Simple encoding: value = self & 0x00FFFFFFFFFFFFFF.
+                        // Unreachable in practice — max_fields == 0 means no
+                        // variant has a field, so num_fields is 0 and this loop
+                        // never runs. Kept as the mirror of the tag read above.
                         field_val = this.fresh_local()
                         this.emit_indent(field_val + " = and i64 %self, 72057594037927935")
                     } else {
@@ -888,12 +900,37 @@
                         }
                     }
 
+                    // The payload slot holds a fully NaN-boxed value —
+                    // gen_enum_construct stores gen_arg_value's result verbatim —
+                    // while __sb_append takes a RAW char* (it calls strlen on it,
+                    // through an @extern, so every argument must be untagged).
+                    // Each arm below is responsible for landing on a raw pointer.
+                    //
+                    // Two of the three arms used to get this wrong. A String field
+                    // was appended still tagged, so strlen dereferenced
+                    // 0x7FF8_0000_0000_0000|ptr and the process died — printing any
+                    // enum carrying a String was a segfault. A Bool field was
+                    // handed to __bool_to_string without untagging, and that helper
+                    // tests `!= 0` against a raw 0/1 on three of the four bases, so
+                    // tagged `false` (0x7FFA000000000000, nonzero) read as true:
+                    // every Bool field printed "true". Float had no arm at all and
+                    // fell into __int_to_string via emit_untag_int, which reads a
+                    // double's bits as an integer.
                     var field_str: String = ""
                     if (field_type == "String") {
-                        field_str = field_val
+                        var s_ptr: String = this.emit_untag_ptr(field_val)
+                        field_str = this.ptr_to_val(s_ptr)
                     } else if (field_type == "Bool") {
+                        var b_raw: String = this.emit_untag_bool(field_val)
                         field_str = this.fresh_local()
-                        this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + field_val + ")")
+                        this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + b_raw + ")")
+                    } else if (field_type == "Float" or field_type == "Number") {
+                        // __float_to_string takes the tagged value: it untags
+                        // internally and its int-tagged path is a sitofp, so a
+                        // whole-number Float that happens to be int-tagged still
+                        // formats correctly (BUGS #83).
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @__float_to_string(i64 " + field_val + ")")
                     } else {
                         var field_raw: String = this.emit_untag_int(field_val)
                         field_str = this.fresh_local()
@@ -973,7 +1010,14 @@
         this.block_terminated = false
         this.reset_locals()
 
-        if (max_fields <= 1) {
+        // `== 0`, matching gen_enum_construct and gen_match. This is only
+        // reachable with at least one field (the caller guards on
+        // `vfields.length() > 0`), so the simple-encoding branch is dead — but
+        // it read `<= 1` and would have packed a one-field variant as
+        // `tag << 56 | value`, which no reader decodes that way. Left in place
+        // and corrected rather than deleted, so the three encoding decisions
+        // read identically.
+        if (max_fields == 0) {
             // Simple encoding: (tag << 56) | value
             var t: String = this.fresh_local()
             this.emit_indent(t + " = shl i64 " + tag.floor().to_string() + ", 56")

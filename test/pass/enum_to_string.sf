@@ -1,0 +1,55 @@
+// Auto-generated `to_string()` on an enum, across every payload field type and
+// both payload encodings. Regression test for BUGS #102: emit_enum_to_string
+// disagreed with gen_enum_construct about which encoding a one-field enum uses,
+// and converted String/Bool/Float fields with the wrong tag convention.
+import "@test" as Test
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum One {
+    Only(s: String)
+}
+
+enum Wide {
+    Nothing,
+    Num(n: Int),
+    Text(s: String),
+    Flag(b: Bool),
+    Real(f: Float),
+    All(n: Int, s: String, b: Bool, f: Float)
+}
+
+fun main() {
+    // max_fields == 0: the `tag << 56` immediate encoding.
+    Test.assert_eq(Color.Red.to_string(), "Red", "no-field variant, tag 0")
+    Test.assert_eq(Color.Green.to_string(), "Green", "no-field variant, tag 1")
+    Test.assert_eq(Color.Blue.to_string(), "Blue", "no-field variant, tag 2")
+
+    // A single-field enum is still the heap [tag, f0] array. Reading it as a
+    // `tag << 56` immediate gave tag 0 for every value and printed the low 56
+    // bits of the pointer as the payload.
+    Test.assert_eq(One.Only("hi").to_string(), "Only(hi)", "one-field enum: heap encoding")
+
+    // Each field type in isolation. A String field used to be appended still
+    // NaN-boxed, so __sb_append's strlen dereferenced a tagged pointer and the
+    // process segfaulted; a Bool field reached __bool_to_string tagged, and
+    // tagged `false` is nonzero, so it printed "true".
+    Test.assert_eq(Wide.Nothing.to_string(), "Nothing", "no-field variant in a wide enum")
+    Test.assert_eq(Wide.Num(42).to_string(), "Num(42)", "Int field")
+    Test.assert_eq(Wide.Text("abc").to_string(), "Text(abc)", "String field")
+    Test.assert_eq(Wide.Flag(true).to_string(), "Flag(true)", "Bool field, true")
+    Test.assert_eq(Wide.Flag(false).to_string(), "Flag(false)", "Bool field, false")
+    Test.assert_eq(Wide.Real(2.5).to_string(), "Real(2.5)", "Float field")
+
+    // All four together, to catch a per-field offset error that a single-field
+    // variant cannot expose.
+    Test.assert_eq(Wide.All(7, "s", false, 1.5).to_string(), "All(7, s, false, 1.5)", "mixed payload")
+
+    Test.summary()
+}
+
+main()

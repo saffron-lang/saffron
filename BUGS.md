@@ -9,6 +9,86 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 102. FIXED — an enum's auto-generated `to_string()` segfaulted on a String field, printed every Bool as `true`, and read a one-field enum as its first variant
+
+Found while verifying #77 (`__bool_to_string` double-untag on wasm32). Checking
+whether other `to_string` helpers had the same "chosen by static type, handed a
+different runtime tag" shape turned up a worse instance on **native**, in
+codegen rather than in a runtime base.
+
+```saffron
+enum Wide { Num(n: Int), Text(s: String), Flag(b: Bool), Real(f: Float) }
+
+IO.println(Wide.Text("abc").to_string())   // Segmentation fault
+IO.println(Wide.Flag(false).to_string())   // "Flag(true)"
+IO.println(Wide.Real(2.5).to_string())     // "Real(105553118658576)"
+```
+
+```saffron
+enum One { Only(s: String) }
+IO.println(One.Only("hi").to_string())     // "X()" — no payload, wrong shape
+```
+
+`Int` was the only payload type that worked, which is why this survived: every
+enum in the compiler's own source and in the test suite either has no payload or
+is only ever destructured by `match`, never stringified. The `match` path is a
+different function (`extract_arm_bindings`) and is correct.
+
+**Two independent defects in `emit_enum_to_string` (`stmts_body.sf:778`).**
+
+*Encoding disagreement.* Three sites decide how an enum value is laid out, and
+they did not agree on the threshold:
+
+| site | condition | encoding chosen |
+|---|---|---|
+| `gen_enum_construct` (`expr_body.sf:2983`) | `max_fields == 0` | immediate, else heap array |
+| `gen_match` (`match_body.sf:204`) | `max_fields == 0` | immediate, else heap array |
+| `emit_enum_to_string` | `max_fields <= 1` | immediate, else heap array |
+| `emit_enum_constructor` | `max_fields <= 1` | immediate, else heap array |
+
+So for an enum whose widest variant has exactly one field, the constructor built
+a heap `[tag, f0]` array and `to_string` decoded it as a `tag << 56` immediate.
+`lshr ptr, 56` is 0 for any real heap pointer, which is variant 0's tag — so
+**every value of a one-field enum stringified as its first variant**, with the
+low 56 bits of the pointer where the payload should be. Silent wrong answer, no
+diagnostic, no invalid IR.
+
+*Tag convention per field type.* The payload slot holds a fully NaN-boxed value
+(`gen_enum_construct` stores `gen_arg_value`'s result verbatim), while
+`__sb_append` takes a **raw** `char*` — it reaches `strlen` through an `@extern`,
+so every argument must be untagged. Two of the three arms got that wrong:
+
+- `String`: appended still tagged, so `strlen` dereferenced
+  `0x7FF8_0000_0000_0000 | ptr`. **Segfault** — printing any enum carrying a
+  String was fatal.
+- `Bool`: passed to `__bool_to_string` without untagging. That helper tests
+  `icmp ne i64 %b, 0` against a raw 0/1 on three of the four bases, and tagged
+  `false` is `0x7FFA000000000000` — nonzero. So **every Bool field printed
+  `true`**, `false` included. Exactly #77's mechanism, mirrored: #77 is the
+  runtime untagging twice, this is codegen untagging zero times.
+- `Float`: no arm at all. Fell through to `emit_untag_int` +
+  `__int_to_string`, reading a double's bit pattern as an integer.
+
+**Fix.** All four encoding decisions now read `max_fields == 0`, and each field
+arm lands on the convention its callee wants: `emit_untag_ptr` + `ptr_to_val`
+for String, `emit_untag_bool` for Bool, and a new arm routing Float through
+`__float_to_string` (which untags internally and whose int-tagged path is a
+`sitofp`, so a whole-number Float that happens to be int-tagged still formats
+correctly — #83).
+
+Covered by `test/pass/enum_to_string.sf`: 11 assertions over both encodings and
+every field type, including a four-field mixed variant to catch a per-field
+offset error a single-field variant cannot expose. Bootstrap green, STAGE 2
+passes, failure set unchanged against the previous run.
+
+**Why the blind spot.** This is [[project_identity_mode_blind_spot]] again, one
+layer out: not a runtime helper this time but codegen choosing a *convention* for
+one. The compiler bootstraps in identity mode where `emit_untag_ptr` is an
+`inttoptr` and tagging is a no-op, so the String arm's missing untag is
+literally invisible to `./bootstrap.sh` — and the compiler's own enums are only
+ever `match`ed, never printed, so nothing in the self-hosting loop touches this
+function at all.
+
 ### 101. FIXED — the mark phase rejected every NaN-boxed pointer, so a major collection freed the entire live heap
 
 The collector marked *nothing*. `__gc_is_heap_ptr` rejects anything above
@@ -3416,7 +3496,7 @@ test()
 
 The compiler has break/continue infrastructure (breakJumps, continueJumps arrays) but the type checker doesn't handle NODE_BREAK/NODE_CONTINUE. Runtime works; type checker just ignores them.
 
-### 12. Type checker segfaults on Any-typed closures in imported modules
+### 12. OBSOLETE — type checker segfaults on Any-typed closures in imported modules (repro targets the dead C VM)
 
 **Reproduction:**
 ```saffron
