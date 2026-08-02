@@ -88,23 +88,265 @@ fun _find_submodule_in_lib_paths(pkg_name: String, sub_path: String, stdlib_dir:
     return stdlib_dir + "/" + pkg_name + "/" + sub_path + ".sf"
 }
 
-fun _extract_entry_from_toml(source: String): String {
+// Read one `key = "value"` out of a TOML source, optionally restricted to a
+// `[section]`. Pass "" as the section to scan the whole file regardless of which
+// table a key sits in (the pre-existing behaviour of _extract_entry_from_toml).
+//
+// This is deliberately the ONE TOML reader in the compiler. src/lib/toml.sf is a
+// real 845-line parser, but pulling it into the bootstrap chain to read a single
+// key would put main.sf's compilation behind toml.sf's nested-closure-heavy
+// `parse`, and it hands back Map<String, Any> whose .get() the checker rejects
+// without a nil dance. Writing a *second* line scanner alongside the one that was
+// already here would be BUGS #27 again, so this generalizes that one instead.
+//
+// Stricter than what it replaces in one respect, on purpose: the old code took
+// any line starting with the key text, so `entrypoint = ...` matched key `entry`.
+// The `=` must now follow the key.
+fun _read_toml_value(source: String, section: String, key: String): String {
     var lines: List<String> = source.split("\n")
+    var in_section: Bool = false
+    if (section.length() == 0) { in_section = true }
     var i: Float = 0
     while (i < lines.length()) {
         var line: String = lines[i].trim()
-        if (line.starts_with("entry")) {
-            var eq_idx: Float = line.index_of("=")
-            if (eq_idx >= 0) {
-                var value: String = line.slice(eq_idx + 1, line.length()).trim()
-                if (value.starts_with("\"") and value.ends_with("\"")) {
-                    return value.slice(1, value.length() - 1)
+        if (line.starts_with("[")) {
+            if (section.length() > 0) {
+                var close_idx: Float = line.index_of("]")
+                if (close_idx > 0) {
+                    var sec: String = line.slice(1, close_idx).trim()
+                    in_section = sec == section
+                }
+            }
+        } else if (in_section) {
+            if (line.starts_with(key)) {
+                var rest: String = line.slice(key.length(), line.length()).trim()
+                if (rest.starts_with("=")) {
+                    var value: String = rest.slice(1, rest.length()).trim()
+                    if (value.length() >= 2) {
+                        if (value.starts_with("\"") and value.ends_with("\"")) {
+                            return value.slice(1, value.length() - 1)
+                        }
+                    }
+                    return value
                 }
             }
         }
         i = i + 1
     }
+    return ""
+}
+
+fun _extract_entry_from_toml(source: String): String {
+    // [package] entry is where all 11 manifests in this tree put it; the
+    // section-less scan is kept as a fallback so a third-party manifest that
+    // spells it elsewhere resolves exactly as it did before.
+    var from_pkg: String = _read_toml_value(source, "package", "entry")
+    if (from_pkg.length() > 0) { return from_pkg }
+    var anywhere: String = _read_toml_value(source, "", "entry")
+    if (anywhere.length() > 0) { return anywhere }
     return "src/lib.sf"
+}
+
+// ---------------------------------------------------------------------------
+// File → owning package
+// ---------------------------------------------------------------------------
+//
+// Plumbing for a later `internal` (package-scoped) visibility check. Nothing
+// here enforces anything; it answers "which package does this file belong to?"
+// and "are these two files in the same package?".
+//
+// The owning package of a file is the nearest `pantry.toml` at or above the
+// file's directory, and that manifest's `[package] name`.
+//
+// IDENTITY IS THE MANIFEST DIRECTORY, NOT THE NAME. This tree contains two
+// distinct packages both declaring `name = "saffron"` — the repo root and
+// src/compiler/ — so a name-keyed check would call src/compiler/parser.sf and
+// src/lib/io.sf same-package when they are not. `same_package` compares roots.
+// The declared name is carried for diagnostics only.
+//
+// "No owning package" is a real answer and must stay distinguishable. Measured,
+// it is RARER in this repo than one might assume: the repo root has a
+// pantry.toml, so every file in the tree — including all of test/*.sf, which has
+// no manifest of its own — inherits the root package. Only a file outside any
+// manifest's subtree (a script in /tmp, a file passed by absolute path from
+// elsewhere) genuinely has none. It is stored as the tagged sentinel "nopkg",
+// never as "" and never as an invented package name (invariant I2 of
+// docs/design/compiler-rewrite.md: unknown must not be spelled as something
+// concrete). The Bool-returning queries below are the airtight way to ask; the
+// String accessors are for diagnostics and are only meaningful once
+// file_has_package() has said yes.
+//
+// Encoding of a map entry:
+//   "pkg:" + <manifest dir> + "|" + <declared name>   — has an owning package
+//   "nopkg"                                            — provably has none
+// The two can never collide: "nopkg" does not start with "pkg:".
+
+fun _no_package_marker(): String { return "nopkg" }
+
+// Package identity is a directory compared by string, so the same directory must
+// have exactly one spelling. It does not, naturally: --lib-path is canonicalised
+// to absolute (see the BUGS #57 comment in main()) while --stdlib and the input
+// path are usually relative, so root-package files reached one way came out as
+// "." and the other way as "/abs/repo". Comparing those says "different package"
+// about one package. Canonicalise to an absolute, "."/".."-free path first.
+//
+// This also makes the answer independent of how a file was *named*: the nearest
+// manifest above a file is a fact about the filesystem, not about cwd. Before
+// canonicalisation a relative walk stopped at "." and never looked above cwd.
+fun _canon_dir(dir: String): String {
+    var d: String = dir
+    if (d == ".") { d = OS.cwd() }
+    if (d.starts_with("./")) { d = OS.cwd() + "/" + d.slice(2, d.length()) }
+    if (!d.starts_with("/")) { d = OS.cwd() + "/" + d }
+
+    // Collapse "." and ".." segments so "a/b/../c" and "a/c" are one directory.
+    var parts: List<String> = d.split("/")
+    var stack: List<String> = []
+    var i: Float = 0
+    while (i < parts.length()) {
+        var seg: String = parts[i]
+        if (seg.length() == 0 or seg == ".") {
+            // skip: leading "" from the root slash, and no-op "." segments
+        } else if (seg == "..") {
+            if (stack.length() > 0) { stack.pop() }
+        } else {
+            stack.push(seg)
+        }
+        i = i + 1
+    }
+    var result: StringBuilder = StringBuilder()
+    var j: Float = 0
+    while (j < stack.length()) {
+        result.append("/")
+        result.append(stack[j])
+        j = j + 1
+    }
+    var out: String = result.to_string()
+    if (out.length() == 0) { return "/" }
+    return out
+}
+
+// directory → tagged package entry, so the upward walk runs once per directory
+var _pkg_dir_cache: Map<String, String> = {}
+// loaded file path → tagged package entry
+var _file_to_package: Map<String, String> = {}
+
+fun _package_entry_for_dir(dir: String): String {
+    if (_pkg_dir_cache.has(dir)) { return _pkg_dir_cache.get(dir) }
+
+    var manifest: String = dir + "/pantry.toml"
+    if (OS.file_exists(manifest)) {
+        var declared: String = _read_toml_value(IO.read_file(manifest), "package", "name")
+        var tagged: String = "pkg:" + dir + "|" + declared
+        _pkg_dir_cache.set(dir, tagged)
+        return tagged
+    }
+
+    // dir is always canonical and absolute here, so "/" is the one terminator.
+    // dir_of("/a") returns "" — treat that and any non-shrinking step as the top.
+    if (dir == "/") {
+        _pkg_dir_cache.set(dir, _no_package_marker())
+        return _no_package_marker()
+    }
+    var parent: String = dir_of(dir)
+    if (parent.length() == 0) { parent = "/" }
+    if (parent == dir) {
+        _pkg_dir_cache.set(dir, _no_package_marker())
+        return _no_package_marker()
+    }
+    var inherited: String = _package_entry_for_dir(parent)
+    _pkg_dir_cache.set(dir, inherited)
+    return inherited
+}
+
+// Record the owning package of a file the compiler has loaded. Called from
+// collect_modules and from the entry/prelude paths, so the mapping is built by
+// the same walk that builds path_to_prefix rather than by a later second pass.
+fun record_file_package(file_path: String) {
+    if (_file_to_package.has(file_path)) { return }
+    _file_to_package.set(file_path, _package_entry_for_dir(_canon_dir(dir_of(file_path))))
+}
+
+fun _package_entry_of_file(file_path: String): String {
+    if (_file_to_package.has(file_path)) { return _file_to_package.get(file_path) }
+    // A file nobody recorded still gets a truthful answer rather than a guess.
+    return _package_entry_for_dir(_canon_dir(dir_of(file_path)))
+}
+
+/// True when `file_path` has an owning package. Ask this before trusting either
+/// String accessor below.
+fun file_has_package(file_path: String): Bool {
+    return _package_entry_of_file(file_path).starts_with("pkg:")
+}
+
+/// The directory holding the owning manifest — the package's identity.
+/// Only meaningful when file_has_package(file_path); returns the _NO_PACKAGE
+/// sentinel otherwise, which is not a path.
+fun package_root_of_file(file_path: String): String {
+    var entry: String = _package_entry_of_file(file_path)
+    if (!entry.starts_with("pkg:")) { return _no_package_marker() }
+    var body: String = entry.slice(4, entry.length())
+    var bar: Float = body.index_of("|")
+    if (bar < 0) { return body }
+    return body.slice(0, bar)
+}
+
+/// The manifest's declared `[package] name`. Diagnostics only — names are NOT
+/// unique in this tree (root and src/compiler/ both declare "saffron"), and an
+/// empty result means the manifest omitted the key, not that there is no package.
+fun package_name_of_file(file_path: String): String {
+    var entry: String = _package_entry_of_file(file_path)
+    if (!entry.starts_with("pkg:")) { return _no_package_marker() }
+    var body: String = entry.slice(4, entry.length())
+    var bar: Float = body.index_of("|")
+    if (bar < 0) { return "" }
+    return body.slice(bar + 1, body.length())
+}
+
+/// "Same file?" — module identity in Saffron is the file (module_prefix_from_file).
+fun same_module_file(a_path: String, b_path: String): Bool {
+    return a_path == b_path
+}
+
+/// "Same package?" — false when either file has no owning package. Two packageless
+/// files are not in a shared package, so `internal` must not grant access between
+/// them; only same_module_file() may.
+fun same_package(a_path: String, b_path: String): Bool {
+    if (!file_has_package(a_path)) { return false }
+    if (!file_has_package(b_path)) { return false }
+    return package_root_of_file(a_path) == package_root_of_file(b_path)
+}
+
+/// Every file the compiler loaded, in load order. Paired with the accessors above
+/// this is the whole mapping, for a later phase to thread into the front end.
+fun loaded_file_paths(): List<String> {
+    return _file_to_package.keys()
+}
+
+fun print_package_map() {
+    var paths: List<String> = loaded_file_paths()
+    var i: Float = 0
+    while (i < paths.length()) {
+        var p: String = paths[i]
+        if (file_has_package(p)) {
+            IO.println(p + "\t" + package_root_of_file(p) + "\t" + package_name_of_file(p))
+        } else {
+            IO.println(p + "\tNO-PACKAGE\tNO-PACKAGE")
+        }
+        i = i + 1
+    }
+    // Also exercise the two relational queries a visibility check will actually
+    // call, against the first loaded file. Defining them and never calling them
+    // would leave them untested (and, given #37, possibly silently wrong).
+    if (paths.length() > 0) {
+        var first: String = paths[0]
+        var j: Float = 0
+        while (j < paths.length()) {
+            var q: String = paths[j]
+            IO.println("REL\t" + first + "\t" + q + "\tsame_file=" + same_module_file(first, q).to_string() + "\tsame_pkg=" + same_package(first, q).to_string())
+            j = j + 1
+        }
+    }
 }
 
 fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: String): String {
@@ -587,6 +829,8 @@ fun _build_package_exports(alias: String, entry_path: String, imp_path: String, 
 fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
+    // Owning package, recorded by the same walk that fills path_to_prefix.
+    record_file_package(file_path)
 
     var source: String = IO.read_file(file_path)
     var tokens: List = Lexer.lex(source)
@@ -676,6 +920,11 @@ fun main(): Int {
     // turns it off so a suspected regression can be attributed to the pass
     // itself rather than to whatever else changed.
     var run_resolve: Bool = true
+    // --dump-packages prints the file → owning-package mapping and exits. The
+    // mapping has no surface syntax yet (nothing consumes it), so this flag is
+    // how it is observable and testable at all; test/pass/package_map_test.sf
+    // drives it.
+    var dump_packages: Bool = false
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
@@ -691,6 +940,9 @@ fun main(): Int {
         }
         if (arg == "--identity-mode") {
             identity_mode = true
+        }
+        if (arg == "--dump-packages") {
+            dump_packages = true
         }
         if (arg == "--no-llvm-lib") {
             use_llvm_lib = false
@@ -762,7 +1014,7 @@ fun main(): Int {
     }
 
     if (last_sf_idx < 0) {
-        IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... <input.sf> [output.ll]")
+        IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... [--dump-packages] <input.sf> [output.ll]")
         return 1
     }
 
@@ -784,6 +1036,7 @@ fun main(): Int {
     }
 
     // Lex and parse the main file
+    record_file_package(input_path)
     var source: String = IO.read_file(input_path)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse_with_source(tokens, source)
@@ -895,6 +1148,7 @@ fun main(): Int {
         module_stmts.push(prelude_program)
         module_prefixes_list.push("")
         visited.set(prelude_path, true)
+        record_file_package(prelude_path)
     }
 
     // Auto-import dependency preludes (src/prelude.sf in each lib-path package)
@@ -924,6 +1178,7 @@ fun main(): Int {
                     module_stmts.push(dep_program)
                     module_prefixes_list.push(dep_prefix)
                     visited.set(pkg_prelude, true)
+                    record_file_package(pkg_prelude)
 
                     // A dependency prelude is a normal module: it may import
                     // other modules of its own package. Register its aliases
@@ -988,6 +1243,11 @@ fun main(): Int {
 
     if (Parser.had_error()) {
         c_exit(1)
+    }
+
+    if (dump_packages) {
+        print_package_map()
+        return 0
     }
 
     // Flatten module_stmts into a single list with boundary markers
