@@ -904,20 +904,22 @@ entry:
 
 ; --- Heap Object Type ID ---
 
-; @override wasm32 -- DRIFT (confirmed live bug, BUGS #109): loads the type id
-;   from user+0, but every wasm32 allocator stores it at user-16 and the magic
-;   at user-8. user+0 is the object's first payload word (a list's `count`),
-;   so `is String`/`is List`/`is Map` are all false on wasm32. Kept as an
-;   override rather than silently fixed because the fix belongs in a change
-;   that can be tested on its own; the override is what makes the divergence
-;   visible instead of invisible.
 define i64 @__val_type_id(i64 %v) {
 entry:
-  ; For a heap pointer, read the type ID from the first field of the object
+  ; For a heap pointer, check if it has a GC header (magic sentinel at ptr - 8)
   %ptr_int = and i64 %v, 281474976710655      ; mask off tag
-  %ptr = inttoptr i64 %ptr_int to i64*
-  %type_id = load i64, i64* %ptr
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %is_string
+read_tag:
+  ; GC-managed object: read type tag from header
+  %type_id = call i64 @__gc_get_type_tag(i64 %ptr_int)
   ret i64 %type_id
+is_string:
+  ; Plain malloc'd buffer (no GC header) = string (type 1)
+  ret i64 1
 }
 
 ; @override wasm32 -- Same logic as native with ONE deliberate difference: the
@@ -968,36 +970,68 @@ no:
   ret i1 false
 }
 
-; @override wasm32 -- DRIFT: still the pre-88297ca identity-mode body. Routes
-;   through this base's broken __val_type_id, which reads the type id from the
-;   object's first user word while wasm32's allocators store the tag in the
-;   16-byte header BEFORE the user pointer, so this is unconditionally false
-;   on wasm32 (BUGS #109).
 define i1 @__val_is_list(i64 %v) {
 entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
   %upper = lshr i64 %v, 48
   %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
+  br i1 %is_ptr, label %check, label %check_raw
 check:
   %tid = call i64 @__val_type_id(i64 %v)
   %result = icmp eq i64 %tid, 2               ; TYPE_LIST
   ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_list = icmp eq i64 %gc_tag, 2
+  ret i1 %gc_is_list
 no:
   ret i1 false
 }
 
-; @override wasm32 -- DRIFT: same as __val_is_list on wasm32 -- routes through
-;   the broken __val_type_id and is therefore unconditionally false (BUGS
-;   #109).
 define i1 @__val_is_map(i64 %v) {
 entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
   %upper = lshr i64 %v, 48
   %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
+  br i1 %is_ptr, label %check, label %check_raw
 check:
   %tid = call i64 @__val_type_id(i64 %v)
   %result = icmp eq i64 %tid, 3               ; TYPE_MAP
   ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_map = icmp eq i64 %gc_tag, 3
+  ret i1 %gc_is_map
 no:
   ret i1 false
 }

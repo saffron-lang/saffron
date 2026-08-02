@@ -531,16 +531,6 @@ is_string:
   ; Plain malloc'd buffer (no GC header) = string (type 1)
   ret i64 1
 }
-@override wasm32
-reason = DRIFT (confirmed live bug, BUGS #109): loads the type id from user+0, but every wasm32 allocator stores it at user-16 and the magic at user-8. user+0 is the object's first payload word (a list's `count`), so `is String`/`is List`/`is Map` are all false on wasm32. Kept as an override rather than silently fixed because the fix belongs in a change that can be tested on its own; the override is what makes the divergence visible instead of invisible.
-define i64 @__val_type_id(i64 %v) {
-entry:
-  ; For a heap pointer, read the type ID from the first field of the object
-  %ptr_int = and i64 %v, 281474976710655      ; mask off tag
-  %ptr = inttoptr i64 %ptr_int to i64*
-  %type_id = load i64, i64* %ptr
-  ret i64 %type_id
-}
 
 [helper __val_class_tag]
 targets = native wasm64 wasm32
@@ -707,20 +697,6 @@ define i1 @__val_is_list(i64 %v) {
 entry:
   ret i1 false
 }
-@override wasm32
-reason = DRIFT: still the pre-88297ca identity-mode body. Routes through this base's broken __val_type_id, which reads the type id from the object's first user word while wasm32's allocators store the tag in the 16-byte header BEFORE the user pointer, so this is unconditionally false on wasm32 (BUGS #109).
-define i1 @__val_is_list(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 2               ; TYPE_LIST
-  ret i1 %result
-no:
-  ret i1 false
-}
 
 [helper __val_is_map]
 targets = boot native wasm64 wasm32
@@ -774,20 +750,6 @@ no:
 reason = wasm64 has no heap type tags at all (its __gc_alloc is a bare malloc with no header), so it cannot answer this and returns false.
 define i1 @__val_is_map(i64 %v) {
 entry:
-  ret i1 false
-}
-@override wasm32
-reason = DRIFT: same as __val_is_list on wasm32 -- routes through the broken __val_type_id and is therefore unconditionally false (BUGS #109).
-define i1 @__val_is_map(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 3               ; TYPE_MAP
-  ret i1 %result
-no:
   ret i1 false
 }
 
