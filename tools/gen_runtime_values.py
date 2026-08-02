@@ -64,6 +64,24 @@ class SpecError(Exception):
     pass
 
 
+def wrap_comment(text, width=78):
+    """Wrap prose into `; `-prefixed LLVM comment lines."""
+    words = text.split()
+    lines = []
+    cur = ";"
+    for w in words:
+        if cur == ";":
+            cur = "; " + w
+        elif len(cur) + 1 + len(w) <= width:
+            cur += " " + w
+        else:
+            lines.append(cur)
+            cur = ";   " + w
+    if cur != ";":
+        lines.append(cur)
+    return "\n".join(lines)
+
+
 class Target:
     def __init__(self, name, discipline, filename):
         self.name = name
@@ -83,11 +101,19 @@ class Helper:
         self.overrides = {}   # target name -> (body text, reason)
 
     def body_for(self, target):
-        """The body this helper contributes to `target`, or None if absent."""
+        """The body this helper contributes to `target`, or None if absent.
+
+        An override's `reason` is emitted above the body as an LLVM comment. A
+        reader of the `.ll` needs to know why this target's copy differs without
+        having to go and find the spec, and it means the justification travels
+        with the code the way the hand-written comment used to.
+        """
         if target.name not in self.targets:
             return None
         if target.name in self.overrides:
-            return self.overrides[target.name][0]
+            body, reason = self.overrides[target.name]
+            return "%s\n%s" % (wrap_comment(
+                "@override %s -- %s" % (target.name, reason)), body)
         if "both" in self.bodies:
             return self.bodies["both"]
         body = self.bodies.get(target.discipline)
@@ -260,7 +286,7 @@ def render(target, sections):
     return "\n".join(out)
 
 
-def splice(text, target, sections):
+def splice(text, target, sections, declared):
     """Replace the marked region of `text`, or report that markers are missing."""
     lines = text.split("\n")
     begins = [i for i, l in enumerate(lines) if l.startswith(BEGIN)]
@@ -273,6 +299,30 @@ def splice(text, target, sections):
     if b > e:
         raise SpecError("%s has the end marker before the begin marker"
                         % target.filename)
+
+    # A `define` sitting inside the markers that the spec does not declare would
+    # be DELETED by the rewrite below, silently and with no diff to review if the
+    # writer is trusted. That is a worse failure than the drift this generator
+    # exists to prevent -- drift is at least visible in a diff -- so refuse.
+    #
+    # This is not hypothetical: `__val_class_tag` and `__val_tag_ptr_nullable`
+    # both landed inside the block while the spec knew nothing about them,
+    # because the block is exactly where a reader looks for the value helpers.
+    # Either declare it in values.spec, or move it below the end marker.
+    inside = "\n".join(lines[b:e + 1])
+    orphans = [name for name in
+               re.findall(r"^define\s+.*?@([A-Za-z0-9_.$]+)\s*\(", inside, re.M)
+               if name not in declared]
+    if orphans:
+        raise SpecError(
+            "%s: the generated block defines %s, which values.spec does not "
+            "declare.\nRegenerating would DELETE %s. Either add %s to "
+            "values.spec, or move %s below the `%s` marker."
+            % (target.filename, ", ".join("@" + o for o in orphans),
+               "them" if len(orphans) > 1 else "it",
+               "them" if len(orphans) > 1 else "it",
+               "them" if len(orphans) > 1 else "it", END))
+
     banner = BANNER.format(begin=BEGIN, target=target.name,
                            discipline=target.discipline)
     block = [banner, ""] + render(target, sections).split("\n") + ["", END]
@@ -303,12 +353,13 @@ def main():
         print(render(match[0], sections))
         return 0
 
+    declared = {h.name for _, helpers in sections for h in helpers}
     stale = []
     for target in targets:
         with open(target.path) as fh:
             old = fh.read()
         try:
-            new = splice(old, target, sections)
+            new = splice(old, target, sections, declared)
         except SpecError as exc:
             sys.stderr.write("%s\n" % exc)
             return 2

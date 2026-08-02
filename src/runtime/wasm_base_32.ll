@@ -695,6 +695,14 @@ entry:
   ret i64 %tagged
 }
 
+; @override wasm32 -- Differs from native in ONE respect only: no
+;   sign-extended-raw-int case, because wasm32 pointers and indices are 32-bit
+;   and zero-extended, so `high_bits == 0xFFFFFFFF` cannot arise from a raw
+;   value. The BUGS #38 denormal guard IS present in both (it lands on
+;   `raw_int` here rather than a separate `raw_ptr` block; same `ret i64 %v`).
+;   Block order also differs, cosmetically. Reconciling the remaining sign-ext
+;   gap is BUGS #82/#83 territory; until then this override is what keeps the
+;   guard from being lost.
 define i64 @__val_untag_int(i64 %v) {
 entry:
   ; Check if value is NaN-boxed (top 16 bits in 0x7FF8..0x7FFF)
@@ -754,8 +762,15 @@ entry:
   ret i64 %tagged
 }
 
-; See base_nanbox.ll: map a NULL void* extern return to int-tagged 0 so the
-; `== 0` guard C-convention code writes actually fires (BUGS #84).
+; Tag a pointer returned by a `void*` @extern, mapping a NULL to int-tagged 0
+; rather than to TAG_PTR|0. A C function that returns NULL on failure (fopen,
+; fgets, strstr, ...) is guarded in Saffron with `== 0`, which lowers to a raw
+; icmp against __val_tag_int(0) = 9221401712017801216. Plain __val_tag_ptr(NULL)
+; is 0x7FF8000000000000 (TAG_PTR|0), a value that is not equal to that, passes
+; __val_is_ptr, and is then dereferenced far from the call — BUGS #84. A
+; non-NULL pointer keeps its normal TAG_PTR representation, so the ~50 other
+; emit_tag_ptr sites and the String-returning void* stdlib wrappers are
+; untouched; only the NULL case changes.
 define i64 @__val_tag_ptr_nullable(i8* %ptr) {
 entry:
   %int_ptr = ptrtoint i8* %ptr to i64
@@ -832,6 +847,9 @@ entry:
 
 ; --- Type Checking ---
 
+; @override wasm32 -- DRIFT: lacks the raw-GC-pointer probe that native grew
+;   in 6de2898, so a bare heap pointer reaching an `Any` binding is still
+;   misclassified as a float on wasm32.
 define i1 @__val_is_float(i64 %v) {
 entry:
   ; A value is a float if it's NOT in our NaN-tagged range
@@ -888,66 +906,28 @@ entry:
 
 define i64 @__val_type_id(i64 %v) {
 entry:
-  ; For a heap pointer, read the type ID from the first field of the object
+  ; For a heap pointer, check if it has a GC header (magic sentinel at ptr - 8)
   %ptr_int = and i64 %v, 281474976710655      ; mask off tag
-  %ptr = inttoptr i64 %ptr_int to i64*
-  %type_id = load i64, i64* %ptr
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %is_string
+read_tag:
+  ; GC-managed object: read type tag from header
+  %type_id = call i64 @__gc_get_type_tag(i64 %ptr_int)
   ret i64 %type_id
+is_string:
+  ; Plain malloc'd buffer (no GC header) = string (type 1)
+  ret i64 1
 }
 
-define i1 @__val_is_string(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 1               ; TYPE_STRING
-  ret i1 %result
-no:
-  ret i1 false
-}
-
-define i1 @__val_is_list(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 2               ; TYPE_LIST
-  ret i1 %result
-no:
-  ret i1 false
-}
-
-define i1 @__val_is_map(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 3               ; TYPE_MAP
-  ret i1 %result
-no:
-  ret i1 false
-}
-
-; @generated-values:end
-
-; __val_class_tag: the per-class GC type tag of a value, or 0 if it has none.
-; Class tags start at 10, so 0 is an unambiguous "not a class instance".
-;
-; See the base_nanbox.ll copy for the reasoning; both accept an instance in
-; either representation (a constructor returns a bare untagged pointer, a value
-; that has been through a collection carries TAG_PTR) and both guard the magic
-; load, since this is called on Any-typed values that may be boxed Ints.
-;
-; The 4 GB lower bound is deliberately NOT applied here: wasm32 linear memory
-; starts near zero, so it would reject every real pointer. Alignment plus the
-; magic sentinel carry the check, and a stray load cannot fault outside the
-; sandbox — the worst case is reading a wrong tag, not a crash.
+; @override wasm32 -- Same logic as native with ONE deliberate difference: the
+;   4 GB lower bound is not applied, because wasm32 linear memory starts near
+;   zero and the bound would reject every real pointer. The floor is 16
+;   instead (the header size), so a user pointer is always above it. Alignment
+;   plus the magic sentinel carry the check, and a stray load cannot fault
+;   outside the sandbox -- worst case is a wrong tag, not a crash.
 define i64 @__val_class_tag(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
@@ -976,6 +956,87 @@ read_tag:
 not_a_class:
   ret i64 0
 }
+
+define i1 @__val_is_string(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %no
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 1               ; TYPE_STRING
+  ret i1 %result
+no:
+  ret i1 false
+}
+
+define i1 @__val_is_list(i64 %v) {
+entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %check_raw
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 2               ; TYPE_LIST
+  ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_list = icmp eq i64 %gc_tag, 2
+  ret i1 %gc_is_list
+no:
+  ret i1 false
+}
+
+define i1 @__val_is_map(i64 %v) {
+entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %check_raw
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 3               ; TYPE_MAP
+  ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_map = icmp eq i64 %gc_tag, 3
+  ret i1 %gc_is_map
+no:
+  ret i1 false
+}
+
+; @generated-values:end
 
 ; =============================================================================
 ; to_string Helpers
