@@ -2895,7 +2895,7 @@ class Parser {
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(ta_n, ta_t) => "other"
+            TypeAlias(ta_n, ta_t, ta_vis) => "other"
         }
         if (kind == "expr") {
             return match (stmt) { ExprStmt(e) => e   _ => AST.Expr.NilLit }

@@ -135,7 +135,7 @@ class Resolver {
             EnumDecl(name, variants, doc) => {
                 this.types.set(name, true)
             }
-            TypeAlias(name, target) => {
+            TypeAlias(name, target, ta_vis) => {
                 this.types.set(name, true)
             }
             ExprStmt(e) => {}
@@ -268,9 +268,9 @@ class Resolver {
                 this.types.set(name, true)
                 AST.Stmt.EnumDecl(name, variants, doc)
             }
-            TypeAlias(name, target) => {
+            TypeAlias(name, target, ta_vis) => {
                 this.types.set(name, true)
-                AST.Stmt.TypeAlias(name, target)
+                AST.Stmt.TypeAlias(name, target, ta_vis)
             }
             Break => { AST.Stmt.Break }
             Continue => { AST.Stmt.Continue }
