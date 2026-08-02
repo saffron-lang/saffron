@@ -160,8 +160,13 @@ uses_io_print() {   # file
 main_entry_only() {   # file
     grep -qE '^[[:space:]]*fun[[:space:]]+main[[:space:]]*\(' "$1" || return 1
     # Any top-level call (e.g. `main()`, `IO.println(...)`) means the shim IS
-    # emitted and the program runs normally on wasm32.
-    ! grep -qE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*\(' "$1"
+    # emitted and the program runs normally on wasm32. Anchored at column 0 with
+    # NO leading-whitespace allowance: an indented call sits inside a function
+    # body, and allowing indentation made every `fun main` program look like it
+    # had top-level code (mini_hello.sf matched on its own `IO.println` at line
+    # 2). `fun main(...)` itself cannot match — the space after `fun` ends the
+    # identifier before the '('.
+    ! grep -qE '^[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*\(' "$1"
 }
 
 # Tests that intentionally exit nonzero because their exit code IS the result
