@@ -1,0 +1,23 @@
+Red
+Green
+Blue
+Red
+Green
+Blue
+Red
+Blue
+Green
+Green
+Green
+Circle(2.5)
+Square(4)
+Named(box)
+Circle(2.5)
+Square(4)
+Named(box)
+Nothing
+Just(7)
+Nothing
+Just(7)
+[Red, Blue]
+[Nothing, Just(1)]

@@ -84,38 +84,48 @@ IO.println([[1, 2], [3]])
 
 // --- enums: the #102 corpus ---
 //
+// Every enum value below is stringified via INTERPOLATION, i.e. `"${e}"`, never
+// via a bare `IO.println(e)`. That is deliberate and it is not a stylistic
+// choice: `IO.println(enum_value)` is separately broken today — it passes the
+// `tag << 56` immediate straight to __io_println with no to_string() call, so the
+// runtime formats the bit pattern as a subnormal double ("7.29112e-304").
+// test/oracle_enum_println.sf is the regression case for that, found by this
+// file. Using the bare form here too would make this file fail for that reason
+// instead of testing what it is for, which is the CONTENT of the generated
+// to_string() — the thing #102 got wrong.
+//
 // Zero fields. The degenerate case that worked, kept as the control.
 enum Color {
     Red,
     Green,
     Blue
 }
-IO.println(Color.Red)
-IO.println(Color.Green)
-IO.println(Color.Blue)
+IO.println("${Color.Red}")
+IO.println("${Color.Green}")
+IO.println("${Color.Blue}")
 
 // Exactly ONE field — the #102 case. One variant per payload type, and the
 // variant printed is NOT always the first, because #102 rendered everything as
 // the first variant and a first-variant-only test would have agreed with the bug.
 enum OneInt { OI(v: Int) }
-IO.println(OneInt.OI(0))
-IO.println(OneInt.OI(7))
-IO.println(OneInt.OI(-7))
+IO.println("${OneInt.OI(0)}")
+IO.println("${OneInt.OI(7)}")
+IO.println("${OneInt.OI(-7)}")
 
 enum OneFloat { OF(v: Float) }
-IO.println(OneFloat.OF(1.5))
-IO.println(OneFloat.OF(0.0))
+IO.println("${OneFloat.OF(1.5)}")
+IO.println("${OneFloat.OF(0.0)}")
 
 enum OneStr { OS(v: String) }
-IO.println(OneStr.OS("payload"))
-IO.println(OneStr.OS(""))
+IO.println("${OneStr.OS("payload")}")
+IO.println("${OneStr.OS("")}")
 
 enum OneBool { OB(v: Bool) }
-IO.println(OneBool.OB(true))
-IO.println(OneBool.OB(false))
+IO.println("${OneBool.OB(true)}")
+IO.println("${OneBool.OB(false)}")
 
 enum OneList { OL(v: List<Int>) }
-IO.println(OneList.OL([1, 2]))
+IO.println("${OneList.OL([1, 2])}")
 
 // Multiple one-field variants, so "which variant" is a real question and not
 // answerable by always saying "the first".
@@ -124,60 +134,66 @@ enum Shape {
     Square(side: Int),
     Named(name: String)
 }
-IO.println(Shape.Circle(2.5))
-IO.println(Shape.Square(4))
-IO.println(Shape.Named("box"))
+IO.println("${Shape.Circle(2.5)}")
+IO.println("${Shape.Square(4)}")
+IO.println("${Shape.Named("box")}")
 
 // Two and three fields, mixed payload types.
 enum Pair { P(a: Int, b: Int) }
-IO.println(Pair.P(1, 2))
+IO.println("${Pair.P(1, 2)}")
 
 enum Mixed { M(n: Int, s: String, f: Float) }
-IO.println(Mixed.M(1, "two", 3.5))
+IO.println("${Mixed.M(1, "two", 3.5)}")
 
 enum Tagged {
     Empty,
     One(a: Int),
     Two(a: Int, b: String)
 }
-IO.println(Tagged.Empty)
-IO.println(Tagged.One(9))
-IO.println(Tagged.Two(9, "nine"))
+IO.println("${Tagged.Empty}")
+IO.println("${Tagged.One(9)}")
+IO.println("${Tagged.Two(9, "nine")}")
 
 // Nested: an enum whose payload is another enum. If the inner to_string is wrong
 // the outer inherits it, so this catches a partial fix that only handled depth 1.
 enum Wrapper { W(inner: Color) }
-IO.println(Wrapper.W(Color.Blue))
+IO.println("${Wrapper.W(Color.Blue)}")
 
-// Enum through interpolation, which is a separate code path from a direct print.
-IO.println("interp enum=${Shape.Square(4)}")
-IO.println("interp one-field=${OneStr.OS("x")}")
-
-// Enum bound to a variable, then printed — the value has round-tripped through a
-// slot rather than being consumed straight from the constructor.
+// Enum bound to a variable, then stringified — the value has round-tripped
+// through a global slot rather than being consumed straight from the constructor.
 var sh = Shape.Named("stored")
-IO.println(sh)
+IO.println("${sh}")
 var ob = OneBool.OB(true)
-IO.println(ob)
+IO.println("${ob}")
 
-// Enum in a list: stringification through the list's element formatter.
-IO.println([Color.Red, Color.Green])
-IO.println([OneInt.OI(1), OneInt.OI(2)])
+// Explicit .to_string(), the other correct path, on the shapes #102 broke.
+IO.println(OneStr.OS("explicit").to_string())
+IO.println(Shape.Square(11).to_string())
+IO.println(Color.Blue.to_string())
 
 // --- match on the same values, to pin down variant identity ---
 //
 // #102 made to_string() report the wrong variant while match still dispatched
 // correctly. Printing the match result next to the direct print puts the two
 // readings of one value side by side, so a disagreement is local.
+// The bindings below are named `mr`/`ms`/`mn` rather than the obvious `r`/`s`/`n`
+// to avoid a SEPARATE compiler bug that this file tripped over while being
+// written: a match-arm binding whose name collides with a module-global variable
+// emits `store i64 %tN, i64* %s` against a global that lives at `@__g_s`, which
+// is invalid IR ("use of undefined value '%s'"). Inside a function the same
+// collision is worse — it type checks, compiles, and silently overwrites the
+// outer variable's slot with the payload. See test/oracle_match_shadow.sf, which
+// is the dedicated regression case; this file works around it so that it can go
+// on testing stringification, which is what it is for.
 var m1 = match (Shape.Square(4)) {
-    Circle(r) => "matched Circle ${r}"
-    Square(s) => "matched Square ${s}"
-    Named(n) => "matched Named ${n}"
+    Circle(mr) => "matched Circle ${mr}"
+    Square(ms) => "matched Square ${ms}"
+    Named(mn) => "matched Named ${mn}"
 }
 IO.println(m1)
 
 var m2 = match (OneBool.OB(false)) {
-    OB(v) => "matched OB ${v}"
+    OB(mv) => "matched OB ${mv}"
 }
 IO.println(m2)
 
