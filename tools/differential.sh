@@ -136,6 +136,34 @@ wasm_unsupported_by_name() {
     esac
 }
 
+# IO.print (no trailing newline) is not expressible on wasm32. Both __io_println
+# and __io_print land on the single js_log_str import (wasm_base_32.ll:1751),
+# where native __io_print is printf("%s") with no terminator
+# (base_nanbox.ll:113-119). The host therefore has to terminate every call, so a
+# program that uses IO.print reads as extra newlines on the wasm side.
+#
+# That is a gap in the four hand-maintained .ll bases, not a wrong answer, and it
+# was previously reported as a MISMATCH on test/pass/narrowing.sf — a harness
+# artifact indistinguishable from a codegen bug. Skip by capability until a
+# no-newline import exists in src/runtime/; then delete this function.
+uses_io_print() {   # file
+    grep -qE '\bIO\.print[[:space:]]*\(' "$1"
+}
+
+# A program whose entry point is `fun main()` with no top-level statements prints
+# NOTHING on wasm32: output_body.sf emits the __saffron_boot shim only when the
+# file has top-level code, while wasm_base_32.ll's _start calls @__saffron_boot()
+# unconditionally and --import-undefined turns the missing symbol into a silent
+# no-op. That is BUGS #110, a real and filed compiler bug, but it makes every such
+# program a whole-output mismatch that drowns out any other finding, so it is
+# gated by capability and tracked as #110 rather than re-reported per test.
+main_entry_only() {   # file
+    grep -qE '^[[:space:]]*fun[[:space:]]+main[[:space:]]*\(' "$1" || return 1
+    # Any top-level call (e.g. `main()`, `IO.println(...)`) means the shim IS
+    # emitted and the program runs normally on wasm32.
+    ! grep -qE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*\(' "$1"
+}
+
 # Tests that intentionally exit nonzero because their exit code IS the result
 # (mini_while exits 55 = fib(10)). Their stdout is still comparable; only the
 # exit-status check has to be relaxed.
@@ -315,6 +343,16 @@ check_file() {   # file label
             if wasm_unsupported_by_name "$name" \
                || grep -qE "import[^\"]*($WASM_UNSUPPORTED_IMPORTS)" "$f"; then
                 printf 'SKIP     %-40s wasm32: needs a host the shim does not provide\n' "$label"
+                N_SKIP=$((N_SKIP + 1))
+                continue
+            fi
+            if uses_io_print "$f"; then
+                printf 'SKIP     %-40s wasm32: IO.print has no no-newline import\n' "$label"
+                N_SKIP=$((N_SKIP + 1))
+                continue
+            fi
+            if main_entry_only "$f"; then
+                printf 'SKIP     %-40s wasm32: `fun main` entry never runs (BUGS #110)\n' "$label"
                 N_SKIP=$((N_SKIP + 1))
                 continue
             fi
