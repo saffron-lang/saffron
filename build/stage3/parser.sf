@@ -1056,6 +1056,29 @@ class Parser {
         if (s == "String") return AST.Type.StringType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
+        // Function type: "Fun(A,B):R", as parse_single_type encodes `(A, B) => R`.
+        //
+        // This is checked BEFORE the union and generic branches, not after, because
+        // both of those would claim the string first and mangle it. `Fun(Map<String,
+        // Int>):Bool` contains a `<`, so the generic branch below used to slice it
+        // into GenericType("Fun(Map", ...) — and it does not end in `>`, so even the
+        // argument slice was off by the trailing `):Bool`. Likewise `Fun(String|Nil):
+        // Int` contains a `|` and came out as a two-member union of two fragments.
+        // A function type is recognizable from its first four characters; recognize
+        // it there and the nesting is handled by recursion instead of by luck.
+        if (s.starts_with("Fun(")) {
+            return this.parse_fun_type_ast(s)
+        }
+        // Receiver function type: "Fun[Type](...):Ret"
+        //
+        // Also moved above the generic branch for the same reason: `Fun[Map<String,
+        // Int>]():Bool` was being read as a generic. This still returns ClassType(s)
+        // — the whole encoded string as a class name, which is what every downstream
+        // consumer of a receiver closure type already expects — so the only change is
+        // that it now reaches this line at all.
+        if (s.starts_with("Fun[")) {
+            return AST.Type.ClassType(s)
+        }
         // Union: "String|Nil" or "Int|String"
         if (s.contains("|")) {
             var parts: List<String> = s.split("|")
@@ -1089,16 +1112,93 @@ class Parser {
             }
             return AST.Type.GenericType(base, args)
         }
-        // Function type: "Fun(...):Ret"
-        if (s.starts_with("Fun(")) {
-            return AST.Type.FuncType([], AST.Type.AnyType)
-        }
-        // Receiver function type: "Fun[Type](...):Ret"
-        if (s.starts_with("Fun[")) {
-            return AST.Type.ClassType(s)
-        }
         // Class/Enum type
         return AST.Type.ClassType(s)
+    }
+
+    // Parse the "Fun(A,B):R" encoding that parse_single_type produces for the arrow
+    // spelling `(A, B) => R` into the FuncType node it describes.
+    //
+    // This used to be one line in parse_type_ast:
+    //     if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }
+    // which threw away the parameter list and the return type that parse_single_type
+    // had just finished encoding. Every consumer downstream then saw a FuncType with
+    // no parameters returning Any, and could not tell `(Box) => String` apart from a
+    // bare `Fun`. That is what made `Fun<A, B, R>` the only spelling able to type a
+    // block-syntax lambda `{ x => ... }` (BUGS #86): the checker's fun_param_types_of
+    // reads the rendered declared type, and there was nothing left in it to read.
+    //
+    // The shape is fixed by parse_single_type (see the `=>` branch there): literal
+    // "Fun(", the parameter types joined by "," with no spaces, then "):", then the
+    // return type. Both halves go back through parse_type_ast, so a nested function
+    // type or generic in either position parses by recursion.
+    fun parse_fun_type_ast(s: String): AST.Type {
+        // Find the ")" that closes the "(" in "Fun(". NOT the first ")": a nested
+        // function type in the parameter list — "Fun(Fun(Int):Int):Bool" — has its
+        // own, and stopping at that one would read the parameters as "Fun(Int" and
+        // the return type as "Int):Bool".
+        var depth: Float = 0
+        var close_paren: Float = 0 - 1
+        var i: Float = 4
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "(") {
+                depth = depth + 1
+            } else if (ch == ")") {
+                if (depth == 0) {
+                    close_paren = i
+                    i = s.length()
+                } else {
+                    depth = depth - 1
+                }
+            }
+            i = i + 1
+        }
+        // Unbalanced. Nothing parse_single_type emits looks like this, so it means
+        // the string came from somewhere else; there is no structure to recover and
+        // guessing one is what this function exists to stop doing.
+        if (close_paren < 0) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
+
+        var params_str: String = s.slice(4, close_paren)
+        var param_types: List<AST.Type> = []
+        // "Fun():Void" must give zero parameters, not one parameter named "". Guard
+        // on the slice being empty rather than splitting and filtering after, so the
+        // empty string never becomes a type name.
+        if (params_str.length() > 0) {
+            var param_strs: List<String> = this.split_type_args(params_str)
+            var pi: Float = 0
+            while (pi < param_strs.length()) {
+                var p: String = param_strs[pi].trim()
+                if (p.length() > 0) {
+                    param_types.push(this.parse_type_ast(p))
+                }
+                pi = pi + 1
+            }
+        }
+
+        // ":" + return type follows the ")". A missing return type cannot come out of
+        // parse_single_type, which always writes "):" before the return type — so
+        // reaching this default means the string was built elsewhere. Any is the same
+        // answer codegen's parse_func_type_str (types_body.sf) gives for the same
+        // input, and it keeps the two readings of one encoding in agreement.
+        var ret_type: AST.Type = AST.Type.AnyType
+        if (close_paren + 1 < s.length() and s.char_at(close_paren + 1) == ":") {
+            var ret_str: String = s.slice(close_paren + 2, s.length()).trim()
+            if (ret_str.length() > 0) {
+                // A top-level "|" here belongs to the RETURN type, not to the
+                // function type. parse_single_type builds the return type with a full
+                // parse_type() call, which consumes `?` and `|` itself — so by the
+                // time it returns "Fun(A):R", the token stream is already past any
+                // union, and the outer parse_type can never append one. `(A) => R?`
+                // and `(A) => R|Nil` both arrive here as "Fun(A):R|Nil", meaning a
+                // function returning `R|Nil`. The nullable-function type
+                // `((A) => R)|Nil` has no distinct spelling in this encoding.
+                ret_type = this.parse_type_ast(ret_str)
+            }
+        }
+        return AST.Type.FuncType(param_types, ret_type)
     }
 
     fun type_ast_to_string(t: AST.Type): String {
@@ -1118,6 +1218,20 @@ class Parser {
         }
     }
 
+    // Split a comma-separated type list on its TOP-LEVEL commas only.
+    //
+    // `<>`, `()` and `[]` all nest. Angle brackets were the only pair tracked here,
+    // which was enough while the sole caller was the generic branch of
+    // parse_type_ast — a generic argument list has no bare parentheses. It stopped
+    // being enough once parse_fun_type_ast started splitting a function type's
+    // parameter list, because a nested function type puts its own commas inside
+    // parentheses: the parameter list of `Fun(Fun(Int,Bool):Int,String)` is
+    // "Fun(Int,Bool):Int,String", whose first comma is inside the inner `Fun(...)`.
+    // Tracking `<>` alone split that into three fragments — "Fun(Int", "Bool):Int",
+    // "String" — and each fragment then parsed as a class named after the fragment.
+    //
+    // `[]` is tracked for the receiver form "Fun[Recv](A,B):R", which reaches the
+    // parameter list of an enclosing function type the same way.
     fun split_type_args(s: String): List<String> {
         var args: List<String> = []
         var current: String = ""
@@ -1125,10 +1239,10 @@ class Parser {
         var i: Float = 0
         while (i < s.length()) {
             var ch: String = s.char_at(i)
-            if (ch == "<") {
+            if (ch == "<" or ch == "(" or ch == "[") {
                 depth = depth + 1
                 current = current + ch
-            } else if (ch == ">") {
+            } else if (ch == ">" or ch == ")" or ch == "]") {
                 depth = depth - 1
                 current = current + ch
             } else if (ch == "," and depth == 0) {
