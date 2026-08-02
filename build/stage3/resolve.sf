@@ -126,7 +126,7 @@ class Resolver {
             VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.globals.set(name, this.current_prefix)
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 this.funcs.set(name, this.current_prefix)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
@@ -174,7 +174,7 @@ class Resolver {
                 }
                 AST.Stmt.VarDecl(name, type_ann, new_init, doc, v_vis)
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 this.funcs.set(name, this.current_prefix)
                 this.push_scope()
                 var pi: Float = 0
@@ -186,7 +186,7 @@ class Resolver {
                 }
                 var new_body: List<AST.Stmt> = this.resolve_stmts(body)
                 this.pop_scope()
-                AST.Stmt.FunDecl(name, params, ret_type, new_body, doc)
+                AST.Stmt.FunDecl(name, params, ret_type, new_body, doc, f_vis)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 // Methods get a scope holding the receiver plus the field
