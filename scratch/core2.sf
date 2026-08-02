@@ -1,0 +1,8 @@
+class Ctx2 {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+}
+extend fun Ctx2.bx(k: Int): Int {
+    if (k <= 0) { return this.n }
+    return this.cz(k - 1)
+}
