@@ -2516,37 +2516,26 @@ unanswerable — `__val_class_tag` returns 0 honestly rather than reading garbag
 A generic parameter `T` and interface conformance are still not runtime-testable.
 Virtual dispatch (#50) is a separate step on the same foundation.
 
-### 60. `for (var i = 1; ...)` is a parse error; a C-style loop variable cannot be inferred
+### 60. FIXED — `for (var i = 1; ...)` parses, and a C-style loop variable is inferred
 
-**Reproduction:**
-
-```saffron
-for (var i = 1; i <= 3; i = i + 1) { IO.println(i) }
-```
+The C-style `for` header used to hard-`consume(":")` after the identifier, so the
+one binding form that could not infer was the first loop anyone writes:
 
 ```
 [line 1, col 13] Error: expected ':' but found '='
 ```
 
-Every other binding form accepts `var x = expr` and infers. The C-style `for`
-header is the one place that both rejects `var` and demands an annotation; the
-only accepted spelling is `for (i: Int = 1; ...)`.
+`parse_for` now takes an optional leading `var` and an optional `": Type"`,
+defaulting to `"Any"` — the same inference sentinel `parse_var_decl_with_doc`
+uses, which the checker's `VarDecl` arm reads as "infer from the initializer".
 
-`src/compiler/parser.sf:2151-2156` hard-`consume(":")`s after the identifier:
+Verified 2026-08-01, all three spellings run and print correctly:
 
 ```saffron
-// C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
-this.consume(":")
-var vtype: String = this.parse_type()
-this.consume("=")
+for (var i = 1; i <= 3; i = i + 1) { IO.println(i) }              // 1 2 3
+for (j: Int = 0; j < 2; j = j + 1) { ... }                        // j0 j1
+for (var k: Int = 7; k < 9; k = k + 1) { ... }                    // k7 k8
 ```
-
-The comment already concedes it — the `var` form was never implemented, so the
-natural spelling is the unsupported one. Fix: accept and skip an optional leading
-`var`, and make the `":" type` optional, passing `""` for inference as the
-for-in desugaring already does at `parser.sf:2197`.
-
-Low severity, high visibility: it is the first loop anyone writes.
 
 ### 59. FIXED — a function's local variable wrote into a like-named module global
 
@@ -3544,21 +3533,24 @@ point; test-suite failure set identical to before the change (38, no test
 previously exercised this).
 
 
-### 34. `bootstrap.sh` never builds a gen4, contradicting the promotion criteria
+### 34. FIXED — `bootstrap.sh` now builds a gen4, and the criterion it contradicted holds
 
-`CLAUDE.md` states, as a promotion criterion, "Gen3 can compile itself
-(bootstrap a gen4 from gen3): the test stage in bootstrap.sh verifies this." The
-TEST stage does not do this — it compiles and runs sample programs, never a
-gen4.
+`CLAUDE.md` listed "gen3 can compile itself (bootstrap a gen4 from gen3)" as a
+promotion criterion and claimed the TEST stage verified it. It did not — TEST
+compiled sample programs. Worse, a hand-built gen4 segfaulted on
+`IO.println("hi")`, so the documented criterion had never held.
 
-The gap matters because a hand-built gen4 **does not work**: it segfaults on
-`IO.println("hi")`. Verified pre-existing by building a gen4 from the unmodified
-baseline, which crashes identically, so this is not a regression from any recent
-change — but it does mean the documented criterion has never actually held.
+STAGE 2, added 2026-07-31, closes both halves: it compiles every compiler source
+with gen3, links the result, and checks the gen4 can compile a program. Skippable
+with `SKIP_GEN4=1` for iteration, which is documented as the one thing not to skip
+when deciding a promotion.
 
-Either the criterion or the script should change. Until then, promotion decisions
-rest on the sample-program tests alone, and that should be stated honestly rather
-than implying a self-hosting check that isn't run.
+Verified 2026-08-01: `build/stage4/saffronc` compiles `IO.println("hi")` and a
+class-plus-import program, both rc=0. Adding the stage immediately paid for
+itself — it surfaced a one-armed match in `codegen.sf` that gen3 had been
+rejecting all along with nobody looking, and it is the stage that would have
+caught [[BUGS #100]] had gen4 been an independent check rather than gen3's own
+output (see that entry for why it still could not).
 
 ### 38. FIXED — a coroutine reached through a module alias was called as a plain function, so `Async.sleep` never suspended and `Async.gather` returned frame handles
 
