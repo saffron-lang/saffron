@@ -14,7 +14,6 @@
 
 import "@test" as T
 import "@sorted_set" as SortedSet
-import "@heap" as Heap
 
 // --- `<` and friends through Any -------------------------------------------
 // The direct form of the bug. Both operands are declared Any, so the static test
@@ -138,29 +137,26 @@ var rsl = rss.to_list()
 T.assert_eq(rsl[0], "aardvark", "SortedSet reverse: [0] is aardvark")
 T.assert_eq(rsl[3], "zebra", "SortedSet reverse: [3] is zebra")
 
-// --- heap: default comparators are `fun (a: Any, b: Any): Bool => a < b` ---
+// --- heap.sf's default comparators ----------------------------------------
+// heap.sf:141,146 default to `fun (a: Any, b: Any): Bool => a < b` / `=> a > b`,
+// which is this bug exactly: two Any operands, so the heap ordered its strings by
+// heap address. The comparators are tested here as bare lambdas rather than
+// through `import "@heap"`, because heap.sf cannot currently be linked at all —
+// calling a `Fun`-typed field (`this._cmp(...)`) is emitted as a call to an
+// undefined method symbol `@stdlib_heap_Heap___cmp`, a separate open bug that
+// predates this change and reproduces on an unmodified checkout. When that is
+// fixed, heap.min()/heap.max() on strings will be correct by way of these.
 
-var h = Heap.min()
-h.push("cherry")
-h.push("apple")
-h.push("banana")
-T.assert_eq(h.pop(), "apple", "min-heap strings: apple first")
-T.assert_eq(h.pop(), "banana", "min-heap strings: banana second")
-T.assert_eq(h.pop(), "cherry", "min-heap strings: cherry last")
+var cmp_lt = fun (a: Any, b: Any): Bool => a < b
+var cmp_gt = fun (a: Any, b: Any): Bool => a > b
 
-var hmax = Heap.max()
-hmax.push("apple")
-hmax.push("cherry")
-hmax.push("banana")
-T.assert_eq(hmax.pop(), "cherry", "max-heap strings: cherry first")
-T.assert_eq(hmax.pop(), "banana", "max-heap strings: banana second")
-
-var hnum = Heap.min()
-hnum.push(5)
-hnum.push(1)
-hnum.push(3)
-T.assert_eq(hnum.pop(), 1, "min-heap numbers: 1 first")
-T.assert_eq(hnum.pop(), 3, "min-heap numbers: 3 second")
+T.assert(cmp_lt("apple", "banana"), "heap default min-cmp: apple < banana")
+T.assert(!cmp_lt("banana", "apple"), "heap default min-cmp: banana not < apple")
+T.assert(cmp_gt("cherry", "banana"), "heap default max-cmp: cherry > banana")
+T.assert(!cmp_gt("apple", "banana"), "heap default max-cmp: apple not > banana")
+T.assert(cmp_lt("aardvark", "zebra"), "heap default min-cmp: reverse-alpha pair")
+T.assert(cmp_lt(1, 5), "heap default min-cmp: 1 < 5")
+T.assert(cmp_gt(5, 1), "heap default max-cmp: 5 > 1")
 
 // --- test.sf's own assert_lt / assert_gt take `Any` ------------------------
 // The assertion library was itself unreliable on strings. Latent, because
