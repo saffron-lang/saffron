@@ -2084,6 +2084,19 @@ class Parser {
         if (this.match_kind_check("}") or this.match_kind_check("eof")) {
             return AST.Stmt.Return(AST.Expr.NilLit)
         }
+        // A `return` is also bare when the next token is on a later line. There
+        // are no statement terminators, so `if (c) return` followed by the next
+        // statement used to parse that statement as the return *value*: the
+        // statement vanished from the enclosing body and everything it declared
+        // became undefined. `if (a) return` above `var key = ...` gave
+        // "undefined variable 'key'" pointing at the use, never the return
+        // (BUGS #99).
+        //
+        // Same-line values still work — `return x`, and `return` alone before a
+        // `}` — because both are checked before this point or sit on this line.
+        if (this.current_line_num() > this.prev_line_num()) {
+            return AST.Stmt.Return(AST.Expr.NilLit)
+        }
         var value: AST.Expr = this.parse_expr()
         return AST.Stmt.Return(value)
     }
