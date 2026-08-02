@@ -476,9 +476,22 @@ declare i32 @snprintf(i8*, i64, i8*, ...)
 @__TYPE_MAP = constant i64 3
 @__TYPE_FLOAT_BOXED = constant i64 4
 
+; The value helpers below run in IDENTITY mode: they pass values through
+; untagged. base_nanbox.ll is the NaN-boxing counterpart, generated from the
+; same spec, so the two disciplines cannot drift apart helper by helper.
+
+; @generated-values:begin -- DO NOT EDIT BELOW THIS LINE
+; Generated from src/runtime/values.spec for target `boot` (discipline:
+; identity) by tools/gen_runtime_values.py. Edit the spec, then re-run:
+;
+;     python3 tools/gen_runtime_values.py
+;
+; These 19 helpers are shared across four IR bases. They were hand-copied and
+; drifted -- BUGS #77 had `true` printing as "false" on wasm32 for months because
+; one base out of four untagged twice. Editing this block directly reintroduces
+; exactly that failure mode, and `--check` in CI will fail.
+
 ; --- Tag/Untag Helpers ---
-; IDENTITY mode (backward compatible). Real NaN-boxing implementations
-; are ready below in comments — swap when runtime is also NaN-box aware.
 
 define i64 @__val_tag_int(i64 %n) {
 entry:
@@ -646,6 +659,8 @@ check:
 no:
   ret i1 false
 }
+
+; @generated-values:end
 
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
 ; TAG_INT_CONST  = 9221401712017801216  (0x7FF9000000000000)
