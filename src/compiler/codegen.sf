@@ -2079,6 +2079,21 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         mi = mi + 1
     }
 
+    // Pre-register every imported module's extension-method SYMBOLS (BUGS #103).
+    // See Codegen.prescan_extend_symbols for why. Runs AFTER the class
+    // pre-registration loop above and not merged into the extend_map pre-scan
+    // further up, because extend_class_prefix reads class_struct_names and that
+    // loop is what fills it.
+    //
+    // The main program's own `extend fun`s are registered further down, after its
+    // class pre-registration loop — main-program classes are not in
+    // class_struct_names yet at this point.
+    mi = 0
+    while (mi < prefixes.length()) {
+        gen.prescan_extend_symbols(all_stmts, boundaries[mi], boundaries[mi + 1], prefixes[mi])
+        mi = mi + 1
+    }
+
     // Pre-scan: register main program top-level VarDecls as globals
     var gvi: Float = 0
     while (gvi < program.length()) {
@@ -2169,6 +2184,15 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         }
         pri = pri + 1
     }
+
+    // The main program's own extension methods (BUGS #103), now that its classes
+    // are in class_struct_names. Prefix "" — main program symbols are unprefixed —
+    // but the class being extended may live in an imported module, in which case
+    // extend_class_prefix returns that module's prefix rather than "". That is the
+    // case `extend fun Ctx2.cz()` written in main.sf against a `Ctx2` from
+    // core2.sf, which linked against @Ctx2__cz while the definition was
+    // @core2_Ctx2__cz.
+    gen.prescan_extend_symbols(program, 0, program.length(), "")
 
     // Coroutine detection
     var cmi: Float = 0

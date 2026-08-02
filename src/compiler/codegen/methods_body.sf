@@ -597,15 +597,95 @@
     return val
     }
 
+    /// The module prefix an extension method's symbol must carry: the prefix of
+    /// the class being EXTENDED, not of the file the `extend fun` is written in.
+    /// `extend fun Ctx.ay()` in other.sf, with Ctx declared in core.sf, emits
+    /// @core_Ctx__ay.
+    ///
+    /// Factored out because two callers must agree exactly: this and the
+    /// pre-registration loop in generate_with_modules_flat_opts3. If they
+    /// disagreed, the pre-registered symbol would name a function that is never
+    /// defined — trading BUGS #103's link error for a different one.
+    ///
+    /// The two lookups are ordered so both callers land on the same answer even
+    /// though they run at different times. At pre-scan time no class has been
+    /// lowered, so func_prefix_map is empty and class_struct_names (filled by the
+    /// class pre-registration loop) answers. At lowering time func_prefix_map has
+    /// the entry and answers first. Both are `<module prefix> + <class name>` for
+    /// the same class, so the two agree by construction.
+    fun extend_class_prefix(ext_class: String, fallback: String): String {
+        var init_key: String = ext_class + "__init"
+        if (this.func_prefix_map.has(init_key)) {
+            var mapped: String = this.func_prefix_map.get(init_key)
+            return mapped.slice(0, mapped.length() - init_key.length())
+        }
+        // A class with no `init` at all has no entry above. Without this second
+        // lookup such a class fell back to the *source file's* prefix, so an
+        // extension method on it emitted under the wrong module.
+        if (this.class_struct_names.has(ext_class)) {
+            var struct_name: String = this.class_struct_names.get(ext_class)
+            if (struct_name.ends_with(ext_class)) {
+                return struct_name.slice(0, struct_name.length() - ext_class.length())
+            }
+        }
+        return fallback
+    }
+
+    /// Register the SYMBOL of every `extend fun` in stmts[start..end) before any
+    /// body is lowered (BUGS #103).
+    ///
+    /// gen_extend_method below registers `Ctx__bx -> core_Ctx__bx` in
+    /// func_prefix_map only as it lowers that method, so a call generated BEFORE
+    /// the callee was lowered found nothing and resolve_method_symbol fell through
+    /// to an unprefixed guess — `@Ctx__bx` against a definition actually named
+    /// `@core_Ctx__bx`. That passes codegen and dies at link time. Two `extend
+    /// fun`s in different modules calling each other hit it in BOTH import orders,
+    /// each order naming the other direction's symbol, so no ordering fixed it.
+    ///
+    /// Invisible in a single file because there the prefix is "" and the guess is
+    /// accidentally right. It only breaks once the code lives in a module.
+    ///
+    /// Must run after class pre-registration: extend_class_prefix reads
+    /// class_struct_names to find the extended class's module.
+    fun prescan_extend_symbols(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var xi: Float = start
+        while (xi < end) {
+            var xdoc: String = this.get_fun_doc(stmts[xi])
+            if (xdoc.starts_with("@extend:")) {
+                var xname: String = this.get_fun_name(stmts[xi])
+                var xcls: String = xdoc.slice(8, xdoc.length())
+                if (xname.length() > 0 and xcls.length() > 0) {
+                    var xfull: String = xcls + "__" + xname
+                    var xprefixed: String = this.extend_class_prefix(xcls, prefix) + xfull
+                    this.func_prefix_map.set(xfull, xprefixed)
+                    if (!this.str_in_list(this.known_functions, xprefixed)) {
+                        this.known_functions.push(xprefixed)
+                    }
+                    if (!this.str_in_list(this.known_functions, xfull)) {
+                        this.known_functions.push(xfull)
+                    }
+                    // The receiver's method list too, or gen_method_call's
+                    // "type 'X' has no method 'y'" check rejects a call compiled
+                    // before the extend fun is lowered.
+                    if (this.class_methods.has(xcls)) {
+                        var xmethods: List<String> = this.class_methods.get(xcls)
+                        if (!this.str_in_list(xmethods, xname)) { xmethods.push(xname) }
+                    }
+                    var xret: String = this.get_fun_ret(stmts[xi])
+                    if (xret.length() > 0) {
+                        this.func_ret_types.set(xprefixed, this.str_to_type(xret))
+                        this.func_ret_types.set(xfull, this.str_to_type(xret))
+                    }
+                }
+            }
+            xi = xi + 1
+        }
+    }
+
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
     // Use target class's prefix (not source file's prefix)
-    var class_prefix: String = this.current_prefix
-    var init_key: String = ext_class + "__init"
-    if (this.func_prefix_map.has(init_key)) {
-        var mapped: String = this.func_prefix_map.get(init_key)
-        class_prefix = mapped.slice(0, mapped.length() - init_key.length())
-    }
+    var class_prefix: String = this.extend_class_prefix(ext_class, this.current_prefix)
     var prefixed: String = class_prefix + full_name
     this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
@@ -768,6 +848,21 @@
             if (this.known_functions[kfi].ends_with(full)) { return this.known_functions[kfi] }
             kfi = kfi + 1
         }
+        // Nothing matched. This used to `return full` — the unprefixed guess. That
+        // guess is right only when the symbol carries no module prefix, so in a
+        // module it named a function that does not exist, passed codegen, and died
+        // at link time with "use of undefined value" (BUGS #103).
+        //
+        // The guess was load-bearing until extension methods were pre-registered:
+        // before prescan_extend_symbols, an `extend fun` not yet lowered was absent
+        // from all four lookups above, and the guess accidentally saved the
+        // single-file case. With pre-registration every method — declared in a class
+        // body or added by `extend fun`, in any module or the main program — is in
+        // func_prefix_map or known_functions before any body is lowered, so reaching
+        // here means the method genuinely does not exist. Report it instead of
+        // emitting a call to a name that was never defined.
+        IO.println("[codegen] Error: no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
+        this.has_errors = true
         return full
     }
 
@@ -1426,6 +1521,32 @@
             // In identity mode (bootstrap), only strings reach here so raw pointer is safe.
             if ((__mp_func.starts_with("__io_println") or __mp_func.starts_with("__io_print")) and args.length() > 0) {
                 var __io_arg: String = this.gen_arg_value(args[0])
+                // An enum value is NOT self-describing at runtime (BUGS #105).
+                // A fieldless variant is the bare immediate `tag << 56`, which
+                // carries no NaN-box tag at all, so __io_println concluded it was
+                // an unboxed double and printed the raw bit pattern: `Color.Red`
+                // (0 << 56) as "0" and `Color.Green` (1 << 56) as "7.29112e-304".
+                // A payload variant is an untagged heap [tag, f0, ...] pointer,
+                // which reads as a denormal and printed as "5.21502e-310".
+                //
+                // Convert here, through the enum's own generated to_string, rather
+                // than teaching __io_println the `tag << 56` encoding: that would
+                // put the encoding in a second place that must be kept in step with
+                // gen_enum_construct and emit_enum_to_string. String interpolation
+                // was already correct precisely because the lexer inserts an
+                // explicit .to_string() call, so routing here makes println use the
+                // one path interpolation already uses instead of a parallel one.
+                //
+                // gen_arg_value has just run, so last_type is the argument's type —
+                // and gen_enum_construct sets it to EnumType(name) even though
+                // get_expr_type reports a bare "Any" for the same expression.
+                var __io_ty: String = this.type_to_string(this.last_type)
+                if (this.enum_defs.has(__io_ty)) {
+                    var __io_ts: String = this.fresh_local()
+                    this.emit_indent(__io_ts + " = call i64 @" + __io_ty + "__to_string(i64 " + __io_arg + ")")
+                    __io_arg = this.fresh_local()
+                    this.emit_indent(__io_arg + " = call i64 @__rt_tag_ptr(i64 " + __io_ts + ")")
+                }
                 var __io_discard: String = this.fresh_local()
                 this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_arg + ")")
                 this.last_type = AST.Type.NilType

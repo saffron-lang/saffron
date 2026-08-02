@@ -1,0 +1,24 @@
+// Helper for extend_cross_module.sf (BUGS #103). `Ctx` and one half of each
+// mutually-recursive extension pair live here; the other half lives in the
+// importer, so whichever module is lowered first names a symbol that has not
+// been emitted yet.
+//
+// Lives in test/fixtures/ rather than test/ because it cannot run standalone —
+// `up` calls `down`, which only the importer defines, so on its own it fails to
+// link on a genuinely missing symbol. run_tests.sh globs test/*.sf
+// non-recursively, so a subdirectory is a fixture and not a test.
+
+class Ctx {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+}
+
+// Calls `down`, which is defined in the IMPORTING module.
+extend fun Ctx.up(k: Int): Int {
+    if (k <= 0) { return this.n }
+    return this.down(k - 1)
+}
+
+// A pair entirely inside this module: `first` is lowered before `second` exists.
+extend fun Ctx.first(): Int { return this.second() + 1 }
+extend fun Ctx.second(): Int { return this.n * 2 }
