@@ -2017,6 +2017,9 @@ class NullChecker {
             // Push scope for arm bindings
             this.env.push_scope()
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+            if (subj_type != "Any") {
+                this.check_pattern_arity(subj_type, variant_name, bindings, "match arm")
+            }
             var bi: Float = 0
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
@@ -2047,42 +2050,78 @@ class NullChecker {
         return result_type
     }
 
-    fun get_enum_binding_type(enum_type: String, variant: String, field_idx: Float): String {
-        // Look up "EnumName.Variant" in enum_fields
-        var key: String = enum_type + "." + variant
-        if (this.env.enum_fields.has(key)) {
-            var fields_str: String = this.env.enum_fields.get(key)
-            if (fields_str.length() > 0) {
-                var parts: List<String> = fields_str.split(",")
-                if (field_idx < parts.length()) {
-                    var kv: List<String> = parts[field_idx.floor()].split(":")
-                    if (kv.length() >= 2) {
-                        return kv[1]
-                    }
-                }
-            }
+    // `enum_fields` and `enum_variants` are keyed by the enum's *declared* name,
+    // which is unqualified ("Stmt"). A subject's inferred type is often the
+    // qualified spelling the importer sees ("AST.Stmt"), so every lookup has to
+    // try both. check_exhaustiveness open-coded this and get_enum_binding_type
+    // did not, which is why a match on an imported enum silently gave every
+    // binding type Any — see BUGS #98.
+    fun resolve_enum_key_name(enum_type: String): String {
+        if (this.env.enum_variants.has(enum_type)) return enum_type
+        if (!enum_type.contains(".")) return enum_type
+        var dot_pos: Float = -1
+        var ci: Float = 0
+        while (ci < enum_type.length()) {
+            if (enum_type.char_at(ci) == ".") { dot_pos = ci }
+            ci = ci + 1
         }
-        return "Any"
+        if (dot_pos < 0) return enum_type
+        return enum_type.slice(dot_pos + 1, enum_type.length())
+    }
+
+    // The declared field list of a variant, one "name:Type" per entry, or an
+    // empty list if the variant is unknown or carries no payload.
+    fun get_variant_fields(enum_type: String, variant: String): List<String> {
+        var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
+        if (!this.env.enum_fields.has(key)) return []
+        var fields_str: String = this.env.enum_fields.get(key)
+        if (fields_str.length() == 0) return []
+        // Split on top-level commas only: `Map<String, Int>` is ONE field, and
+        // splitting it in two shifted every later field's type by one position.
+        return this.split_type_args(fields_str)
+    }
+
+    fun get_enum_binding_type(enum_type: String, variant: String, field_idx: Float): String {
+        var parts: List<String> = this.get_variant_fields(enum_type, variant)
+        if (field_idx >= parts.length()) return "Any"
+        // First colon only. A field is "name:Type" and the type may itself
+        // contain a colon, so split(":") could not be trusted to give two parts.
+        var field_def: String = parts[field_idx.floor()]
+        var colon: Float = field_def.index_of(":")
+        if (colon < 0) return "Any"
+        return field_def.slice(colon + 1, field_def.length()).trim()
+    }
+
+    // A pattern must name exactly as many bindings as the variant has fields.
+    // Binding fewer left the extra fields unread; binding more invented a
+    // binding whose slot was never stored, and both were silently accepted.
+    // That is how the stdlib AST mirrors drifted to a stale field count without
+    // a single diagnostic (BUGS #98).
+    fun check_pattern_arity(enum_type: String, variant: String, bindings: List<String>, ctx: String) {
+        // Braced, not `if (c) return` — a bare `return` as an unbraced if-body
+        // swallowed the next statement as its value until BUGS #99, and gen2
+        // still parses it that way. Keep this shape while gen2 is the root of
+        // trust for the bootstrap.
+        if (variant == "_" or variant.length() == 0) { return }
+        if (variant.starts_with("__strpat:")) { return }
+        var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
+        var declared: Float = 0
+        if (this.env.enum_fields.has(key)) {
+            declared = this.get_variant_fields(enum_type, variant).length()
+        } else if (!this.env.enum_variants.has(this.resolve_enum_key_name(enum_type))) {
+            // Unknown enum — nothing to compare against. Not an arity problem.
+            return
+        }
+        if (bindings.length() != declared) {
+            this.error(ctx + " " + variant + " binds " + bindings.length().to_string()
+                + " field(s) but " + variant + " declares " + declared.to_string())
+        }
     }
 
     fun check_exhaustiveness(enum_type: String, matched: List<String>) {
-        // Look up all variants of this enum (try both qualified and unqualified names)
-        var lookup_name: String = enum_type
-        if (!this.env.enum_variants.has(lookup_name)) {
-            // Try stripping module prefix: "AST.Stmt" → "Stmt"
-            if (lookup_name.contains(".")) {
-                var dot_pos: Float = -1
-                var ci: Float = 0
-                while (ci < lookup_name.length()) {
-                    if (lookup_name.char_at(ci) == ".") { dot_pos = ci }
-                    ci = ci + 1
-                }
-                if (dot_pos >= 0) {
-                    lookup_name = lookup_name.slice(dot_pos + 1, lookup_name.length())
-                }
-            }
-            if (!this.env.enum_variants.has(lookup_name)) return nil
-        }
+        // Try both the qualified spelling and the declared (unqualified) one.
+        var lookup_name: String = this.resolve_enum_key_name(enum_type)
+        if (!this.env.enum_variants.has(lookup_name)) return nil
         var all_variants_str: String = this.env.enum_variants.get(lookup_name)
         if (all_variants_str.length() == 0) return nil
         var all_variants: List<String> = all_variants_str.split(",")
@@ -2130,7 +2169,7 @@ class NullChecker {
             }
             return
         }
-        var key: String = val_type + "." + variant
+        var key: String = this.resolve_enum_key_name(val_type) + "." + variant
         if (!this.env.enum_fields.has(key)) {
             this.error("let " + variant + "(...): " + variant + " is not a variant of " + val_type)
             var bi: Float = 0
@@ -2140,6 +2179,7 @@ class NullChecker {
             }
             return
         }
+        this.check_pattern_arity(val_type, variant, bindings, "let-destructuring of")
         var bi: Float = 0
         while (bi < bindings.length()) {
             var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
