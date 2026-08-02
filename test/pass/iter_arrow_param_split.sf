@@ -1,0 +1,69 @@
+// BUGS #114 — the stdlib sweep.
+//
+// codegen.sf's split_respecting_generics tracked <> but not (). type_to_string
+// renders a FuncType as "Fun(A,B):R" with a PLAIN comma, and params_to_string
+// joins parameters with a plain comma too, so gen_function split a MULTI-parameter
+// arrow-spelled function type in half and manufactured a phantom parameter:
+//
+//   fun reduce<T, R>(iterable: List<T>, func: (R, T) => R, initial: R): R
+//   "iterable:List<T>,func:Fun(R,T):R,initial:R"
+//     -> [iterable:List<T>] [func:Fun(R] [T):R] [initial:R]    4 params, not 3
+//
+// The phantom lands BETWEEN func and initial, so `initial` was read from the wrong
+// slot: reduce([1,2,3,4], (a,b) => a+b, 0) answered 12 instead of 10, with no error
+// and no warning. That is the number this file exists to pin down.
+//
+// Every other arrow-spelled parameter in src/lib is zero- or single-parameter
+// ("Fun(T):Bool" and friends), so none of them contains a top-level comma and none
+// was ever mis-split. They are asserted here anyway: the split is the shared code
+// path, and "the others happen to have no comma" is a property worth having a test
+// for rather than a comment.
+
+import "@test" as Test
+import "@iter" as Iter
+import "@time" as Time
+
+fun main() {
+    // --- reduce: the actual victim. Two-parameter arrow type. ---
+    Test.assert_eq(Iter.reduce([1, 2, 3, 4], fun (a: Int, b: Int): Int => a + b, 0), 10,
+        "reduce sums to 10, not 12 — no phantom parameter shifts `initial`")
+
+    // A non-zero seed: if `initial` were read from the wrong slot this would not
+    // simply be off by a constant, it would ignore the 100 entirely.
+    Test.assert_eq(Iter.reduce([1, 2, 3, 4], fun (a: Int, b: Int): Int => a + b, 100), 110,
+        "reduce reads `initial` from the correct slot")
+
+    // Order matters for a non-commutative reducer, so this also pins down that the
+    // accumulator and the element did not swap slots.
+    Test.assert_eq(Iter.reduce(["a", "b", "c"], fun (a: String, b: String): String => a + b, "_"),
+        "_abc", "the accumulator is the FIRST parameter, the element the second")
+
+    // reduce reached indirectly: Iter.sum is implemented on top of it.
+    Test.assert_eq(Iter.sum([1, 2, 3, 4]), 10, "sum goes through reduce")
+
+    // --- The single-parameter arrow types: (T) => R, no internal comma ---
+    Test.assert_eq(Iter.map([1, 2, 3], fun (x: Int): Int => x * 2).length(), 3, "map arity")
+    Test.assert_eq(Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)[2], 6, "map value")
+    Test.assert_eq(Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0).length(), 2,
+        "filter arity")
+    Test.assert(Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2), "any")
+    Test.assert(Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0), "all")
+    Test.assert_eq(Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2), 2, "count")
+    Test.assert_eq(Iter.find([1, 2, 3, 4], fun (x: Int): Bool => x > 2), 3, "find")
+    Test.assert_eq(Iter.flat_map([1, 2], fun (x: Int): List<Int> => [x, x]).length(), 4,
+        "flat_map, whose return type List<R> puts a generic after the `)`")
+
+    // each returns Nil and is checked by its side effect.
+    var seen: List<Int> = []
+    Iter.each([1, 2, 3], fun (x: Int): Nil => seen.push(x))
+    Test.assert_eq(seen.length(), 3, "each visits every element")
+
+    // --- () => R: zero parameters, the empty-parameter-list edge of the split ---
+    var ticks: List<Int> = []
+    Time.measure(fun (): Any => ticks.push(1))
+    Test.assert_eq(ticks.length(), 1, "a zero-parameter arrow type calls its callback once")
+
+    Test.summary()
+}
+
+main()
