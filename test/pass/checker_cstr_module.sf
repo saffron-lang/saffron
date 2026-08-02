@@ -1,0 +1,47 @@
+// BUGS #89: `src/lib/string.sf` declared `class String`, and the builtin `String`
+// won name resolution. So `sub: String` inside that class meant the BUILTIN, not the
+// class 20 lines above it. A string literal has no `_ptr` field, so `sub._ptr` read a
+// field off a value with no fields and the process died — 18 such accesses across
+// `contains`, `starts_with`, `ends_with`, `index_of`, `split`, `replace`, `add` and
+// `eq`. Only `length()`, `char_at()` and the no-argument transforms worked, because
+// only those touch `this`.
+//
+// The class is now `CStr`, so its parameter types name it unambiguously. This test
+// exercises exactly the methods that used to segfault, and checks their VALUES: a
+// pointer-comparison bug here would still "run".
+
+import "@test" as Test
+import "@string" as Str
+
+fun main() {
+    var s: Str.CStr = Str.CStr("hello world")
+
+    // This one always worked — it only touches `this`. It is the control.
+    Test.assert_eq(s.length(), 11, "length() counts bytes")
+
+    // --- The methods that used to segfault: each takes a CStr parameter ---
+    Test.assert(s.contains(Str.CStr("ell")), "contains() finds a substring")
+    Test.assert(!s.contains(Str.CStr("zzz")), "contains() rejects an absent substring")
+
+    Test.assert(s.starts_with(Str.CStr("hello")), "starts_with() matches a prefix")
+    Test.assert(!s.starts_with(Str.CStr("world")), "starts_with() rejects a non-prefix")
+
+    Test.assert(s.ends_with(Str.CStr("world")), "ends_with() matches a suffix")
+    Test.assert(!s.ends_with(Str.CStr("hello")), "ends_with() rejects a non-suffix")
+
+    Test.assert_eq(s.index_of(Str.CStr("world")), 6, "index_of() returns a byte offset")
+    Test.assert_eq(s.index_of(Str.CStr("hello")), 0, "index_of() finds a match at 0")
+    Test.assert_eq(s.index_of(Str.CStr("zzz")), 0 - 1, "index_of() returns -1 when absent")
+
+    // --- No-argument transforms, which also worked before ---
+    Test.assert_eq(Str.CStr("  hi  ").trim(), "hi", "trim() strips whitespace")
+    Test.assert_eq(Str.CStr("abc").to_upper(), "ABC", "to_upper() uppercases")
+    Test.assert_eq(Str.CStr("ABC").to_lower(), "abc", "to_lower() lowercases")
+    Test.assert_eq(s.char_at(0), "h", "char_at() reads one byte")
+    Test.assert_eq(s.slice(0, 5), "hello", "slice() cuts a substring")
+    Test.assert_eq(Str.CStr("ab").repeat(3), "ababab", "repeat() concatenates n copies")
+
+    Test.summary()
+}
+
+main()
