@@ -9,6 +9,234 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 104. relational operators on `Any`-typed operands compare untagged garbage
+
+**Severity: critical.** Silent wrong answers, and the answer depends on heap
+layout, so it changes with optimization level.
+
+`src/compiler/codegen/expr_body.sf:1127` gates the string-comparison path on a
+**static** type test:
+
+```
+if ((left_type2 == "String" or right_type2 == "String")
+    and (op == "<" or op == "<=" or op == ">" or op == ">="))
+    ... call i64 @__safe_strcmp ...
+```
+
+When both operands are declared `Any` — which is what every generic container
+has — the test fails and codegen falls through to the integer path:
+
+```llvm
+%t5 = call i64 @__val_untag_int(i64 %t3)
+%t6 = call i64 @__val_untag_int(i64 %t4)
+%t8 = icmp slt i64 %t5, %t6
+```
+
+`__val_untag_int` on a TAG_PTR value does not yield an integer, so this compares
+bit patterns of heap pointers. Mechanism M1 (codegen re-infers types and reaches
+a different answer than the checker) plus M3 (representation is a convention).
+
+Repro:
+
+```saffron
+fun lt_any(a: Any, b: Any): Bool { return a < b }
+IO.println(lt_any("apple", "banana"))   // prints false at -O0
+var sa: String = "apple"
+var sb: String = "banana"
+IO.println(sa < sb)                     // prints true — the static path is fine
+```
+
+**Scope is wider than the comparison operator.** `rt_list_sort`
+(`src/runtime/runtime.sf:1759`) is a bubble sort whose comparison is
+`if (a > b)` on two `Int`-declared locals holding NaN-boxed values. For pointers
+the comparison is never true, so **`List.sort()` does not sort strings at all**,
+at either optimization level, and returns the list untouched with no error:
+
+```saffron
+var l = ["cherry", "apple", "banana"]
+l.sort()
+IO.println("${l}")      // [cherry, apple, banana]
+```
+
+The idiomatic way to iterate a map in key order — `var ks = m.keys(); ks.sort()`
+— is therefore silently a no-op.
+
+Also affected: `src/lib/sorted_set.sf` (`_bisect` takes `value: Any`),
+`src/lib/heap.sf:141,146` (default comparators are
+`fun (a: Any, b: Any): Bool => a < b`), and `T.assert_lt`/`T.assert_gt` in
+`src/lib/test.sf:77,85`, which take `Any` and so are unreliable on strings — the
+assertion library itself. The `assert_lt`/`assert_gt` exposure is latent, as no
+test currently calls them on strings.
+
+`src/lib/sorted_map.sf` vs `src/lib/sorted_set.sf` is a controlled experiment for
+the mechanism: same binary search over string keys, but `sorted_map` declares
+`key: String` and routes through a hand-rolled `_str_cmp` over an `_alphabet`
+lookup table, whose comment says it exists "enabling correct `<` ordering". Someone
+hit this and worked around it in the library instead of fixing the compiler.
+`sorted_map` is right; `sorted_set` is wrong.
+
+**Why it stayed hidden.** `test/test_sorted_collections.sf` reports
+`All 76 assertions passed` at -O2 and `74/76 passed, 2 failed` (exit 1) at -O0,
+from identical source through an identical compiler. At -O2 the three interned
+literals happen to sit at addresses whose order agrees with alphabetical order, so
+it passes **by luck**. `run_tests.sh` builds at -O2, so it is green. The suite's
+only two `.sort()` calls (`test/lists.sf:19`, `test/test_stdlib.sf:39`) sort
+numbers.
+
+Found by `tools/differential.sh`, as the only mismatch on the pure-native
+-O2 vs -O0 axis. Regression test: `test/oracle_any_compare.sf` (fails 16/41 at
+-O0, 1/41 at -O2; every control passes — the one still failing at -O2 is a
+reverse-alphabetical insert added so layout luck cannot rescue it).
+
+Fix sketch: the comparison needs a runtime type dispatch rather than a static
+one, when the static types do not settle it — i.e. a generic `__val_lt` helper in
+the runtime that inspects the NaN-box tags of both operands, with codegen calling
+it whenever either operand's static type is not a known primitive. `rt_list_sort`
+should call the same helper.
+
+---
+
+### 105. `IO.println(enum_value)` prints a reinterpreted bit pattern
+
+**Severity: high.** Silent, and currently producing garbage in two tests that
+count as passing.
+
+A fieldless enum variant is represented as the immediate `tag << 56`. Codegen's
+`IO.println` path passes it straight through with no `to_string()` call and no int
+tag:
+
+```llvm
+%t2 = shl i64 0, 56
+%t3 = call i64 @__io_println(i64 %t2)
+```
+
+`__io_println` inspects the NaN-box tag bits, finds none of
+TAG_PTR/TAG_INT/TAG_SPEC, correctly concludes the value is an unboxed double, and
+formats the raw bits. `0 << 56` prints `0`; `1 << 56` is `0x0100000000000000`, a
+subnormal, and prints `7.29112e-304`.
+
+```saffron
+enum Color { Red, Green, Blue }
+IO.println(Color.Red)          // 0
+IO.println(Color.Green)        // 7.29112e-304
+IO.println("${Color.Green}")   // Green  — correct
+IO.println([Color.Red, Color.Blue])   // [0, 4.77831e-299]
+```
+
+Interpolation is correct because the lexer's `"${e}"` desugaring inserts an
+explicit `.to_string()`, which emits `call i64 @Color__to_string`. Two code paths
+for one value, one right and one wrong: mechanism M5, and the same shape as
+BUGS #77 (branching on a bool was right while printing it was wrong). Payload
+variants and list elements are broken the same way, so the working path is
+specifically the one that goes through an explicit `.to_string()`.
+
+Closely related to but **not** the same as BUGS #102. #102 was inside the
+generated `to_string()`; this path never calls `to_string()` at all, which is why
+#102's fix made interpolation work while leaving this broken.
+
+`test/pass/enums.sf` and `test/pass/generics.sf` print these subnormals **today**
+and both PASS, because they have no assertions and no `.expected` file (see #107).
+
+Regression test: `test/oracle_enum_println.sf` + `.expected`.
+
+---
+
+### 106. a match-arm binding collides with a same-named variable in the enclosing scope
+
+**Severity: high.** One face is loud, the other is silent.
+
+The arm binding is registered in the enclosing scope rather than in an arm scope.
+
+At **module scope**, the outer variable is a global at `@__g_s` but the arm emits
+`store i64 %tN, i64* %s` against a local that was never allocated — invalid IR,
+`use of undefined value '%s'`, caught by `opt -passes=verify` in `tools/saffron`:
+
+```saffron
+var s: String = "bound"
+enum E { Sq(side: Int) }
+var m = match (E.Sq(4)) { Sq(s) => "got ${s}" }
+```
+
+**Inside a function** `%s = alloca i64` does exist, so the store lands in the
+outer variable's slot. A `String`-declared variable silently holds a tagged Int;
+`IO.println(s)` prints `4`, `s.length()` prints `0`, exit 0, no diagnostic. This
+is the dangerous face.
+
+Renaming the binding (`Sq(zz)`) makes it work, confirming a scoping bug rather
+than a payload-decoding one. Distinct from BUGS #76 (non-exhaustive match yields
+an indeterminate value) and from #97.
+
+This obstructed building the differential oracle itself —
+`test/oracle_stringify.sf` had to rename its match bindings to `mr`/`ms`/`mn` to
+get around it.
+
+Regression test: `test/oracle_match_shadow.sf` (currently segfaults, exit 139, at
+both -O0 and -O2).
+
+---
+
+### 107. 64 of 174 positive tests assert nothing and would pass on any output
+
+**Severity: high — this is the reason the other entries survived.**
+
+| | count |
+|---|---|
+| assertions **and** `.expected` | 0 |
+| assertions only | 77 |
+| `.expected` only | 33 |
+| **neither — passes on ANY output** | **64** |
+
+The 64 are graded solely on "exit 0 and no `Runtime Error:` on stderr". They
+print, and nothing checks what. Includes all 11 `mini_*` tests,
+`test/pass/enums.sf`, `test/pass/generics.sf`, `test/pass/closures.sf`,
+`test/pass/interfaces.sf`, `test/pass/operators.sf`, `test/json.sf`,
+`test/inheritance.sf`.
+
+Not hypothetical: `test/pass/enums.sf` and `test/pass/generics.sf` print
+subnormal doubles today (#105) and both pass. `run_tests.sh` already notes that
+`test_async.sf` "was green for the entire life of BUGS #38 while emitting 2 of
+its ~12 expected lines and garbage for the rest" — the mechanism was known, the
+scale was not.
+
+`tools/differential.sh --record` writes `.expected` from the reference run and
+refuses when configurations disagree.
+
+---
+
+### 108. enum `to_string()` prints heap addresses for List, Map and nested-enum payloads
+
+**Severity: medium-high.** Silent, and nondeterministic between runs of one
+binary.
+
+The generated `to_string()` formats its payload by declared type. Int, Float,
+String and Bool are handled; List, Map and nested enum fall through to being
+printed as raw integers:
+
+```saffron
+enum OneList { OL(v: List<Int>) }
+IO.println("${OneList.OL([1, 2])}")   // OL(105553124048920) — varies per run
+enum OneMap { OM(v: Map<String, Int>) }
+IO.println("${OneMap.OM({"a": 1})}")  // OM(105553146069272) — varies per run
+enum Inner { A, B }
+enum OuterE { OE(v: Inner) }
+IO.println("${OuterE.OE(Inner.B)}")   // OE(0) — stable but wrong
+```
+
+A String payload is also a heap pointer and prints correctly (`OS(hi)`), so this
+is a per-type formatter list with three types missing, not a general inability to
+handle heap payloads. Mechanism M5.
+
+Distinct from #102 (which mis-*decoded* a one-field payload; here the payload
+decodes fine and is *formatted* wrong) and from #105 (which never calls
+`to_string()`).
+
+Found by the differential's nondeterminism gate: `oracle_stringify.sf` failed a
+diff against its own second run. Regression test:
+`test/oracle_enum_payload_tostring.sf` (6/14 fail). Its last two assertions
+require only that stringification be a pure function of the value — one value
+twice, and two equal values — so they hold regardless of what the correct
+rendering is.
+
 ### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link
 
 This is the measured blocker for rewrite stage 10 (`docs/design/compiler-rewrite.md`
@@ -1216,7 +1444,43 @@ therefore dead code too: `__gc_minor_collect` is never reached. Both remain in
 the tree for whoever revives the nursery, along with the write barrier they were
 built around.
 
-### 80. Three tests in `test/` segfault with the garbage collector fully disabled — non-GC codegen faults hiding behind the GC bugs
+### 80. FIXED — a name bound by both a `fun` and a `var` compiled to a call through the variable's value
+
+**Only one of the three tests was a live defect.** `comprehensive.sf` and
+`nullable_narrowing.sf` were fixed by other landed work and now pass at rc=0
+under `tools/gc_stress.sh` at a 4KB nursery — the harness that originally flagged
+them. Filing all three together pointed at three causes where there was one.
+
+`functions.sf` died on `0x7ff9000000000001` — TAG_INT with payload 1, i.e. the
+NaN-boxed integer `1` being unpacked as a closure-pair pointer. That address is
+the whole bug: nothing rejects a name claimed by both a `fun` and a `var`, and
+codegen had no rule for which wins, so a call on such a name loaded the
+*variable* and jumped through its value.
+
+Two shapes. A nested `fun` returned by name compiled `return cl` to
+`load i64* @__g_cl` — the module global, read during its own initializer and so
+still 0, giving a null closure pair. A top-level `var a = 1` next to `fun a()`
+fell past the direct-call branch (which correctly declines when a binding exists,
+because the binding might hold a lambda) and read `a`'s value as a closure pair.
+
+Fixed by giving a nested `fun` the innermost-wins binding that `var` already had
+from `current_fn_locals` (#59), recorded under a reserved `__nestedfn:` key so
+the alloca and GC-root sites sharing that map cannot mistake it for a `var`, and
+consulted *above* the `module_globals` guards; plus dispatching directly when the
+callee's recorded type is concretely non-callable. `Fun(...)` and `Any`
+deliberately stay indirect — that is what keeps lambdas working through untyped
+parameters. Regression test:
+`test/pass/segv_name_collision_fun_vs_var.sf`, 13 assertions on returned
+*values*, plus controls that must not change.
+
+**`functions.sf` no longer segfaults but now hangs**, which is the file's own
+property rather than a remaining codegen defect: its last section is
+`fun c() { c("too","many") }`, unconditional infinite recursion written to
+exercise a diagnostic codegen does not emit. Over-applying a 0-arity function is
+silently accepted — `fun c(){}; c("too","many")` compiles and runs. The segfault
+was masking that. Worth its own entry.
+
+### 80-orig. Three tests in `test/` segfault with the garbage collector fully disabled — non-GC codegen faults hiding behind the GC bugs
 
 `test/comprehensive.sf`, `test/functions.sf` and `test/nullable_narrowing.sf` all
 exit 139 under `tools/saffron run`, and they still exit 139 when linked against a
