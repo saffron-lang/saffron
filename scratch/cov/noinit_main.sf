@@ -1,0 +1,7 @@
+import "./lib1.sf" as L1
+import "./lib2.sf" as L2
+extend fun NoInit.n3(): Int { return this.n2() + 1 }
+var x = L1.NoInit()
+IO.println(x.n1())
+IO.println(x.n2())
+IO.println(x.n3())

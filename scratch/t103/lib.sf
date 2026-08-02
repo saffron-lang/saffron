@@ -1,0 +1,4 @@
+class Ctx { var n: Int
+    fun init(n: Int) { this.n = n } }
+extend fun Ctx.outer(): Int { return this.inner() + 1 }
+extend fun Ctx.inner(): Int { return this.n }

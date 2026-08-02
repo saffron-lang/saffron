@@ -1,0 +1,47 @@
+// BUGS #103: two `extend fun`s in different modules that call each other failed
+// to LINK — "use of undefined value '@Ctx__down'" while the definition was
+// named '@helper_Ctx__down'.
+//
+// gen_extend_method registered `Ctx__down -> helper_Ctx__down` in
+// func_prefix_map only as it lowered that method, so a call generated BEFORE the
+// callee was lowered found nothing and resolve_method_symbol fell through to an
+// unprefixed guess. That guess survives codegen and dies at link time. Both
+// import orders failed, each naming the other direction's symbol, so no
+// reordering fixed it. Fixed by Codegen.prescan_extend_symbols, which registers
+// every extension method's emitted symbol before any body is lowered.
+//
+// Invisible in a single file because there the module prefix is "" and the
+// guess is accidentally right — which is why the helper's own self-check passes
+// when it runs standalone. Mutual recursion ACROSS the module boundary is what
+// this file adds, and it is required: a one-directional call links fine, because
+// the callee happens to be lowered first.
+//
+// Note that `down` is defined HERE but extends a class from the helper, so its
+// symbol must carry the HELPER's prefix, not this file's. That is the second
+// half of the fix — extend_class_prefix derives the prefix from the extended
+// class, and both the pre-scan and the lowering use it, so they cannot disagree.
+
+import "@test" as Test
+import "../fixtures/extend_cross_module_helper.sf" as Helper
+
+// The other half of the helper's `up`. `up` calls this; this calls `up`.
+extend fun Ctx.down(k: Int): Int {
+    return this.up(k) + 100
+}
+
+var c: Helper.Ctx = Helper.Ctx(7)
+
+// up(1) -> down(0) -> up(0) -> 7, then +100 -> 107.
+Test.assert_eq(c.up(1), 107, "extend fun in module A calls extend fun in module B")
+// Entering from the other direction, so both orders are exercised.
+Test.assert_eq(c.down(0), 107, "extend fun in module B calls extend fun in module A")
+// Deeper recursion: up(3) -> down(2) -> up(2) -> down(1) -> up(1) -> down(0)
+// -> up(0)=7, and +100 once per `down`, three times.
+Test.assert_eq(c.up(3), 307, "mutual cross-module recursion, three round trips")
+
+// The helper's in-module pair still resolves when the helper is an import, not
+// the main program — a different pre-scan path from the standalone case.
+Test.assert_eq(c.first(), 15, "imported module's own extend fun pair")
+Test.assert_eq(c.second(), 14, "imported module's later extend fun")
+
+Test.summary()
