@@ -1,0 +1,175 @@
+//! BUGS #104 regression: relational operators on operands whose static type does
+//! not settle the representation.
+//!
+//! Codegen used to gate the string-comparison path on a STATIC `left == "String"
+//! or right == "String"` test. Two `Any` operands — which is what every generic
+//! container has — failed that test and fell to the integer path, so `<` emitted
+//! `__val_untag_int` on both sides and `icmp slt` on two heap POINTERS. The
+//! answer therefore depended on heap layout: this file's assertions passed at
+//! -O2 (interned literals happened to land in alphabetical address order) and
+//! failed at -O0, from identical source through an identical compiler.
+//!
+//! So this test is only meaningful when run at BOTH optimization levels, and via
+//! tools/differential.sh, whose -O2 vs -O0 axis is what found the bug.
+
+import "@test" as T
+import "@sorted_set" as SortedSet
+import "@heap" as Heap
+
+// --- `<` and friends through Any -------------------------------------------
+// The direct form of the bug. Both operands are declared Any, so the static test
+// that used to guard the strcmp path fails and the old code compared pointers.
+
+fun lt_any(a: Any, b: Any): Bool { return a < b }
+fun le_any(a: Any, b: Any): Bool { return a <= b }
+fun gt_any(a: Any, b: Any): Bool { return a > b }
+fun ge_any(a: Any, b: Any): Bool { return a >= b }
+
+T.assert(lt_any("apple", "banana"), "Any: apple < banana")
+T.assert(!lt_any("banana", "apple"), "Any: banana not < apple")
+T.assert(!lt_any("apple", "apple"), "Any: apple not < apple")
+T.assert(le_any("apple", "banana"), "Any: apple <= banana")
+T.assert(le_any("apple", "apple"), "Any: apple <= apple")
+T.assert(gt_any("banana", "apple"), "Any: banana > apple")
+T.assert(!gt_any("apple", "banana"), "Any: apple not > banana")
+T.assert(ge_any("apple", "apple"), "Any: apple >= apple")
+T.assert(ge_any("banana", "apple"), "Any: banana >= apple")
+
+// Reverse-alphabetical pairs, so that a heap layout which happens to agree with
+// alphabetical order cannot rescue a pointer comparison.
+T.assert(lt_any("aardvark", "zebra"), "Any: aardvark < zebra")
+T.assert(gt_any("zebra", "aardvark"), "Any: zebra > aardvark")
+T.assert(lt_any("yak", "yam"), "Any: yak < yam (one char apart)")
+
+// Strings built at runtime rather than interned literals: a different set of
+// addresses again, and the content comparison must still hold.
+var built_a: Any = "ap" + "ple"
+var built_b: Any = "ba" + "nana"
+T.assert(lt_any(built_a, built_b), "Any: runtime-built apple < banana")
+T.assert(gt_any(built_b, built_a), "Any: runtime-built banana > apple")
+
+// --- numbers through Any (must not have regressed) -------------------------
+// The runtime helper routes non-pointer operands through a double key, so Int
+// and Float mix correctly and negatives order properly.
+
+T.assert(lt_any(1, 2), "Any: 1 < 2")
+T.assert(!lt_any(2, 1), "Any: 2 not < 1")
+T.assert(lt_any(0 - 5, 3), "Any: -5 < 3")
+T.assert(lt_any(0 - 10, 0 - 2), "Any: -10 < -2")
+T.assert(gt_any(0 - 2, 0 - 10), "Any: -2 > -10")
+T.assert(lt_any(1.5, 2.5), "Any: 1.5 < 2.5")
+T.assert(lt_any(1, 2.5), "Any: Int 1 < Float 2.5 (mixed)")
+T.assert(gt_any(2.5, 1), "Any: Float 2.5 > Int 1 (mixed)")
+T.assert(lt_any(0 - 1.5, 0.0), "Any: -1.5 < 0.0")
+T.assert(ge_any(2, 2), "Any: 2 >= 2")
+T.assert(le_any(2, 2), "Any: 2 <= 2")
+
+// --- statically-typed operands (controls) ---------------------------------
+// These always worked and must keep working. The String pair still goes through
+// __safe_strcmp; the numeric pairs must still be a direct icmp/fcmp with no
+// runtime call at all.
+
+var s_a: String = "apple"
+var s_b: String = "banana"
+T.assert(s_a < s_b, "String static: apple < banana")
+T.assert(s_b > s_a, "String static: banana > apple")
+
+var i_a: Int = 3
+var i_b: Int = 7
+T.assert(i_a < i_b, "Int static: 3 < 7")
+T.assert(i_b > i_a, "Int static: 7 > 3")
+T.assert(i_a <= 3, "Int static: 3 <= 3")
+
+var f_a: Float = 1.25
+var f_b: Float = 9.5
+T.assert(f_a < f_b, "Float static: 1.25 < 9.5")
+T.assert(f_b >= f_a, "Float static: 9.5 >= 1.25")
+
+// --- List.sort() on strings ------------------------------------------------
+// rt_list_sort compared `a > b` on two Int-declared locals holding NaN-boxed
+// values, so for pointers it was never true and the list came back UNTOUCHED, at
+// every optimization level. The idiomatic `m.keys().sort()` was a silent no-op.
+
+var fruit: List<String> = ["cherry", "apple", "banana"]
+fruit.sort()
+T.assert_eq(fruit[0], "apple", "sort strings: [0] is apple")
+T.assert_eq(fruit[1], "banana", "sort strings: [1] is banana")
+T.assert_eq(fruit[2], "cherry", "sort strings: [2] is cherry")
+
+// Reverse-sorted input, so no-op and correct-sort cannot look alike.
+var rev: List<String> = ["zebra", "yak", "walrus", "aardvark"]
+rev.sort()
+T.assert_eq(rev[0], "aardvark", "sort reverse: [0] is aardvark")
+T.assert_eq(rev[3], "zebra", "sort reverse: [3] is zebra")
+
+// Numbers must still sort (this always worked).
+var nums: List<Int> = [5, 3, 9, 1]
+nums.sort()
+T.assert_eq(nums[0], 1, "sort numbers: [0] is 1")
+T.assert_eq(nums[3], 9, "sort numbers: [3] is 9")
+
+// Map keys in sorted order — the idiom the bug silently broke.
+var m: Map<String, Int> = {"delta": 4, "alpha": 1, "charlie": 3}
+var ks: List<String> = m.keys()
+ks.sort()
+T.assert_eq(ks[0], "alpha", "map keys sorted: [0] is alpha")
+T.assert_eq(ks[1], "charlie", "map keys sorted: [1] is charlie")
+T.assert_eq(ks[2], "delta", "map keys sorted: [2] is delta")
+
+// --- sorted_set: _bisect takes `value: Any` --------------------------------
+// The controlled experiment from the bug entry. sorted_map declared its keys
+// String and hand-rolled a _str_cmp to dodge this; sorted_set did not, and so
+// ordered its string elements by heap address.
+
+var ss = SortedSet.new()
+ss.add("cherry").add("apple").add("banana")
+var sl = ss.to_list()
+T.assert_eq(sl[0], "apple", "SortedSet: [0] is apple")
+T.assert_eq(sl[1], "banana", "SortedSet: [1] is banana")
+T.assert_eq(sl[2], "cherry", "SortedSet: [2] is cherry")
+T.assert(ss.has("banana"), "SortedSet: has banana")
+T.assert(!ss.has("durian"), "SortedSet: no durian")
+T.assert_eq(ss.min(), "apple", "SortedSet: min is apple")
+T.assert_eq(ss.max(), "cherry", "SortedSet: max is cherry")
+
+var rss = SortedSet.new()
+rss.add("zebra").add("yak").add("walrus").add("aardvark")
+var rsl = rss.to_list()
+T.assert_eq(rsl[0], "aardvark", "SortedSet reverse: [0] is aardvark")
+T.assert_eq(rsl[3], "zebra", "SortedSet reverse: [3] is zebra")
+
+// --- heap: default comparators are `fun (a: Any, b: Any): Bool => a < b` ---
+
+var h = Heap.min()
+h.push("cherry")
+h.push("apple")
+h.push("banana")
+T.assert_eq(h.pop(), "apple", "min-heap strings: apple first")
+T.assert_eq(h.pop(), "banana", "min-heap strings: banana second")
+T.assert_eq(h.pop(), "cherry", "min-heap strings: cherry last")
+
+var hmax = Heap.max()
+hmax.push("apple")
+hmax.push("cherry")
+hmax.push("banana")
+T.assert_eq(hmax.pop(), "cherry", "max-heap strings: cherry first")
+T.assert_eq(hmax.pop(), "banana", "max-heap strings: banana second")
+
+var hnum = Heap.min()
+hnum.push(5)
+hnum.push(1)
+hnum.push(3)
+T.assert_eq(hnum.pop(), 1, "min-heap numbers: 1 first")
+T.assert_eq(hnum.pop(), 3, "min-heap numbers: 3 second")
+
+// --- test.sf's own assert_lt / assert_gt take `Any` ------------------------
+// The assertion library was itself unreliable on strings. Latent, because
+// nothing called it that way — so call it that way.
+
+T.assert_lt("apple", "banana", "assert_lt on strings")
+T.assert_gt("banana", "apple", "assert_gt on strings")
+T.assert_lt("aardvark", "zebra", "assert_lt reverse-alphabetical pair")
+T.assert_lt(1, 2, "assert_lt on numbers")
+T.assert_gt(9, 4, "assert_gt on numbers")
+
+T.summary()
