@@ -725,7 +725,7 @@ class Parser {
                 var kl_name: String = this.expect_ident()
                 if (this.match_kind("=>")) {
                     var lparams: List<AST.Param> = []
-                    IO.println("[KL-PATH]"); lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    IO.println("[KL-PATH]"); lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -749,12 +749,12 @@ class Parser {
                     return AST.Expr.Lambda(lparams, "Any", lbody)
                 } else if (this.match_kind(",")) {
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lpname: String = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     while (this.match_kind(",")) {
                         lpname = this.expect_ident()
-                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     }
                     this.consume("=>")
                     var lbody: List<AST.Stmt> = []
@@ -1155,25 +1155,25 @@ class Parser {
             var pname: String = this.expect_ident()
             if (!this.match_kind_check(":")) {
                 this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
             } else {
                 this.consume(":")
                 var ptype: String = this.parse_type()
                 var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
             }
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
                     var pdefault: AST.Expr = AST.Expr.NilLit
                     if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
                 }
             }
         }
@@ -1417,21 +1417,21 @@ class Parser {
                 var pname: String = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
-                    ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
                 }
                 while (this.match_kind(",")) {
                     pname = this.expect_ident()
                     if (!this.match_kind_check(":")) {
                         this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                        ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     } else {
                         this.consume(":")
                         var ptype: String = this.parse_type()
-                        ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
                     }
                 }
             }
@@ -1790,12 +1790,12 @@ class Parser {
             var epi: Float = 0
             while (epi < params.length()) {
                 var ep: AST.Param = params[epi]
-                var ep_name: String = match (ep) { Param(n, t, d) => n }
-                var ep_type: AST.Type = match (ep) { Param(n, t, d) => t }
-                var ep_default: AST.Expr = match (ep) { Param(n, t, d) => d }
+                var ep_name: String = match (ep) { Param(n, t, d, p_vis) => n }
+                var ep_type: AST.Type = match (ep) { Param(n, t, d, p_vis) => t }
+                var ep_default: AST.Expr = match (ep) { Param(n, t, d, p_vis) => d }
                 var ep_type_str: String = this.type_ast_to_string(ep_type)
                 if (type_param_names.contains(ep_type_str)) {
-                    params[epi] = AST.Param.Param(ep_name, AST.Type.AnyType, ep_default)
+                    params[epi] = AST.Param.Param(ep_name, AST.Type.AnyType, ep_default, "public")
                 }
                 epi = epi + 1
             }
@@ -1836,22 +1836,22 @@ class Parser {
             this.consume(":")
             var ptype: String = this.parse_type()
             var syn_name: String = "__p" + idx.floor().to_string()
-            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
             pattern_prepend.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(pname, pb), AST.Expr.Variable(syn_name)))
         } else if (pname == "_") {
             this.consume(":")
             var ptype: String = this.parse_type()
             var syn_name: String = "__p" + idx.floor().to_string()
-            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
         } else if (!this.match_kind_check(":")) {
             this.parse_error("Parameter '" + pname + "' requires a type annotation")
-            params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+            params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
         } else {
             this.consume(":")
             var ptype: String = this.parse_type()
             var pdefault: AST.Expr = AST.Expr.NilLit
             if (this.match_kind("=")) { pdefault = this.parse_expr() }
-            params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+            params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
         }
     }
 
@@ -2100,7 +2100,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit))
+                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit, "public"))
             } else if (this.is_ident_named("@")) {
                 // Decorator on method: @inline, @intrinsic, etc.
                 this.advance()
@@ -2491,7 +2491,7 @@ class Parser {
         var params: List<AST.Param> = []
         var i: Float = 0
         while (i < names.length()) {
-            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
+            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit, "public"))
             i = i + 1
         }
         return AST.Expr.Lambda(params, "Any", body)
@@ -2671,7 +2671,7 @@ class Parser {
                 if (this.match_kind("=>")) {
                     // Single-param Kotlin lambda: {x => body}
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -2692,12 +2692,12 @@ class Parser {
                 } else if (this.match_kind(",")) {
                     // Multi-param Kotlin lambda: {x, y => body}
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lpname: String = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     while (this.match_kind(",")) {
                         lpname = this.expect_ident()
-                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     }
                     this.consume("=>")
                     var lbody: List<AST.Stmt> = []

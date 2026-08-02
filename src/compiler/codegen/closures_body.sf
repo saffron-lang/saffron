@@ -4,7 +4,7 @@
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            var pname: String = match (p) { Param(n, t, d) => n }
+            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
             param_names.push(pname)
             pi = pi + 1
         }
@@ -647,7 +647,7 @@
                 var inner_bound: List<String> = []
                 var pi2: Float = 0
                 while (pi2 < p.length()) {
-                    var pn: String = match (p[pi2]) { Param(n, t, d) => n }
+                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis) => n }
                     inner_bound.push(pn)
                     pi2 = pi2 + 1
                 }

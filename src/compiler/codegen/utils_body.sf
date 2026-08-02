@@ -1310,8 +1310,8 @@
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            defaults.push(match (p) { Param(n, t, d) => d })
-            pnames.push(match (p) { Param(n, t, d) => n })
+            defaults.push(match (p) { Param(n, t, d, p_vis) => d })
+            pnames.push(match (p) { Param(n, t, d, p_vis) => n })
             pi = pi + 1
         }
         this.func_defaults.set(emit_name, defaults)
@@ -1353,8 +1353,8 @@
                 var mpi: Float = 0
                 while (mpi < mparams.length()) {
                     var mp: AST.Param = mparams[mpi]
-                    mdefs.push(match (mp) { Param(n, t, d) => d })
-                    mpnames.push(match (mp) { Param(n, t, d) => n })
+                    mdefs.push(match (mp) { Param(n, t, d, p_vis) => d })
+                    mpnames.push(match (mp) { Param(n, t, d, p_vis) => n })
                     mpi = mpi + 1
                 }
                 var full: String = cname + "__" + mname

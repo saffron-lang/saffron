@@ -216,9 +216,9 @@ fun format_params(params: List<AST.Param>): String {
     while (i < params.length()) {
         if (i > 0) { sb.append(", ") }
         var p: AST.Param = params[i]
-        var pname: String = match (p) { Param(n, t, d) => n }
-        var ptype: String = match (p) { Param(n, t, d) => t }
-        var pdefault: AST.Expr = match (p) { Param(n, t, d) => d }
+        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+        var ptype: String = match (p) { Param(n, t, d, p_vis) => t }
+        var pdefault: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
         sb.append(pname)
         if (ptype.length() > 0 and ptype != "Any") {
             sb.append(": ")
@@ -345,8 +345,8 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             var fi: Float = 0
             while (fi < fields.length()) {
                 var f: AST.Param = fields[fi]
-                var fname: String = match (f) { Param(n, t, d) => n }
-                var ftype: String = match (f) { Param(n, t, d) => t }
+                var fname: String = match (f) { Param(n, t, d, p_vis) => n }
+                var ftype: String = match (f) { Param(n, t, d, p_vis) => t }
                 sb.append(make_indent(indent + 1))
                 sb.append("var ")
                 sb.append(fname)
