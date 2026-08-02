@@ -1,0 +1,28 @@
+// BUGS #98(c) — bindings on an imported enum must get their declared types.
+//
+// `enum_fields` is keyed by the enum's declared (unqualified) name, but a
+// subject's inferred type is the qualified spelling the importer sees. So
+// get_enum_binding_type looked up "AST.Stmt.VarDecl", missed, and returned Any
+// for every binding of every arm — a match on any imported enum was effectively
+// unchecked. check_exhaustiveness had open-coded the prefix-stripping fallback,
+// so non-exhaustive matches on AST.Stmt *were* reported while nothing else about
+// them was, which made the checker look like it worked.
+//
+// Both arms return String here on purpose: with one arm String and one Int the
+// result unifies to `String|Int` and the assignment to Int is accepted for a
+// different and legitimate reason, which would have made this test pass
+// vacuously.
+
+import "@ast" as AST
+
+var s: AST.Stmt = AST.Stmt.VarDecl("x", "Int", AST.Expr.NilLit, "")
+
+fun fallback(): String { return "0" }
+
+// VarDecl's first field is declared String. Assigning it to Int must be an error.
+var bad: Int = match (s) {
+    VarDecl(name, type_ann, initializer, docstring) => name
+    _ => fallback()
+}
+
+IO.println(bad)
