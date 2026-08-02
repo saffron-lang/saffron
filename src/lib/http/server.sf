@@ -439,7 +439,7 @@ fun _match_route(pattern: String, path: String): Map<String, String> {
         return nil
     }
     var params: Map<String, String> = {}
-    var i: Number = 0
+    var i: Int = 0
     while (i < pattern_parts.length()) {
         var pat: String = pattern_parts[i]
         var seg: String = path_parts[i]
@@ -711,7 +711,7 @@ class App {
     }
 
     fun _run_middlewares(req: Request): Response {
-        var i: Number = 0
+        var i: Int = 0
         while (i < this._middlewares.length()) {
             var mw: Fun = this._middlewares[i]
             var result: Response = mw(req)
@@ -724,7 +724,7 @@ class App {
     }
 
     fun _run_after_middlewares(req: Request, resp: Response): Response {
-        var i: Number = 0
+        var i: Int = 0
         var current: Response = resp
         while (i < this._after_middlewares.length()) {
             var mw: Fun = this._after_middlewares[i]
@@ -736,7 +736,7 @@ class App {
 
     fun _route(req: Request): Response {
         // First pass: exact matches take priority
-        var i: Number = 0
+        var i: Int = 0
         while (i < this.routes.length()) {
             var route: Route = this.routes[i]
             if ((route.method == req.method or route.method == "*") and (route.path == req.path or route.path == "*")) {
@@ -753,7 +753,7 @@ class App {
                 var matched: Map<String, String> = _match_route(route.path, req.path)
                 if (matched != nil) {
                     var keys: List<String> = matched.keys()
-                    var k: Number = 0
+                    var k: Int = 0
                     while (k < keys.length()) {
                         req.params.set(keys[k], matched.get(keys[k]))
                         k = k + 1

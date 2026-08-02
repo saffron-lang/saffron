@@ -51,7 +51,14 @@ NETWORK_TESTS="test_httpx test_async_io test_dns test_net"
 STALE_TESTS="loops builtin_types for_in types runner decorators any_bug_repro"
 
 # Aspirational / non-native-target files that are not runnable tests.
-NOT_A_TEST="goals hello_wasm"
+#
+# gc_generational_test exercises the nursery, which __gc_init deliberately no
+# longer starts (BUGS #63/#81 — the moving minor collector cannot be correct
+# against codegen that holds receivers in SSA temps). Its four assertions test
+# for bump allocation and minor collections, so they fail by design while the
+# nursery is off; the file is kept because it is exactly the test to re-enable
+# alongside a non-moving young generation.
+NOT_A_TEST="goals hello_wasm gc_generational_test"
 
 # Tests that intentionally return their computed result as the process exit
 # code (mini_while exits 55 = fib(10)). A nonzero exit is CORRECT for these,

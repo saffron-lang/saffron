@@ -7,23 +7,23 @@ Test 1: Allocation tracking
 
 Test 2: Collection frees unreachable objects
   Allocs after garbage: 7
-  Allocs after collect: 8
-  Freed bytes: 0
-  FAIL: No memory freed
+  Allocs after collect: 0
+  Freed bytes: 2272
+  PASS: Memory was freed
 
 Test 3: Shadow stack protects roots
-  Allocs after collecting (no roots pushed): 11
+  Allocs after collecting (no roots pushed): 0
   (Objects without roots are collected)
   PASS: GC collection works
 
 Test 4: GC-tracked list
   List allocated with 3 elements
-  Current alloc count: 14
+  Current alloc count: 3
   PASS: GC list operations work
 
 Test 5: GC-tracked map
   Map allocated
-  Current alloc count: 18
+  Current alloc count: 7
   PASS: GC map allocation works
 
 Test 6: Multiple collections
@@ -32,11 +32,11 @@ Test 6: Multiple collections
 
 Test 7: Auto-collection threshold
   Collections before alloc burst: 5
-  Collections after alloc burst:  5
-  INFO: Auto-collection may not have triggered (objects may have been reachable)
+  Collections after alloc burst:  7
+  PASS: Auto-collection triggered
 
 === GC Test Complete ===
-Total allocations: 37
-Total bytes in use: 5944
-Total freed: 496
-Total collections: 5
+Total allocations: 8
+Total bytes in use: 56
+Total freed: 6380
+Total collections: 8

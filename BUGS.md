@@ -9,6 +9,56 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 101. FIXED — the mark phase rejected every NaN-boxed pointer, so a major collection freed the entire live heap
+
+The collector marked *nothing*. `__gc_is_heap_ptr` rejects anything above
+`0x0000FFFFFFFFFFFF` as "a tagged NaN-boxed value or a kernel address" — and
+every value the collector reads out of the object graph is exactly that. A heap
+pointer in a root slot, a list element, a map key or an instance field reads as
+`0x7FF8_0000_0000_0000 | payload`, failed that bounds check, and
+`__gc_mark_object` returned without setting a mark bit. The sweep then freed the
+whole live heap on the first collection.
+
+Two things hid it, and both were removed in the same afternoon:
+
+- **Identity mode.** The compiler self-hosts against `base.ll`, where tagging is
+  the identity, so *its own* roots are bare pointers that pass the bounds check.
+  No bootstrap could ever see this (see the identity-mode blind spot).
+- **The nursery.** New objects were bump-allocated outside `@__gc_head`, so the
+  sweep had nothing to free. Retiring the nursery for #63/#81 removed the
+  cover, and the breakage surfaced as strings and map keys losing their first
+  byte (`bbbb` → `\xNNbbb`, then length 0), then as a `toml_test` segfault.
+
+```saffron
+@extern("void __gc_collect()") fun gc()
+import "@toml" as TOML
+var basic = TOML.parse("aaaa = 1\nbbbb = 2\ncccc = 3\ndddd = 4")
+gc()
+var ks = basic.keys()
+var i = 0
+while (i < ks.length()) { IO.println("key[${i}] len=${ks[i].length()}"); i = i + 1 }
+```
+
+Before: `len=4, 0, 0, 0`. After: `4, 4, 4, 4`. The first key survives because it
+is still referenced from a live SSA temp at the collection point; everything
+reached only through the map is freed under it.
+
+**Fix.** New `@__gc_strip_tag` removes TAG_PTR (`0x7FF8`) and leaves every other
+bit pattern alone, so TAG_INT and TAG_SPEC keep failing the pointer test and an
+unboxed double is still rejected by the bounds check. `__gc_mark_object` strips
+before validating, which normalises both representations it legitimately
+receives: NaN-boxed values from the object graph, and raw `__gc_alloc` pointers
+for the collector's own internal links (a list's data array, a map's key/value
+arrays, a closure's env). `__gc_minor_mark_value` gets the same treatment so
+re-enabling the nursery does not resurrect the bug; the forwarding half in
+`__gc_minor_visit_slot` is *not* tag-correct and says so in a comment — it needs
+a re-tag on the store, and is dead code while the nursery is off.
+
+`test/gc_test.expected` and `test/gc_api_test.expected` both encoded the broken
+behaviour and were regenerated: the old baseline literally asserted
+`FAIL: No memory freed`, and `gc_test` now reports `PASS: Memory was freed`
+(6380 bytes freed across 8 collections, deterministic run to run).
+
 ### 100. FIXED — #96's fix was in gen3 but not in gen2, so every bootstrap rebuilt a gen3 that segfaulted on any class
 
 ```bash
@@ -1032,6 +1082,13 @@ worst case (2010 old-gen objects × 2000 minor collections, no old→young edges
 loop with a small old gen is unchanged. Option 3 remains the better end state and
 would remove this cost along with #63.
 
+**Option 3 has since been taken** — the nursery is retired (see #63), so there is
+no young generation, no old→young edge, and this entry's remembered set has
+nothing to remember. The option-2 old-gen scan and its O(live old-gen) cost are
+therefore dead code too: `__gc_minor_collect` is never reached. Both remain in
+the tree for whoever revives the nursery, along with the write barrier they were
+built around.
+
 ### 80. Three tests in `test/` segfault with the garbage collector fully disabled — non-GC codegen faults hiding behind the GC bugs
 
 `test/comprehensive.sf`, `test/functions.sf` and `test/nullable_narrowing.sf` all
@@ -1163,6 +1220,25 @@ Part 2 is the same shape as several entries here: a resolution helper that
 cannot fail, so it returns a plausible wrong answer instead. Compare #22 and
 #40, where a lookup that should have said "not found" said "assume it's a
 local."
+
+**FIXED, both parts.** The `starts_with("/")` branch returns the path unchanged,
+and the `OS.file_exists(full_path)` guard reports the import path, the importing
+file, and the path that was tried before `c_exit(1)`. The repro above now prints
+`hi from abs`, and a bogus `@definitely_not_a_module` says so by name instead of
+failing at the linker.
+
+The guard had to go in **twice**: the import-resolution loop is duplicated
+between `collect_modules` and the entry module's own copy, and patching only the
+first left `@definitely_not_a_module` silent from the entry file. A third copy
+handles package dependency preludes and is still unguarded — it is reached only
+for `<lib>/<pkg>/src/prelude.sf` imports. Three near-identical copies of this
+loop is the underlying code smell; see the duplication notes in this file.
+
+Part 2 turns two tests from a link-error into a compile-error, which is the point
+of it: `enum_cross_simple` imports `./enum_module_helper.sf`, a file that has
+never existed in this repo, and `test_package_import` imports `testpkg`, which
+lives at `test/testpkg` and is not on any `--lib-path` that `run_tests.sh`
+passes. Both were already failing; they now fail naming the import.
 
 ### 77. On wasm32 only, `true.to_string()` returns `"false"` — `__bool_to_string` untags a value codegen already untagged
 
@@ -1486,6 +1562,23 @@ wrong values instead of right ones by accident.
 runtime constructor and do not go through this path, so they are unaffected. Only
 the `GC.set_max_memory()` / `GC.set_threshold()` Saffron-level setters are.
 
+**FIXED** — the first fix direction, and it is the same one-line shape #88 used
+for `IO`/`OS`. `GC`'s hardcoded prefix registration is now guarded by
+`if (!alias_map.has("GC"))`, so an actual `import "@gc" as GC` wins and the call
+routes through universal module dispatch to `stdlib_gc_set_threshold`, which
+untags properly. The guard goes on all three occurrences in `codegen.sf`. The IR
+for `GC.set_threshold(4096)` now shows
+`%t2 = call i64 @__val_untag_int(i64 %t1)` followed by
+`call void @__gc_set_threshold(i64 %t2)` — the wrapper is reached, and the raw
+runtime symbol is no longer called with a boxed argument.
+
+The getter's compensating double-mask is untouched and still correct: it masks a
+value that is now genuinely tagged, rather than one that was corrupt.
+
+The `declare void` / `call i64` return-type mismatch on the old rewrite path was
+not separately fixed — that path is simply no longer taken for an aliased `GC`.
+It still applies to any builtin namespace used without an import.
+
 ### 73. `tuple_test` compiles or fails at random — the same binary on the same source disagrees with itself run to run — FIXED
 
 Found while diffing a baseline failure set for #69, where it presented as a
@@ -1769,6 +1862,28 @@ Whether bare `super.f` should even be legal is a language-design question: it
 would have to mean a parent-bound method value, and Saffron has no other way to
 spell one. Rejecting it in the checker with a clear diagnostic is likely better
 than making it work.
+
+**FIXED — the value position too, and more cheaply than the addendum expected.**
+No new dispatch arm was needed. `super` and `this` name the *same* receiver
+pointer; only the dispatch differs, and `gen_method_call` already handles that.
+So the variable-load path just has to know that `super`'s storage is `%self`:
+
+```saffron
+if (name == "super") {
+    var_ref = "%self"
+}
+```
+
+Two subtleties made this a three-attempt fix rather than a one-line one. The
+alloca is `%self`, not `%this` — the prologue emits
+`store i64 %self.arg, i64* %self`. And the variable-load path is **duplicated**:
+the `Variable` arm in `expr_body.sf` and a second copy inside `gen_arg_value`.
+Patching only the first left the error in place, because the failing site was the
+`:1640` preamble's `gen_arg_value` call. Both copies now carry the arm.
+
+`super.f` in value position yields the receiver, and the checker still rejects
+anything that would misuse it. `test/inheritance.sf`'s remaining failure is the
+unrelated duplicate `var b` at top level noted above.
 
 ### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead — FIXED
 
@@ -2247,6 +2362,30 @@ triggerable with ~85 unauthenticated GETs. `__gc_disable()` trades the crash for
 an unbounded heap; the fix belongs in making the shadow stack coroutine-aware
 (re-push roots on resume, root via the frame pointer, or make `llvm.coro` frames
 traced objects).
+
+**FIXED via option 3 — the nursery is retired.** `__gc_init` no longer calls
+`__gc_nursery_init()`, so `__gc_nursery_inited` stays 0 and `__gc_alloc` takes
+the old-gen path unconditionally. With no moving young generation there is no
+move to invalidate an SSA temp, and this and #81 close together. The repro at the
+top of this entry now prints `len=20000`; major collection still recycles
+(120000 objects allocated, `bytes=86152` resident).
+
+Everything is left intact and reachable: the nursery code, its stats externs, and
+`__gc_set_nursery_size` all still work, and calling `__gc_nursery_init()` by hand
+re-enables the whole path. `src/runtime/gc.ll`'s nursery section header carries
+the full explanation of why it is off. Two notes for whoever revives it:
+
+- The blocker is unchanged and is **in codegen, not the collector**: values in
+  SSA temps are not roots, so no moving collector can be correct against this
+  codegen. Sink the receiver load below all allocating argument code first
+  (`methods_body.sf` / `expr_body.sf`), or make the young generation non-moving.
+- The forwarding pass has its own tag bug on top of that — see #101 and the
+  comment in `__gc_minor_visit_slot`.
+
+`test/gc_generational_test.sf` asserts on bump allocation and minor collections,
+so it fails by design while the nursery is off; `run_tests.sh` classifies it
+under `NOT_A_TEST` with that reason. It is exactly the test to re-enable
+alongside a non-moving young generation.
 
 ### 62. FIXED (map half) — `for (entry in someMap)` compiled to a list index loop and segfaulted; the documented iterator protocol is still never used
 
@@ -3028,6 +3167,17 @@ naming an internal symbol, with no hint that a duplicated flag is the cause.
 Fix: canonicalise paths before comparing. Workaround: let the driver discover
 `.pantry/packages` itself and do not pass `--lib-path` explicitly.
 
+**FIXED.** `--lib-path` arguments are canonicalised once at startup before
+`_lib_paths` is populated, rather than compared as raw strings at each use: a
+relative path is made absolute against `OS.cwd()` (dropping a leading `./`),
+trailing slashes are stripped, and `contains` then dedupes what is left. The
+repro's two spellings collapse to one entry and the redefinition is gone.
+
+This is path *normalisation*, not full canonicalisation — it does not resolve
+symlinks or interior `..` segments, so `a/../b` and `b` are still two paths. That
+is deliberate: `OS` has no realpath binding, and the failure this entry describes
+comes from the relative-vs-absolute spelling that the driver itself produces.
+
 ### 49. `Number` is one surface name for two representations
 
 `str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
@@ -3080,7 +3230,17 @@ but its blast radius is shrinking:
   `scheduler.sleep_times` → `List<Float>`; `reflect.number_to_string`,
   `toml.number`/`number_or` → `Any` (genuinely int-OR-float pass-throughs that
   do no arithmetic). `toml.sf`'s `peek_at(offset: Number)` — the example cited
-  above — is now `offset: Int`. **No `Number` annotation remains in `src/lib`.**
+  above — is now `offset: Int`.
+
+  **Correction (2026-08-01): "no `Number` annotation remains in `src/lib`" was
+  false when written.** Fourteen live annotations were left in
+  `src/lib/http/client.sf` and `src/lib/http/server.sf` — `var status`,
+  `max_redirects`, `redirect_count`, `port`, `body_start`, `_parse_hex(): Number`,
+  `_index_of_from(start: Number): Number`, `_is_redirect(status: Number)`, and
+  five `var i`/`var k` loop counters. All are indices, counts or HTTP status
+  codes, so all fourteen became `Int`. The five remaining hits in
+  `src/lib/llvm/test_codegen.sf` are inside comments and are left alone. `src/lib`
+  is now genuinely free of `Number` annotations.
 - `test/*.sf`: all 152 annotations → `Int` across 49 files. The 9 `is Number`
   checks are kept deliberately: they cover the feature while it still exists.
 - `checker.sf` no longer collapses `Float` into `IntType` when parsing type

@@ -1542,6 +1542,14 @@ class Codegen {
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
+                // `super` names the same receiver pointer as `this` — only the
+                // dispatch differs, and gen_method_call handles that above. In
+                // value position there is no `%super` alloca, so the generic
+                // load below emitted `load i64, i64* %super` and the module
+                // failed LLVM verification (BUGS #70).
+                if (name == "super") {
+                    var_ref = "%self"
+                }
                 if (this.module_globals.has(this.current_prefix + name)) {
                     var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                 } else if (this.module_globals.has(name)) {
@@ -3067,6 +3075,13 @@ class Codegen {
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
+            // Same as the Variable arm at :128 — `super` is the receiver
+            // pointer, whose alloca is `%self`; there is no `%super` slot, so
+            // the load below produced invalid IR (BUGS #70). This copy of the
+            // variable-load path is the one arguments take.
+            if (vname == "super") {
+                var_ref = "%self"
+            }
             if (this.module_globals.has(this.current_prefix + vname)) {
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
             } else if (this.module_globals.has(vname)) {
@@ -14248,7 +14263,15 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
-    gen.module_prefixes.set("GC", "__gc_")
+    // Same deferral as IO/OS above (BUGS #88). Hard-wiring GC to the runtime
+    // prefix routed `GC.set_threshold(4096)` straight at @__gc_set_threshold
+    // with the argument still NaN-boxed, so 4096 arrived as ~9.2e18; the
+    // matching getter re-masked it and read back 4096, hiding the corruption
+    // (BUGS #74). src/lib/gc.sf's wrappers untag properly, and deferring to
+    // alias_map is what reaches them.
+    if (!alias_map.has("GC")) {
+        gen.module_prefixes.set("GC", "__gc_")
+    }
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "stdlib_reflect_")
@@ -14787,7 +14810,15 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
-    gen.module_prefixes.set("GC", "__gc_")
+    // Same deferral as IO/OS above (BUGS #88). Hard-wiring GC to the runtime
+    // prefix routed `GC.set_threshold(4096)` straight at @__gc_set_threshold
+    // with the argument still NaN-boxed, so 4096 arrived as ~9.2e18; the
+    // matching getter re-masked it and read back 4096, hiding the corruption
+    // (BUGS #74). src/lib/gc.sf's wrappers untag properly, and deferring to
+    // alias_map is what reaches them.
+    if (!alias_map.has("GC")) {
+        gen.module_prefixes.set("GC", "__gc_")
+    }
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "stdlib_reflect_")
@@ -15459,7 +15490,15 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     // No hard-wired "OS" prefix. src/lib/os.sf is an ordinary stdlib module, so
     // its alias comes from alias_map like every other import; wiring OS here made
     // it a reserved name and shadowed the module's own Saffron functions.
-    gen.module_prefixes.set("GC", "__gc_")
+    // Same deferral as IO/OS above (BUGS #88). Hard-wiring GC to the runtime
+    // prefix routed `GC.set_threshold(4096)` straight at @__gc_set_threshold
+    // with the argument still NaN-boxed, so 4096 arrived as ~9.2e18; the
+    // matching getter re-masked it and read back 4096, hiding the corruption
+    // (BUGS #74). src/lib/gc.sf's wrappers untag properly, and deferring to
+    // alias_map is what reaches them.
+    if (!alias_map.has("GC")) {
+        gen.module_prefixes.set("GC", "__gc_")
+    }
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "stdlib_reflect_")

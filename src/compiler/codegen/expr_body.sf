@@ -119,6 +119,14 @@
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
+                // `super` names the same receiver pointer as `this` — only the
+                // dispatch differs, and gen_method_call handles that above. In
+                // value position there is no `%super` alloca, so the generic
+                // load below emitted `load i64, i64* %super` and the module
+                // failed LLVM verification (BUGS #70).
+                if (name == "super") {
+                    var_ref = "%self"
+                }
                 if (this.module_globals.has(this.current_prefix + name)) {
                     var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                 } else if (this.module_globals.has(name)) {
@@ -1644,6 +1652,13 @@
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
+            // Same as the Variable arm at :128 — `super` is the receiver
+            // pointer, whose alloca is `%self`; there is no `%super` slot, so
+            // the load below produced invalid IR (BUGS #70). This copy of the
+            // variable-load path is the one arguments take.
+            if (vname == "super") {
+                var_ref = "%self"
+            }
             if (this.module_globals.has(this.current_prefix + vname)) {
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
             } else if (this.module_globals.has(vname)) {
