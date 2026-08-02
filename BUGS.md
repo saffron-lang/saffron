@@ -1338,7 +1338,7 @@ never existed in this repo, and `test_package_import` imports `testpkg`, which
 lives at `test/testpkg` and is not on any `--lib-path` that `run_tests.sh`
 passes. Both were already failing; they now fail naming the import.
 
-### 77. On wasm32 only, `true.to_string()` returns `"false"` — `__bool_to_string` untags a value codegen already untagged
+### 77. FIXED — on wasm32 only, `true.to_string()` returned `"false"`; `__bool_to_string` untagged a value codegen had already untagged
 
 Branching on the same value is correct, which is what makes this so misleading: an
 `if` takes the right arm while `to_string()` on the identical variable prints the
@@ -1382,6 +1382,24 @@ three bases. This is exactly the hazard `CLAUDE.md` states as a rule — tagging
 untagging happen in one place, "never in codegen, and never in both" — so it is
 worth checking the other `wasm_base_32.ll` `to_string` helpers for the same
 duplicated-untag shape rather than fixing only this one.
+
+**FIXED.** The extra call is gone and the parameter now carries a comment stating
+the convention it is part of — `%b` arrives already untagged, which is what the
+other three bases encode by testing `icmp ne i64 %b, 0` directly. Verified in
+both directions by swapping `wasm_base_32.ll` and rebuilding: the pre-fix module
+prints `false, false, taken` under Node, the fixed one prints
+`true, false, taken`.
+
+**The audit this entry called for found a worse bug, and it was not in this
+file.** No other `wasm_base_32.ll` `to_string` helper untags twice —
+`__io_println_bool` looked like a candidate but is declared and never called from
+anywhere, so it has no convention to be wrong about. The same *shape* did turn
+up in codegen, on **native**, and much larger: `emit_enum_to_string` handed
+`__bool_to_string` a still-tagged value (untagging zero times, the mirror of this
+bug's twice), appended a tagged String straight into `strlen`, and had no `Float`
+arm at all. See #102. Worth generalising from: "which of the four bases is the
+odd one out" is the narrow question, and "does every caller of this helper agree
+on the convention" is the one that finds more.
 
 ### 76. FIXED — the type checker never descended into class method bodies, so every check was silently skipped inside a method
 

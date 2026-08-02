@@ -969,10 +969,19 @@ not_a_class:
 @.str.false = private unnamed_addr constant [6 x i8] c"false\00"
 @.str.nil = private unnamed_addr constant [4 x i8] c"nil\00"
 
+; %b arrives ALREADY UNTAGGED — a raw 0 or 1. Every caller untags first:
+; codegen's Bool arm calls emit_untag_bool before the call (methods_body.sf,
+; stmts_body.sf), which is the convention base.ll, base_nanbox.ll and
+; wasm_base.ll all encode by testing `icmp ne i64 %b, 0` directly.
+;
+; This used to call @__val_untag_bool here as well, i.e. untag twice. That
+; helper is `icmp eq i64 %v, <fully tagged true>`, so given the already-reduced
+; 1 it yields 0 and every `true` formatted as "false" — on wasm32 only, while
+; branching on the same value stayed correct (BUGS #77). `false` also formatted
+; as "false", so half the cases looked right by accident.
 define i64 @__bool_to_string(i64 %b) {
 entry:
-  %raw = call i64 @__val_untag_bool(i64 %b)
-  %is_true = icmp ne i64 %raw, 0
+  %is_true = icmp ne i64 %b, 0
   br i1 %is_true, label %yes, label %no
 yes:
   %t = getelementptr [5 x i8], [5 x i8]* @.str.true, i64 0, i64 0
