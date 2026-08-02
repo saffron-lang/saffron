@@ -1,11 +1,28 @@
+// Two interleaved coroutines, each with its own GC roots, marking the points at
+// which they run. Graded on exit status alone until BUGS #107, so the eight lines
+// it prints — the whole content of the test — were never compared to anything.
+//
+// The checks at the bottom assert the SEQUENCE and the depth invariants, not the
+// literal lines. A `.expected` file here would freeze the absolute shadow-stack
+// depths, which are a function of frame layout and move with unrelated codegen
+// changes (adding three locals to the sibling gc_coro_root_depth.sf moved its
+// reported depth from 18 to 24). The interleaving itself is stable across runs
+// and is what the file is about.
 import "@scheduler" as Scheduler
+import "@test" as Test
 
 @extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
+
+var order: List<String> = []
+var depths: List<Int> = []
 
 var seq: Int = 0
 fun mark(label: String) {
     seq = seq + 1
-    IO.println(seq.to_string() + ": " + label + " depth=" + ss_depth().to_string())
+    var d: Int = ss_depth()
+    order.push(label.trim())
+    depths.push(d)
+    IO.println(seq.to_string() + ": " + label + " depth=" + d.to_string())
 }
 
 fun sleepy(duration: Int) {
@@ -39,3 +56,32 @@ var ra = ta.await()
 mark("awaited A")
 var rb = tb.await()
 mark("awaited B")
+
+// --- checks ---------------------------------------------------------------
+// The interleaving. Both workers run their first half before either resumes, and
+// A resumes before B: A sleeps 0.03 but was spawned first, and the scheduler runs
+// the ready queue in spawn order. Verified stable over 8 consecutive runs.
+Test.assert_eq(order.length(), 8, "all eight marks were reached")
+Test.assert_eq(order[0], "entry", "the entry frame marks first")
+Test.assert_eq(order[1], "A-1", "worker A runs its first half on spawn")
+Test.assert_eq(order[2], "B-1", "worker B runs its first half before A resumes")
+Test.assert_eq(order[3], "both spawned", "control returns to the entry frame after both spawns")
+Test.assert_eq(order[4], "A-2", "A resumes before B")
+Test.assert_eq(order[5], "B-2", "then B resumes")
+Test.assert_eq(order[6], "awaited A", "await A completes first")
+Test.assert_eq(order[7], "awaited B", "await B completes last")
+
+// The results actually came back, which nothing checked before.
+Test.assert_eq(ra, "xA", "worker A's return value reached the awaiter")
+Test.assert_eq(rb, "yB", "worker B's return value reached the awaiter")
+
+// Depth invariants, stated relatively so they survive a frame-layout change.
+// A coroutine's frame sits above the entry frame that spawned it.
+Test.assert_gt(depths[0], 0, "the entry-frame depth is actually being read")
+Test.assert_gt(depths[1], depths[0], "worker A's frame is above the entry frame")
+Test.assert_gt(depths[2], depths[1], "worker B's frame is above worker A's")
+// And after both coroutines have finished, the entry frame's roots are still
+// there: an epilogue that over-popped would have cut below depths[0].
+Test.assert_gt(depths[7], depths[0], "the entry frame's roots outlive both coroutines")
+
+Test.summary()
