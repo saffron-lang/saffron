@@ -576,10 +576,85 @@ resolve to exist first.
 | 7 | Structural LLVM emission; delete `emit(String)`, `block_terminated`, `use_llvm_lib` | the undefined-`%tN` class | Reuses `src/lib/llvm/*` as the only path. |
 | 8 | `Session`/`Program`/`FnCtx`; delete the god object | M4 | Largely falls out of 4 and 7. |
 | 9 | Generated runtime; one header definition, four targets | M5 → #39 | Independent of 0-8; can run in parallel. |
-| 10 | Replace `sed` assembly with real modules | build integrity | Blocked on the import-system work already tracked in `docs/design/`. |
+| 10 | Replace `sed` assembly with real modules | build integrity | Blocked on **one** compiler bug, not on the import system as a whole — see below. |
 
 Stages 0-2 and 9 are independent and can proceed concurrently. Stage 4 is the
 inflection point: after it, the "codegen guessed a type" bug class is gone.
+
+### What actually blocks stage 10 (measured 2026-08-02)
+
+This row used to say "blocked on the import-system work already tracked in
+`docs/design/`", which was too vague to act on and pointed at a larger project
+than the evidence supports. The blocker was re-measured against the promoted
+gen2 at `67c8cf3`; most of what the older notes described as blocking is done.
+
+**Not the blocker (verified working).** `extend fun` reaches across module
+boundaries in all the ways the split needs *except one*:
+
+| shape | status |
+|---|---|
+| `extend fun Ctx.m()` in a file that imports `Ctx`'s module | works |
+| an extension method reading and writing `this.field` | works (the field-set bug the old notes cite is fixed) |
+| a **core** method in `core.sf` calling an extension defined in another file | works |
+| an extension calling an extension defined **later in the same module** | works |
+| two extensions in different files, called in dependency order | works, by luck — see below |
+| two extensions calling **each other** across files | **fails**, in either import order |
+
+**The blocker: extension-method calls are resolved by scanning already-emitted
+symbols, so a forward reference across a module prefix emits an unprefixed
+callee that nothing defines.** `gen_extend_method`
+(`codegen/methods_body.sf:600`) registers `Ctx__m` → `core_Ctx__m` in
+`func_prefix_map` *as it lowers that method*, and the call site
+(`methods_body.sf:940`, same logic factored into `resolve_method_symbol` at
+`:759`) resolves `Ctx__m` by consulting `func_prefix_map`, then
+`current_prefix + name`, then a suffix scan of `known_functions` — and when all
+three miss, **returns the unprefixed name unchanged**. So a call emitted before
+the callee has been lowered becomes `@Ctx__m`, while the definition is
+`@core_Ctx__m`, and LLVM rejects it:
+
+```
+error: use of undefined value '@Ctx__bx'
+  %t20 = call i64 @Ctx__bx(i64 %t12, i64 %t19)
+```
+
+Two properties make this precisely a stage-10 blocker rather than a nuisance:
+
+- **Prefix-dependent.** The identical forward reference in a *single* file
+  compiles and runs, because there `current_prefix` is `""` and the unprefixed
+  fallback happens to be the right answer. The bug appears the moment the
+  extensions live in a module — i.e. exactly when you split a class across
+  files.
+- **Order cannot fix it.** For a one-directional dependency, importing the
+  callee's file first works. The codegen split is *mutually* recursive
+  (`gen_arg_value` lives in `expr_body.sf` and is called from
+  `methods_body.sf`; `expr_body.sf` calls back into statement generation), and
+  no topological order exists for a cycle. Both orders were tested; both fail,
+  each naming the other direction's symbol.
+
+This is a fifth instance of the pattern #22, #40 and #78 all share, and which
+Part 0 calls out: **a resolution helper that cannot fail, so it returns a
+plausible wrong answer instead of reporting "not found."** Here the wrong answer
+is an unprefixed symbol, and the report comes from LLVM with no mention of the
+extension method or the module.
+
+**So: unfinished work plus one compiler bug — not a missing language feature.**
+The fix has the same shape as the fix for the identical bug class elsewhere: a
+pre-pass over *all* modules that registers every `@extend:` method's prefixed
+symbol in `func_prefix_map` before any body is lowered, and then making the
+unprefixed fallback in `resolve_method_symbol` a diagnostic rather than a
+guess. The pre-pass hook already exists —
+`codegen.sf:737` walks every module and fills `extend_map` with
+`prefix + name → class` before compilation, and `gen_extend_method` recomputes
+the same prefix from `func_prefix_map`'s `Ctx__init` entry — so this is a
+matter of writing `func_prefix_map` in that existing loop, not of building new
+machinery.
+
+Scheduling note: the fix lives in `codegen/methods_body.sf` and `codegen.sf`,
+not in the import system or in `main.sf`, and it does not need a gen2
+promotion — extension methods already parse and lower under the current gen2.
+Stage 10 is therefore schedulable as soon as that one resolution bug is fixed,
+and it should be verified by a mutual-recursion test across two extension
+files, which is the case every ordering-based workaround hides.
 
 Throughout: **build the differential interpreter early** (it only needs HIR, so
 right after stage 4) and let it grade every subsequent stage. Without an oracle,
