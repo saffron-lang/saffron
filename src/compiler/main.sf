@@ -1373,7 +1373,13 @@ fun main(): Int {
     if (run_checker) {
         var checker_errors: String = ""
         if (all_import_stmts.length() > 0) {
-            checker_errors = Checker.check_errors_with_imports(program, all_import_stmts)
+            // The same module_boundaries / prefixes_joined that Resolve and
+            // Codegen already receive. Without them the checker sees one flat
+            // list of every transitively imported declaration and cannot tell
+            // which module anything came from, so two modules declaring the
+            // same class name are one entry (docs/design/access-modifiers.md
+            // Phase 2; `Response` in http/client.sf and http/server.sf).
+            checker_errors = Checker.check_errors_with_modules(program, all_import_stmts, module_boundaries, prefixes_joined)
         } else {
             checker_errors = Checker.check_errors_only(program)
         }

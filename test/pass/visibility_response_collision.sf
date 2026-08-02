@@ -1,0 +1,37 @@
+// Two modules each declaring a same-named class must not be conflated.
+//
+// This is the src/lib/http/client.sf vs src/lib/http/server.sf `class Response`
+// collision, reduced. Both helpers declare `class Response` with a `payload`
+// field of a DIFFERENT type — String in the client, Int in the server — so a
+// field table keyed by the bare name "Response" can only hold one answer for
+// `.payload` and answers it for both.
+//
+// Before Phase 2 of docs/design/access-modifiers.md (checker.sf keyed
+// env.class_fields by the bare name, with an ambiguous_enums mechanism but no
+// ambiguous_classes), one of the two `.payload` reads below was typed from the
+// OTHER module's declaration and rejected with a type error about a field the
+// receiver does not have. Which one depended on registration order, so both
+// directions are exercised here.
+
+import "../support/visibility_collision_client.sf" as HttpClient
+import "../support/visibility_collision_server.sf" as HttpServer
+
+var client_resp = HttpClient.make_client_response()
+var server_resp = HttpServer.make_server_response()
+
+// The client Response's payload is a String. Reading it into a String must be
+// accepted, and the value must be the client's.
+var client_payload: String = client_resp.payload
+IO.println(client_payload)
+
+// The server Response's payload is an Int. Reading it into an Int must be
+// accepted, and the value must be the server's.
+var server_payload: Int = server_resp.payload
+IO.println(server_payload)
+
+// The statuses come from the two distinct constructors, proving the objects are
+// separate at runtime and not one class serving both call sites.
+IO.println(client_resp.status)
+IO.println(server_resp.status)
+
+IO.println("visibility response collision test passed")
