@@ -314,6 +314,30 @@ echo ""
 pass "TEST" "Example compiled and ran successfully!"
 echo ""
 
+# A class plus an import — the smallest program that exercises the checker's
+# register_decl path over a six-field ClassDecl. hello_bootstrap.sf above has
+# neither, and that is exactly why BUGS #100 stayed invisible: a gen2 predating
+# #96 emitted a register_decl that never stored ClassDecl's sixth field, so the
+# gen3 it built segfaulted on any class, and both stages plus this test still
+# came out green. gen4 could not catch it either — gen3 compiles gen4 with the
+# fixed codegen, so gen4 is correct while gen3 is not.
+info "TEST" "Checking gen3 type-checks a class reached through an import..."
+GUARD_DIR="$BUILD_DIR/guard_lib"
+mkdir -p "$GUARD_DIR"
+echo 'fun guard_helper(): Int { return 2 }' > "$GUARD_DIR/guard_mod.sf"
+cat > "$BUILD_DIR/guard.sf" << 'EOF'
+import "@guard_mod" as GuardMod
+class GuardClass {
+    fun init() {}
+}
+IO.println(GuardMod.guard_helper())
+EOF
+"$BUILD_DIR/saffronc" --stdlib "$GUARD_DIR" "$BUILD_DIR/guard.sf" "$BUILD_DIR/guard.ll" \
+    || fail "TEST" "gen3 cannot compile a class reached through an import — see BUGS #100. If gen3 works but the checked-in gen2 does not, gen2 needs the promotion ceremony in CLAUDE.md."
+
+pass "TEST" "gen3 handles a class plus an import."
+echo ""
+
 # =============================================================================
 # Summary
 # =============================================================================
