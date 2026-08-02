@@ -256,6 +256,109 @@ fun __safe_strcmp(a: Int, b: Int): Int {
     return rt_strcmp(ra, rb)
 }
 
+// Reinterpret a value as a double and hand back the raw IEEE-754 bit pattern.
+//
+// The `double` return is deliberate and load-bearing. runtime.sf is compiled
+// with --identity-mode, where codegen lowers a double-returning extern with a
+// plain `bitcast double to i64` (types_body.sf emit_tag_float), so this yields
+// the *bits* rather than a re-boxed value — the only way to get at a double from
+// runtime.sf, which has no float arithmetic of its own in identity mode.
+//
+// __val_untag_float also normalises the two numeric representations for free: a
+// TAG_INT value is converted (sitofp) and a bare double passes through, so one
+// call covers Int and Float without the caller having to branch on the tag.
+@extern("double __val_untag_float(i64)") fun __rt_float_bits(val: Int): Int
+
+// Map an IEEE-754 bit pattern to an i64 whose *signed integer* order is the same
+// as the double's numeric order, so a plain `<` on the keys sorts the doubles.
+//
+// Positive doubles already sort by bit pattern (the exponent sits above the
+// mantissa, and the sign bit is clear so the i64 is non-negative). Negative
+// doubles sort backwards — a larger magnitude means a more negative number — so
+// strip the sign bit to recover the magnitude and negate it. -0.0 and +0.0 both
+// map to 0, which is the answer `==` gives too.
+fun __rt_dbl_key(bits: Int): Int {
+    if (bits >= 0) { return bits }
+    var mag: Int = bits & 9223372036854775807
+    return 0 - mag
+}
+
+// Three-way ordering comparison for two values of unknown static type.
+// Returns -1 when a < b, 1 when a > b, 0 when neither (equal or incomparable),
+// i.e. the strcmp convention, so callers read `< 0` / `> 0`.
+//
+// This exists because codegen cannot always know the operand types. `<`, `<=`,
+// `>` and `>=` used to be gated on a *static* test for String, and every generic
+// container declares its elements `Any`, so `this._items[mid] < value` fell
+// through to the integer path and compared the bit patterns of two heap
+// pointers. That is not merely wrong, it is wrong *by heap layout*: the same
+// source through the same compiler answered differently at -O0 and -O2, because
+// at -O2 the interned literals happened to land in addresses whose order agreed
+// with alphabetical order (BUGS #104).
+//
+// The dispatch is on the NaN-box tag of BOTH operands, which is the only
+// authority available at the point the comparison actually happens:
+//
+//   both TAG_PTR (0x7FF8)  → heap pointers; compare contents with strcmp. This
+//                            is the same conservative choice __any_eq makes:
+//                            string literals are plain malloc'd char* with no GC
+//                            header, so the GC type tag cannot be consulted (see
+//                            __rt_as_string_ptr) and TAG_PTR is all there is.
+//   anything else          → compare numerically through the double key above,
+//                            which handles Int vs Float mixtures correctly.
+//
+// Untagged pointers (upper == 0), which is what identity mode and a raw
+// constructor result look like, are deliberately NOT treated as strings. The
+// `> 65536` heuristic __map_key_str uses to guess "this is a pointer" is safe
+// there because a mis-guess only costs a failed key match; here it would hand a
+// large integer to strcmp and segfault. Ordering is defined for strings and
+// numbers, and identity mode has no strings to order.
+fun __val_cmp(a: Int, b: Int): Int {
+    if (a == b) { return 0 }
+    var ua: Int = a >> 48
+    var ub: Int = b >> 48
+    if (ua == 32760 and ub == 32760) {
+        var ra: Int = __rt_untag_ptr(a)
+        var rb: Int = __rt_untag_ptr(b)
+        if (ra != 0 and rb != 0) {
+            var c: Int = rt_strcmp(ra, rb)
+            if (c < 0) { return 0 - 1 }
+            if (c > 0) { return 1 }
+            return 0
+        }
+        return 0
+    }
+    var ka: Int = __rt_dbl_key(__rt_float_bits(a))
+    var kb: Int = __rt_dbl_key(__rt_float_bits(b))
+    if (ka < kb) { return 0 - 1 }
+    if (ka > kb) { return 1 }
+    return 0
+}
+
+// The four relational operators, as the runtime entry points codegen calls when
+// the static types do not settle the comparison. Separate symbols rather than
+// one plus a codegen-side icmp so the call site stays a single instruction and
+// the operator is legible in the emitted IR.
+fun __val_lt(a: Int, b: Int): Int {
+    if (__val_cmp(a, b) < 0) { return 1 }
+    return 0
+}
+
+fun __val_le(a: Int, b: Int): Int {
+    if (__val_cmp(a, b) <= 0) { return 1 }
+    return 0
+}
+
+fun __val_gt(a: Int, b: Int): Int {
+    if (__val_cmp(a, b) > 0) { return 1 }
+    return 0
+}
+
+fun __val_ge(a: Int, b: Int): Int {
+    if (__val_cmp(a, b) >= 0) { return 1 }
+    return 0
+}
+
 // Is this map key safe to hand to strcmp?
 //
 // Map keys reach the runtime in two forms, because the compiler compiles
@@ -1756,6 +1859,18 @@ fun rt_list_copy(list: Int): Int {
     return new_list
 }
 
+// Bubble sort, ordering elements with __val_cmp.
+//
+// The comparison used to be `if (a > b)` on two `Int`-declared locals that
+// actually hold NaN-boxed values, so for TAG_PTR elements it was comparing
+// pointer bit patterns. `>` between two large positive pointers is essentially
+// never true in the direction the sort needs, so this returned string lists
+// completely untouched, at every optimization level, with no error — making the
+// idiomatic `var ks = m.keys(); ks.sort()` a silent no-op (BUGS #104).
+//
+// __val_cmp dispatches on the tag, so one call orders strings by content and
+// numbers numerically, and this is the same helper `<` itself now compiles to —
+// `.sort()` and `<` cannot disagree about order.
 fun rt_list_sort(list: Int): Int {
     if (list == 0) { return __list_new() }
     var len: Int = __list_length(list)
@@ -1765,7 +1880,7 @@ fun rt_list_sort(list: Int): Int {
         while (inner < len - 1 - outer) {
             var a: Int = __list_get(list, inner)
             var b: Int = __list_get(list, inner + 1)
-            if (a > b) {
+            if (__val_cmp(a, b) > 0) {
                 __list_set(list, inner, b)
                 __list_set(list, inner + 1, a)
             }
