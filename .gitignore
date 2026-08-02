@@ -7,3 +7,8 @@ cmake-build-debug/
 # Nothing consumes it — it exists so that a gen3 which rejects the compiler
 # source fails the build. Unlike stage3/, it is never checked in.
 build/stage4/
+
+# Bootstrap guard artifacts (BUGS #100 check) — regenerated every run.
+build/guard.sf
+build/guard.ll
+build/guard_lib/
