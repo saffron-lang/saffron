@@ -1143,6 +1143,46 @@
         return result
     }
 
+    // The boxing discipline for a runtime `__io_*`/`__os_*` symbol reached
+    // through builtin-namespace dispatch (`IO.foo(...)` mangles straight to
+    // `@__io_foo` and never enters the wrapper in src/lib/io.sf, so the wrapper's
+    // return annotation is not consulted).
+    //
+    // Returns one of "string", "bool", "int", "list", "void", or "" for
+    // not-a-runtime-symbol. This used to be three hardcoded `or` chains at the
+    // call site, and the failure mode of that shape is that a symbol absent from
+    // all three chains silently keeps `last_type = IntType`: `IO.readln()` and
+    // `IO.read_line()` are aliases of `__io_readline`, which IS listed, but the
+    // aliases were not, so both printed a raw heap address (`[5360378368]`)
+    // instead of the line. The value itself was correct and correctly TAG_PTR'd
+    // by the runtime — only codegen's *static* type was wrong, which is why
+    // `.length()` on the same value returned 5 while interpolating it printed an
+    // address. That asymmetry is the tell for this class of bug.
+    //
+    // Note this classifies the STATIC TYPE, and the tagging that follows is
+    // idempotent: __io_read_file already returns __rt_tag_ptr'd memory and is
+    // tagged again here, which is harmless because __val_tag_ptr masks the low 48
+    // bits and re-ors TAG_PTR. Doubling an UNTAG is the unsafe direction (BUGS
+    // #77) — do not read this as licence to double up in general.
+    fun runtime_ret_discipline(fn: String): String {
+        if (fn == "__io_read_file" or fn == "__io_readline" or fn == "__io_readln" or fn == "__io_read_line" or fn == "__io_read_stdin") { return "string" }
+        if (fn == "__os_exec" or fn == "__os_env" or fn == "__os_cwd" or fn == "__os_path_sep" or fn == "__os_platform" or fn == "__os_home") { return "string" }
+        if (fn == "__io_file_exists" or fn == "__os_file_exists" or fn == "__io_is_dir" or fn == "__io_rename" or fn == "__io_delete_file" or fn == "__os_set_env") { return "bool" }
+        if (fn == "__io_file_size" or fn == "__io_read_binary" or fn == "__os_system") { return "int" }
+        // Lists travel deliberately UNTAGGED. Tagging the returned list pointer
+        // here segfaults: __gc_is_heap_ptr (gc.ll:615) rejects any NaN-tagged
+        // value as a heap pointer, so a tagged __list_new() result stops being
+        // traced and is swept while live. That is the caveat in BUGS #23, and it
+        // is why "list" is a discipline of its own rather than an omission.
+        // `__str_split` is the precedent and is also untagged at its call site.
+        if (fn == "__io_walk_dir" or fn == "__io_list_dir" or fn == "__os_list_dir" or fn == "__os_args") { return "list" }
+        if (fn == "__io_write_file" or fn == "__io_append_file" or fn == "__io_mkdir" or fn == "__os_mkdir") { return "void" }
+        // Intercepted before generic dispatch, but listed so they are never
+        // reported as unclassified.
+        if (fn == "__io_println" or fn == "__io_print") { return "void" }
+        return ""
+    }
+
     fun resolve_namespace(obj_name: String, object: AST.Expr): String {
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
@@ -1594,44 +1634,30 @@
             } else {
                 this.last_type = AST.Type.IntType
             }
-            // Tag results from builtin runtime functions that return raw values.
-            // String-returning functions: tag raw pointer as string
-            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform" or __mp_func == "__os_home") {
+            // Box the result of a builtin runtime symbol per its declared
+            // discipline. See runtime_ret_discipline above for why this is one
+            // table rather than three `or` chains, and for the alias omission
+            // (`__io_readln`/`__io_read_line`) that shape hid.
+            var __mp_disc: String = this.runtime_ret_discipline(__mp_func)
+            if (__mp_disc == "string") {
                 var __tag_ptr: String = this.fresh_local()
                 this.emit_indent(__tag_ptr + " = inttoptr i64 " + __mp_local + " to i8*")
                 var __tagged: String = this.emit_tag_ptr(__tag_ptr)
                 this.last_type = AST.Type.StringType
                 return __tagged
             }
-            // Bool-returning functions: tag raw 0/1 as bool. This path bypasses
-            // the stdlib wrapper in io.sf/os.sf entirely — `IO.is_dir(p)` lowers
-            // straight to `@__io_is_dir` — so a predicate missing from this list
-            // surfaces its raw runtime int and prints `1`/`0` instead of
-            // `true`/`false`, and `== true` on it is false.
-            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists" or __mp_func == "__io_is_dir" or __mp_func == "__io_rename" or __mp_func == "__io_delete_file" or __mp_func == "__os_set_env") {
+            if (__mp_disc == "bool") {
                 var __tagged: String = this.emit_tag_bool(__mp_local)
                 this.last_type = AST.Type.BoolType
                 return __tagged
             }
-            // NOTE: no arm for list-returning functions (`__io_walk_dir`,
-            // `__os_args`). Tagging the returned list pointer here segfaults —
-            // `__gc_is_heap_ptr` (gc.ll:615) rejects any NaN-tagged value as a
-            // heap pointer, so a tagged `__list_new()` result stops being traced
-            // and is swept while live. That is the caveat recorded in BUGS #23.
-            // Lists deliberately travel untagged; `__str_split` is the precedent
-            // and is also untagged at its call site. `IO.list_dir(d)[0]` reading
-            // back as a subnormal double had the same cause one level down —
-            // `__io_walk_dir` pushed untagged elements — and is fixed there, in
-            // runtime.sf, not here.
-            //
-            // Int-returning functions: tag the raw count. `IO.file_size(p)`
-            // printed `5.43e-323` for an 11-byte file without this, and
-            // `== 11` on it was false — the silent half of the same bug.
-            if (__mp_func == "__io_file_size" or __mp_func == "__io_read_binary" or __mp_func == "__os_system") {
+            if (__mp_disc == "int") {
                 var __tagged: String = this.emit_tag_int(__mp_local)
                 this.last_type = AST.Type.IntType
                 return __tagged
             }
+            // "list" and "void" fall through deliberately untagged — see the
+            // __gc_is_heap_ptr caveat in runtime_ret_discipline.
             return __mp_local
         }
     }
