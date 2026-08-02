@@ -253,6 +253,20 @@ run_positive_test() {   # file label
     # stripped. Assertion-based tests need no such file — @test already sets a
     # non-zero exit — so this stays opt-in per test rather than becoming a
     # blanket requirement that would have to be back-filled for 165 files.
+    #
+    # THE TWO MECHANISMS COMPOSE. Assertions and `.expected` are not alternatives,
+    # and carrying both is supported: the assertion gate above returns early only
+    # when an assertion actually FAILED, so a test whose assertions all pass still
+    # falls through to the diff below. BUGS #107's survey found 0 of 174 tests
+    # carrying both, which reads like a policy and is not one — it is an accident
+    # of how the two were adopted. Prefer both where a test has real invariants AND
+    # a stable full output: the assertion says *why* a value is right, the
+    # `.expected` catches everything the assertions forgot to mention.
+    #
+    # The one case to NOT record is an output that is currently WRONG. Freezing a
+    # known-bad output is worse than leaving a test blind, because the eventual fix
+    # then reads as a regression. test/pass/enums.sf and test/pass/generics.sf are
+    # deliberately assertion-only for this reason (BUGS #105).
     local expected="${f%.sf}.expected"
     if [[ -f "$expected" ]]; then
         # filter_noise strips trailing structure, so compare through the same
