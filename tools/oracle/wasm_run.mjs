@@ -188,6 +188,62 @@ const env = {
   js_log_nil: () => emit('nil'),
 };
 
+// libm. wasm has no libc, so `@math`'s externs (round, pow, cos, log2, ...)
+// become plain module imports and the host must supply them. These are NOT
+// stubbed, they are implemented, because JS's Math is IEEE-754 double math on the
+// same hardware as native libm — so `Math.pow(2, 10)` and C `pow(2, 10)` agree
+// bit-for-bit, and the differential can therefore grade a math program instead
+// of skipping it.
+//
+// Before this, stubbing them to 0 made test/stdlib_math.sf report five FAILing
+// assertions on wasm ("expected: 1024, actual: 0") that were purely the shim's
+// doing. That is the exact failure mode this file's header warns about: the
+// harness manufacturing findings. Anything added here must be a faithful
+// implementation, never a placeholder — a wrong implementation here is worse
+// than an absent one, because it looks like a compiler bug.
+//
+// sqrt/sin/cos/tan/log/exp/atan2/fabs are the same function in both languages.
+// `round` is NOT: C's round() breaks ties away from zero (round(-2.5) == -3)
+// while JS's Math.round breaks ties toward +Infinity (Math.round(-2.5) == -2).
+// Getting that wrong would show up as a wasm-only mismatch on negative halves,
+// so it is written out rather than delegated.
+const cRound = (x) => (x < 0 ? -Math.round(-x) : Math.round(x));
+
+const libm = {
+  round: cRound,
+  sqrt: Math.sqrt,
+  pow: Math.pow,
+  sin: Math.sin,
+  cos: Math.cos,
+  tan: Math.tan,
+  asin: Math.asin,
+  acos: Math.acos,
+  atan: Math.atan,
+  atan2: Math.atan2,
+  log: Math.log,
+  log2: Math.log2,
+  log10: Math.log10,
+  exp: Math.exp,
+  floor: Math.floor,
+  ceil: Math.ceil,
+  fabs: Math.abs,
+  fmod: (a, b) => a % b,
+  trunc: Math.trunc,
+};
+
+// Only install a libm function if the module actually declares it as an f64
+// import. Guarding on the declared signature keeps this from shadowing a
+// same-named Saffron export or an i64-typed import that happens to collide.
+const importedByName = new Map(imported.map((i) => [i.field, i]));
+for (const [name, fn] of Object.entries(libm)) {
+  const imp = importedByName.get(name);
+  if (!imp) continue;
+  const t = imp.type || { params: [], results: [] };
+  const allF64 =
+    t.params.every((p) => p === 0x7c) && t.results.every((r) => r === 0x7c);
+  if (allF64) env[name] = fn;
+}
+
 let status = 0;
 try {
   const { instance } = await WebAssembly.instantiate(buf, {
