@@ -197,8 +197,18 @@ directly from that:
 
 - It cannot catch a bug that is **identical in all configurations**. A wrong
   answer that is consistently wrong native and wasm, -O0 and -O2, is invisible to
-  it. Bug 1 and bug 3's `List.sort()` face were both found only because a
-  hand-written test asserted the *correct* answer — not by the diff.
+  it. Bug 1 (`IO.println(enum_value)`) is exactly that case: it is uniformly
+  wrong everywhere, and it was found only because a hand-written test asserted
+  the *correct* answer.
+
+  Bug 3's `List.sort()` face, by contrast, *is* caught by the diff unaided, and
+  the reason is instructive. The comparison reads bit patterns, and the two
+  targets lay strings out differently, so a four-element sort that comes back
+  `[delta, alpha, charlie, bravo]` on native comes back
+  `[bravo, charlie, delta, alpha]` on wasm32 — both wrong, differently wrong,
+  therefore visible. Being wrong for a reason that depends on the environment is
+  what makes a bug differentially detectable; being *reliably* wrong is what
+  hides it.
 - Tests behind the capability gate get **no cross-target comparison** at all.
 - `.expected` files recorded by `--record` freeze *current* behaviour, which
   makes them regression detectors, not correctness statements.
