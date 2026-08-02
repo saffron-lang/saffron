@@ -100,17 +100,25 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
-    // Parent of each class that has one. gen_class_decl_with_parent is *handed*
+    // Parent of each class that has one. gen_class_decl_with_parents is *handed*
     // the parent name and used to discard it after inheriting fields and
     // methods, which made the hierarchy look unavailable to codegen (it is not
     // — only checker.sf recorded it). Writing it down here is what lets
     // __class_is_a answer `d is Animal` for a Dog, which no amount of
     // compile-time folding can (BUGS #61, #50).
     var class_parent_of: Map<String, String>
+    // Every declared base of each class, struct-keyed like class_parent_of.
+    // class_parent_of above deliberately stays the *primary* base — parents[0] —
+    // because that is the one whose field layout the child extends and whose
+    // `init` it forwards to; __class_parent_tag still reports exactly it. This
+    // map is the full set, and it is what __class_is_a is built from, so
+    // `duck is Swimmable` answers true for `class Duck extends Flyable,
+    // Swimmable, Walkable` instead of stopping at Flyable.
+    var class_parents_of: Map<String, List<String>>
     // Methods a class declares *itself* (real symbols, not inherited forwarders),
     // and the bare (unprefixed) name for each struct name. Both keyed by struct
     // name and populated in the generate() pre-registration pass, before the
-    // forwarder logic in gen_class_decl_with_parent pushes inherited names into
+    // forwarder logic in gen_class_decl_with_parents pushes inherited names into
     // class_methods — that mixing is why class_methods can't answer "does this
     // class override the method" on its own. gen_virtual_dispatch (BUGS #50)
     // needs exactly that: to switch a call on the receiver's runtime tag it must
@@ -189,6 +197,7 @@ class Codegen {
         this.class_type_ids = {}
         this.next_class_type_id = 10
         this.class_parent_of = {}
+        this.class_parents_of = {}
         this.class_own_methods = {}
         this.class_bare_of = {}
         this.actor_classes = {}
@@ -5345,7 +5354,7 @@ class Codegen {
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
             FunDecl(n, p, r, b, d) => {}
             EnumDecl(n, v, d) => {}
-            ClassDecl(n, __tps, p, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -6211,7 +6220,7 @@ class Codegen {
             EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 // Registered before the body is generated: a method returning a
                 // class type parameter is typed by substituting the receiver's
                 // own type arguments, and that has to be known by the time any
@@ -6222,7 +6231,7 @@ class Codegen {
                         this.class_type_params.set(this.current_prefix + name, type_params)
                     }
                 }
-                this.gen_class_decl_with_parent(name, parent, fields, methods)
+                this.gen_class_decl_with_parents(name, parents, fields, methods)
             }
             TypeAlias(ta_n, ta_t) => {}
         }
@@ -6456,10 +6465,23 @@ class Codegen {
         }
     }
 
-    fun gen_class_decl_with_parent(name: String, parent: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+    fun gen_class_decl_with_parents(name: String, parents: List<String>, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        // The primary base: the one whose field layout the child extends, whose
+        // `init` it may forward to, and which `super` names. Bases 2..n
+        // contribute methods only — see the field guard below.
+        var parent: String = ""
+        if (parents.length() > 0) { parent = parents[0] }
         // Convert fields to string format for internal use
         var fields_str: String = this.params_to_string(fields)
-        // Inherit parent fields (prepend parent fields before child's own)
+        // Inherit parent fields (prepend parent fields before child's own).
+        //
+        // Only the FIRST base contributes fields, deliberately. Prepending base
+        // 2's fields as well would be more complete but would break the one
+        // invariant the whole inheritance lowering rests on: parent field index i
+        // must equal child field index i, which is what makes `init` forwarding
+        // and every inherited method's field access correct without a vtable.
+        // That can hold for exactly one base. Keeping it on parents[0] means a
+        // single-inheritance class lays out byte-for-byte as it always has.
         var all_fields: String = fields_str
         if (parent.length() > 0 and this.class_fields.has(parent)) {
             var parent_fields: String = this.class_fields.get(parent)
@@ -6470,6 +6492,19 @@ class Codegen {
                     all_fields = parent_fields
                 }
             }
+        }
+        // So a second base that carries state cannot work, and must say so rather
+        // than emit methods that read the first base's fields at those offsets.
+        // Interfaces — the overwhelmingly common case for `extends A, B, C` — are
+        // fieldless and are unaffected.
+        var gi: Float = 1
+        while (gi < parents.length()) {
+            var extra: String = parents[gi]
+            if (this.class_fields.has(extra) and this.class_fields.get(extra).length() > 0) {
+                IO.println("Error: class " + name + " cannot extend " + extra
+                    + " as a secondary base: it declares fields, and only the first base's fields are inherited. Make it the first base, or give it no fields.")
+            }
+            gi = gi + 1
         }
         // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
         if (this.actor_classes.has(name)) {
@@ -6490,22 +6525,57 @@ class Codegen {
         // could never see a subclass relation (BUGS #61) and dispatch had no
         // hierarchy to switch on (BUGS #50). class_struct_names resolves the
         // parent's own prefix, so a base class in another module still joins.
-        if (parent.length() > 0) {
+        if (parents.length() > 0) {
             var child_struct: String = name
             if (this.class_struct_names.has(name)) { child_struct = this.class_struct_names.get(name) }
             var parent_struct: String = parent
             if (this.class_struct_names.has(parent)) { parent_struct = this.class_struct_names.get(parent) }
             this.class_parent_of.set(child_struct, parent_struct)
+            // …and the full set, struct-resolved the same way, for __class_is_a.
+            var all_structs: List<String> = []
+            var psi: Float = 0
+            while (psi < parents.length()) {
+                var one: String = parents[psi]
+                if (this.class_struct_names.has(one)) { one = this.class_struct_names.get(one) }
+                all_structs.push(one)
+                psi = psi + 1
+            }
+            this.class_parents_of.set(child_struct, all_structs)
         }
-        // Register inherited methods: if child doesn't define a method, map it to parent's
-        if (parent.length() > 0 and this.class_methods.has(parent)) {
-            var parent_methods: List = this.class_methods.get(parent)
+        // Register inherited methods: if child doesn't define a method, map it to
+        // parent's — for EVERY base, in declaration order, not just the first.
+        // This loop used to run once against parents[0], which is why
+        // `class Duck extends Flyable, Swimmable, Walkable` got a Duck__fly
+        // forwarder and nothing for swim or walk: `d.swim()` then failed with
+        // "type 'Duck' has no method 'swim'". Earlier bases win ties, since
+        // str_in_list(child_methods, ...) sees names pushed by previous
+        // iterations — the same first-wins rule an override already had.
+        var ppi: Float = 0
+        while (ppi < parents.length()) {
+        var cur_parent: String = parents[ppi]
+        if (this.class_methods.has(cur_parent)) {
+            var parent_methods: List = this.class_methods.get(cur_parent)
+            // Which of this base's methods are bodyless. There is nothing to
+            // forward *to* for those, and claiming the name would shadow a real
+            // body on a later base: `class Both extends Requires, Provides`,
+            // Requires.compute() bodyless and Provides.compute() concrete, forwarded
+            // Both__compute to Requires__compute and b.compute() returned 0.
+            var cur_abstract: List<String> = []
+            if (this.class_abstract_methods.has(cur_parent)) {
+                cur_abstract = this.class_abstract_methods.get(cur_parent)
+            }
             var child_methods: List = this.class_methods.get(name)
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
                 var forward_method: Bool = !this.str_in_list(child_methods,mname)
+                if (this.str_in_list(cur_abstract, mname)) { forward_method = false }
                 if (mname == "init") {
+                    // Only the primary base's constructor may be forwarded. A
+                    // secondary base's fields are NOT prepended to the child (see
+                    // the layout note above), so its init would write the child's
+                    // inherited-from-parents[0] slots at its own field indices.
+                    if (ppi > 0) { forward_method = false }
                     // `init` used to be excluded here, which meant a child that
                     // declares no constructor of its own got no Child__init at
                     // all. The call site in gen_call only emits the __init call
@@ -6520,12 +6590,12 @@ class Codegen {
                     // where that does not hold is an actor inheriting from a
                     // non-actor: the actor gets two hidden fields prepended,
                     // shifting every inherited index by two.
-                    if (this.actor_classes.has(name) and !this.actor_classes.has(parent)) {
+                    if (this.actor_classes.has(name) and !this.actor_classes.has(cur_parent)) {
                         forward_method = false
                     }
                     // Without a known arity we cannot emit matching parameters,
                     // and a forwarder with the wrong arity is worse than none.
-                    if (!this.called_function_arity.has(this.current_prefix + parent + "__init")) {
+                    if (!this.called_function_arity.has(this.current_prefix + cur_parent + "__init")) {
                         forward_method = false
                     }
                 }
@@ -6534,7 +6604,7 @@ class Codegen {
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
                     var child_full: String = name + "__" + mname
-                    var parent_full: String = parent + "__" + mname
+                    var parent_full: String = cur_parent + "__" + mname
                     if (this.func_ret_types.has(parent_full)) {
                         this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
                     } else {
@@ -6576,25 +6646,41 @@ class Codegen {
                 }
                 i = i + 1
             }
-            // Conformance: only the parent's ABSTRACT (bodyless) methods are
-            // requirements. Previously this keyed off "parent has no fields" as a
-            // proxy for "parent is an interface", then demanded every parent method
-            // be redeclared — which rejected legitimate inheritance from a
-            // fieldless base class and forced implementors to copy interface
-            // default-method bodies. Note child_methods has already had inherited
-            // names pushed into it above, so a method inherited from a grandparent
-            // correctly counts as satisfying the requirement.
-            if (this.class_abstract_methods.has(parent)) {
-                var required_methods: List = this.class_abstract_methods.get(parent)
+        }
+        ppi = ppi + 1
+        }
+        // Conformance: only a base's ABSTRACT (bodyless) methods are
+        // requirements. Previously this keyed off "parent has no fields" as a
+        // proxy for "parent is an interface", then demanded every parent method
+        // be redeclared — which rejected legitimate inheritance from a
+        // fieldless base class and forced implementors to copy interface
+        // default-method bodies. child_methods has had every inherited name
+        // pushed into it above, so a method inherited from a grandparent
+        // correctly counts as satisfying the requirement.
+        //
+        // This runs in a SECOND loop, after all forwarding, not interleaved with
+        // it. Interleaved, `class C extends Abstract, Provider` — Abstract
+        // declares `foo` bodyless, Provider supplies a body — would be checked
+        // against Abstract before Provider's foo had been forwarded, and report a
+        // requirement that is in fact satisfied. That combination is a large part
+        // of why multiple bases are worth having.
+        var cpi: Float = 0
+        while (cpi < parents.length()) {
+            var conf_parent: String = parents[cpi]
+            if (this.class_abstract_methods.has(conf_parent)) {
+                var have: List = []
+                if (this.class_methods.has(name)) { have = this.class_methods.get(name) }
+                var required_methods: List = this.class_abstract_methods.get(conf_parent)
                 var pi: Int = 0
                 while (pi < required_methods.length()) {
                     var required: String = required_methods[pi]
-                    if (required != "init" and !this.str_in_list(child_methods,required)) {
-                        IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
+                    if (required != "init" and !this.str_in_list(have,required)) {
+                        IO.println("Error: class " + name + " does not implement " + conf_parent + "." + required + "()")
                     }
                     pi = pi + 1
                 }
             }
+            cpi = cpi + 1
         }
     }
 
@@ -7193,7 +7279,7 @@ class Codegen {
             }
             VarDecl(n, t, i, d) => {}
             FunDecl(n, p, r, b, d) => {}
-            ClassDecl(n, __tps, p, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -7363,7 +7449,7 @@ class Codegen {
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, __tps, p, f, m, d) => "class"
+            ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -7388,7 +7474,7 @@ class Codegen {
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d) => "other"
-            ClassDecl(n, __tps, p, f, m, d) => "other"
+            ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
@@ -7656,18 +7742,62 @@ class Codegen {
         this.start_block(end_label)
     }
 
+    // Every ancestor struct name of `struct_c`, transitively, through ALL of its
+    // bases. Breadth-first with a visited set, so a diamond yields the shared
+    // ancestor once and an `extends` cycle terminates instead of hanging codegen.
+    // Does not include struct_c itself.
+    fun all_ancestor_structs(struct_c: String): List<String> {
+        var out: List<String> = []
+        var visited: List<String> = [struct_c]
+        var work: List<String> = []
+        if (this.class_parents_of.has(struct_c)) {
+            var seed: List<String> = this.class_parents_of.get(struct_c)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        } else if (this.class_parent_of.has(struct_c)) {
+            // Sites that only recorded the primary base still contribute it.
+            work.push(this.class_parent_of.get(struct_c))
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.str_in_list(visited, cur)) {
+                visited.push(cur)
+                out.push(cur)
+                var ups: List<String> = []
+                if (this.class_parents_of.has(cur)) {
+                    ups = this.class_parents_of.get(cur)
+                } else if (this.class_parent_of.has(cur)) {
+                    ups = [this.class_parent_of.get(cur)]
+                }
+                var ui: Float = 0
+                while (ui < ups.length()) {
+                    if (!this.str_in_list(visited, ups[ui])) { work.push(ups[ui]) }
+                    ui = ui + 1
+                }
+            }
+        }
+        return out
+    }
+
     // Emit the two helpers that give the class hierarchy a runtime existence:
-    // __class_parent_tag (one switch arm per class that has a parent) and
-    // __class_is_a (walk the chain, comparing against a target tag).
+    // __class_parent_tag (the PRIMARY base of each class, one switch arm each)
+    // and __class_is_a (does a tag name a target or a descendant of it).
     //
     // Emitted for *every* target and both modes, unlike emit_reflect_helpers
     // which is skipped in identity mode. gen_is_check calls __class_is_a
     // unconditionally, so skipping the definition here would leave an undefined
     // symbol whenever the compiler compiles itself.
     //
-    // A flattened tag -> ancestor-set table would be O(1) instead of O(depth);
-    // the walk is emitted because hierarchies are shallow and this is far easier
-    // to read in the IR when something goes wrong.
+    // __class_is_a is a flattened tag -> ancestor-set table, not a chain walk.
+    // The walk was O(depth) and easier to read in the IR, but it could only ever
+    // follow ONE parent per tag — a switch arm returns a single value — so
+    // `duck is Swimmable` was false for `class Duck extends Flyable, Swimmable,
+    // Walkable`. Multiple bases are a DAG, not a chain, and no single-successor
+    // walk can traverse one. The closure is computed here at compile time (see
+    // all_ancestor_structs), so the emitted form is a nested switch and O(1).
     fun emit_class_hierarchy_helpers() {
         var child_names: List<String> = this.class_parent_of.keys()
         this.emit("")
@@ -7714,26 +7844,76 @@ class Codegen {
         }
 
         // __class_is_a(tag, target): does `tag` name `target` or a descendant of
-        // it? The zero test comes before the equality test so a target of 0 (a
+        // it? The zero tests come before the equality test so a target of 0 (a
         // non-class value, whose __gc_get_type_tag is 0) answers false rather
-        // than matching the end-of-chain sentinel.
+        // than matching the no-such-class sentinel.
+        //
+        // Outer switch on the receiver's tag, inner switch on the target against
+        // that class's precomputed ancestor set. A chain walk cannot do this: it
+        // has one successor per step and multiple bases are a DAG.
+        var isa_children: List<String> = this.class_parents_of.keys()
+        var isa_lbls: List<String> = []
+        var isa_sets: List<List<String>> = []
+        var isa_arms: String = ""
+        var ci: Float = 0
+        while (ci < isa_children.length()) {
+            var ch: String = isa_children[ci]
+            if (this.class_type_ids.has(ch)) {
+                // Ancestors that actually have a tag. An interface never
+                // constructed has no type id, so there is nothing to compare
+                // against and it contributes no arm — but note gen_is_check
+                // resolves the *target* through class_type_ids too, so an
+                // untagged interface is unaskable rather than wrongly false.
+                var tagged: List<String> = []
+                var anc: List<String> = this.all_ancestor_structs(ch)
+                var ai2: Float = 0
+                while (ai2 < anc.length()) {
+                    if (this.class_type_ids.has(anc[ai2])) {
+                        var atag: Float = this.class_type_ids.get(anc[ai2])
+                        tagged.push(atag.floor().to_string())
+                    }
+                    ai2 = ai2 + 1
+                }
+                if (tagged.length() > 0) {
+                    var chtag: Float = this.class_type_ids.get(ch)
+                    var clbl: String = "cia.c" + isa_lbls.length().floor().to_string()
+                    isa_lbls.push(clbl)
+                    isa_sets.push(tagged)
+                    isa_arms = isa_arms + " i64 " + chtag.floor().to_string() + ", label %" + clbl
+                }
+            }
+            ci = ci + 1
+        }
         this.emit("")
         this.emit("define i1 @__class_is_a(i64 %tag, i64 %target) {")
         this.emit("entry:")
-        this.emit("  %cur = alloca i64")
-        this.emit("  store i64 %tag, i64* %cur")
-        this.emit("  br label %cia.loop")
-        this.emit("cia.loop:")
-        this.emit("  %c = load i64, i64* %cur")
-        this.emit("  %z = icmp eq i64 %c, 0")
-        this.emit("  br i1 %z, label %cia.no, label %cia.test")
-        this.emit("cia.test:")
-        this.emit("  %hit = icmp eq i64 %c, %target")
-        this.emit("  br i1 %hit, label %cia.yes, label %cia.step")
-        this.emit("cia.step:")
-        this.emit("  %p = call i64 @__class_parent_tag(i64 %c)")
-        this.emit("  store i64 %p, i64* %cur")
-        this.emit("  br label %cia.loop")
+        this.emit("  %z = icmp eq i64 %tag, 0")
+        this.emit("  br i1 %z, label %cia.no, label %cia.tchk")
+        this.emit("cia.tchk:")
+        this.emit("  %tz = icmp eq i64 %target, 0")
+        this.emit("  br i1 %tz, label %cia.no, label %cia.self")
+        this.emit("cia.self:")
+        this.emit("  %hit = icmp eq i64 %tag, %target")
+        if (isa_lbls.length() == 0) {
+            this.emit("  br i1 %hit, label %cia.yes, label %cia.no")
+        } else {
+            this.emit("  br i1 %hit, label %cia.yes, label %cia.disp")
+            this.emit("cia.disp:")
+            this.emit("  switch i64 %tag, label %cia.no [" + isa_arms + " ]")
+            var li: Float = 0
+            while (li < isa_lbls.length()) {
+                this.emit(isa_lbls[li] + ":")
+                var set: List<String> = isa_sets[li]
+                var tarms: String = ""
+                var ti: Float = 0
+                while (ti < set.length()) {
+                    tarms = tarms + " i64 " + set[ti] + ", label %cia.yes"
+                    ti = ti + 1
+                }
+                this.emit("  switch i64 %target, label %cia.no [" + tarms + " ]")
+                li = li + 1
+            }
+        }
         this.emit("cia.yes:")
         this.emit("  ret i1 1")
         this.emit("cia.no:")
@@ -8208,7 +8388,7 @@ class Codegen {
             }
             FunDecl(n, p, r, b, d) => {}
             EnumDecl(n, v, d) => {}
-            ClassDecl(n, __tps, p, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -8677,7 +8857,7 @@ class Codegen {
                 var cls_name: String = ""
                 var cls_methods: List<AST.Stmt> = []
                 match (program[i]) {
-                    ClassDecl(cn, __tps, cp, cf, cm, cd) => {
+                    ClassDecl(cn, __tps, cps, cf, cm, cd) => {
                         cls_name = cn
                         cls_methods = cm
                     }
@@ -9271,10 +9451,10 @@ class Codegen {
     /// leading `self`, registered under both the bare `Class__method` name and
     /// the prefixed one.
     fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
-        var cname: String = match (stmt) { ClassDecl(n, __tps, p, f, m, d) => n
+        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => n
             _ => ""
         }
-        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, p, f, m, d) => m
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => m
             _ => []
         }
         var mi: Float = 0
@@ -9967,7 +10147,7 @@ class Codegen {
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true
             EnumDecl(n, v, d) => true
-            ClassDecl(n, __tps, p, f, m, d) => true
+            ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
             VarDecl(n, t, i, d) => d.starts_with("@import:")
             Return(v) => false
@@ -10133,14 +10313,14 @@ class Codegen {
                         }
                     }
                 }
-                ClassDecl(pr_cname, __tps, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc) => {
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
                     // Assign the type tag and record the parent here, not only in
-                    // gen_class_constructor / gen_class_decl_with_parent. Bodies
+                    // gen_class_constructor / gen_class_decl_with_parents. Bodies
                     // are lowered in the pass below, in source order, so `x is Dog`
                     // inside a function declared above `class Dog` would otherwise
                     // find no tag and fall back to the always-false warning —
@@ -10151,15 +10331,28 @@ class Codegen {
                         this.class_type_ids.set(pr_type_name, this.next_class_type_id)
                         this.next_class_type_id = this.next_class_type_id + 1
                     }
-                    if (pr_parent.length() > 0) {
+                    if (pr_parents.length() > 0) {
                         // The parent's own struct name is known if it was already
                         // lowered (an imported base class); otherwise it is in this
                         // module and carries this module's prefix.
-                        var pr_pstruct: String = this.current_prefix + pr_parent
-                        if (this.class_struct_names.has(pr_parent)) {
-                            pr_pstruct = this.class_struct_names.get(pr_parent)
+                        var pr_pstructs: String = ""
+                        var pr_pall: List<String> = []
+                        var pr_ppi: Float = 0
+                        while (pr_ppi < pr_parents.length()) {
+                            var pr_one: String = this.current_prefix + pr_parents[pr_ppi]
+                            if (this.class_struct_names.has(pr_parents[pr_ppi])) {
+                                pr_one = this.class_struct_names.get(pr_parents[pr_ppi])
+                            }
+                            pr_pall.push(pr_one)
+                            if (pr_ppi == 0) { pr_pstructs = pr_one }
+                            pr_ppi = pr_ppi + 1
                         }
-                        this.class_parent_of.set(pr_type_name, pr_pstruct)
+                        // Primary base keeps its own single-valued table (field
+                        // layout, `super`, __class_parent_tag); the full set is
+                        // what __class_is_a and the BUGS #50 descendant search
+                        // read, since neither can follow one link per class.
+                        this.class_parent_of.set(pr_type_name, pr_pstructs)
+                        this.class_parents_of.set(pr_type_name, pr_pall)
                     }
                     if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)
@@ -11484,18 +11677,26 @@ class Codegen {
     }
 
     // The struct name that actually implements `method` for the class whose
-    // struct name is `struct_c` — walk the parent chain to the nearest class
-    // that declares it itself (class_own_methods). "" if none does.
+    // struct name is `struct_c` — the nearest class at or above it that declares
+    // the method itself (class_own_methods). "" if none does.
+    //
+    // Searches every base, not one chain, so a method supplied by the 2nd or 3rd
+    // interface of `extends A, B, C` has an owner. Bases are visited in
+    // declaration order at each level (all_ancestor_structs is breadth-first),
+    // matching the first-wins rule the forwarder emission uses.
     fun effective_method_owner(struct_c: String, method: String): String {
-        var cur: String = struct_c
-        var guard: Float = 0
-        while (guard < 64) {
-            if (this.class_own_methods.has(cur)) {
-                var own: List<String> = this.class_own_methods.get(cur)
-                if (own.contains(method)) { return cur }
+        if (this.class_own_methods.has(struct_c)) {
+            var own0: List<String> = this.class_own_methods.get(struct_c)
+            if (own0.contains(method)) { return struct_c }
+        }
+        var anc: List<String> = this.all_ancestor_structs(struct_c)
+        var ai: Float = 0
+        while (ai < anc.length()) {
+            if (this.class_own_methods.has(anc[ai])) {
+                var own: List<String> = this.class_own_methods.get(anc[ai])
+                if (own.contains(method)) { return anc[ai] }
             }
-            if (this.class_parent_of.has(cur)) { cur = this.class_parent_of.get(cur) } else { return "" }
-            guard = guard + 1
+            ai = ai + 1
         }
         return ""
     }
@@ -11527,17 +11728,11 @@ class Codegen {
         while (ki < keys.length()) {
             var sc: String = keys[ki]
             if (sc != struct_ns) {
-                // Is sc a descendant of struct_ns?
-                var cur: String = sc
-                var is_desc: Bool = false
-                var g: Float = 0
-                while (g < 64) {
-                    if (this.class_parent_of.has(cur)) {
-                        cur = this.class_parent_of.get(cur)
-                        if (cur == struct_ns) { is_desc = true; g = 64 }
-                    } else { g = 64 }
-                    g = g + 1
-                }
+                // Is sc a descendant of struct_ns, through any of its bases? The
+                // single-chain walk this replaces missed a class whose relation to
+                // struct_ns runs through its 2nd or 3rd base, so a call typed at
+                // the interface did not dispatch to that implementor.
+                var is_desc: Bool = this.str_in_list(this.all_ancestor_structs(sc), struct_ns)
                 if (is_desc) {
                     var sc_owner: String = this.effective_method_owner(sc, method)
                     if (sc_owner.length() > 0 and sc_owner != ns_owner) {
@@ -14457,19 +14652,23 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         while (si3 < stmts3.length()) {
             var sk3: String = gen.classify_stmt(stmts3[si3])
             if (sk3 == "class") {
-                var cn3: String = match (stmts3[si3]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var cn3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
-                var cp3: String = match (stmts3[si3]) { ClassDecl(n, __tps, p, f, m, d) => p
-                    _ => ""
-                }
-                var cf3: List<AST.Param> = match (stmts3[si3]) { ClassDecl(n, __tps, p, f, m, d) => f
+                // Only the primary base contributes fields — see the layout rule in
+                // gen_class_decl_with_parents. parents[0] is that base.
+                var cp3_all: List<String> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d) => ps
                     _ => []
                 }
-                var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, __tps, p, f, m, d) => m
+                var cp3: String = ""
+                if (cp3_all.length() > 0) { cp3 = cp3_all[0] }
+                var cf3: List<AST.Param> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d) => f
                     _ => []
                 }
-                var cd3: String = match (stmts3[si3]) { ClassDecl(n, __tps, p, f, m, d) => d
+                var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d) => m
+                    _ => []
+                }
+                var cd3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d) => d
                     _ => ""
                 }
                 if (cd3.starts_with("@actor")) {
@@ -14516,7 +14715,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tp3_names: List<String> = match (stmts3[si3]) { ClassDecl(n, tps, p, f, m, d) => tps
+                    var tp3_names: List<String> = match (stmts3[si3]) { ClassDecl(n, tps, ps, f, m, d) => tps
                         _ => []
                     }
                     if (tp3_names.length() > 0) {
@@ -14563,7 +14762,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     }
                 }
             } else if (pr_kind == "class") {
-                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -14577,7 +14776,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
-                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => m
+                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -14634,10 +14833,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -14646,7 +14845,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => m
                 _ => []
             }
             var pr_mj2: Float = 0
@@ -15012,16 +15211,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         while (si < end) {
             var mod_kind: String = gen.classify_stmt(all_stmts[si])
             if (mod_kind == "class") {
-                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
-                var mod_parent: String = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => p
-                    _ => ""
-                }
-                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => f
+                // Only the primary base contributes fields — see the layout rule in
+                // gen_class_decl_with_parents. parents[0] is that base.
+                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => ps
                     _ => []
                 }
-                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => m
+                var mod_parent: String = ""
+                if (mod_parent_all.length() > 0) { mod_parent = mod_parent_all[0] }
+                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => f
+                    _ => []
+                }
+                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => m
                     _ => []
                 }
                 if (mod_name.length() > 0) {
@@ -15061,7 +15264,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, p, f, m, d) => tps
+                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d) => tps
                         _ => []
                     }
                     if (tpm_names.length() > 0) {
@@ -15111,19 +15314,23 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     while (pri < program.length()) {
         var pr_kind: String = gen.classify_stmt(program[pri])
         if (pr_kind == "class") {
-            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => n
+            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => n
                 _ => ""
             }
-            var pr_parent: String = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => p
-                _ => ""
-            }
-            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => f
+            // Only the primary base contributes fields — see the layout rule in
+            // gen_class_decl_with_parents. parents[0] is that base.
+            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => ps
                 _ => []
             }
-            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => m
+            var pr_parent: String = ""
+            if (pr_parent_all.length() > 0) { pr_parent = pr_parent_all[0] }
+            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => f
                 _ => []
             }
-            var pr_doc: String = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => d
+            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => m
+                _ => []
+            }
+            var pr_doc: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => d
                 _ => ""
             }
             if (pr_doc.starts_with("@actor")) {
@@ -15165,7 +15372,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 // Declared generic parameter names, kept alongside the method list
                 // so a method returning a class type parameter can be typed at a
                 // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, p, f, m, d) => tps
+                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d) => tps
                     _ => []
                 }
                 if (tpp_names.length() > 0) {
@@ -15216,7 +15423,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     }
                 }
             } else if (pr_kind == "class") {
-                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -15231,7 +15438,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         gen.known_functions.push(pr_cname)
                     }
                     // Register all method names as ClassName__method
-                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => m
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -15296,10 +15503,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -15308,7 +15515,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => m
                 _ => []
             }
             var pr_mj2: Float = 0
@@ -15690,16 +15897,20 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         while (si < end) {
             var mod_kind: String = gen.classify_stmt(all_stmts[si])
             if (mod_kind == "class") {
-                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
-                var mod_parent: String = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => p
-                    _ => ""
-                }
-                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => f
+                // Only the primary base contributes fields — see the layout rule in
+                // gen_class_decl_with_parents. parents[0] is that base.
+                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => ps
                     _ => []
                 }
-                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, p, f, m, d) => m
+                var mod_parent: String = ""
+                if (mod_parent_all.length() > 0) { mod_parent = mod_parent_all[0] }
+                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => f
+                    _ => []
+                }
+                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d) => m
                     _ => []
                 }
                 if (mod_name.length() > 0) {
@@ -15736,7 +15947,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, p, f, m, d) => tps
+                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d) => tps
                         _ => []
                     }
                     if (tpm_names.length() > 0) {
@@ -15785,16 +15996,20 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     while (pri < program.length()) {
         var pr_kind: String = gen.classify_stmt(program[pri])
         if (pr_kind == "class") {
-            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => n
+            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => n
                 _ => ""
             }
-            var pr_parent: String = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => p
-                _ => ""
-            }
-            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => f
+            // Only the primary base contributes fields — see the layout rule in
+            // gen_class_decl_with_parents. parents[0] is that base.
+            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => ps
                 _ => []
             }
-            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, p, f, m, d) => m
+            var pr_parent: String = ""
+            if (pr_parent_all.length() > 0) { pr_parent = pr_parent_all[0] }
+            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => f
+                _ => []
+            }
+            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d) => m
                 _ => []
             }
             if (pr_name.length() > 0) {
@@ -15825,7 +16040,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                 // Declared generic parameter names, kept alongside the method list
                 // so a method returning a class type parameter can be typed at a
                 // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, p, f, m, d) => tps
+                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d) => tps
                     _ => []
                 }
                 if (tpp_names.length() > 0) {
@@ -15875,7 +16090,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     }
                 }
             } else if (pr_kind2 == "class") {
-                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => n
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -15889,7 +16104,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
-                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, p, f, m, d) => m
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -15946,10 +16161,10 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -15958,7 +16173,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, p, f, m, d) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d) => m
                 _ => []
             }
             var pr_mj2: Float = 0

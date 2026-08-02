@@ -396,6 +396,17 @@ class Circle extends Drawable {
 
 Multiple inheritance: `class Duck extends Flyable, Swimmable, Walkable { ... }`
 
+Every base contributes methods, and `is` answers true against each of them. Until
+BUGS #103 the parser discarded parents 2..n, so this form silently meant `extends
+Flyable`; `test/pass/multi_inherit.sf` is the regression test.
+
+**Only the first base contributes fields**, and only its `init` is forwarded. That
+is a deliberate limit, not an oversight: inherited field access and `init`
+forwarding work without a vtable because parent field index i equals child field
+index i, which can hold for exactly one base. Put the state-carrying class first
+and interfaces after it. A secondary base that declares fields is a compile error
+rather than a silent misread of the primary base's slots.
+
 ### is-Pattern Matching
 
 ```saffron

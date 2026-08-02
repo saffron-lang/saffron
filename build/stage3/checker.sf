@@ -160,7 +160,11 @@ class NullChecker {
     var warnings: List<String>
     var current_func_ret: AST.Type
     var current_class: String
-    var class_parents: Map<String, String>
+    // Every declared base of each class that has one, in source order. This was
+    // `Map<String, String>` — one parent — which is why `class Duck extends
+    // Flyable, Swimmable, Walkable` was invisible past Flyable: conformance only
+    // ever consulted one base and is_subtype_node walked one chain.
+    var class_parents: Map<String, List<String>>
     var class_method_names: Map<String, String>
     // The declared generic parameter names of each class, comma-joined:
     // `class Box<T>` → "T", `class Pair<K, V>` → "K,V". Keyed by the bare class
@@ -380,8 +384,11 @@ class NullChecker {
         if (typ.starts_with("List") or typ.starts_with("Map")) return false
         if (typ.starts_with("Fun") or typ.contains("=>")) return false
         if (this.class_parents.has(typ)) {
-            var parent: String = this.class_parents.get(typ)
-            if (parent.contains("Sendable")) return true
+            var parents: List<String> = this.class_parents.get(typ)
+            // `extends Sendable` in any position, not only the first. The old
+            // single-String form used `.contains("Sendable")`, a substring test
+            // that also accepted a base named `NotSendable`.
+            if (this.list_has_string(parents, "Sendable")) return true
         }
         return false
     }
@@ -602,15 +609,36 @@ class NullChecker {
             var inner: AST.Type = this.strip_nil_from_node(parent)
             return this.is_subtype_node(child, inner)
         }
-        // Check inheritance chain via stored parent types
-        var current: String = cs
-        while (current.length() > 0) {
-            if (current == ps) return true
-            var parent_key: String = current + "__parent"
-            var next_type: AST.Type = this.env.get_var_type(parent_key)
-            var next: String = this.type_to_str(next_type)
-            if (next == "Any" or next == current) return false
-            current = next
+        return this.inherits_from(cs, ps)
+    }
+
+    // Does `child` name `parent`, or any of its transitive bases? Breadth-first
+    // over class_parents, which holds *every* declared base rather than one.
+    //
+    // This used to be a single `current = current.__parent` chain walk, so for
+    // `class Duck extends Flyable, Swimmable, Walkable` only Flyable was ever
+    // reachable and `d is Swimmable` was statically false. The visited list is
+    // what makes a diamond (two bases sharing a grandparent) terminate instead
+    // of re-expanding the shared ancestor, and it also bounds a cyclic
+    // `extends` rather than looping forever.
+    fun inherits_from(child: String, parent: String): Bool {
+        if (child == parent) return true
+        var visited: List<String> = []
+        var work: List<String> = [child]
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (cur == parent) return true
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.class_parents.has(cur)) {
+                    var ps: List<String> = this.class_parents.get(cur)
+                    var i: Float = 0
+                    while (i < ps.length()) {
+                        if (!this.list_has_string(visited, ps[i])) { work.push(ps[i]) }
+                        i = i + 1
+                    }
+                }
+            }
         }
         return false
     }
@@ -682,40 +710,118 @@ class NullChecker {
         var i: Float = 0
         while (i < classes.length()) {
             var child_name: String = classes[i]
-            var parent_name: String = this.class_parents.get(child_name)
-            // The parent of an `extends` must actually name a class or interface.
-            // Both register in class_fields during the first pass; List/Map/Sendable
-            // are built-in bases. Without this check, `class OhNo extends NotClass`
-            // where NotClass is a String variable compiled cleanly — inheriting from
-            // a value is meaningless and must be rejected.
-            if (!this.env.class_fields.has(parent_name)
-                and parent_name != "List" and parent_name != "Map"
-                and parent_name != "Sendable") {
-                this.error(child_name + " extends unknown type " + parent_name + " (not a class or interface)")
+            // Every base, not just the first. `class Duck extends Flyable,
+            // Swimmable, Walkable` used to be conformance-checked against
+            // Flyable alone, so an unimplemented abstract method on Swimmable or
+            // Walkable was accepted silently.
+            var parent_names: List<String> = this.class_parents.get(child_name)
+            // What the child can offer: its own methods plus every concrete
+            // method reachable through any ancestor. Without the inherited half,
+            // `extends Abstract, Provider` — where Provider supplies a default
+            // body for what Abstract declares bodyless — would be rejected, and
+            // that combination is the whole point of multiple bases.
+            var child_methods: List<String> = []
+            if (this.class_method_names.has(child_name)) {
+                child_methods = this.class_method_names.get(child_name).split(",")
             }
-            if (this.class_abstract_methods.has(parent_name)) {
-                var required_str: String = this.class_abstract_methods.get(parent_name)
-                var required_methods: List<String> = required_str.split(",")
-                var child_methods: List<String> = []
-                if (this.class_method_names.has(child_name)) {
-                    child_methods = this.class_method_names.get(child_name).split(",")
+            var inherited: List<String> = this.inherited_method_names(child_name)
+            var ii: Float = 0
+            while (ii < inherited.length()) {
+                if (!this.list_has_string(child_methods, inherited[ii])) {
+                    child_methods.push(inherited[ii])
                 }
-                var j: Float = 0
-                while (j < required_methods.length()) {
-                    var method_name: String = required_methods[j]
-                    if (method_name != "init" and method_name.length() > 0) {
-                        // Exact name comparison, not substring: `.contains()` on the
-                        // joined list meant a child method named `draw_border` would
-                        // wrongly satisfy a required `draw`.
-                        if (!this.list_has_string(child_methods, method_name)) {
-                            this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
+                ii = ii + 1
+            }
+            var pi: Float = 0
+            while (pi < parent_names.length()) {
+                var parent_name: String = parent_names[pi]
+                // The parent of an `extends` must actually name a class or interface.
+                // Both register in class_fields during the first pass; List/Map/Sendable
+                // are built-in bases. Without this check, `class OhNo extends NotClass`
+                // where NotClass is a String variable compiled cleanly — inheriting from
+                // a value is meaningless and must be rejected.
+                if (!this.env.class_fields.has(parent_name)
+                    and parent_name != "List" and parent_name != "Map"
+                    and parent_name != "Sendable") {
+                    this.error(child_name + " extends unknown type " + parent_name + " (not a class or interface)")
+                }
+                if (this.class_abstract_methods.has(parent_name)) {
+                    var required_str: String = this.class_abstract_methods.get(parent_name)
+                    var required_methods: List<String> = required_str.split(",")
+                    var j: Float = 0
+                    while (j < required_methods.length()) {
+                        var method_name: String = required_methods[j]
+                        if (method_name != "init" and method_name.length() > 0) {
+                            // Exact name comparison, not substring: `.contains()` on the
+                            // joined list meant a child method named `draw_border` would
+                            // wrongly satisfy a required `draw`.
+                            if (!this.list_has_string(child_methods, method_name)) {
+                                this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
+                            }
                         }
+                        j = j + 1
                     }
-                    j = j + 1
                 }
+                pi = pi + 1
             }
             i = i + 1
         }
+    }
+
+    // Every method name reachable from `cls` through any base, at any depth,
+    // that some base actually supplies a BODY for. Breadth-first over all
+    // parents with a visited set, so a diamond visits the shared ancestor once
+    // and a cyclic `extends` terminates.
+    //
+    // Abstract (bodyless) names are excluded, and that exclusion is the whole
+    // point: this list is used to answer "is the requirement already satisfied
+    // from above?". Including abstracts would let a requirement satisfy itself —
+    // `class Circle extends Shape` with `Shape.area()` bodyless would find
+    // `area` inherited from Shape and be accepted, which is precisely what
+    // test/fail/conformance.sf is written to catch.
+    fun inherited_method_names(cls: String): List<String> {
+        var out: List<String> = []
+        var visited: List<String> = [cls]
+        var work: List<String> = []
+        if (this.class_parents.has(cls)) {
+            var seed: List<String> = this.class_parents.get(cls)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.class_method_names.has(cur)) {
+                    var names: List<String> = this.class_method_names.get(cur).split(",")
+                    // The bodyless subset of `cur`'s own methods, to subtract.
+                    var cur_abstract: List<String> = []
+                    if (this.class_abstract_methods.has(cur)) {
+                        cur_abstract = this.class_abstract_methods.get(cur).split(",")
+                    }
+                    var ni: Float = 0
+                    while (ni < names.length()) {
+                        if (names[ni].length() > 0 and !this.list_has_string(out, names[ni])
+                            and !this.list_has_string(cur_abstract, names[ni])) {
+                            out.push(names[ni])
+                        }
+                        ni = ni + 1
+                    }
+                }
+                if (this.class_parents.has(cur)) {
+                    var ups: List<String> = this.class_parents.get(cur)
+                    var ui: Float = 0
+                    while (ui < ups.length()) {
+                        if (!this.list_has_string(visited, ups[ui])) { work.push(ups[ui]) }
+                        ui = ui + 1
+                    }
+                }
+            }
+        }
+        return out
     }
 
     fun list_has_string(haystack: List<String>, needle: String): Bool {
@@ -758,7 +864,7 @@ class NullChecker {
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -768,9 +874,14 @@ class NullChecker {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
-                if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
-                    this.class_parents.set(name, parent)
+                if (parents.length() > 0) {
+                    // `X__parent` keeps naming the *first* base only. It is read
+                    // by nothing but the old chain walk's replacement (which now
+                    // goes through class_parents instead) and by anything treating
+                    // a class as having a single supertype; preserving the
+                    // single-inheritance value keeps that meaning unchanged.
+                    this.env.define_var(name + "__parent", this.parse_type_node(parents[0]))
+                    this.class_parents.set(name, parents)
                 }
                 // Register methods with their return types and param types
                 // Also populate class_method_names for receiver closure desugaring
@@ -1066,11 +1177,11 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parent, fields, methods, doc) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc) => {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
-                if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
-                    this.class_parents.set(name, parent)
+                if (parents.length() > 0) {
+                    this.env.define_var(name + "__parent", this.parse_type_node(parents[0]))
+                    this.class_parents.set(name, parents)
                 }
                 // Walk the method bodies. This arm used to stop at the fields, so
                 // no statement inside any method was checked at all — not
@@ -2678,15 +2789,10 @@ class NullChecker {
     fun type_satisfies_constraint(typ: String, constraint: String): Bool {
         // Check if a type satisfies a constraint (interface name)
         // 1. Check if the type has the constraint as a parent (interface conformance)
-        if (this.class_parents.has(typ)) {
-            var parent: String = this.class_parents.get(typ)
-            if (parent == constraint) return true
-            // Check comma-separated parent list
-            if (parent.contains(",")) {
-                var parents: List<String> = parent.split(",")
-                if (parents.contains(constraint)) return true
-            }
-        }
+        // Any base at any depth satisfies the constraint. The comma-splitting
+        // that used to live here was vestigial — class_parents held a single
+        // name, never a joined list — and it only ever looked one level up.
+        if (this.inherits_from(typ, constraint)) return true
         // 2. Check if the constraint's methods are all present on the type
         if (this.class_method_names.has(constraint)) {
             var required_methods_str: String = this.class_method_names.get(constraint)

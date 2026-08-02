@@ -1,19 +1,29 @@
-// Test: Multiple interface inheritance with is-checks
+// Test: Multiple interface inheritance.
+//
+// The point of this test is the SECOND and THIRD parent. Before ClassDecl.parent
+// was widened to parents: List<String>, parser.sf discarded every name after the
+// first ("skip additional interfaces for now"), so `class Duck extends Flyable,
+// Swimmable, Walkable` was parsed as `extends Flyable` alone. This file's earlier
+// version therefore did not pass — it failed at codegen with "type 'Duck' has no
+// method 'swim'". Assertions rather than prints, so a wrong answer is a nonzero
+// exit and not a silently different transcript.
+import "@test" as T
+
 interface Flyable {
-    fun fly() {
-        IO.println("flying")
+    fun fly(): String {
+        return "flying"
     }
 }
 
 interface Swimmable {
-    fun swim() {
-        IO.println("swimming")
+    fun swim(): String {
+        return "swimming"
     }
 }
 
 interface Walkable {
-    fun walk() {
-        IO.println("walking")
+    fun walk(): String {
+        return "walking"
     }
 }
 
@@ -22,12 +32,98 @@ class Duck extends Flyable, Swimmable, Walkable {
 }
 
 var d = Duck()
-d.fly()
-d.swim()
-d.walk()
+// The first parent always worked. The other two are the regression.
+T.assert_eq(d.fly(), "flying", "method from 1st parent")
+T.assert_eq(d.swim(), "swimming", "method from 2nd parent")
+T.assert_eq(d.walk(), "walking", "method from 3rd parent")
 
-// All is-checks should pass
-IO.println(d is Flyable)
-IO.println(d is Swimmable)
-IO.println(d is Walkable)
-IO.println(d is Duck)
+// `is` against each base. This needs the runtime hierarchy to be a DAG: the old
+// __class_is_a walked one parent per tag, which cannot reach parent 2 or 3 no
+// matter how deep it walks.
+T.assert(d is Flyable, "is 1st parent")
+T.assert(d is Swimmable, "is 2nd parent")
+T.assert(d is Walkable, "is 3rd parent")
+T.assert(d is Duck, "is own class")
+
+// An override of a default method on a non-first parent must win over the
+// inherited forwarder, and must not disturb the other two.
+class Penguin extends Flyable, Swimmable, Walkable {
+    fun init() {}
+    fun swim(): String { return "penguin swims fast" }
+}
+var p = Penguin()
+T.assert_eq(p.swim(), "penguin swims fast", "override of 2nd parent's method")
+T.assert_eq(p.fly(), "flying", "1st parent still inherited alongside override")
+T.assert_eq(p.walk(), "walking", "3rd parent still inherited alongside override")
+T.assert(p is Swimmable, "override does not break the is relation")
+
+// A requirement declared bodyless on one base, satisfied by a method the class
+// declares itself. Conformance has to consult every base to see the requirement
+// at all — checked against the 3rd position specifically.
+interface Named {
+    fun name(): String
+}
+
+class Robot extends Flyable, Swimmable, Named {
+    fun init() {}
+    fun name(): String { return "R2" }
+}
+var r = Robot()
+T.assert_eq(r.name(), "R2", "abstract on 3rd parent implemented")
+T.assert_eq(r.fly(), "flying", "concrete default alongside an abstract base")
+T.assert(r is Named, "is against the base that declared the abstract")
+
+// One base declares a requirement bodyless, a LATER base supplies the body.
+// Two things have to be right for this: conformance must not treat the abstract
+// declaration as satisfying itself, and forwarding must skip the bodyless
+// declaration so the concrete base wins the name. Getting only the first right
+// compiles and then returns 0 at runtime.
+interface Requires {
+    fun compute(): Int
+}
+
+interface Provides {
+    fun compute(): Int { return 42 }
+}
+
+class Both extends Requires, Provides {
+    fun init() {}
+}
+var bo = Both()
+T.assert_eq(bo.compute(), 42, "a later base satisfies an earlier base's requirement")
+T.assert(bo is Requires, "is against the base that only declared it")
+T.assert(bo is Provides, "is against the base that supplied the body")
+
+// Two levels: a class whose single parent itself has three parents. The
+// grandchild must reach all of them, which the transitive closure provides.
+class Duckling extends Duck {
+    fun init() {}
+}
+var dl = Duckling()
+T.assert_eq(dl.swim(), "swimming", "grandparent's 2nd base reached through one parent")
+T.assert_eq(dl.walk(), "walking", "grandparent's 3rd base reached through one parent")
+T.assert(dl is Swimmable, "is against a grandparent's 2nd base")
+T.assert(dl is Walkable, "is against a grandparent's 3rd base")
+T.assert(dl is Duck, "is against the immediate parent")
+
+// A state-carrying primary base combined with fieldless secondary interfaces.
+// parents[0] keeps contributing fields exactly as single inheritance always did;
+// this asserts the layout did not shift when the other two bases were added.
+class Vehicle {
+    var wheels: Int
+    fun init(w: Int) { this.wheels = w }
+    fun describe(): String { return "vehicle with ${this.wheels} wheels" }
+}
+
+class Amphibian extends Vehicle, Swimmable, Walkable {
+    fun init(w: Int) { this.wheels = w }
+}
+var a = Amphibian(4)
+T.assert_eq(a.wheels, 4, "field inherited from the primary base")
+T.assert_eq(a.describe(), "vehicle with 4 wheels", "primary base's method reads its own field")
+T.assert_eq(a.swim(), "swimming", "interface method alongside an inherited field")
+T.assert_eq(a.walk(), "walking", "3rd base alongside an inherited field")
+T.assert(a is Vehicle, "is against the primary base")
+T.assert(a is Swimmable, "is against a secondary interface")
+
+T.summary()
