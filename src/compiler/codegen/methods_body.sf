@@ -3288,8 +3288,29 @@
         this.last_type = AST.Type.StringType
         return ts_tagged
     }
-    // Error: method not found on a known user-defined class type
-    // Skip for builtin types (String, List, Map, etc.) which have runtime methods
+    // The terminal fall-through of gen_method_call: no arm above matched, so no
+    // call has been emitted. Reaching here means the method call in the user's
+    // program has been SILENTLY DROPPED — the expression evaluates to int-tagged
+    // 0 and the program runs to completion with a wrong answer and no
+    // diagnostic. That is BUGS #37.
+    //
+    // Until now only ONE of the three ways to get here reported anything: a
+    // method missing from a class that codegen has fields for. The other two —
+    // a builtin/`Any` receiver, and a receiver whose type came out empty — fell
+    // straight through to `return "0"`. Measured over the tree (258 files that
+    // actually reach codegen: test/, test/pass/, src/lib/, turmeric, parsley,
+    // basil, pantry, examples), that unreported path fires twice, and both are
+    // real bugs: `manifest.dependencies.delete(name)` on a `Map<String,Any>` in
+    // pantry/src/commands/remove.sf and its transitive use from
+    // pantry/src/main.sf. `pantry remove <pkg>` compiles clean, emits no call at
+    // all (zero `__map_*` instructions for it), and removes nothing.
+    //
+    // So all three ways out are diagnostics now. The blast radius of that is
+    // exactly those two files; nothing else in the tree relies on a dropped
+    // call. The message names the category, because the three causes have
+    // different fixes: a missing runtime method needs one written (Map has no
+    // `delete` — there is no `__map_delete` in src/runtime/runtime.sf at all),
+    // whereas an `Any` receiver needs a type annotation at the definition site.
     var is_builtin_type: Bool = false
     if (obj_type == "Any" or obj_type == "Int" or obj_type == "Float" or obj_type == "Bool" or obj_type == "String" or obj_type == "Nil") { is_builtin_type = true }
     if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { is_builtin_type = true }
@@ -3319,6 +3340,22 @@
             IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
             this.has_errors = true
         }
+    } else if (is_builtin_type) {
+        // A builtin or `Any` receiver with no matching arm above. `Any` is the
+        // common shape and deserves the annotation hint; a concrete builtin
+        // means the method genuinely does not exist on that type.
+        if (obj_type == "Any") {
+            IO.println("[codegen] Error: cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
+        } else {
+            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+        }
+        this.has_errors = true
+    } else {
+        // Receiver type unknown to codegen entirely: an empty type string, or a
+        // named type with no registered fields. Either way there is nothing to
+        // dispatch to, and silently returning 0 is what BUGS #37 is.
+        IO.println("[codegen] Error: cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
+        this.has_errors = true
     }
     this.last_type = AST.Type.IntType
     return "0"
