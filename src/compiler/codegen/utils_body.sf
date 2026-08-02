@@ -272,7 +272,7 @@
             }
             FunDecl(n, p, r, b, d) => {}
             EnumDecl(n, v, d) => {}
-            ClassDecl(n, __tps, p, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -741,7 +741,7 @@
                 var cls_name: String = ""
                 var cls_methods: List<AST.Stmt> = []
                 match (program[i]) {
-                    ClassDecl(cn, __tps, cp, cf, cm, cd) => {
+                    ClassDecl(cn, __tps, cps, cf, cm, cd) => {
                         cls_name = cn
                         cls_methods = cm
                     }
@@ -1335,10 +1335,10 @@
     /// leading `self`, registered under both the bare `Class__method` name and
     /// the prefixed one.
     fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
-        var cname: String = match (stmt) { ClassDecl(n, __tps, p, f, m, d) => n
+        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => n
             _ => ""
         }
-        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, p, f, m, d) => m
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => m
             _ => []
         }
         var mi: Float = 0

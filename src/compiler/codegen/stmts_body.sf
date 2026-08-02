@@ -99,7 +99,7 @@
             EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 // Registered before the body is generated: a method returning a
                 // class type parameter is typed by substituting the receiver's
                 // own type arguments, and that has to be known by the time any
@@ -110,7 +110,7 @@
                         this.class_type_params.set(this.current_prefix + name, type_params)
                     }
                 }
-                this.gen_class_decl_with_parent(name, parent, fields, methods)
+                this.gen_class_decl_with_parents(name, parents, fields, methods)
             }
             TypeAlias(ta_n, ta_t) => {}
         }
@@ -344,10 +344,23 @@
         }
     }
 
-    fun gen_class_decl_with_parent(name: String, parent: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+    fun gen_class_decl_with_parents(name: String, parents: List<String>, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        // The primary base: the one whose field layout the child extends, whose
+        // `init` it may forward to, and which `super` names. Bases 2..n
+        // contribute methods only — see the field guard below.
+        var parent: String = ""
+        if (parents.length() > 0) { parent = parents[0] }
         // Convert fields to string format for internal use
         var fields_str: String = this.params_to_string(fields)
-        // Inherit parent fields (prepend parent fields before child's own)
+        // Inherit parent fields (prepend parent fields before child's own).
+        //
+        // Only the FIRST base contributes fields, deliberately. Prepending base
+        // 2's fields as well would be more complete but would break the one
+        // invariant the whole inheritance lowering rests on: parent field index i
+        // must equal child field index i, which is what makes `init` forwarding
+        // and every inherited method's field access correct without a vtable.
+        // That can hold for exactly one base. Keeping it on parents[0] means a
+        // single-inheritance class lays out byte-for-byte as it always has.
         var all_fields: String = fields_str
         if (parent.length() > 0 and this.class_fields.has(parent)) {
             var parent_fields: String = this.class_fields.get(parent)
@@ -358,6 +371,19 @@
                     all_fields = parent_fields
                 }
             }
+        }
+        // So a second base that carries state cannot work, and must say so rather
+        // than emit methods that read the first base's fields at those offsets.
+        // Interfaces — the overwhelmingly common case for `extends A, B, C` — are
+        // fieldless and are unaffected.
+        var gi: Float = 1
+        while (gi < parents.length()) {
+            var extra: String = parents[gi]
+            if (this.class_fields.has(extra) and this.class_fields.get(extra).length() > 0) {
+                IO.println("Error: class " + name + " cannot extend " + extra
+                    + " as a secondary base: it declares fields, and only the first base's fields are inherited. Make it the first base, or give it no fields.")
+            }
+            gi = gi + 1
         }
         // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
         if (this.actor_classes.has(name)) {
@@ -378,22 +404,57 @@
         // could never see a subclass relation (BUGS #61) and dispatch had no
         // hierarchy to switch on (BUGS #50). class_struct_names resolves the
         // parent's own prefix, so a base class in another module still joins.
-        if (parent.length() > 0) {
+        if (parents.length() > 0) {
             var child_struct: String = name
             if (this.class_struct_names.has(name)) { child_struct = this.class_struct_names.get(name) }
             var parent_struct: String = parent
             if (this.class_struct_names.has(parent)) { parent_struct = this.class_struct_names.get(parent) }
             this.class_parent_of.set(child_struct, parent_struct)
+            // …and the full set, struct-resolved the same way, for __class_is_a.
+            var all_structs: List<String> = []
+            var psi: Float = 0
+            while (psi < parents.length()) {
+                var one: String = parents[psi]
+                if (this.class_struct_names.has(one)) { one = this.class_struct_names.get(one) }
+                all_structs.push(one)
+                psi = psi + 1
+            }
+            this.class_parents_of.set(child_struct, all_structs)
         }
-        // Register inherited methods: if child doesn't define a method, map it to parent's
-        if (parent.length() > 0 and this.class_methods.has(parent)) {
-            var parent_methods: List = this.class_methods.get(parent)
+        // Register inherited methods: if child doesn't define a method, map it to
+        // parent's — for EVERY base, in declaration order, not just the first.
+        // This loop used to run once against parents[0], which is why
+        // `class Duck extends Flyable, Swimmable, Walkable` got a Duck__fly
+        // forwarder and nothing for swim or walk: `d.swim()` then failed with
+        // "type 'Duck' has no method 'swim'". Earlier bases win ties, since
+        // str_in_list(child_methods, ...) sees names pushed by previous
+        // iterations — the same first-wins rule an override already had.
+        var ppi: Float = 0
+        while (ppi < parents.length()) {
+        var cur_parent: String = parents[ppi]
+        if (this.class_methods.has(cur_parent)) {
+            var parent_methods: List = this.class_methods.get(cur_parent)
+            // Which of this base's methods are bodyless. There is nothing to
+            // forward *to* for those, and claiming the name would shadow a real
+            // body on a later base: `class Both extends Requires, Provides`,
+            // Requires.compute() bodyless and Provides.compute() concrete, forwarded
+            // Both__compute to Requires__compute and b.compute() returned 0.
+            var cur_abstract: List<String> = []
+            if (this.class_abstract_methods.has(cur_parent)) {
+                cur_abstract = this.class_abstract_methods.get(cur_parent)
+            }
             var child_methods: List = this.class_methods.get(name)
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
                 var forward_method: Bool = !this.str_in_list(child_methods,mname)
+                if (this.str_in_list(cur_abstract, mname)) { forward_method = false }
                 if (mname == "init") {
+                    // Only the primary base's constructor may be forwarded. A
+                    // secondary base's fields are NOT prepended to the child (see
+                    // the layout note above), so its init would write the child's
+                    // inherited-from-parents[0] slots at its own field indices.
+                    if (ppi > 0) { forward_method = false }
                     // `init` used to be excluded here, which meant a child that
                     // declares no constructor of its own got no Child__init at
                     // all. The call site in gen_call only emits the __init call
@@ -408,12 +469,12 @@
                     // where that does not hold is an actor inheriting from a
                     // non-actor: the actor gets two hidden fields prepended,
                     // shifting every inherited index by two.
-                    if (this.actor_classes.has(name) and !this.actor_classes.has(parent)) {
+                    if (this.actor_classes.has(name) and !this.actor_classes.has(cur_parent)) {
                         forward_method = false
                     }
                     // Without a known arity we cannot emit matching parameters,
                     // and a forwarder with the wrong arity is worse than none.
-                    if (!this.called_function_arity.has(this.current_prefix + parent + "__init")) {
+                    if (!this.called_function_arity.has(this.current_prefix + cur_parent + "__init")) {
                         forward_method = false
                     }
                 }
@@ -422,7 +483,7 @@
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
                     var child_full: String = name + "__" + mname
-                    var parent_full: String = parent + "__" + mname
+                    var parent_full: String = cur_parent + "__" + mname
                     if (this.func_ret_types.has(parent_full)) {
                         this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
                     } else {
@@ -464,25 +525,41 @@
                 }
                 i = i + 1
             }
-            // Conformance: only the parent's ABSTRACT (bodyless) methods are
-            // requirements. Previously this keyed off "parent has no fields" as a
-            // proxy for "parent is an interface", then demanded every parent method
-            // be redeclared — which rejected legitimate inheritance from a
-            // fieldless base class and forced implementors to copy interface
-            // default-method bodies. Note child_methods has already had inherited
-            // names pushed into it above, so a method inherited from a grandparent
-            // correctly counts as satisfying the requirement.
-            if (this.class_abstract_methods.has(parent)) {
-                var required_methods: List = this.class_abstract_methods.get(parent)
+        }
+        ppi = ppi + 1
+        }
+        // Conformance: only a base's ABSTRACT (bodyless) methods are
+        // requirements. Previously this keyed off "parent has no fields" as a
+        // proxy for "parent is an interface", then demanded every parent method
+        // be redeclared — which rejected legitimate inheritance from a
+        // fieldless base class and forced implementors to copy interface
+        // default-method bodies. child_methods has had every inherited name
+        // pushed into it above, so a method inherited from a grandparent
+        // correctly counts as satisfying the requirement.
+        //
+        // This runs in a SECOND loop, after all forwarding, not interleaved with
+        // it. Interleaved, `class C extends Abstract, Provider` — Abstract
+        // declares `foo` bodyless, Provider supplies a body — would be checked
+        // against Abstract before Provider's foo had been forwarded, and report a
+        // requirement that is in fact satisfied. That combination is a large part
+        // of why multiple bases are worth having.
+        var cpi: Float = 0
+        while (cpi < parents.length()) {
+            var conf_parent: String = parents[cpi]
+            if (this.class_abstract_methods.has(conf_parent)) {
+                var have: List = []
+                if (this.class_methods.has(name)) { have = this.class_methods.get(name) }
+                var required_methods: List = this.class_abstract_methods.get(conf_parent)
                 var pi: Int = 0
                 while (pi < required_methods.length()) {
                     var required: String = required_methods[pi]
-                    if (required != "init" and !this.str_in_list(child_methods,required)) {
-                        IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
+                    if (required != "init" and !this.str_in_list(have,required)) {
+                        IO.println("Error: class " + name + " does not implement " + conf_parent + "." + required + "()")
                     }
                     pi = pi + 1
                 }
             }
+            cpi = cpi + 1
         }
     }
 
@@ -1081,7 +1158,7 @@
             }
             VarDecl(n, t, i, d) => {}
             FunDecl(n, p, r, b, d) => {}
-            ClassDecl(n, __tps, p, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -1251,7 +1328,7 @@
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, __tps, p, f, m, d) => "class"
+            ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -1276,7 +1353,7 @@
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d) => "other"
-            ClassDecl(n, __tps, p, f, m, d) => "other"
+            ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
@@ -1544,18 +1621,62 @@
         this.start_block(end_label)
     }
 
+    // Every ancestor struct name of `struct_c`, transitively, through ALL of its
+    // bases. Breadth-first with a visited set, so a diamond yields the shared
+    // ancestor once and an `extends` cycle terminates instead of hanging codegen.
+    // Does not include struct_c itself.
+    fun all_ancestor_structs(struct_c: String): List<String> {
+        var out: List<String> = []
+        var visited: List<String> = [struct_c]
+        var work: List<String> = []
+        if (this.class_parents_of.has(struct_c)) {
+            var seed: List<String> = this.class_parents_of.get(struct_c)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        } else if (this.class_parent_of.has(struct_c)) {
+            // Sites that only recorded the primary base still contribute it.
+            work.push(this.class_parent_of.get(struct_c))
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.str_in_list(visited, cur)) {
+                visited.push(cur)
+                out.push(cur)
+                var ups: List<String> = []
+                if (this.class_parents_of.has(cur)) {
+                    ups = this.class_parents_of.get(cur)
+                } else if (this.class_parent_of.has(cur)) {
+                    ups = [this.class_parent_of.get(cur)]
+                }
+                var ui: Float = 0
+                while (ui < ups.length()) {
+                    if (!this.str_in_list(visited, ups[ui])) { work.push(ups[ui]) }
+                    ui = ui + 1
+                }
+            }
+        }
+        return out
+    }
+
     // Emit the two helpers that give the class hierarchy a runtime existence:
-    // __class_parent_tag (one switch arm per class that has a parent) and
-    // __class_is_a (walk the chain, comparing against a target tag).
+    // __class_parent_tag (the PRIMARY base of each class, one switch arm each)
+    // and __class_is_a (does a tag name a target or a descendant of it).
     //
     // Emitted for *every* target and both modes, unlike emit_reflect_helpers
     // which is skipped in identity mode. gen_is_check calls __class_is_a
     // unconditionally, so skipping the definition here would leave an undefined
     // symbol whenever the compiler compiles itself.
     //
-    // A flattened tag -> ancestor-set table would be O(1) instead of O(depth);
-    // the walk is emitted because hierarchies are shallow and this is far easier
-    // to read in the IR when something goes wrong.
+    // __class_is_a is a flattened tag -> ancestor-set table, not a chain walk.
+    // The walk was O(depth) and easier to read in the IR, but it could only ever
+    // follow ONE parent per tag — a switch arm returns a single value — so
+    // `duck is Swimmable` was false for `class Duck extends Flyable, Swimmable,
+    // Walkable`. Multiple bases are a DAG, not a chain, and no single-successor
+    // walk can traverse one. The closure is computed here at compile time (see
+    // all_ancestor_structs), so the emitted form is a nested switch and O(1).
     fun emit_class_hierarchy_helpers() {
         var child_names: List<String> = this.class_parent_of.keys()
         this.emit("")
@@ -1602,26 +1723,76 @@
         }
 
         // __class_is_a(tag, target): does `tag` name `target` or a descendant of
-        // it? The zero test comes before the equality test so a target of 0 (a
+        // it? The zero tests come before the equality test so a target of 0 (a
         // non-class value, whose __gc_get_type_tag is 0) answers false rather
-        // than matching the end-of-chain sentinel.
+        // than matching the no-such-class sentinel.
+        //
+        // Outer switch on the receiver's tag, inner switch on the target against
+        // that class's precomputed ancestor set. A chain walk cannot do this: it
+        // has one successor per step and multiple bases are a DAG.
+        var isa_children: List<String> = this.class_parents_of.keys()
+        var isa_lbls: List<String> = []
+        var isa_sets: List<List<String>> = []
+        var isa_arms: String = ""
+        var ci: Float = 0
+        while (ci < isa_children.length()) {
+            var ch: String = isa_children[ci]
+            if (this.class_type_ids.has(ch)) {
+                // Ancestors that actually have a tag. An interface never
+                // constructed has no type id, so there is nothing to compare
+                // against and it contributes no arm — but note gen_is_check
+                // resolves the *target* through class_type_ids too, so an
+                // untagged interface is unaskable rather than wrongly false.
+                var tagged: List<String> = []
+                var anc: List<String> = this.all_ancestor_structs(ch)
+                var ai2: Float = 0
+                while (ai2 < anc.length()) {
+                    if (this.class_type_ids.has(anc[ai2])) {
+                        var atag: Float = this.class_type_ids.get(anc[ai2])
+                        tagged.push(atag.floor().to_string())
+                    }
+                    ai2 = ai2 + 1
+                }
+                if (tagged.length() > 0) {
+                    var chtag: Float = this.class_type_ids.get(ch)
+                    var clbl: String = "cia.c" + isa_lbls.length().floor().to_string()
+                    isa_lbls.push(clbl)
+                    isa_sets.push(tagged)
+                    isa_arms = isa_arms + " i64 " + chtag.floor().to_string() + ", label %" + clbl
+                }
+            }
+            ci = ci + 1
+        }
         this.emit("")
         this.emit("define i1 @__class_is_a(i64 %tag, i64 %target) {")
         this.emit("entry:")
-        this.emit("  %cur = alloca i64")
-        this.emit("  store i64 %tag, i64* %cur")
-        this.emit("  br label %cia.loop")
-        this.emit("cia.loop:")
-        this.emit("  %c = load i64, i64* %cur")
-        this.emit("  %z = icmp eq i64 %c, 0")
-        this.emit("  br i1 %z, label %cia.no, label %cia.test")
-        this.emit("cia.test:")
-        this.emit("  %hit = icmp eq i64 %c, %target")
-        this.emit("  br i1 %hit, label %cia.yes, label %cia.step")
-        this.emit("cia.step:")
-        this.emit("  %p = call i64 @__class_parent_tag(i64 %c)")
-        this.emit("  store i64 %p, i64* %cur")
-        this.emit("  br label %cia.loop")
+        this.emit("  %z = icmp eq i64 %tag, 0")
+        this.emit("  br i1 %z, label %cia.no, label %cia.tchk")
+        this.emit("cia.tchk:")
+        this.emit("  %tz = icmp eq i64 %target, 0")
+        this.emit("  br i1 %tz, label %cia.no, label %cia.self")
+        this.emit("cia.self:")
+        this.emit("  %hit = icmp eq i64 %tag, %target")
+        if (isa_lbls.length() == 0) {
+            this.emit("  br i1 %hit, label %cia.yes, label %cia.no")
+        } else {
+            this.emit("  br i1 %hit, label %cia.yes, label %cia.disp")
+            this.emit("cia.disp:")
+            this.emit("  switch i64 %tag, label %cia.no [" + isa_arms + " ]")
+            var li: Float = 0
+            while (li < isa_lbls.length()) {
+                this.emit(isa_lbls[li] + ":")
+                var set: List<String> = isa_sets[li]
+                var tarms: String = ""
+                var ti: Float = 0
+                while (ti < set.length()) {
+                    tarms = tarms + " i64 " + set[ti] + ", label %cia.yes"
+                    ti = ti + 1
+                }
+                this.emit("  switch i64 %target, label %cia.no [" + tarms + " ]")
+                li = li + 1
+            }
+        }
         this.emit("cia.yes:")
         this.emit("  ret i1 1")
         this.emit("cia.no:")
