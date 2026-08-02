@@ -299,20 +299,45 @@ fun __rt_dbl_key(bits: Int): Int {
 // The dispatch is on the NaN-box tag of BOTH operands, which is the only
 // authority available at the point the comparison actually happens:
 //
-//   both TAG_PTR (0x7FF8)  → heap pointers; compare contents with strcmp. This
-//                            is the same conservative choice __any_eq makes:
-//                            string literals are plain malloc'd char* with no GC
-//                            header, so the GC type tag cannot be consulted (see
-//                            __rt_as_string_ptr) and TAG_PTR is all there is.
+//   both TAG_PTR (0x7FF8)  → heap pointers; compare contents with strcmp, unless
+//                            one is a GC object that is provably NOT a string.
 //   anything else          → compare numerically through the double key above,
 //                            which handles Int vs Float mixtures correctly.
 //
-// Untagged pointers (upper == 0), which is what identity mode and a raw
-// constructor result look like, are deliberately NOT treated as strings. The
-// `> 65536` heuristic __map_key_str uses to guess "this is a pointer" is safe
-// there because a mis-guess only costs a failed key match; here it would hand a
-// large integer to strcmp and segfault. Ordering is defined for strings and
-// numbers, and identity mode has no strings to order.
+// The "provably not a string" test is why __rt_is_gc_non_string exists: a GC
+// object carries a header sentinel and a type tag, so an object that is
+// definitely not a string can be refused rather than walked as a C string. The
+// converse does not hold — string *literals* are plain malloc'd char* with no GC
+// header at all (see __rt_as_string_ptr), so a missing header cannot be read as
+// "not a string". Hence the asymmetry: reject what is provably a non-string
+// object, strcmp everything else, which is the choice __any_eq also makes.
+//
+// Measured caveat, so nobody mistakes that guard for more than it is: today a
+// List, Map or class instance reaches here *untagged* (upper == 0), not as
+// TAG_PTR, so it never enters this branch and is ordered by the numeric path
+// below — i.e. by address. The guard therefore currently only covers TAG_PTR
+// non-strings, and it is here so that ordering two Lists cannot become a strcmp
+// walk over a length field if that tagging ever changes. Ordering non-strings is
+// meaningless either way; `<` on two Lists is a thing the checker ought to
+// reject outright, which is a separate concern from this bug.
+//
+// Untagged pointers are deliberately NOT treated as strings. The `> 65536`
+// heuristic __map_key_str uses to guess "this is a pointer" is safe there
+// because a mis-guess only costs a failed key match; here it would hand a large
+// integer to strcmp and segfault. Ordering is defined for strings and numbers,
+// and identity mode has no strings to order.
+
+// True when `raw` is a GC-allocated object that is definitely not a string, i.e.
+// it has a valid header sentinel and a type tag other than 1 (string). Used to
+// keep a List or Map out of strcmp. A header-less pointer answers false, because
+// string literals look exactly like that.
+fun __rt_is_gc_non_string(raw: Int): Bool {
+    if (raw == 0) { return false }
+    var magic: Int = load64(raw - 8)
+    if (magic != 6557403441622859503) { return false }
+    return __rt_gc_type_tag(raw) != 1
+}
+
 fun __val_cmp(a: Int, b: Int): Int {
     if (a == b) { return 0 }
     var ua: Int = a >> 48
@@ -320,6 +345,9 @@ fun __val_cmp(a: Int, b: Int): Int {
     if (ua == 32760 and ub == 32760) {
         var ra: Int = __rt_untag_ptr(a)
         var rb: Int = __rt_untag_ptr(b)
+        // A List/Map is a pointer but has no ordering; strcmp would read its
+        // payload as text. Report "neither less nor greater" instead.
+        if (__rt_is_gc_non_string(ra) or __rt_is_gc_non_string(rb)) { return 0 }
         if (ra != 0 and rb != 0) {
             var c: Int = rt_strcmp(ra, rb)
             if (c < 0) { return 0 - 1 }
