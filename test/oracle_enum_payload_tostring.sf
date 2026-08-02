@@ -1,0 +1,98 @@
+// oracle_enum_payload_tostring.sf — a generated enum to_string() must format its
+// payload by VALUE for every payload type, not print a heap address.
+//
+// Found by the differential oracle's nondeterminism gate, which is a nice
+// demonstration of why that gate is worth having. The gate exists to EXCLUDE
+// flaky tests from comparison, so it runs the reference configuration twice and
+// diffs it against itself. test/oracle_stringify.sf tripped it:
+//
+//     48c48
+//     < OL(105553125557112)
+//     ---
+//     > OL(105553136977480)
+//
+// Those are heap addresses. `OneList.OL([1, 2])` must stringify as `OL([1, 2])`;
+// instead the generated to_string() emits the payload pointer as a decimal
+// integer, so the output of a single unchanged binary differs between runs. A
+// test whose expected output cannot even be WRITTEN DOWN is a strong signal, and
+// it is one that only shows up if something actually re-runs the program.
+//
+// MECHANISM. The generated to_string() formats its payload by the payload's
+// declared type. Int, Float, String and Bool are handled. List, Map, and nested
+// enum payloads are not, and fall through to being printed as raw integers:
+//
+//     OL(105553124048920)   List<Int> payload   — address, varies per run
+//     OM(105553146069272)   Map payload         — address, varies per run
+//     OE(0)                 nested enum payload — the tag << 56 immediate,
+//                                                 reinterpreted; stable but wrong
+//
+// The String case is the instructive contrast. A String payload is also a heap
+// pointer, and it prints correctly (`OS(hi)`), so this is not "heap payloads are
+// unsupported" — it is a per-type list of payload formatters with three types
+// missing. That is mechanism M5 from docs/design/compiler-rewrite.md: logic
+// duplicated per case, which drifts as cases are added.
+//
+// RELATION TO OTHER BUGS. Distinct from BUGS #102, which was about DECODING a
+// one-field enum's payload (it read the heap pointer as a `tag << 56` immediate);
+// here the payload is decoded correctly and then FORMATTED wrong. Also distinct
+// from the IO.println(enum_value) bug in test/oracle_enum_println.sf, which never
+// calls to_string() at all — this one does call it, and to_string() is what is
+// wrong. All three have to be fixed separately.
+//
+// There is no .expected file for the List and Map cases on purpose: their current
+// output is nondeterministic, so freezing it would record a specific heap address
+// as the correct answer. The assertions below state the intended behaviour
+// instead.
+
+import "@test" as T
+
+enum OneInt { OI(v: Int) }
+enum OneFloat { OF(v: Float) }
+enum OneStr { OS(v: String) }
+enum OneBool { OB(v: Bool) }
+enum OneList { OL(v: List<Int>) }
+enum OneStrList { OSL(v: List<String>) }
+enum Inner { IA, IB }
+enum OuterE { OE(v: Inner) }
+
+// --- the payload types that work today, as controls ---------------------------
+
+T.section("payload types that already format correctly")
+T.assert_eq("${OneInt.OI(7)}", "OI(7)", "Int payload")
+T.assert_eq("${OneInt.OI(-7)}", "OI(-7)", "negative Int payload")
+T.assert_eq("${OneFloat.OF(1.5)}", "OF(1.5)", "Float payload")
+T.assert_eq("${OneStr.OS("hi")}", "OS(hi)", "String payload (also a heap pointer)")
+T.assert_eq("${OneBool.OB(true)}", "OB(true)", "Bool payload true")
+T.assert_eq("${OneBool.OB(false)}", "OB(false)", "Bool payload false")
+
+// A bare list formats correctly on its own, so the defect is in the generated
+// enum to_string() rather than in list formatting.
+T.section("bare containers format correctly (so the defect is in the enum path)")
+var plain: List<Int> = [1, 2]
+T.assert_eq("${plain}", "[1, 2]", "bare List<Int>")
+
+// --- the broken payload types -------------------------------------------------
+
+T.section("List payload must format by value, not as an address")
+T.assert_eq("${OneList.OL([1, 2])}", "OL([1, 2])", "List<Int> payload")
+T.assert_eq("${OneList.OL([])}", "OL([])", "empty List payload")
+T.assert_eq("${OneStrList.OSL(["a", "b"])}", "OSL([a, b])", "List<String> payload")
+
+T.section("nested enum payload must format by value")
+T.assert_eq("${OuterE.OE(Inner.IB)}", "OE(IB)", "nested enum payload, second variant")
+T.assert_eq("${OuterE.OE(Inner.IA)}", "OE(IA)", "nested enum payload, first variant")
+
+// The strongest form of the List assertion: stringify the SAME value twice in one
+// process. Formatting must be a pure function of the value, so the two results
+// must agree even if both are wrong. This one cannot be explained away as a
+// formatting-convention disagreement, and unlike the assertions above it does not
+// depend on knowing what the right rendering is.
+T.section("stringification must be deterministic within a run")
+var same = OneList.OL([1, 2])
+T.assert_eq("${same}", "${same}", "same enum value stringifies identically twice")
+
+var l1 = OneList.OL([1, 2])
+var l2 = OneList.OL([1, 2])
+T.assert_eq("${l1}", "${l2}", "equal payloads stringify identically")
+
+T.summary()
