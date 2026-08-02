@@ -444,7 +444,7 @@
 
     fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
         match (stmt) {
-            VarDecl(name, typ, init) => {
+            VarDecl(name, typ, init, doc) => {
                 this.find_free_vars_expr(init, bound, free)
                 bound.push(name)
             }
@@ -736,7 +736,7 @@
     fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
         var sk: String = this.classify_stmt(stmt)
         if (sk == "var") {
-            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init) => init
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d) => init
                 _ => AST.Expr.NilLit
             }
             this.collect_lambda_assigned_expr(vi, out, in_lambda)

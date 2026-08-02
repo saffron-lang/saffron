@@ -75705,6 +75705,7 @@ entry:
   %name = alloca i64
   %typ = alloca i64
   %init = alloca i64
+  %doc = alloca i64
   %expr = alloca i64
   %value = alloca i64
   %cond = alloca i64
@@ -75737,234 +75738,237 @@ entry:
   %t3 = trunc i64 %t5 to i8
   switch i8 %t3, label %match.end3800 [ i8 1, label %match.arm3801 i8 0, label %match.arm3802 i8 5, label %match.arm3803 i8 6, label %match.arm3804 i8 7, label %match.arm3805 i8 8, label %match.arm3806 i8 2, label %match.arm3807 i8 3, label %match.arm3808 i8 4, label %match.arm3809 i8 9, label %match.arm3810 i8 10, label %match.arm3811 i8 11, label %match.arm3812 i8 12, label %match.arm3813 i8 13, label %match.arm3814 ]
 match.arm3801:
-  %t6 = inttoptr i64 %t1 to [4 x i64]*
-  %t7 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 1
+  %t6 = inttoptr i64 %t1 to [5 x i64]*
+  %t7 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 1
   %t8 = load i64, i64* %t7
   store i64 %t8, i64* %name
-  %t9 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 2
+  %t9 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 2
   %t10 = load i64, i64* %t9
   store i64 %t10, i64* %typ
-  %t11 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 3
+  %t11 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 3
   %t12 = load i64, i64* %t11
   store i64 %t12, i64* %init
-  %t13 = load i64, i64* %self
-  %t14 = load i64, i64* %init
-  %t15 = load i64, i64* %bound
-  %t16 = load i64, i64* %free
-  %t17 = call i64 @Codegen__find_free_vars_expr(i64 %t13, i64 %t14, i64 %t15, i64 %t16)
-  %t18 = load i64, i64* %bound
-  %t19 = load i64, i64* %name
-  %t20 = call i64 @__list_push(i64 %t18, i64 %t19)
+  %t13 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 4
+  %t14 = load i64, i64* %t13
+  store i64 %t14, i64* %doc
+  %t15 = load i64, i64* %self
+  %t16 = load i64, i64* %init
+  %t17 = load i64, i64* %bound
+  %t18 = load i64, i64* %free
+  %t19 = call i64 @Codegen__find_free_vars_expr(i64 %t15, i64 %t16, i64 %t17, i64 %t18)
+  %t20 = load i64, i64* %bound
+  %t21 = load i64, i64* %name
+  %t22 = call i64 @__list_push(i64 %t20, i64 %t21)
   store i64 0, i64* %t2
   br label %match.end3800
 match.arm3802:
-  %t21 = inttoptr i64 %t1 to [2 x i64]*
-  %t22 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 1
-  %t23 = load i64, i64* %t22
-  store i64 %t23, i64* %expr
-  %t24 = load i64, i64* %self
-  %t25 = load i64, i64* %expr
-  %t26 = load i64, i64* %bound
-  %t27 = load i64, i64* %free
-  %t28 = call i64 @Codegen__find_free_vars_expr(i64 %t24, i64 %t25, i64 %t26, i64 %t27)
-  store i64 %t28, i64* %t2
+  %t23 = inttoptr i64 %t1 to [2 x i64]*
+  %t24 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  %t25 = load i64, i64* %t24
+  store i64 %t25, i64* %expr
+  %t26 = load i64, i64* %self
+  %t27 = load i64, i64* %expr
+  %t28 = load i64, i64* %bound
+  %t29 = load i64, i64* %free
+  %t30 = call i64 @Codegen__find_free_vars_expr(i64 %t26, i64 %t27, i64 %t28, i64 %t29)
+  store i64 %t30, i64* %t2
   br label %match.end3800
 match.arm3803:
-  %t29 = inttoptr i64 %t1 to [2 x i64]*
-  %t30 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
-  %t31 = load i64, i64* %t30
-  store i64 %t31, i64* %value
-  %t32 = load i64, i64* %self
-  %t33 = load i64, i64* %value
-  %t34 = load i64, i64* %bound
-  %t35 = load i64, i64* %free
-  %t36 = call i64 @Codegen__find_free_vars_expr(i64 %t32, i64 %t33, i64 %t34, i64 %t35)
-  store i64 %t36, i64* %t2
+  %t31 = inttoptr i64 %t1 to [2 x i64]*
+  %t32 = getelementptr [2 x i64], [2 x i64]* %t31, i64 0, i64 1
+  %t33 = load i64, i64* %t32
+  store i64 %t33, i64* %value
+  %t34 = load i64, i64* %self
+  %t35 = load i64, i64* %value
+  %t36 = load i64, i64* %bound
+  %t37 = load i64, i64* %free
+  %t38 = call i64 @Codegen__find_free_vars_expr(i64 %t34, i64 %t35, i64 %t36, i64 %t37)
+  store i64 %t38, i64* %t2
   br label %match.end3800
 match.arm3804:
-  %t37 = inttoptr i64 %t1 to [4 x i64]*
-  %t38 = getelementptr [4 x i64], [4 x i64]* %t37, i64 0, i64 1
-  %t39 = load i64, i64* %t38
-  store i64 %t39, i64* %cond
-  %t40 = getelementptr [4 x i64], [4 x i64]* %t37, i64 0, i64 2
+  %t39 = inttoptr i64 %t1 to [4 x i64]*
+  %t40 = getelementptr [4 x i64], [4 x i64]* %t39, i64 0, i64 1
   %t41 = load i64, i64* %t40
-  store i64 %t41, i64* %then_b
-  %t42 = getelementptr [4 x i64], [4 x i64]* %t37, i64 0, i64 3
+  store i64 %t41, i64* %cond
+  %t42 = getelementptr [4 x i64], [4 x i64]* %t39, i64 0, i64 2
   %t43 = load i64, i64* %t42
-  store i64 %t43, i64* %else_b
-  %t44 = load i64, i64* %self
-  %t45 = load i64, i64* %cond
-  %t46 = load i64, i64* %bound
-  %t47 = load i64, i64* %free
-  %t48 = call i64 @Codegen__find_free_vars_expr(i64 %t44, i64 %t45, i64 %t46, i64 %t47)
-  %t49 = load i64, i64* %self
-  %t50 = load i64, i64* %then_b
-  %t51 = load i64, i64* %bound
-  %t52 = load i64, i64* %free
-  %t53 = call i64 @Codegen__find_free_vars_stmts(i64 %t49, i64 %t50, i64 %t51, i64 %t52)
-  %t54 = load i64, i64* %self
-  %t55 = load i64, i64* %else_b
-  %t56 = load i64, i64* %bound
-  %t57 = load i64, i64* %free
-  %t58 = call i64 @Codegen__find_free_vars_stmts(i64 %t54, i64 %t55, i64 %t56, i64 %t57)
-  store i64 %t58, i64* %t2
+  store i64 %t43, i64* %then_b
+  %t44 = getelementptr [4 x i64], [4 x i64]* %t39, i64 0, i64 3
+  %t45 = load i64, i64* %t44
+  store i64 %t45, i64* %else_b
+  %t46 = load i64, i64* %self
+  %t47 = load i64, i64* %cond
+  %t48 = load i64, i64* %bound
+  %t49 = load i64, i64* %free
+  %t50 = call i64 @Codegen__find_free_vars_expr(i64 %t46, i64 %t47, i64 %t48, i64 %t49)
+  %t51 = load i64, i64* %self
+  %t52 = load i64, i64* %then_b
+  %t53 = load i64, i64* %bound
+  %t54 = load i64, i64* %free
+  %t55 = call i64 @Codegen__find_free_vars_stmts(i64 %t51, i64 %t52, i64 %t53, i64 %t54)
+  %t56 = load i64, i64* %self
+  %t57 = load i64, i64* %else_b
+  %t58 = load i64, i64* %bound
+  %t59 = load i64, i64* %free
+  %t60 = call i64 @Codegen__find_free_vars_stmts(i64 %t56, i64 %t57, i64 %t58, i64 %t59)
+  store i64 %t60, i64* %t2
   br label %match.end3800
 match.arm3805:
-  %t59 = inttoptr i64 %t1 to [3 x i64]*
-  %t60 = getelementptr [3 x i64], [3 x i64]* %t59, i64 0, i64 1
-  %t61 = load i64, i64* %t60
-  store i64 %t61, i64* %cond
-  %t62 = getelementptr [3 x i64], [3 x i64]* %t59, i64 0, i64 2
+  %t61 = inttoptr i64 %t1 to [3 x i64]*
+  %t62 = getelementptr [3 x i64], [3 x i64]* %t61, i64 0, i64 1
   %t63 = load i64, i64* %t62
-  store i64 %t63, i64* %v_body
-  %t64 = load i64, i64* %self
-  %t65 = load i64, i64* %cond
-  %t66 = load i64, i64* %bound
-  %t67 = load i64, i64* %free
-  %t68 = call i64 @Codegen__find_free_vars_expr(i64 %t64, i64 %t65, i64 %t66, i64 %t67)
-  %t69 = load i64, i64* %self
-  %t70 = load i64, i64* %v_body
-  %t71 = load i64, i64* %bound
-  %t72 = load i64, i64* %free
-  %t73 = call i64 @Codegen__find_free_vars_stmts(i64 %t69, i64 %t70, i64 %t71, i64 %t72)
-  store i64 %t73, i64* %t2
+  store i64 %t63, i64* %cond
+  %t64 = getelementptr [3 x i64], [3 x i64]* %t61, i64 0, i64 2
+  %t65 = load i64, i64* %t64
+  store i64 %t65, i64* %v_body
+  %t66 = load i64, i64* %self
+  %t67 = load i64, i64* %cond
+  %t68 = load i64, i64* %bound
+  %t69 = load i64, i64* %free
+  %t70 = call i64 @Codegen__find_free_vars_expr(i64 %t66, i64 %t67, i64 %t68, i64 %t69)
+  %t71 = load i64, i64* %self
+  %t72 = load i64, i64* %v_body
+  %t73 = load i64, i64* %bound
+  %t74 = load i64, i64* %free
+  %t75 = call i64 @Codegen__find_free_vars_stmts(i64 %t71, i64 %t72, i64 %t73, i64 %t74)
+  store i64 %t75, i64* %t2
   br label %match.end3800
 match.arm3806:
-  %t74 = inttoptr i64 %t1 to [2 x i64]*
-  %t75 = getelementptr [2 x i64], [2 x i64]* %t74, i64 0, i64 1
-  %t76 = load i64, i64* %t75
-  store i64 %t76, i64* %stmts
-  %t77 = load i64, i64* %self
-  %t78 = load i64, i64* %stmts
-  %t79 = load i64, i64* %bound
-  %t80 = load i64, i64* %free
-  %t81 = call i64 @Codegen__find_free_vars_stmts(i64 %t77, i64 %t78, i64 %t79, i64 %t80)
-  store i64 %t81, i64* %t2
+  %t76 = inttoptr i64 %t1 to [2 x i64]*
+  %t77 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 1
+  %t78 = load i64, i64* %t77
+  store i64 %t78, i64* %stmts
+  %t79 = load i64, i64* %self
+  %t80 = load i64, i64* %stmts
+  %t81 = load i64, i64* %bound
+  %t82 = load i64, i64* %free
+  %t83 = call i64 @Codegen__find_free_vars_stmts(i64 %t79, i64 %t80, i64 %t81, i64 %t82)
+  store i64 %t83, i64* %t2
   br label %match.end3800
 match.arm3807:
-  %t82 = inttoptr i64 %t1 to [6 x i64]*
-  %t83 = getelementptr [6 x i64], [6 x i64]* %t82, i64 0, i64 1
-  %t84 = load i64, i64* %t83
-  store i64 %t84, i64* %n
-  %t85 = getelementptr [6 x i64], [6 x i64]* %t82, i64 0, i64 2
+  %t84 = inttoptr i64 %t1 to [6 x i64]*
+  %t85 = getelementptr [6 x i64], [6 x i64]* %t84, i64 0, i64 1
   %t86 = load i64, i64* %t85
-  store i64 %t86, i64* %p
-  %t87 = getelementptr [6 x i64], [6 x i64]* %t82, i64 0, i64 3
+  store i64 %t86, i64* %n
+  %t87 = getelementptr [6 x i64], [6 x i64]* %t84, i64 0, i64 2
   %t88 = load i64, i64* %t87
-  store i64 %t88, i64* %r
-  %t89 = getelementptr [6 x i64], [6 x i64]* %t82, i64 0, i64 4
+  store i64 %t88, i64* %p
+  %t89 = getelementptr [6 x i64], [6 x i64]* %t84, i64 0, i64 3
   %t90 = load i64, i64* %t89
-  store i64 %t90, i64* %b
-  %t91 = getelementptr [6 x i64], [6 x i64]* %t82, i64 0, i64 5
+  store i64 %t90, i64* %r
+  %t91 = getelementptr [6 x i64], [6 x i64]* %t84, i64 0, i64 4
   %t92 = load i64, i64* %t91
-  store i64 %t92, i64* %d
-  %t93 = call i64 @__map_new()
-  store i64 %t93, i64* %t2
+  store i64 %t92, i64* %b
+  %t93 = getelementptr [6 x i64], [6 x i64]* %t84, i64 0, i64 5
+  %t94 = load i64, i64* %t93
+  store i64 %t94, i64* %d
+  %t95 = call i64 @__map_new()
+  store i64 %t95, i64* %t2
   br label %match.end3800
 match.arm3808:
-  %t94 = inttoptr i64 %t1 to [4 x i64]*
-  %t95 = getelementptr [4 x i64], [4 x i64]* %t94, i64 0, i64 1
-  %t96 = load i64, i64* %t95
-  store i64 %t96, i64* %n
-  %t97 = getelementptr [4 x i64], [4 x i64]* %t94, i64 0, i64 2
+  %t96 = inttoptr i64 %t1 to [4 x i64]*
+  %t97 = getelementptr [4 x i64], [4 x i64]* %t96, i64 0, i64 1
   %t98 = load i64, i64* %t97
-  store i64 %t98, i64* %v
-  %t99 = getelementptr [4 x i64], [4 x i64]* %t94, i64 0, i64 3
+  store i64 %t98, i64* %n
+  %t99 = getelementptr [4 x i64], [4 x i64]* %t96, i64 0, i64 2
   %t100 = load i64, i64* %t99
-  store i64 %t100, i64* %d
-  %t101 = call i64 @__map_new()
-  store i64 %t101, i64* %t2
+  store i64 %t100, i64* %v
+  %t101 = getelementptr [4 x i64], [4 x i64]* %t96, i64 0, i64 3
+  %t102 = load i64, i64* %t101
+  store i64 %t102, i64* %d
+  %t103 = call i64 @__map_new()
+  store i64 %t103, i64* %t2
   br label %match.end3800
 match.arm3809:
-  %t102 = inttoptr i64 %t1 to [7 x i64]*
-  %t103 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 1
-  %t104 = load i64, i64* %t103
-  store i64 %t104, i64* %n
-  %t105 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 2
+  %t104 = inttoptr i64 %t1 to [7 x i64]*
+  %t105 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 1
   %t106 = load i64, i64* %t105
-  store i64 %t106, i64* %__tps
-  %t107 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 3
+  store i64 %t106, i64* %n
+  %t107 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 2
   %t108 = load i64, i64* %t107
-  store i64 %t108, i64* %p
-  %t109 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 4
+  store i64 %t108, i64* %__tps
+  %t109 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 3
   %t110 = load i64, i64* %t109
-  store i64 %t110, i64* %f
-  %t111 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 5
+  store i64 %t110, i64* %p
+  %t111 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 4
   %t112 = load i64, i64* %t111
-  store i64 %t112, i64* %m
-  %t113 = getelementptr [7 x i64], [7 x i64]* %t102, i64 0, i64 6
+  store i64 %t112, i64* %f
+  %t113 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 5
   %t114 = load i64, i64* %t113
-  store i64 %t114, i64* %d
-  %t115 = call i64 @__map_new()
-  store i64 %t115, i64* %t2
-  br label %match.end3800
-match.arm3810:
-  %t116 = call i64 @__map_new()
-  store i64 %t116, i64* %t2
-  br label %match.end3800
-match.arm3811:
+  store i64 %t114, i64* %m
+  %t115 = getelementptr [7 x i64], [7 x i64]* %t104, i64 0, i64 6
+  %t116 = load i64, i64* %t115
+  store i64 %t116, i64* %d
   %t117 = call i64 @__map_new()
   store i64 %t117, i64* %t2
   br label %match.end3800
+match.arm3810:
+  %t118 = call i64 @__map_new()
+  store i64 %t118, i64* %t2
+  br label %match.end3800
+match.arm3811:
+  %t119 = call i64 @__map_new()
+  store i64 %t119, i64* %t2
+  br label %match.end3800
 match.arm3812:
-  %t118 = inttoptr i64 %t1 to [5 x i64]*
-  %t119 = getelementptr [5 x i64], [5 x i64]* %t118, i64 0, i64 1
-  %t120 = load i64, i64* %t119
-  store i64 %t120, i64* %try_body
-  %t121 = getelementptr [5 x i64], [5 x i64]* %t118, i64 0, i64 2
+  %t120 = inttoptr i64 %t1 to [5 x i64]*
+  %t121 = getelementptr [5 x i64], [5 x i64]* %t120, i64 0, i64 1
   %t122 = load i64, i64* %t121
-  store i64 %t122, i64* %catch_name
-  %t123 = getelementptr [5 x i64], [5 x i64]* %t118, i64 0, i64 3
+  store i64 %t122, i64* %try_body
+  %t123 = getelementptr [5 x i64], [5 x i64]* %t120, i64 0, i64 2
   %t124 = load i64, i64* %t123
-  store i64 %t124, i64* %catch_body
-  %t125 = getelementptr [5 x i64], [5 x i64]* %t118, i64 0, i64 4
+  store i64 %t124, i64* %catch_name
+  %t125 = getelementptr [5 x i64], [5 x i64]* %t120, i64 0, i64 3
   %t126 = load i64, i64* %t125
-  store i64 %t126, i64* %finally_body
-  %t127 = load i64, i64* %self
-  %t128 = load i64, i64* %try_body
-  %t129 = load i64, i64* %bound
-  %t130 = load i64, i64* %free
-  %t131 = call i64 @Codegen__find_free_vars_stmts(i64 %t127, i64 %t128, i64 %t129, i64 %t130)
-  %t132 = load i64, i64* %bound
-  %t133 = load i64, i64* %catch_name
-  %t134 = call i64 @__list_push(i64 %t132, i64 %t133)
-  %t135 = load i64, i64* %self
-  %t136 = load i64, i64* %catch_body
-  %t137 = load i64, i64* %bound
-  %t138 = load i64, i64* %free
-  %t139 = call i64 @Codegen__find_free_vars_stmts(i64 %t135, i64 %t136, i64 %t137, i64 %t138)
-  %t140 = load i64, i64* %self
-  %t141 = load i64, i64* %finally_body
-  %t142 = load i64, i64* %bound
-  %t143 = load i64, i64* %free
-  %t144 = call i64 @Codegen__find_free_vars_stmts(i64 %t140, i64 %t141, i64 %t142, i64 %t143)
-  store i64 %t144, i64* %t2
+  store i64 %t126, i64* %catch_body
+  %t127 = getelementptr [5 x i64], [5 x i64]* %t120, i64 0, i64 4
+  %t128 = load i64, i64* %t127
+  store i64 %t128, i64* %finally_body
+  %t129 = load i64, i64* %self
+  %t130 = load i64, i64* %try_body
+  %t131 = load i64, i64* %bound
+  %t132 = load i64, i64* %free
+  %t133 = call i64 @Codegen__find_free_vars_stmts(i64 %t129, i64 %t130, i64 %t131, i64 %t132)
+  %t134 = load i64, i64* %bound
+  %t135 = load i64, i64* %catch_name
+  %t136 = call i64 @__list_push(i64 %t134, i64 %t135)
+  %t137 = load i64, i64* %self
+  %t138 = load i64, i64* %catch_body
+  %t139 = load i64, i64* %bound
+  %t140 = load i64, i64* %free
+  %t141 = call i64 @Codegen__find_free_vars_stmts(i64 %t137, i64 %t138, i64 %t139, i64 %t140)
+  %t142 = load i64, i64* %self
+  %t143 = load i64, i64* %finally_body
+  %t144 = load i64, i64* %bound
+  %t145 = load i64, i64* %free
+  %t146 = call i64 @Codegen__find_free_vars_stmts(i64 %t142, i64 %t143, i64 %t144, i64 %t145)
+  store i64 %t146, i64* %t2
   br label %match.end3800
 match.arm3813:
-  %t145 = inttoptr i64 %t1 to [2 x i64]*
-  %t146 = getelementptr [2 x i64], [2 x i64]* %t145, i64 0, i64 1
-  %t147 = load i64, i64* %t146
-  store i64 %t147, i64* %value
-  %t148 = load i64, i64* %self
-  %t149 = load i64, i64* %value
-  %t150 = load i64, i64* %bound
-  %t151 = load i64, i64* %free
-  %t152 = call i64 @Codegen__find_free_vars_expr(i64 %t148, i64 %t149, i64 %t150, i64 %t151)
-  store i64 %t152, i64* %t2
+  %t147 = inttoptr i64 %t1 to [2 x i64]*
+  %t148 = getelementptr [2 x i64], [2 x i64]* %t147, i64 0, i64 1
+  %t149 = load i64, i64* %t148
+  store i64 %t149, i64* %value
+  %t150 = load i64, i64* %self
+  %t151 = load i64, i64* %value
+  %t152 = load i64, i64* %bound
+  %t153 = load i64, i64* %free
+  %t154 = call i64 @Codegen__find_free_vars_expr(i64 %t150, i64 %t151, i64 %t152, i64 %t153)
+  store i64 %t154, i64* %t2
   br label %match.end3800
 match.arm3814:
-  %t153 = inttoptr i64 %t1 to [3 x i64]*
-  %t154 = getelementptr [3 x i64], [3 x i64]* %t153, i64 0, i64 1
-  %t155 = load i64, i64* %t154
-  store i64 %t155, i64* %pattern
-  %t156 = getelementptr [3 x i64], [3 x i64]* %t153, i64 0, i64 2
+  %t155 = inttoptr i64 %t1 to [3 x i64]*
+  %t156 = getelementptr [3 x i64], [3 x i64]* %t155, i64 0, i64 1
   %t157 = load i64, i64* %t156
-  store i64 %t157, i64* %value
-  %t158 = call i64 @__map_new()
-  store i64 %t158, i64* %t2
+  store i64 %t157, i64* %pattern
+  %t158 = getelementptr [3 x i64], [3 x i64]* %t155, i64 0, i64 2
+  %t159 = load i64, i64* %t158
+  store i64 %t159, i64* %value
+  %t160 = call i64 @__map_new()
+  store i64 %t160, i64* %t2
   br label %match.end3800
 match.end3800:
-  %t159 = load i64, i64* %t2
+  %t161 = load i64, i64* %t2
   ret i64 0
 }
 
@@ -77840,6 +77844,7 @@ entry:
   %n = alloca i64
   %t = alloca i64
   %init = alloca i64
+  %d = alloca i64
   %ee = alloca i64
   %e = alloca i64
   %re = alloca i64
@@ -77882,481 +77887,484 @@ then4045:
   %t11 = trunc i64 %t13 to i8
   switch i8 %t11, label %match.arm4049 [ i8 1, label %match.arm4048 ]
 match.arm4048:
-  %t14 = inttoptr i64 %t9 to [4 x i64]*
-  %t15 = getelementptr [4 x i64], [4 x i64]* %t14, i64 0, i64 1
+  %t14 = inttoptr i64 %t9 to [5 x i64]*
+  %t15 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 1
   %t16 = load i64, i64* %t15
   store i64 %t16, i64* %n
-  %t17 = getelementptr [4 x i64], [4 x i64]* %t14, i64 0, i64 2
+  %t17 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 2
   %t18 = load i64, i64* %t17
   store i64 %t18, i64* %t
-  %t19 = getelementptr [4 x i64], [4 x i64]* %t14, i64 0, i64 3
+  %t19 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 3
   %t20 = load i64, i64* %t19
   store i64 %t20, i64* %init
-  %t21 = load i64, i64* %init
-  store i64 %t21, i64* %t10
+  %t21 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 4
+  %t22 = load i64, i64* %t21
+  store i64 %t22, i64* %d
+  %t23 = load i64, i64* %init
+  store i64 %t23, i64* %t10
   br label %match.end4047
 match.arm4049:
-  %t22 = call i8* @__sf_malloc(i64 8)
-  %t23 = bitcast i8* %t22 to [1 x i64]*
-  %t24 = getelementptr [1 x i64], [1 x i64]* %t23, i64 0, i64 0
-  store i64 4, i64* %t24
-  %t25 = ptrtoint [1 x i64]* %t23 to i64
-  store i64 %t25, i64* %t10
+  %t24 = call i8* @__sf_malloc(i64 8)
+  %t25 = bitcast i8* %t24 to [1 x i64]*
+  %t26 = getelementptr [1 x i64], [1 x i64]* %t25, i64 0, i64 0
+  store i64 4, i64* %t26
+  %t27 = ptrtoint [1 x i64]* %t25 to i64
+  store i64 %t27, i64* %t10
   br label %match.end4047
 match.end4047:
-  %t26 = load i64, i64* %t10
-  store i64 %t26, i64* %vi
-  %t27 = load i64, i64* %self
-  %t28 = load i64, i64* %vi
-  %t29 = load i64, i64* %out
-  %t30 = load i64, i64* %in_lambda
-  %t31 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t27, i64 %t28, i64 %t29, i64 %t30)
+  %t28 = load i64, i64* %t10
+  store i64 %t28, i64* %vi
+  %t29 = load i64, i64* %self
+  %t30 = load i64, i64* %vi
+  %t31 = load i64, i64* %out
+  %t32 = load i64, i64* %in_lambda
+  %t33 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t29, i64 %t30, i64 %t31, i64 %t32)
   br label %endif4044
 else4046:
-  %t32 = load i64, i64* %sk
-  %t33 = getelementptr [5 x i8], [5 x i8]* @.str.2609, i64 0, i64 0
-  %t34 = ptrtoint i8* %t33 to i64
-  %t35 = call i64 @__string_eq(i64 %t32, i64 %t34)
-  %t36 = trunc i64 %t35 to i1
-  br i1 %t36, label %then4050, label %else4051
+  %t34 = load i64, i64* %sk
+  %t35 = getelementptr [5 x i8], [5 x i8]* @.str.2609, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = call i64 @__string_eq(i64 %t34, i64 %t36)
+  %t38 = trunc i64 %t37 to i1
+  br i1 %t38, label %then4050, label %else4051
 then4050:
-  %t37 = load i64, i64* %stmt
-  %t38 = alloca i64
-  %t40 = inttoptr i64 %t37 to i64*
-  %t41 = load i64, i64* %t40
-  %t39 = trunc i64 %t41 to i8
-  switch i8 %t39, label %match.arm4054 [ i8 0, label %match.arm4053 ]
+  %t39 = load i64, i64* %stmt
+  %t40 = alloca i64
+  %t42 = inttoptr i64 %t39 to i64*
+  %t43 = load i64, i64* %t42
+  %t41 = trunc i64 %t43 to i8
+  switch i8 %t41, label %match.arm4054 [ i8 0, label %match.arm4053 ]
 match.arm4053:
-  %t42 = inttoptr i64 %t37 to [2 x i64]*
-  %t43 = getelementptr [2 x i64], [2 x i64]* %t42, i64 0, i64 1
-  %t44 = load i64, i64* %t43
-  store i64 %t44, i64* %e
-  %t45 = load i64, i64* %e
-  store i64 %t45, i64* %t38
+  %t44 = inttoptr i64 %t39 to [2 x i64]*
+  %t45 = getelementptr [2 x i64], [2 x i64]* %t44, i64 0, i64 1
+  %t46 = load i64, i64* %t45
+  store i64 %t46, i64* %e
+  %t47 = load i64, i64* %e
+  store i64 %t47, i64* %t40
   br label %match.end4052
 match.arm4054:
-  %t46 = call i8* @__sf_malloc(i64 8)
-  %t47 = bitcast i8* %t46 to [1 x i64]*
-  %t48 = getelementptr [1 x i64], [1 x i64]* %t47, i64 0, i64 0
-  store i64 4, i64* %t48
-  %t49 = ptrtoint [1 x i64]* %t47 to i64
-  store i64 %t49, i64* %t38
+  %t48 = call i8* @__sf_malloc(i64 8)
+  %t49 = bitcast i8* %t48 to [1 x i64]*
+  %t50 = getelementptr [1 x i64], [1 x i64]* %t49, i64 0, i64 0
+  store i64 4, i64* %t50
+  %t51 = ptrtoint [1 x i64]* %t49 to i64
+  store i64 %t51, i64* %t40
   br label %match.end4052
 match.end4052:
-  %t50 = load i64, i64* %t38
-  store i64 %t50, i64* %ee
-  %t51 = load i64, i64* %self
-  %t52 = load i64, i64* %ee
-  %t53 = load i64, i64* %out
-  %t54 = load i64, i64* %in_lambda
-  %t55 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t51, i64 %t52, i64 %t53, i64 %t54)
+  %t52 = load i64, i64* %t40
+  store i64 %t52, i64* %ee
+  %t53 = load i64, i64* %self
+  %t54 = load i64, i64* %ee
+  %t55 = load i64, i64* %out
+  %t56 = load i64, i64* %in_lambda
+  %t57 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t53, i64 %t54, i64 %t55, i64 %t56)
   br label %endif4044
 else4051:
-  %t56 = load i64, i64* %sk
-  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.2610, i64 0, i64 0
-  %t58 = ptrtoint i8* %t57 to i64
-  %t59 = call i64 @__string_eq(i64 %t56, i64 %t58)
-  %t60 = trunc i64 %t59 to i1
-  br i1 %t60, label %then4055, label %else4056
+  %t58 = load i64, i64* %sk
+  %t59 = getelementptr [7 x i8], [7 x i8]* @.str.2610, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = call i64 @__string_eq(i64 %t58, i64 %t60)
+  %t62 = trunc i64 %t61 to i1
+  br i1 %t62, label %then4055, label %else4056
 then4055:
-  %t61 = load i64, i64* %stmt
-  %t62 = alloca i64
-  %t64 = inttoptr i64 %t61 to i64*
-  %t65 = load i64, i64* %t64
-  %t63 = trunc i64 %t65 to i8
-  switch i8 %t63, label %match.arm4059 [ i8 5, label %match.arm4058 ]
+  %t63 = load i64, i64* %stmt
+  %t64 = alloca i64
+  %t66 = inttoptr i64 %t63 to i64*
+  %t67 = load i64, i64* %t66
+  %t65 = trunc i64 %t67 to i8
+  switch i8 %t65, label %match.arm4059 [ i8 5, label %match.arm4058 ]
 match.arm4058:
-  %t66 = inttoptr i64 %t61 to [2 x i64]*
-  %t67 = getelementptr [2 x i64], [2 x i64]* %t66, i64 0, i64 1
-  %t68 = load i64, i64* %t67
-  store i64 %t68, i64* %v
-  %t69 = load i64, i64* %v
-  store i64 %t69, i64* %t62
+  %t68 = inttoptr i64 %t63 to [2 x i64]*
+  %t69 = getelementptr [2 x i64], [2 x i64]* %t68, i64 0, i64 1
+  %t70 = load i64, i64* %t69
+  store i64 %t70, i64* %v
+  %t71 = load i64, i64* %v
+  store i64 %t71, i64* %t64
   br label %match.end4057
 match.arm4059:
-  %t70 = call i8* @__sf_malloc(i64 8)
-  %t71 = bitcast i8* %t70 to [1 x i64]*
-  %t72 = getelementptr [1 x i64], [1 x i64]* %t71, i64 0, i64 0
-  store i64 4, i64* %t72
-  %t73 = ptrtoint [1 x i64]* %t71 to i64
-  store i64 %t73, i64* %t62
+  %t72 = call i8* @__sf_malloc(i64 8)
+  %t73 = bitcast i8* %t72 to [1 x i64]*
+  %t74 = getelementptr [1 x i64], [1 x i64]* %t73, i64 0, i64 0
+  store i64 4, i64* %t74
+  %t75 = ptrtoint [1 x i64]* %t73 to i64
+  store i64 %t75, i64* %t64
   br label %match.end4057
 match.end4057:
-  %t74 = load i64, i64* %t62
-  store i64 %t74, i64* %re
-  %t75 = load i64, i64* %self
-  %t76 = load i64, i64* %re
-  %t77 = load i64, i64* %out
-  %t78 = load i64, i64* %in_lambda
-  %t79 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t75, i64 %t76, i64 %t77, i64 %t78)
+  %t76 = load i64, i64* %t64
+  store i64 %t76, i64* %re
+  %t77 = load i64, i64* %self
+  %t78 = load i64, i64* %re
+  %t79 = load i64, i64* %out
+  %t80 = load i64, i64* %in_lambda
+  %t81 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t77, i64 %t78, i64 %t79, i64 %t80)
   br label %endif4044
 else4056:
-  %t80 = load i64, i64* %sk
-  %t81 = getelementptr [3 x i8], [3 x i8]* @.str.2611, i64 0, i64 0
-  %t82 = ptrtoint i8* %t81 to i64
-  %t83 = call i64 @__string_eq(i64 %t80, i64 %t82)
-  %t84 = trunc i64 %t83 to i1
-  br i1 %t84, label %then4060, label %else4061
+  %t82 = load i64, i64* %sk
+  %t83 = getelementptr [3 x i8], [3 x i8]* @.str.2611, i64 0, i64 0
+  %t84 = ptrtoint i8* %t83 to i64
+  %t85 = call i64 @__string_eq(i64 %t82, i64 %t84)
+  %t86 = trunc i64 %t85 to i1
+  br i1 %t86, label %then4060, label %else4061
 then4060:
-  %t85 = load i64, i64* %stmt
-  %t86 = alloca i64
-  %t88 = inttoptr i64 %t85 to i64*
-  %t89 = load i64, i64* %t88
-  %t87 = trunc i64 %t89 to i8
-  switch i8 %t87, label %match.arm4064 [ i8 6, label %match.arm4063 ]
+  %t87 = load i64, i64* %stmt
+  %t88 = alloca i64
+  %t90 = inttoptr i64 %t87 to i64*
+  %t91 = load i64, i64* %t90
+  %t89 = trunc i64 %t91 to i8
+  switch i8 %t89, label %match.arm4064 [ i8 6, label %match.arm4063 ]
 match.arm4063:
-  %t90 = inttoptr i64 %t85 to [4 x i64]*
-  %t91 = getelementptr [4 x i64], [4 x i64]* %t90, i64 0, i64 1
-  %t92 = load i64, i64* %t91
-  store i64 %t92, i64* %c
-  %t93 = getelementptr [4 x i64], [4 x i64]* %t90, i64 0, i64 2
+  %t92 = inttoptr i64 %t87 to [4 x i64]*
+  %t93 = getelementptr [4 x i64], [4 x i64]* %t92, i64 0, i64 1
   %t94 = load i64, i64* %t93
-  store i64 %t94, i64* %t
-  %t95 = getelementptr [4 x i64], [4 x i64]* %t90, i64 0, i64 3
+  store i64 %t94, i64* %c
+  %t95 = getelementptr [4 x i64], [4 x i64]* %t92, i64 0, i64 2
   %t96 = load i64, i64* %t95
-  store i64 %t96, i64* %e
-  %t97 = load i64, i64* %c
-  store i64 %t97, i64* %t86
+  store i64 %t96, i64* %t
+  %t97 = getelementptr [4 x i64], [4 x i64]* %t92, i64 0, i64 3
+  %t98 = load i64, i64* %t97
+  store i64 %t98, i64* %e
+  %t99 = load i64, i64* %c
+  store i64 %t99, i64* %t88
   br label %match.end4062
 match.arm4064:
-  %t98 = call i8* @__sf_malloc(i64 8)
-  %t99 = bitcast i8* %t98 to [1 x i64]*
-  %t100 = getelementptr [1 x i64], [1 x i64]* %t99, i64 0, i64 0
-  store i64 4, i64* %t100
-  %t101 = ptrtoint [1 x i64]* %t99 to i64
-  store i64 %t101, i64* %t86
+  %t100 = call i8* @__sf_malloc(i64 8)
+  %t101 = bitcast i8* %t100 to [1 x i64]*
+  %t102 = getelementptr [1 x i64], [1 x i64]* %t101, i64 0, i64 0
+  store i64 4, i64* %t102
+  %t103 = ptrtoint [1 x i64]* %t101 to i64
+  store i64 %t103, i64* %t88
   br label %match.end4062
 match.end4062:
-  %t102 = load i64, i64* %t86
-  store i64 %t102, i64* %ic
-  %t103 = load i64, i64* %stmt
-  %t104 = alloca i64
-  %t106 = inttoptr i64 %t103 to i64*
-  %t107 = load i64, i64* %t106
-  %t105 = trunc i64 %t107 to i8
-  switch i8 %t105, label %match.arm4067 [ i8 6, label %match.arm4066 ]
+  %t104 = load i64, i64* %t88
+  store i64 %t104, i64* %ic
+  %t105 = load i64, i64* %stmt
+  %t106 = alloca i64
+  %t108 = inttoptr i64 %t105 to i64*
+  %t109 = load i64, i64* %t108
+  %t107 = trunc i64 %t109 to i8
+  switch i8 %t107, label %match.arm4067 [ i8 6, label %match.arm4066 ]
 match.arm4066:
-  %t108 = inttoptr i64 %t103 to [4 x i64]*
-  %t109 = getelementptr [4 x i64], [4 x i64]* %t108, i64 0, i64 1
-  %t110 = load i64, i64* %t109
-  store i64 %t110, i64* %c
-  %t111 = getelementptr [4 x i64], [4 x i64]* %t108, i64 0, i64 2
+  %t110 = inttoptr i64 %t105 to [4 x i64]*
+  %t111 = getelementptr [4 x i64], [4 x i64]* %t110, i64 0, i64 1
   %t112 = load i64, i64* %t111
-  store i64 %t112, i64* %t
-  %t113 = getelementptr [4 x i64], [4 x i64]* %t108, i64 0, i64 3
+  store i64 %t112, i64* %c
+  %t113 = getelementptr [4 x i64], [4 x i64]* %t110, i64 0, i64 2
   %t114 = load i64, i64* %t113
-  store i64 %t114, i64* %e
-  %t115 = load i64, i64* %t
-  store i64 %t115, i64* %t104
+  store i64 %t114, i64* %t
+  %t115 = getelementptr [4 x i64], [4 x i64]* %t110, i64 0, i64 3
+  %t116 = load i64, i64* %t115
+  store i64 %t116, i64* %e
+  %t117 = load i64, i64* %t
+  store i64 %t117, i64* %t106
   br label %match.end4065
 match.arm4067:
-  %t116 = call i64 @__list_new()
-  store i64 %t116, i64* %t104
+  %t118 = call i64 @__list_new()
+  store i64 %t118, i64* %t106
   br label %match.end4065
 match.end4065:
-  %t117 = load i64, i64* %t104
-  store i64 %t117, i64* %it
-  %t118 = load i64, i64* %stmt
-  %t119 = alloca i64
-  %t121 = inttoptr i64 %t118 to i64*
-  %t122 = load i64, i64* %t121
-  %t120 = trunc i64 %t122 to i8
-  switch i8 %t120, label %match.arm4070 [ i8 6, label %match.arm4069 ]
+  %t119 = load i64, i64* %t106
+  store i64 %t119, i64* %it
+  %t120 = load i64, i64* %stmt
+  %t121 = alloca i64
+  %t123 = inttoptr i64 %t120 to i64*
+  %t124 = load i64, i64* %t123
+  %t122 = trunc i64 %t124 to i8
+  switch i8 %t122, label %match.arm4070 [ i8 6, label %match.arm4069 ]
 match.arm4069:
-  %t123 = inttoptr i64 %t118 to [4 x i64]*
-  %t124 = getelementptr [4 x i64], [4 x i64]* %t123, i64 0, i64 1
-  %t125 = load i64, i64* %t124
-  store i64 %t125, i64* %c
-  %t126 = getelementptr [4 x i64], [4 x i64]* %t123, i64 0, i64 2
+  %t125 = inttoptr i64 %t120 to [4 x i64]*
+  %t126 = getelementptr [4 x i64], [4 x i64]* %t125, i64 0, i64 1
   %t127 = load i64, i64* %t126
-  store i64 %t127, i64* %t
-  %t128 = getelementptr [4 x i64], [4 x i64]* %t123, i64 0, i64 3
+  store i64 %t127, i64* %c
+  %t128 = getelementptr [4 x i64], [4 x i64]* %t125, i64 0, i64 2
   %t129 = load i64, i64* %t128
-  store i64 %t129, i64* %e
-  %t130 = load i64, i64* %e
-  store i64 %t130, i64* %t119
+  store i64 %t129, i64* %t
+  %t130 = getelementptr [4 x i64], [4 x i64]* %t125, i64 0, i64 3
+  %t131 = load i64, i64* %t130
+  store i64 %t131, i64* %e
+  %t132 = load i64, i64* %e
+  store i64 %t132, i64* %t121
   br label %match.end4068
 match.arm4070:
-  %t131 = call i64 @__list_new()
-  store i64 %t131, i64* %t119
+  %t133 = call i64 @__list_new()
+  store i64 %t133, i64* %t121
   br label %match.end4068
 match.end4068:
-  %t132 = load i64, i64* %t119
-  store i64 %t132, i64* %ie
-  %t133 = load i64, i64* %self
-  %t134 = load i64, i64* %ic
-  %t135 = load i64, i64* %out
-  %t136 = load i64, i64* %in_lambda
-  %t137 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t133, i64 %t134, i64 %t135, i64 %t136)
-  %t138 = load i64, i64* %self
-  %t139 = load i64, i64* %it
-  %t140 = load i64, i64* %out
-  %t141 = load i64, i64* %in_lambda
-  %t142 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t138, i64 %t139, i64 %t140, i64 %t141)
-  %t143 = load i64, i64* %self
-  %t144 = load i64, i64* %ie
-  %t145 = load i64, i64* %out
-  %t146 = load i64, i64* %in_lambda
-  %t147 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t143, i64 %t144, i64 %t145, i64 %t146)
+  %t134 = load i64, i64* %t121
+  store i64 %t134, i64* %ie
+  %t135 = load i64, i64* %self
+  %t136 = load i64, i64* %ic
+  %t137 = load i64, i64* %out
+  %t138 = load i64, i64* %in_lambda
+  %t139 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t135, i64 %t136, i64 %t137, i64 %t138)
+  %t140 = load i64, i64* %self
+  %t141 = load i64, i64* %it
+  %t142 = load i64, i64* %out
+  %t143 = load i64, i64* %in_lambda
+  %t144 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t140, i64 %t141, i64 %t142, i64 %t143)
+  %t145 = load i64, i64* %self
+  %t146 = load i64, i64* %ie
+  %t147 = load i64, i64* %out
+  %t148 = load i64, i64* %in_lambda
+  %t149 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t145, i64 %t146, i64 %t147, i64 %t148)
   br label %endif4044
 else4061:
-  %t148 = load i64, i64* %sk
-  %t149 = getelementptr [6 x i8], [6 x i8]* @.str.2612, i64 0, i64 0
-  %t150 = ptrtoint i8* %t149 to i64
-  %t151 = call i64 @__string_eq(i64 %t148, i64 %t150)
-  %t152 = trunc i64 %t151 to i1
-  br i1 %t152, label %then4071, label %else4072
+  %t150 = load i64, i64* %sk
+  %t151 = getelementptr [6 x i8], [6 x i8]* @.str.2612, i64 0, i64 0
+  %t152 = ptrtoint i8* %t151 to i64
+  %t153 = call i64 @__string_eq(i64 %t150, i64 %t152)
+  %t154 = trunc i64 %t153 to i1
+  br i1 %t154, label %then4071, label %else4072
 then4071:
-  %t153 = load i64, i64* %stmt
-  %t154 = alloca i64
-  %t156 = inttoptr i64 %t153 to i64*
-  %t157 = load i64, i64* %t156
-  %t155 = trunc i64 %t157 to i8
-  switch i8 %t155, label %match.arm4075 [ i8 7, label %match.arm4074 ]
+  %t155 = load i64, i64* %stmt
+  %t156 = alloca i64
+  %t158 = inttoptr i64 %t155 to i64*
+  %t159 = load i64, i64* %t158
+  %t157 = trunc i64 %t159 to i8
+  switch i8 %t157, label %match.arm4075 [ i8 7, label %match.arm4074 ]
 match.arm4074:
-  %t158 = inttoptr i64 %t153 to [3 x i64]*
-  %t159 = getelementptr [3 x i64], [3 x i64]* %t158, i64 0, i64 1
-  %t160 = load i64, i64* %t159
-  store i64 %t160, i64* %c
-  %t161 = getelementptr [3 x i64], [3 x i64]* %t158, i64 0, i64 2
+  %t160 = inttoptr i64 %t155 to [3 x i64]*
+  %t161 = getelementptr [3 x i64], [3 x i64]* %t160, i64 0, i64 1
   %t162 = load i64, i64* %t161
-  store i64 %t162, i64* %b
-  %t163 = load i64, i64* %c
-  store i64 %t163, i64* %t154
+  store i64 %t162, i64* %c
+  %t163 = getelementptr [3 x i64], [3 x i64]* %t160, i64 0, i64 2
+  %t164 = load i64, i64* %t163
+  store i64 %t164, i64* %b
+  %t165 = load i64, i64* %c
+  store i64 %t165, i64* %t156
   br label %match.end4073
 match.arm4075:
-  %t164 = call i8* @__sf_malloc(i64 8)
-  %t165 = bitcast i8* %t164 to [1 x i64]*
-  %t166 = getelementptr [1 x i64], [1 x i64]* %t165, i64 0, i64 0
-  store i64 4, i64* %t166
-  %t167 = ptrtoint [1 x i64]* %t165 to i64
-  store i64 %t167, i64* %t154
+  %t166 = call i8* @__sf_malloc(i64 8)
+  %t167 = bitcast i8* %t166 to [1 x i64]*
+  %t168 = getelementptr [1 x i64], [1 x i64]* %t167, i64 0, i64 0
+  store i64 4, i64* %t168
+  %t169 = ptrtoint [1 x i64]* %t167 to i64
+  store i64 %t169, i64* %t156
   br label %match.end4073
 match.end4073:
-  %t168 = load i64, i64* %t154
-  store i64 %t168, i64* %wc
-  %t169 = load i64, i64* %stmt
-  %t170 = alloca i64
-  %t172 = inttoptr i64 %t169 to i64*
-  %t173 = load i64, i64* %t172
-  %t171 = trunc i64 %t173 to i8
-  switch i8 %t171, label %match.arm4078 [ i8 7, label %match.arm4077 ]
+  %t170 = load i64, i64* %t156
+  store i64 %t170, i64* %wc
+  %t171 = load i64, i64* %stmt
+  %t172 = alloca i64
+  %t174 = inttoptr i64 %t171 to i64*
+  %t175 = load i64, i64* %t174
+  %t173 = trunc i64 %t175 to i8
+  switch i8 %t173, label %match.arm4078 [ i8 7, label %match.arm4077 ]
 match.arm4077:
-  %t174 = inttoptr i64 %t169 to [3 x i64]*
-  %t175 = getelementptr [3 x i64], [3 x i64]* %t174, i64 0, i64 1
-  %t176 = load i64, i64* %t175
-  store i64 %t176, i64* %c
-  %t177 = getelementptr [3 x i64], [3 x i64]* %t174, i64 0, i64 2
+  %t176 = inttoptr i64 %t171 to [3 x i64]*
+  %t177 = getelementptr [3 x i64], [3 x i64]* %t176, i64 0, i64 1
   %t178 = load i64, i64* %t177
-  store i64 %t178, i64* %b
-  %t179 = load i64, i64* %b
-  store i64 %t179, i64* %t170
+  store i64 %t178, i64* %c
+  %t179 = getelementptr [3 x i64], [3 x i64]* %t176, i64 0, i64 2
+  %t180 = load i64, i64* %t179
+  store i64 %t180, i64* %b
+  %t181 = load i64, i64* %b
+  store i64 %t181, i64* %t172
   br label %match.end4076
 match.arm4078:
-  %t180 = call i64 @__list_new()
-  store i64 %t180, i64* %t170
+  %t182 = call i64 @__list_new()
+  store i64 %t182, i64* %t172
   br label %match.end4076
 match.end4076:
-  %t181 = load i64, i64* %t170
-  store i64 %t181, i64* %wb
-  %t182 = load i64, i64* %self
-  %t183 = load i64, i64* %wc
-  %t184 = load i64, i64* %out
-  %t185 = load i64, i64* %in_lambda
-  %t186 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t182, i64 %t183, i64 %t184, i64 %t185)
-  %t187 = load i64, i64* %self
-  %t188 = load i64, i64* %wb
-  %t189 = load i64, i64* %out
-  %t190 = load i64, i64* %in_lambda
-  %t191 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t187, i64 %t188, i64 %t189, i64 %t190)
+  %t183 = load i64, i64* %t172
+  store i64 %t183, i64* %wb
+  %t184 = load i64, i64* %self
+  %t185 = load i64, i64* %wc
+  %t186 = load i64, i64* %out
+  %t187 = load i64, i64* %in_lambda
+  %t188 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t184, i64 %t185, i64 %t186, i64 %t187)
+  %t189 = load i64, i64* %self
+  %t190 = load i64, i64* %wb
+  %t191 = load i64, i64* %out
+  %t192 = load i64, i64* %in_lambda
+  %t193 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t189, i64 %t190, i64 %t191, i64 %t192)
   br label %endif4044
 else4072:
-  %t192 = load i64, i64* %sk
-  %t193 = getelementptr [6 x i8], [6 x i8]* @.str.2613, i64 0, i64 0
-  %t194 = ptrtoint i8* %t193 to i64
-  %t195 = call i64 @__string_eq(i64 %t192, i64 %t194)
-  %t196 = trunc i64 %t195 to i1
-  br i1 %t196, label %then4079, label %else4080
+  %t194 = load i64, i64* %sk
+  %t195 = getelementptr [6 x i8], [6 x i8]* @.str.2613, i64 0, i64 0
+  %t196 = ptrtoint i8* %t195 to i64
+  %t197 = call i64 @__string_eq(i64 %t194, i64 %t196)
+  %t198 = trunc i64 %t197 to i1
+  br i1 %t198, label %then4079, label %else4080
 then4079:
-  %t197 = load i64, i64* %stmt
-  %t198 = alloca i64
-  %t200 = inttoptr i64 %t197 to i64*
-  %t201 = load i64, i64* %t200
-  %t199 = trunc i64 %t201 to i8
-  switch i8 %t199, label %match.arm4083 [ i8 8, label %match.arm4082 ]
+  %t199 = load i64, i64* %stmt
+  %t200 = alloca i64
+  %t202 = inttoptr i64 %t199 to i64*
+  %t203 = load i64, i64* %t202
+  %t201 = trunc i64 %t203 to i8
+  switch i8 %t201, label %match.arm4083 [ i8 8, label %match.arm4082 ]
 match.arm4082:
-  %t202 = inttoptr i64 %t197 to [2 x i64]*
-  %t203 = getelementptr [2 x i64], [2 x i64]* %t202, i64 0, i64 1
-  %t204 = load i64, i64* %t203
-  store i64 %t204, i64* %s
-  %t205 = load i64, i64* %s
-  store i64 %t205, i64* %t198
+  %t204 = inttoptr i64 %t199 to [2 x i64]*
+  %t205 = getelementptr [2 x i64], [2 x i64]* %t204, i64 0, i64 1
+  %t206 = load i64, i64* %t205
+  store i64 %t206, i64* %s
+  %t207 = load i64, i64* %s
+  store i64 %t207, i64* %t200
   br label %match.end4081
 match.arm4083:
-  %t206 = call i64 @__list_new()
-  store i64 %t206, i64* %t198
+  %t208 = call i64 @__list_new()
+  store i64 %t208, i64* %t200
   br label %match.end4081
 match.end4081:
-  %t207 = load i64, i64* %t198
-  store i64 %t207, i64* %bs
-  %t208 = load i64, i64* %self
-  %t209 = load i64, i64* %bs
-  %t210 = load i64, i64* %out
-  %t211 = load i64, i64* %in_lambda
-  %t212 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t208, i64 %t209, i64 %t210, i64 %t211)
+  %t209 = load i64, i64* %t200
+  store i64 %t209, i64* %bs
+  %t210 = load i64, i64* %self
+  %t211 = load i64, i64* %bs
+  %t212 = load i64, i64* %out
+  %t213 = load i64, i64* %in_lambda
+  %t214 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t210, i64 %t211, i64 %t212, i64 %t213)
   br label %endif4044
 else4080:
-  %t213 = load i64, i64* %sk
-  %t214 = getelementptr [4 x i8], [4 x i8]* @.str.2614, i64 0, i64 0
-  %t215 = ptrtoint i8* %t214 to i64
-  %t216 = call i64 @__string_eq(i64 %t213, i64 %t215)
-  %t217 = trunc i64 %t216 to i1
-  br i1 %t217, label %then4084, label %else4085
+  %t215 = load i64, i64* %sk
+  %t216 = getelementptr [4 x i8], [4 x i8]* @.str.2614, i64 0, i64 0
+  %t217 = ptrtoint i8* %t216 to i64
+  %t218 = call i64 @__string_eq(i64 %t215, i64 %t217)
+  %t219 = trunc i64 %t218 to i1
+  br i1 %t219, label %then4084, label %else4085
 then4084:
-  %t218 = load i64, i64* %stmt
-  %t219 = alloca i64
-  %t221 = inttoptr i64 %t218 to i64*
-  %t222 = load i64, i64* %t221
-  %t220 = trunc i64 %t222 to i8
-  switch i8 %t220, label %match.arm4088 [ i8 11, label %match.arm4087 ]
+  %t220 = load i64, i64* %stmt
+  %t221 = alloca i64
+  %t223 = inttoptr i64 %t220 to i64*
+  %t224 = load i64, i64* %t223
+  %t222 = trunc i64 %t224 to i8
+  switch i8 %t222, label %match.arm4088 [ i8 11, label %match.arm4087 ]
 match.arm4087:
-  %t223 = inttoptr i64 %t218 to [5 x i64]*
-  %t224 = getelementptr [5 x i64], [5 x i64]* %t223, i64 0, i64 1
-  %t225 = load i64, i64* %t224
-  store i64 %t225, i64* %t
-  %t226 = getelementptr [5 x i64], [5 x i64]* %t223, i64 0, i64 2
+  %t225 = inttoptr i64 %t220 to [5 x i64]*
+  %t226 = getelementptr [5 x i64], [5 x i64]* %t225, i64 0, i64 1
   %t227 = load i64, i64* %t226
-  store i64 %t227, i64* %cn
-  %t228 = getelementptr [5 x i64], [5 x i64]* %t223, i64 0, i64 3
+  store i64 %t227, i64* %t
+  %t228 = getelementptr [5 x i64], [5 x i64]* %t225, i64 0, i64 2
   %t229 = load i64, i64* %t228
-  store i64 %t229, i64* %cb
-  %t230 = getelementptr [5 x i64], [5 x i64]* %t223, i64 0, i64 4
+  store i64 %t229, i64* %cn
+  %t230 = getelementptr [5 x i64], [5 x i64]* %t225, i64 0, i64 3
   %t231 = load i64, i64* %t230
-  store i64 %t231, i64* %fb
-  %t232 = load i64, i64* %t
-  store i64 %t232, i64* %t219
+  store i64 %t231, i64* %cb
+  %t232 = getelementptr [5 x i64], [5 x i64]* %t225, i64 0, i64 4
+  %t233 = load i64, i64* %t232
+  store i64 %t233, i64* %fb
+  %t234 = load i64, i64* %t
+  store i64 %t234, i64* %t221
   br label %match.end4086
 match.arm4088:
-  %t233 = call i64 @__list_new()
-  store i64 %t233, i64* %t219
+  %t235 = call i64 @__list_new()
+  store i64 %t235, i64* %t221
   br label %match.end4086
 match.end4086:
-  %t234 = load i64, i64* %t219
-  store i64 %t234, i64* %tb
-  %t235 = load i64, i64* %stmt
-  %t236 = alloca i64
-  %t238 = inttoptr i64 %t235 to i64*
-  %t239 = load i64, i64* %t238
-  %t237 = trunc i64 %t239 to i8
-  switch i8 %t237, label %match.arm4091 [ i8 11, label %match.arm4090 ]
+  %t236 = load i64, i64* %t221
+  store i64 %t236, i64* %tb
+  %t237 = load i64, i64* %stmt
+  %t238 = alloca i64
+  %t240 = inttoptr i64 %t237 to i64*
+  %t241 = load i64, i64* %t240
+  %t239 = trunc i64 %t241 to i8
+  switch i8 %t239, label %match.arm4091 [ i8 11, label %match.arm4090 ]
 match.arm4090:
-  %t240 = inttoptr i64 %t235 to [5 x i64]*
-  %t241 = getelementptr [5 x i64], [5 x i64]* %t240, i64 0, i64 1
-  %t242 = load i64, i64* %t241
-  store i64 %t242, i64* %t
-  %t243 = getelementptr [5 x i64], [5 x i64]* %t240, i64 0, i64 2
+  %t242 = inttoptr i64 %t237 to [5 x i64]*
+  %t243 = getelementptr [5 x i64], [5 x i64]* %t242, i64 0, i64 1
   %t244 = load i64, i64* %t243
-  store i64 %t244, i64* %cn
-  %t245 = getelementptr [5 x i64], [5 x i64]* %t240, i64 0, i64 3
+  store i64 %t244, i64* %t
+  %t245 = getelementptr [5 x i64], [5 x i64]* %t242, i64 0, i64 2
   %t246 = load i64, i64* %t245
-  store i64 %t246, i64* %cb
-  %t247 = getelementptr [5 x i64], [5 x i64]* %t240, i64 0, i64 4
+  store i64 %t246, i64* %cn
+  %t247 = getelementptr [5 x i64], [5 x i64]* %t242, i64 0, i64 3
   %t248 = load i64, i64* %t247
-  store i64 %t248, i64* %fb
-  %t249 = load i64, i64* %cb
-  store i64 %t249, i64* %t236
+  store i64 %t248, i64* %cb
+  %t249 = getelementptr [5 x i64], [5 x i64]* %t242, i64 0, i64 4
+  %t250 = load i64, i64* %t249
+  store i64 %t250, i64* %fb
+  %t251 = load i64, i64* %cb
+  store i64 %t251, i64* %t238
   br label %match.end4089
 match.arm4091:
-  %t250 = call i64 @__list_new()
-  store i64 %t250, i64* %t236
+  %t252 = call i64 @__list_new()
+  store i64 %t252, i64* %t238
   br label %match.end4089
 match.end4089:
-  %t251 = load i64, i64* %t236
-  store i64 %t251, i64* %cb2
-  %t252 = load i64, i64* %stmt
-  %t253 = alloca i64
-  %t255 = inttoptr i64 %t252 to i64*
-  %t256 = load i64, i64* %t255
-  %t254 = trunc i64 %t256 to i8
-  switch i8 %t254, label %match.arm4094 [ i8 11, label %match.arm4093 ]
+  %t253 = load i64, i64* %t238
+  store i64 %t253, i64* %cb2
+  %t254 = load i64, i64* %stmt
+  %t255 = alloca i64
+  %t257 = inttoptr i64 %t254 to i64*
+  %t258 = load i64, i64* %t257
+  %t256 = trunc i64 %t258 to i8
+  switch i8 %t256, label %match.arm4094 [ i8 11, label %match.arm4093 ]
 match.arm4093:
-  %t257 = inttoptr i64 %t252 to [5 x i64]*
-  %t258 = getelementptr [5 x i64], [5 x i64]* %t257, i64 0, i64 1
-  %t259 = load i64, i64* %t258
-  store i64 %t259, i64* %t
-  %t260 = getelementptr [5 x i64], [5 x i64]* %t257, i64 0, i64 2
+  %t259 = inttoptr i64 %t254 to [5 x i64]*
+  %t260 = getelementptr [5 x i64], [5 x i64]* %t259, i64 0, i64 1
   %t261 = load i64, i64* %t260
-  store i64 %t261, i64* %cn
-  %t262 = getelementptr [5 x i64], [5 x i64]* %t257, i64 0, i64 3
+  store i64 %t261, i64* %t
+  %t262 = getelementptr [5 x i64], [5 x i64]* %t259, i64 0, i64 2
   %t263 = load i64, i64* %t262
-  store i64 %t263, i64* %cb
-  %t264 = getelementptr [5 x i64], [5 x i64]* %t257, i64 0, i64 4
+  store i64 %t263, i64* %cn
+  %t264 = getelementptr [5 x i64], [5 x i64]* %t259, i64 0, i64 3
   %t265 = load i64, i64* %t264
-  store i64 %t265, i64* %fb
-  %t266 = load i64, i64* %fb
-  store i64 %t266, i64* %t253
+  store i64 %t265, i64* %cb
+  %t266 = getelementptr [5 x i64], [5 x i64]* %t259, i64 0, i64 4
+  %t267 = load i64, i64* %t266
+  store i64 %t267, i64* %fb
+  %t268 = load i64, i64* %fb
+  store i64 %t268, i64* %t255
   br label %match.end4092
 match.arm4094:
-  %t267 = call i64 @__list_new()
-  store i64 %t267, i64* %t253
+  %t269 = call i64 @__list_new()
+  store i64 %t269, i64* %t255
   br label %match.end4092
 match.end4092:
-  %t268 = load i64, i64* %t253
-  store i64 %t268, i64* %fb2
-  %t269 = load i64, i64* %self
-  %t270 = load i64, i64* %tb
-  %t271 = load i64, i64* %out
-  %t272 = load i64, i64* %in_lambda
-  %t273 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t269, i64 %t270, i64 %t271, i64 %t272)
-  %t274 = load i64, i64* %self
-  %t275 = load i64, i64* %cb2
-  %t276 = load i64, i64* %out
-  %t277 = load i64, i64* %in_lambda
-  %t278 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t274, i64 %t275, i64 %t276, i64 %t277)
-  %t279 = load i64, i64* %self
-  %t280 = load i64, i64* %fb2
-  %t281 = load i64, i64* %out
-  %t282 = load i64, i64* %in_lambda
-  %t283 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t279, i64 %t280, i64 %t281, i64 %t282)
+  %t270 = load i64, i64* %t255
+  store i64 %t270, i64* %fb2
+  %t271 = load i64, i64* %self
+  %t272 = load i64, i64* %tb
+  %t273 = load i64, i64* %out
+  %t274 = load i64, i64* %in_lambda
+  %t275 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t271, i64 %t272, i64 %t273, i64 %t274)
+  %t276 = load i64, i64* %self
+  %t277 = load i64, i64* %cb2
+  %t278 = load i64, i64* %out
+  %t279 = load i64, i64* %in_lambda
+  %t280 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t276, i64 %t277, i64 %t278, i64 %t279)
+  %t281 = load i64, i64* %self
+  %t282 = load i64, i64* %fb2
+  %t283 = load i64, i64* %out
+  %t284 = load i64, i64* %in_lambda
+  %t285 = call i64 @Codegen__collect_lambda_assigned_stmts(i64 %t281, i64 %t282, i64 %t283, i64 %t284)
   br label %endif4044
 else4085:
-  %t284 = load i64, i64* %sk
-  %t285 = getelementptr [6 x i8], [6 x i8]* @.str.2615, i64 0, i64 0
-  %t286 = ptrtoint i8* %t285 to i64
-  %t287 = call i64 @__string_eq(i64 %t284, i64 %t286)
-  %t288 = trunc i64 %t287 to i1
-  br i1 %t288, label %then4095, label %else4096
+  %t286 = load i64, i64* %sk
+  %t287 = getelementptr [6 x i8], [6 x i8]* @.str.2615, i64 0, i64 0
+  %t288 = ptrtoint i8* %t287 to i64
+  %t289 = call i64 @__string_eq(i64 %t286, i64 %t288)
+  %t290 = trunc i64 %t289 to i1
+  br i1 %t290, label %then4095, label %else4096
 then4095:
-  %t289 = load i64, i64* %stmt
-  %t290 = alloca i64
-  %t292 = inttoptr i64 %t289 to i64*
-  %t293 = load i64, i64* %t292
-  %t291 = trunc i64 %t293 to i8
-  switch i8 %t291, label %match.arm4099 [ i8 12, label %match.arm4098 ]
+  %t291 = load i64, i64* %stmt
+  %t292 = alloca i64
+  %t294 = inttoptr i64 %t291 to i64*
+  %t295 = load i64, i64* %t294
+  %t293 = trunc i64 %t295 to i8
+  switch i8 %t293, label %match.arm4099 [ i8 12, label %match.arm4098 ]
 match.arm4098:
-  %t294 = inttoptr i64 %t289 to [2 x i64]*
-  %t295 = getelementptr [2 x i64], [2 x i64]* %t294, i64 0, i64 1
-  %t296 = load i64, i64* %t295
-  store i64 %t296, i64* %v
-  %t297 = load i64, i64* %v
-  store i64 %t297, i64* %t290
+  %t296 = inttoptr i64 %t291 to [2 x i64]*
+  %t297 = getelementptr [2 x i64], [2 x i64]* %t296, i64 0, i64 1
+  %t298 = load i64, i64* %t297
+  store i64 %t298, i64* %v
+  %t299 = load i64, i64* %v
+  store i64 %t299, i64* %t292
   br label %match.end4097
 match.arm4099:
-  %t298 = call i8* @__sf_malloc(i64 8)
-  %t299 = bitcast i8* %t298 to [1 x i64]*
-  %t300 = getelementptr [1 x i64], [1 x i64]* %t299, i64 0, i64 0
-  store i64 4, i64* %t300
-  %t301 = ptrtoint [1 x i64]* %t299 to i64
-  store i64 %t301, i64* %t290
+  %t300 = call i8* @__sf_malloc(i64 8)
+  %t301 = bitcast i8* %t300 to [1 x i64]*
+  %t302 = getelementptr [1 x i64], [1 x i64]* %t301, i64 0, i64 0
+  store i64 4, i64* %t302
+  %t303 = ptrtoint [1 x i64]* %t301 to i64
+  store i64 %t303, i64* %t292
   br label %match.end4097
 match.end4097:
-  %t302 = load i64, i64* %t290
-  store i64 %t302, i64* %te
-  %t303 = load i64, i64* %self
-  %t304 = load i64, i64* %te
-  %t305 = load i64, i64* %out
-  %t306 = load i64, i64* %in_lambda
-  %t307 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t303, i64 %t304, i64 %t305, i64 %t306)
+  %t304 = load i64, i64* %t292
+  store i64 %t304, i64* %te
+  %t305 = load i64, i64* %self
+  %t306 = load i64, i64* %te
+  %t307 = load i64, i64* %out
+  %t308 = load i64, i64* %in_lambda
+  %t309 = call i64 @Codegen__collect_lambda_assigned_expr(i64 %t305, i64 %t306, i64 %t307, i64 %t308)
   br label %endif4044
 else4096:
   br label %endif4044
