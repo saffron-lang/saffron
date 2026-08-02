@@ -416,7 +416,7 @@
         // Detect yield [reason, arg] pattern for sleep/IO
         var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
         if (is_list == "yes") {
-            var elems: List<AST.Expr> = match (value) { ListLit(e) => e }
+            var elems: List<AST.Expr> = match (value) { ListLit(e) => e    _ => [] }
             if (elems.length() >= 1) {
                 var reason: String = this.gen_arg_value(elems[0])
                 this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
@@ -1251,11 +1251,16 @@
     }
 
     fun flatten_string_expr(expr: AST.Expr): String {
-        var kind: Any = match (expr) {
+        return match (expr) {
             StringLit(s) => s
             Binary(l, o, r) => this.flatten_string_expr(l) + this.flatten_string_expr(r)
+            // Every caller guards with is_string_expr, which admits only those
+            // two shapes, so this arm is unreachable. It still has to be written:
+            // a missing arm yields an indeterminate value rather than a
+            // diagnostic (BUGS #76), so a future caller that forgot the guard
+            // would silently emit a garbage string constant instead of "".
+            _ => ""
         }
-        return kind
     }
 
     fun gen_func_ref(fn_name: String): String {
@@ -2893,65 +2898,28 @@
     }
 
     fun contains_string_lit(expr: AST.Expr): Bool {
-        var kind: Any = match (expr) {
-            StringLit(s) => "yes"
-            Binary(l, o, r) => {
-                if (this.contains_string_lit(l) or this.contains_string_lit(r)) { "yes" } else { "no" }
-            }
-            IntLit(v) => "no"
-            FloatLit(v) => "no"
-            BoolLit(v) => "no"
-            Variable(n) => "no"
-            Ref(rk, rn, rs) => "no"
-            Unary(o, r) => "no"
-            Call(c, a) => "no"
-            Assign(n, v) => "no"
-            Logical(l, o, r) => "no"
-            MemberAccess(o, f) => "no"
-            NilLit => "no"
-            Match(s, a) => "no"
-            EnumConstruct(e, v, a) => "no"
-            Lambda(p, r, b) => "no"
-            GetField(o, f) => "no"
-            SetField(o, f, v) => "no"
-            This => "no"
-            BlockExpr(s, v) => "no"
-            IsCheck(val, t) => "no"
-            IfExpr(c, tb, tv, eb, ev) => "no"
-            TryExpr(tb, tv, cn, cb, cv) => "no"
-            Yield(v) => "no"
-            TupleLit(e) => "no"
+        // Only these two shapes can hold a literal that reaches the concat path;
+        // everything else is a runtime value. The 26 arms spelled out one per
+        // variant, all returning "no", are the `_` arm — and being hand-written
+        // they went stale: IndexGet, IndexSet, MethodCall and MapLit were never
+        // added, so those four fell through to an indeterminate value instead of
+        // false (BUGS #76).
+        return match (expr) {
+            StringLit(s) => true
+            Binary(l, o, r) => this.contains_string_lit(l) or this.contains_string_lit(r)
+            _ => false
         }
-        return kind == "yes"
     }
 
     fun is_string_variable(expr: AST.Expr): Bool {
-        var name: Any = match (expr) {
+        // Same story as contains_string_lit: only a name-shaped expression can be
+        // looked up in string_vars, and the 24 hand-written `=> ""` arms had
+        // likewise gone stale (MapLit, IndexGet, IndexSet, MethodCall missing).
+        var name: String = match (expr) {
             Variable(n) => n
             Ref(rk, rn, rs) => rn
             GetField(o, f) => f
-            IntLit(v) => ""
-            FloatLit(v) => ""
-            BoolLit(v) => ""
-            StringLit(s) => ""
-            NilLit => ""
-            Binary(l, o, r) => ""
-            Unary(o, r) => ""
-            Call(c, a) => ""
-            Assign(n, v) => ""
-            Logical(l, o, r) => ""
-            MemberAccess(o, f) => ""
-            Match(s, a) => ""
-            EnumConstruct(e, v, a) => ""
-            Lambda(p, r, b) => ""
-            SetField(o, f, v) => ""
-            This => ""
-            BlockExpr(s, v) => ""
-            IsCheck(val, t) => ""
-            IfExpr(c, tb, tv, eb, ev) => ""
-            TryExpr(tb, tv, cn, cb, cv) => ""
-            Yield(v) => ""
-            TupleLit(e) => ""
+            _ => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -2971,42 +2939,17 @@
     }
 
     fun is_string_expr(expr: AST.Expr): Bool {
-        var kind: Any = match (expr) {
-            StringLit(s) => "string"
-            Binary(l, o, r) => {
-                if (o == "+") {
-                    if (this.is_string_expr(l) and this.is_string_expr(r)) { "string" } else { "binary" }
-                } else { "binary" }
-            }
-            IntLit(v) => "int"
-            FloatLit(v) => "float"
-            BoolLit(v) => "bool"
-            Variable(n) => "var"
-            Ref(rk, rn, rs) => "var"
-            Unary(o, r) => "unary"
-            Call(c, a) => "call"
-            Assign(n, v) => "assign"
-            Logical(l, o, r) => "logical"
-            MemberAccess(o, f) => "member"
-            NilLit => "nil"
-            Match(s, a) => "match"
-            EnumConstruct(e, v, a) => "enum"
-            Lambda(p, r, b) => "lambda"
-            GetField(o, f) => "get_field"
-            SetField(o, f, v) => "set_field"
-            This => "this"
-            ListLit(e) => "list"
-            IndexGet(o, i) => "index"
-            IndexSet(o, i, v) => "index"
-            MethodCall(o, m, a) => "method"
-            BlockExpr(s, v) => "block"
-            IsCheck(val, t) => "is"
-            IfExpr(c, tb, tv, eb, ev) => "other"
-            TryExpr(tb, tv, cn, cb, cv) => "other"
-            Yield(v) => "other"
-            TupleLit(e) => "other"
+        // True only for a compile-time-known string: a literal, or a `+` chain of
+        // them. flatten_string_expr relies on exactly this: whatever answers true
+        // here it must be able to fold to a constant. The 27 remaining arms each
+        // named their variant and then all failed the `== "string"` test below, so
+        // they were a `_ => false` written the long way — and MapLit had never
+        // been added to the list, leaving it indeterminate (BUGS #76).
+        return match (expr) {
+            StringLit(s) => true
+            Binary(l, o, r) => o == "+" and this.is_string_expr(l) and this.is_string_expr(r)
+            _ => false
         }
-        return kind == "string"
     }
 
     fun get_format_ptr(fmt: String): String {

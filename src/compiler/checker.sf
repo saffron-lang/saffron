@@ -176,6 +176,9 @@ class NullChecker {
     var class_abstract_methods: Map<String, String>
     var receiver_params: Map<String, String>
     var actor_classes: Map<String, Bool>
+    // Bare enum names declared by two different modules with different variant
+    // lists — see register_enum.
+    var ambiguous_enums: List<String>
 
     fun init() {
         this.env = TypeEnv()
@@ -189,6 +192,7 @@ class NullChecker {
         this.class_abstract_methods = {}
         this.receiver_params = {}
         this.actor_classes = {}
+        this.ambiguous_enums = []
     }
 
     fun error(msg: String) {
@@ -856,6 +860,7 @@ class NullChecker {
             TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -872,7 +877,37 @@ class NullChecker {
             }
             i = i + 1
         }
-        this.env.enum_variants.set(name, variant_names.join(","))
+        var joined: String = variant_names.join(",")
+        // enum_variants is keyed by the *bare* declared name, and the checker is
+        // handed a flat list of every imported declaration with no module
+        // boundaries and no aliases (check_errors_with_imports), so two modules
+        // declaring the same enum name are indistinguishable here. The compiler
+        // is its own witness: `enum Type` exists in both src/compiler/ast.sf and
+        // src/lib/llvm/types.sf, and whichever registered last used to silently
+        // win — reporting `match` on an AST.Type as missing Void/I1/I8/... The
+        // honest answer with the information available is that the name is
+        // ambiguous, so exhaustiveness and payload-binding inference are both
+        // skipped for it rather than answered from the wrong declaration.
+        if (this.env.enum_variants.has(name)) {
+            // Bound to a String first: `.get()` is typed `String|Nil`, so comparing
+            // its result directly emits __any_ne, which base.ll (the bootstrap
+            // base) does not define — the link of gen3 fails with an undefined
+            // symbol rather than any compile-time complaint.
+            var prior: String = this.env.enum_variants.get(name)
+            if (prior != joined) {
+                if (!this.ambiguous_enums.contains(name)) {
+                    this.ambiguous_enums.push(name)
+                }
+                return
+            }
+        }
+        this.env.enum_variants.set(name, joined)
+    }
+
+    // True when `enum_type` names more than one distinct declaration, so nothing
+    // keyed on its bare name can be trusted. See register_enum.
+    fun is_ambiguous_enum(enum_type: String): Bool {
+        return this.ambiguous_enums.contains(this.resolve_enum_key_name(enum_type))
     }
 
 
@@ -1062,6 +1097,7 @@ class NullChecker {
             LetPattern(pattern, value) => {
                 this.infer_expr(value)
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -1307,6 +1343,25 @@ class NullChecker {
             SetField(obj, field, value) => this.infer_type(value)
             This => AST.Type.ClassType(this.current_class)
             ListLit(elements) => AST.Type.GenericType("List", [AST.Type.AnyType])
+            // A tuple is a List at runtime (expr_body.sf gen_tuple), typed
+            // `Tuple<T0,...>` by codegen so `._0` can find each element's type.
+            // Mirror the element types here rather than collapsing to Any.
+            TupleLit(elements) => {
+                var tuple_elem_types: List<AST.Type> = []
+                var tei: Float = 0
+                while (tei < elements.length()) {
+                    tuple_elem_types.push(this.infer_type(elements[tei]))
+                    tei = tei + 1
+                }
+                AST.Type.GenericType("Tuple", tuple_elem_types)
+            }
+            // `yield` resumes with whatever the scheduler stores, which the
+            // checker cannot see. Any is the honest answer; before this arm
+            // existed the result was an indeterminate type (BUGS #76).
+            Yield(value) => {
+                this.infer_expr(value)
+                AST.Type.AnyType
+            }
             IndexGet(obj, index) => {
                 var list_type: String = this.infer_expr(obj)
                 this.infer_expr(index)
@@ -1407,33 +1462,15 @@ class NullChecker {
         // Known module members
         if (obj_type == "Any") {
             // Module-qualified access: IO.println, OS.args, etc.
+            // Only a bare name can be a module or enum name. The 24 arms that
+            // used to be spelled out one per variant, all returning "", are the
+            // `_` arm — and being written by hand they went stale: IfExpr,
+            // TryExpr, Yield and TupleLit were never added, so those four fell
+            // through to an indeterminate value instead of "" (BUGS #76).
             var obj_name: String = match (obj) {
                 Variable(n) => n
                 Ref(rk, rn, rs) => rn
-                IntLit(v) => ""
-                FloatLit(v) => ""
-                BoolLit(v) => ""
-                StringLit(s) => ""
-                NilLit => ""
-                Binary(l, o, r) => ""
-                Unary(o, r) => ""
-                Call(c, a) => ""
-                Assign(n, v) => ""
-                Logical(l, o, r) => ""
-                MemberAccess(o, f) => ""
-                Match(s, a) => ""
-                EnumConstruct(e, v, a) => ""
-                Lambda(p, r, b) => ""
-                GetField(o, f) => ""
-                SetField(o, f, v) => ""
-                This => ""
-                ListLit(e) => ""
-                IndexGet(o, i) => ""
-                IndexSet(o, i, v) => ""
-                MethodCall(o, m, a) => ""
-                MapLit => ""
-                BlockExpr(s, v) => ""
-                IsCheck(v, t) => ""
+                _ => ""
             }
             // Enum variant access (Color.Red, Option.Some, etc.)
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
@@ -1738,6 +1775,11 @@ class NullChecker {
             Variable(n) => n
             Ref(rk, rn, rs) => rn
             MemberAccess(o, f) => f
+            // Anything else in callee position is an indirect call — a lambda
+            // value, a field holding a function, an element of a list of
+            // functions. There is no name to look up, and "" is what every
+            // caller below already treats as "unknown callee".
+            _ => ""
         }
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
         var di: Float = 0
@@ -1988,6 +2030,42 @@ class NullChecker {
 
     // --- Match type inference + exhaustiveness ---
 
+    // True when evaluating `expr` cannot fall through to produce a value, because
+    // control leaves the enclosing function first. Only a block whose statements
+    // diverge can do that in expression position: `Struct(n, f) => { ...; return
+    // "%${n}" }` is parsed as a BlockExpr with a NilLit value slot, and treating
+    // that Nil as the arm's type is what made a total function look partial.
+    fun expr_diverges(expr: AST.Expr): Bool {
+        return match (expr) {
+            BlockExpr(stmts, value) => this.stmts_diverge(stmts)
+            _ => false
+        }
+    }
+
+    // True when this statement list always leaves the function. Conservative on
+    // purpose: a false answer only loses the refinement above, while a wrong true
+    // would drop a real arm type out of the union.
+    fun stmts_diverge(stmts: List<AST.Stmt>): Bool {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            var diverges: Bool = match (stmts[i]) {
+                Return(v) => true
+                Throw(v) => true
+                // Both branches must leave for the `if` itself to leave. An empty
+                // else_branch is a missing else, which falls through.
+                If(c, tb, eb) => {
+                    if (eb.length() == 0) { false } else { this.stmts_diverge(tb) and this.stmts_diverge(eb) }
+                }
+                Block(s) => this.stmts_diverge(s)
+                ExprStmt(e) => this.expr_diverges(e)
+                _ => false
+            }
+            if (diverges) return true
+            i = i + 1
+        }
+        return false
+    }
+
     fun infer_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
         var subj_type: String = this.infer_expr(subject)
 
@@ -1997,6 +2075,7 @@ class NullChecker {
 
         // Infer each arm body type; unify across arms
         var result_type: String = "Any"
+        var have_result: Bool = false
         var i: Float = 0
         while (i < arms.length()) {
             var arm: AST.MatchArm = arms[i]
@@ -2016,6 +2095,12 @@ class NullChecker {
 
             // Push scope for arm bindings
             this.env.push_scope()
+            // A NamedWildcard binds the whole subject under its own name, so it
+            // gets the subject's type rather than a payload field's.
+            var named_wc: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+            if (named_wc.length() > 0) {
+                this.env.define_var(named_wc, this.parse_type_node(subj_type))
+            }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
             if (subj_type != "Any") {
                 this.check_pattern_arity(subj_type, variant_name, bindings, "match arm")
@@ -2032,11 +2117,21 @@ class NullChecker {
             this.check_unused_in_scope()
             this.env.pop_scope()
 
-            if (i == 0) {
-                result_type = arm_type
-            } else {
-                if (arm_type != result_type and arm_type != "Any" and result_type != "Any") {
-                    result_type = result_type + "|" + arm_type
+            // An arm that diverges contributes nothing to the match's type: the
+            // `return` leaves the enclosing function, so control never reaches
+            // the match's value. The parser gives such a block a NilLit value
+            // slot, so unifying it in produced a spurious `Nil` member — which
+            // is why `format_type` in src/lib/llvm/types.sf, whose Struct and
+            // FnType arms both end in `return`, was reported as returning
+            // `String|Nil` from a function expecting `String`.
+            if (!this.expr_diverges(body)) {
+                if (!have_result) {
+                    result_type = arm_type
+                    have_result = true
+                } else {
+                    if (arm_type != result_type and arm_type != "Any" and result_type != "Any") {
+                        result_type = result_type + "|" + arm_type
+                    }
                 }
             }
             i = i + 1
@@ -2072,6 +2167,9 @@ class NullChecker {
     // The declared field list of a variant, one "name:Type" per entry, or an
     // empty list if the variant is unknown or carries no payload.
     fun get_variant_fields(enum_type: String, variant: String): List<String> {
+        // Ambiguous name: the field list on file may be the other module's, and
+        // typing a binding from it is worse than Any. See register_enum.
+        if (this.is_ambiguous_enum(enum_type)) return []
         var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
         if (!this.env.enum_fields.has(key)) return []
         var fields_str: String = this.env.enum_fields.get(key)
@@ -2104,6 +2202,9 @@ class NullChecker {
         // trust for the bootstrap.
         if (variant == "_" or variant.length() == 0) { return }
         if (variant.starts_with("__strpat:")) { return }
+        // Ambiguous name — the declared arity on file may belong to the other
+        // module's enum, so any mismatch reported here would be invented.
+        if (this.is_ambiguous_enum(enum_type)) { return }
         var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
         var declared: Float = 0
         if (this.env.enum_fields.has(key)) {
@@ -2119,6 +2220,10 @@ class NullChecker {
     }
 
     fun check_exhaustiveness(enum_type: String, matched: List<String>) {
+        // Two modules declaring this name means the variant list on file may
+        // belong to the other one — reporting from it invents missing variants
+        // that the matched enum never had. See register_enum.
+        if (this.is_ambiguous_enum(enum_type)) return nil
         // Try both the qualified spelling and the declared (unqualified) one.
         var lookup_name: String = this.resolve_enum_key_name(enum_type)
         if (!this.env.enum_variants.has(lookup_name)) return nil
@@ -2236,9 +2341,9 @@ class NullChecker {
     fun desugar_receiver_closure(args: List<AST.Expr>, arg_idx: Float, receiver_class: String) {
         // Transform a Lambda at args[arg_idx] to add 'self' param and rewrite body
         var lambda: AST.Expr = args[arg_idx]
-        var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p }
-        var ret_type: AST.Type = match (lambda) { Lambda(p, r, b) => r }
-        var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b }
+        var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p    _ => [] }
+        var ret_type: AST.Type = match (lambda) { Lambda(p, r, b) => r    _ => AST.Type.AnyType }
+        var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b    _ => [] }
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
         if (params.length() > 0) {
@@ -2357,8 +2462,8 @@ class NullChecker {
     }
 
     fun rewrite_recv_assign(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var name: String = match (expr) { Assign(n, v) => n }
-        var value: AST.Expr = match (expr) { Assign(n, v) => v }
+        var name: String = match (expr) { Assign(n, v) => n    _ => "" }
+        var value: AST.Expr = match (expr) { Assign(n, v) => v    _ => AST.Expr.NilLit }
         if (fields.contains(name)) {
             return AST.Expr.SetField(AST.Expr.This, name, this.rewrite_receiver_expr(value, fields, methods))
         }
@@ -2374,8 +2479,8 @@ class NullChecker {
     }
 
     fun rewrite_recv_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var callee: AST.Expr = match (expr) { Call(c, a) => c }
-        var args: List<AST.Expr> = match (expr) { Call(c, a) => a }
+        var callee: AST.Expr = match (expr) { Call(c, a) => c    _ => AST.Expr.NilLit }
+        var args: List<AST.Expr> = match (expr) { Call(c, a) => a    _ => [] }
         var callee_name: String = match (callee) {
             Variable(n) => n
             Ref(rk, rn, rs) => rn
@@ -2397,62 +2502,62 @@ class NullChecker {
     }
 
     fun rewrite_recv_binary(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var left: AST.Expr = match (expr) { Binary(l, o, r) => l }
-        var op: String = match (expr) { Binary(l, o, r) => o }
-        var right: AST.Expr = match (expr) { Binary(l, o, r) => r }
+        var left: AST.Expr = match (expr) { Binary(l, o, r) => l    _ => AST.Expr.NilLit }
+        var op: String = match (expr) { Binary(l, o, r) => o    _ => "" }
+        var right: AST.Expr = match (expr) { Binary(l, o, r) => r    _ => AST.Expr.NilLit }
         return AST.Expr.Binary(this.rewrite_receiver_expr(left, fields, methods), op, this.rewrite_receiver_expr(right, fields, methods))
     }
 
     fun rewrite_recv_unary(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var op: String = match (expr) { Unary(o, r) => o }
-        var right: AST.Expr = match (expr) { Unary(o, r) => r }
+        var op: String = match (expr) { Unary(o, r) => o    _ => "" }
+        var right: AST.Expr = match (expr) { Unary(o, r) => r    _ => AST.Expr.NilLit }
         return AST.Expr.Unary(op, this.rewrite_receiver_expr(right, fields, methods))
     }
 
     fun rewrite_recv_method_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o }
-        var method: String = match (expr) { MethodCall(o, m, a) => m }
-        var args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a }
+        var obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o    _ => AST.Expr.NilLit }
+        var method: String = match (expr) { MethodCall(o, m, a) => m    _ => "" }
+        var args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a    _ => [] }
         var new_obj: AST.Expr = this.rewrite_receiver_expr(obj, fields, methods)
         var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
         return AST.Expr.MethodCall(new_obj, method, new_args)
     }
 
     fun rewrite_recv_set_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { SetField(o, f, v) => o }
-        var field: String = match (expr) { SetField(o, f, v) => f }
-        var value: AST.Expr = match (expr) { SetField(o, f, v) => v }
+        var obj: AST.Expr = match (expr) { SetField(o, f, v) => o    _ => AST.Expr.NilLit }
+        var field: String = match (expr) { SetField(o, f, v) => f    _ => "" }
+        var value: AST.Expr = match (expr) { SetField(o, f, v) => v    _ => AST.Expr.NilLit }
         return AST.Expr.SetField(this.rewrite_receiver_expr(obj, fields, methods), field, this.rewrite_receiver_expr(value, fields, methods))
     }
 
     fun rewrite_recv_get_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { GetField(o, f) => o }
-        var field: String = match (expr) { GetField(o, f) => f }
+        var obj: AST.Expr = match (expr) { GetField(o, f) => o    _ => AST.Expr.NilLit }
+        var field: String = match (expr) { GetField(o, f) => f    _ => "" }
         return AST.Expr.GetField(this.rewrite_receiver_expr(obj, fields, methods), field)
     }
 
     fun rewrite_recv_index_get(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { IndexGet(o, i) => o }
-        var index: AST.Expr = match (expr) { IndexGet(o, i) => i }
+        var obj: AST.Expr = match (expr) { IndexGet(o, i) => o    _ => AST.Expr.NilLit }
+        var index: AST.Expr = match (expr) { IndexGet(o, i) => i    _ => AST.Expr.NilLit }
         return AST.Expr.IndexGet(this.rewrite_receiver_expr(obj, fields, methods), this.rewrite_receiver_expr(index, fields, methods))
     }
 
     fun rewrite_recv_index_set(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { IndexSet(o, i, v) => o }
-        var index: AST.Expr = match (expr) { IndexSet(o, i, v) => i }
-        var value: AST.Expr = match (expr) { IndexSet(o, i, v) => v }
+        var obj: AST.Expr = match (expr) { IndexSet(o, i, v) => o    _ => AST.Expr.NilLit }
+        var index: AST.Expr = match (expr) { IndexSet(o, i, v) => i    _ => AST.Expr.NilLit }
+        var value: AST.Expr = match (expr) { IndexSet(o, i, v) => v    _ => AST.Expr.NilLit }
         return AST.Expr.IndexSet(this.rewrite_receiver_expr(obj, fields, methods), this.rewrite_receiver_expr(index, fields, methods), this.rewrite_receiver_expr(value, fields, methods))
     }
 
     fun rewrite_recv_logical(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var left: AST.Expr = match (expr) { Logical(l, o, r) => l }
-        var op: String = match (expr) { Logical(l, o, r) => o }
-        var right: AST.Expr = match (expr) { Logical(l, o, r) => r }
+        var left: AST.Expr = match (expr) { Logical(l, o, r) => l    _ => AST.Expr.NilLit }
+        var op: String = match (expr) { Logical(l, o, r) => o    _ => "" }
+        var right: AST.Expr = match (expr) { Logical(l, o, r) => r    _ => AST.Expr.NilLit }
         return AST.Expr.Logical(this.rewrite_receiver_expr(left, fields, methods), op, this.rewrite_receiver_expr(right, fields, methods))
     }
 
     fun rewrite_recv_list_lit(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var elements: List<AST.Expr> = match (expr) { ListLit(e) => e }
+        var elements: List<AST.Expr> = match (expr) { ListLit(e) => e    _ => [] }
         return AST.Expr.ListLit(this.rewrite_receiver_exprs(elements, fields, methods))
     }
 

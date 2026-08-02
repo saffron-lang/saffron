@@ -474,6 +474,7 @@
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 

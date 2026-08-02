@@ -112,6 +112,7 @@
                 }
                 this.gen_class_decl_with_parent(name, parent, fields, methods)
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -129,7 +130,12 @@
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
         return match (stmt) { VarDecl(n, t, i, d) => i
-            _ => ""
+            // Was `_ => ""`: a String default on a function declared to return
+            // AST.Expr. Nothing rejected it because the checker never walked
+            // method bodies (BUGS #76), and every caller pre-checks for a
+            // VarDecl, so the wrong-typed value was never produced. NilLit is
+            // the honest "no initializer" of the right type.
+            _ => AST.Expr.NilLit
         }
     }
 
@@ -1042,6 +1048,7 @@
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -1170,9 +1177,9 @@
             }
             if (is_elseif) {
                 var nested: Any = current_else[0]
-                current_cond = match (nested) { If(c, t, e) => c }
-                current_then = match (nested) { If(c, t, e) => t }
-                current_else = match (nested) { If(c, t, e) => e }
+                current_cond = match (nested) { If(c, t, e) => c   _ => AST.Expr.NilLit }
+                current_then = match (nested) { If(c, t, e) => t   _ => [] }
+                current_else = match (nested) { If(c, t, e) => e   _ => [] }
                 // Continue loop instead of recursing
             } else {
                 // Final else or no else
@@ -1209,6 +1216,12 @@
             TryCatch(t, n, c, f) => "try"
             Throw(v) => "throw"
             LetPattern(p, v) => "let_pattern"
+            // A type alias is erased by the time codegen runs — resolve.sf has
+            // already rewritten every use of the name. It still has to be named
+            // here: `classify_stmt` returns one tag per variant, and until BUGS
+            // #76 made the checker walk method bodies, a missing arm yielded an
+            // indeterminate string rather than an error.
+            TypeAlias(ta_n, ta_t) => "type_alias"
         }
     }
 
@@ -1228,6 +1241,7 @@
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
+            TypeAlias(ta_n, ta_t) => "other"
         }
         return kind == "if"
     }
@@ -1335,7 +1349,11 @@
         var finally_label: String = this.fresh_label("finally")
         var end_label: String = this.fresh_label("tryend")
 
-        var has_finally: Float = finally_body.length() > 0
+        // Was annotated Float while holding a comparison result. It is only ever
+        // used as an `if` condition, so nothing misbehaved — but the annotation
+        // was simply wrong, and no pass rejected it until the checker began
+        // walking method bodies (BUGS #76).
+        var has_finally: Bool = finally_body.length() > 0
 
         // Allocate a local jmp_buf on the stack (512 bytes, enough for any platform)
         var jmp_buf: String = this.fresh_local()

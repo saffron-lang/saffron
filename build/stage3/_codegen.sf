@@ -1839,7 +1839,7 @@ class Codegen {
         // Detect yield [reason, arg] pattern for sleep/IO
         var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
         if (is_list == "yes") {
-            var elems: List<AST.Expr> = match (value) { ListLit(e) => e }
+            var elems: List<AST.Expr> = match (value) { ListLit(e) => e    _ => [] }
             if (elems.length() >= 1) {
                 var reason: String = this.gen_arg_value(elems[0])
                 this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
@@ -2674,11 +2674,16 @@ class Codegen {
     }
 
     fun flatten_string_expr(expr: AST.Expr): String {
-        var kind: Any = match (expr) {
+        return match (expr) {
             StringLit(s) => s
             Binary(l, o, r) => this.flatten_string_expr(l) + this.flatten_string_expr(r)
+            // Every caller guards with is_string_expr, which admits only those
+            // two shapes, so this arm is unreachable. It still has to be written:
+            // a missing arm yields an indeterminate value rather than a
+            // diagnostic (BUGS #76), so a future caller that forgot the guard
+            // would silently emit a garbage string constant instead of "".
+            _ => ""
         }
-        return kind
     }
 
     fun gen_func_ref(fn_name: String): String {
@@ -4316,65 +4321,28 @@ class Codegen {
     }
 
     fun contains_string_lit(expr: AST.Expr): Bool {
-        var kind: Any = match (expr) {
-            StringLit(s) => "yes"
-            Binary(l, o, r) => {
-                if (this.contains_string_lit(l) or this.contains_string_lit(r)) { "yes" } else { "no" }
-            }
-            IntLit(v) => "no"
-            FloatLit(v) => "no"
-            BoolLit(v) => "no"
-            Variable(n) => "no"
-            Ref(rk, rn, rs) => "no"
-            Unary(o, r) => "no"
-            Call(c, a) => "no"
-            Assign(n, v) => "no"
-            Logical(l, o, r) => "no"
-            MemberAccess(o, f) => "no"
-            NilLit => "no"
-            Match(s, a) => "no"
-            EnumConstruct(e, v, a) => "no"
-            Lambda(p, r, b) => "no"
-            GetField(o, f) => "no"
-            SetField(o, f, v) => "no"
-            This => "no"
-            BlockExpr(s, v) => "no"
-            IsCheck(val, t) => "no"
-            IfExpr(c, tb, tv, eb, ev) => "no"
-            TryExpr(tb, tv, cn, cb, cv) => "no"
-            Yield(v) => "no"
-            TupleLit(e) => "no"
+        // Only these two shapes can hold a literal that reaches the concat path;
+        // everything else is a runtime value. The 26 arms spelled out one per
+        // variant, all returning "no", are the `_` arm — and being hand-written
+        // they went stale: IndexGet, IndexSet, MethodCall and MapLit were never
+        // added, so those four fell through to an indeterminate value instead of
+        // false (BUGS #76).
+        return match (expr) {
+            StringLit(s) => true
+            Binary(l, o, r) => this.contains_string_lit(l) or this.contains_string_lit(r)
+            _ => false
         }
-        return kind == "yes"
     }
 
     fun is_string_variable(expr: AST.Expr): Bool {
-        var name: Any = match (expr) {
+        // Same story as contains_string_lit: only a name-shaped expression can be
+        // looked up in string_vars, and the 24 hand-written `=> ""` arms had
+        // likewise gone stale (MapLit, IndexGet, IndexSet, MethodCall missing).
+        var name: String = match (expr) {
             Variable(n) => n
             Ref(rk, rn, rs) => rn
             GetField(o, f) => f
-            IntLit(v) => ""
-            FloatLit(v) => ""
-            BoolLit(v) => ""
-            StringLit(s) => ""
-            NilLit => ""
-            Binary(l, o, r) => ""
-            Unary(o, r) => ""
-            Call(c, a) => ""
-            Assign(n, v) => ""
-            Logical(l, o, r) => ""
-            MemberAccess(o, f) => ""
-            Match(s, a) => ""
-            EnumConstruct(e, v, a) => ""
-            Lambda(p, r, b) => ""
-            SetField(o, f, v) => ""
-            This => ""
-            BlockExpr(s, v) => ""
-            IsCheck(val, t) => ""
-            IfExpr(c, tb, tv, eb, ev) => ""
-            TryExpr(tb, tv, cn, cb, cv) => ""
-            Yield(v) => ""
-            TupleLit(e) => ""
+            _ => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -4394,42 +4362,17 @@ class Codegen {
     }
 
     fun is_string_expr(expr: AST.Expr): Bool {
-        var kind: Any = match (expr) {
-            StringLit(s) => "string"
-            Binary(l, o, r) => {
-                if (o == "+") {
-                    if (this.is_string_expr(l) and this.is_string_expr(r)) { "string" } else { "binary" }
-                } else { "binary" }
-            }
-            IntLit(v) => "int"
-            FloatLit(v) => "float"
-            BoolLit(v) => "bool"
-            Variable(n) => "var"
-            Ref(rk, rn, rs) => "var"
-            Unary(o, r) => "unary"
-            Call(c, a) => "call"
-            Assign(n, v) => "assign"
-            Logical(l, o, r) => "logical"
-            MemberAccess(o, f) => "member"
-            NilLit => "nil"
-            Match(s, a) => "match"
-            EnumConstruct(e, v, a) => "enum"
-            Lambda(p, r, b) => "lambda"
-            GetField(o, f) => "get_field"
-            SetField(o, f, v) => "set_field"
-            This => "this"
-            ListLit(e) => "list"
-            IndexGet(o, i) => "index"
-            IndexSet(o, i, v) => "index"
-            MethodCall(o, m, a) => "method"
-            BlockExpr(s, v) => "block"
-            IsCheck(val, t) => "is"
-            IfExpr(c, tb, tv, eb, ev) => "other"
-            TryExpr(tb, tv, cn, cb, cv) => "other"
-            Yield(v) => "other"
-            TupleLit(e) => "other"
+        // True only for a compile-time-known string: a literal, or a `+` chain of
+        // them. flatten_string_expr relies on exactly this: whatever answers true
+        // here it must be able to fold to a constant. The 27 remaining arms each
+        // named their variant and then all failed the `== "string"` test below, so
+        // they were a `_ => false` written the long way — and MapLit had never
+        // been added to the list, leaving it indeterminate (BUGS #76).
+        return match (expr) {
+            StringLit(s) => true
+            Binary(l, o, r) => o == "+" and this.is_string_expr(l) and this.is_string_expr(r)
+            _ => false
         }
-        return kind == "string"
     }
 
     fun get_format_ptr(fmt: String): String {
@@ -4793,6 +4736,13 @@ class Codegen {
             // Extract bindings from payload and set their types
             var arm_variant: String = match (pattern) { VariantPattern(v, b) => v
                 _ => ""
+            }
+            // A NamedWildcard binds the subject itself, not a payload field, so
+            // it is stored directly rather than GEP'd out of the enum's payload.
+            var nw_name: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+            if (nw_name.length() > 0) {
+                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(nw_name))
+                this.typed_vars.set(nw_name, this.str_to_type(enum_name))
             }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b
                 _ => []
@@ -5392,6 +5342,7 @@ class Codegen {
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -6258,6 +6209,7 @@ class Codegen {
                 }
                 this.gen_class_decl_with_parent(name, parent, fields, methods)
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -6275,7 +6227,12 @@ class Codegen {
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
         return match (stmt) { VarDecl(n, t, i, d) => i
-            _ => ""
+            // Was `_ => ""`: a String default on a function declared to return
+            // AST.Expr. Nothing rejected it because the checker never walked
+            // method bodies (BUGS #76), and every caller pre-checks for a
+            // VarDecl, so the wrong-typed value was never produced. NilLit is
+            // the honest "no initializer" of the right type.
+            _ => AST.Expr.NilLit
         }
     }
 
@@ -7188,6 +7145,7 @@ class Codegen {
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -7316,9 +7274,9 @@ class Codegen {
             }
             if (is_elseif) {
                 var nested: Any = current_else[0]
-                current_cond = match (nested) { If(c, t, e) => c }
-                current_then = match (nested) { If(c, t, e) => t }
-                current_else = match (nested) { If(c, t, e) => e }
+                current_cond = match (nested) { If(c, t, e) => c   _ => AST.Expr.NilLit }
+                current_then = match (nested) { If(c, t, e) => t   _ => [] }
+                current_else = match (nested) { If(c, t, e) => e   _ => [] }
                 // Continue loop instead of recursing
             } else {
                 // Final else or no else
@@ -7355,6 +7313,12 @@ class Codegen {
             TryCatch(t, n, c, f) => "try"
             Throw(v) => "throw"
             LetPattern(p, v) => "let_pattern"
+            // A type alias is erased by the time codegen runs — resolve.sf has
+            // already rewritten every use of the name. It still has to be named
+            // here: `classify_stmt` returns one tag per variant, and until BUGS
+            // #76 made the checker walk method bodies, a missing arm yielded an
+            // indeterminate string rather than an error.
+            TypeAlias(ta_n, ta_t) => "type_alias"
         }
     }
 
@@ -7374,6 +7338,7 @@ class Codegen {
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
+            TypeAlias(ta_n, ta_t) => "other"
         }
         return kind == "if"
     }
@@ -7481,7 +7446,11 @@ class Codegen {
         var finally_label: String = this.fresh_label("finally")
         var end_label: String = this.fresh_label("tryend")
 
-        var has_finally: Float = finally_body.length() > 0
+        // Was annotated Float while holding a comparison result. It is only ever
+        // used as an `if` condition, so nothing misbehaved — but the annotation
+        // was simply wrong, and no pass rejected it until the checker began
+        // walking method bodies (BUGS #76).
+        var has_finally: Bool = finally_body.length() > 0
 
         // Allocate a local jmp_buf on the stack (512 bytes, enough for any platform)
         var jmp_buf: String = this.fresh_local()
@@ -8194,6 +8163,7 @@ class Codegen {
             }
             LetPattern(pattern, value) => {
             }
+            TypeAlias(ta_n, ta_t) => {}
         }
     }
 
@@ -8320,6 +8290,11 @@ class Codegen {
     }
 
     fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
+        // A NamedWildcard is unconditionally a catch-all. It already answered
+        // true by accident — its name came out "" here, which is never a
+        // registered tag — but saying so directly is what the code means.
+        var is_named_wc: Bool = match (pattern) { NamedWildcard(n) => true   _ => false }
+        if (is_named_wc) return true
         var name: String = match (pattern) { VariantPattern(v, b) => v
             _ => ""
         }
@@ -8327,20 +8302,26 @@ class Codegen {
     }
 
     fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
+        // Arm is MatchArm's only variant, so the default is unreachable — but it
+        // returned a String from a function declared to return AST.Pattern, which
+        // nothing rejected until the checker began walking method bodies.
         return match (arm) { Arm(p, b) => p
-            _ => ""
+            _ => AST.Pattern.WildcardPattern
         }
     }
 
     fun get_arm_body(arm: AST.MatchArm): AST.Expr {
         return match (arm) { Arm(p, b) => b
-            _ => ""
+            _ => AST.Expr.NilLit
         }
     }
 
     fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
         return match (pattern) { VariantPattern(v, b) => b
-            _ => ""
+            // A NamedWildcard binds one name, and it is the pattern's binding —
+            // omitting it here is why `x => ...` had no `x` in scope.
+            NamedWildcard(n) => [n]
+            _ => []
         }
     }
 
@@ -8523,6 +8504,34 @@ class Codegen {
                 this.collect_calls_from_stmts(eb, calls)
                 this.collect_calls_from_expr(ev, calls)
             }
+            // These five used to be missing, so a call sited inside a match arm,
+            // a try/catch value, an enum payload, a lambda body or a yield was
+            // invisible to the caller that decides whether a function is a
+            // transitive coroutine (output_body.sf gen_function). expr_has_yield
+            // above already walks all of them; keep the two in step.
+            Match(subject, match_arms) => {
+                this.collect_calls_from_expr(subject, calls)
+                var mai: Float = 0
+                while (mai < match_arms.length()) {
+                    var arm: AST.MatchArm = match_arms[mai]
+                    var arm_body: AST.Expr = match (arm) { Arm(p, b) => b }
+                    this.collect_calls_from_expr(arm_body, calls)
+                    mai = mai + 1
+                }
+            }
+            TryExpr(tb, tv, cn, cb, cv) => {
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_expr(tv, calls)
+                this.collect_calls_from_stmts(cb, calls)
+                this.collect_calls_from_expr(cv, calls)
+            }
+            EnumConstruct(en, v, a) => { this.collect_calls_from_exprs(a, calls) }
+            Lambda(p, r, b) => { this.collect_calls_from_stmts(b, calls) }
+            Yield(v) => { this.collect_calls_from_expr(v, calls) }
+            TupleLit(e) => { this.collect_calls_from_exprs(e, calls) }
+            IsCheck(v, t) => { this.collect_calls_from_expr(v, calls) }
+            // Leaves: no sub-expression can hold a call.
+            _ => {}
         }
     }
 
@@ -8563,6 +8572,14 @@ class Codegen {
                 this.collect_calls_from_stmts(f, calls)
             }
             Throw(v) => { this.collect_calls_from_expr(v, calls) }
+            // `let [a, b] = f()` holds a call in its value, and used to be
+            // missed here for the same reason as the expression arms above.
+            LetPattern(p, v) => { this.collect_calls_from_expr(v, calls) }
+            // Break, Continue, TypeAlias hold no expression. A nested FunDecl /
+            // EnumDecl / ClassDecl body is a *different* function's code, so its
+            // calls deliberately do not count as the enclosing function's — see
+            // mark_coroutines, which walks declarations itself.
+            _ => {}
         }
     }
 
@@ -8605,6 +8622,7 @@ class Codegen {
                         cls_name = cn
                         cls_methods = cm
                     }
+                    _ => {}
                 }
                 var cmi: Float = 0
                 while (cmi < cls_methods.length()) {
@@ -9902,6 +9920,7 @@ class Codegen {
             TryCatch(t, n, c, f) => false
             Throw(v) => false
             LetPattern(p, v) => false
+            TypeAlias(ta_n, ta_t) => false
         }
     }
 
@@ -10147,6 +10166,7 @@ class Codegen {
                 TryCatch(t, n, c, f) => {}
                 Throw(v) => {}
                 LetPattern(p, v) => {}
+                TypeAlias(ta_n, ta_t) => {}
             }
             pri = pri + 1
         }
@@ -10704,38 +10724,16 @@ class Codegen {
     }
 
     fun get_variable_name(expr: AST.Expr): String {
-    var name: Any = match (expr) {
+    // The 28 arms that used to follow, all returning "", are the `_` arm: only a
+    // name-shaped expression has a name. Written out by hand they were also
+    // wrong — the closing brace sat on the same line as the last arm, and the
+    // result was bound as `Any`, so the declared String return type was never
+    // actually checked (BUGS #76).
+    return match (expr) {
         Variable(n) => n
         Ref(rk, rn, rs) => rn
-        IntLit(v) => ""
-        FloatLit(v) => ""
-        BoolLit(v) => ""
-        StringLit(s) => ""
-        NilLit => ""
-        Binary(l, o, r) => ""
-        Unary(o, r) => ""
-        Call(c, a) => ""
-        Assign(n, v) => ""
-        Logical(l, o, r) => ""
-        MemberAccess(o, f) => ""
-        Match(s, a) => ""
-        EnumConstruct(e, v, a) => ""
-        Lambda(p, r, b) => ""
-        GetField(o, f) => ""
-        SetField(o, f, v) => ""
-        This => ""
-        ListLit(e) => ""
-        IndexGet(o, i) => ""
-        IndexSet(o, i, v) => ""
-        MethodCall(o, m, a) => ""
-        MapLit => ""
-        BlockExpr(s, v) => ""
-        IsCheck(val, t) => ""
-        IfExpr(c, tb, tv, eb, ev) => ""
-        TryExpr(tb, tv, cn, cb, cv) => ""
-        Yield(v) => ""
-        TupleLit(e) => ""    }
-    return name
+        _ => ""
+    }
     }
 
     fun get_string_literal(expr: AST.Expr): String {
@@ -13954,34 +13952,15 @@ class Codegen {
     }
 
     fun is_this_expr(expr: AST.Expr): Bool {
-    var kind: Any = match (expr) {
-        This => "this"
-        IntLit(v) => "other"
-        FloatLit(v) => "other"
-        BoolLit(v) => "other"
-        StringLit(s) => "other"
-        NilLit => "other"
-        Variable(n) => "other"
-        Ref(rk, rn, rs) => "other"
-        Binary(l, o, r) => "other"
-        Unary(o, r) => "other"
-        Call(c, a) => "other"
-        Assign(n, v) => "other"
-        Logical(l, o, r) => "other"
-        MemberAccess(o, f) => "other"
-        Match(s, a) => "other"
-        EnumConstruct(e, v, a) => "other"
-        Lambda(p, r, b) => "other"
-        GetField(o, f) => "other"
-        SetField(o, f, v) => "other"
-        BlockExpr(s, v) => "other"
-        IsCheck(val, t) => "other"
-        IfExpr(c, tb, tv, eb, ev) => "other"
-        TryExpr(tb, tv, cn, cb, cv) => "other"
-        Yield(v) => "other"
-        TupleLit(e) => "other"
+    // The 28 arms that used to follow, each naming a variant and returning
+    // "other", were a `_ => false` written the long way — and being hand-written
+    // the list went stale: ListLit, IndexGet, IndexSet, MethodCall and MapLit
+    // were never added, so those five yielded an indeterminate value rather
+    // than false (BUGS #76).
+    return match (expr) {
+        This => true
+        _ => false
     }
-    return kind == "this"
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
@@ -14064,7 +14043,12 @@ class Codegen {
             if (this.class_fields.has(__bare)) { __gft_lookup = __bare }
         }
     }
-    var fields: String = this.class_fields.get(__gft_lookup)
+    // `.get()` is typed String|Nil, and the has() checks above are inside the
+    // `if` block rather than immediately before this line, so no narrowing
+    // reaches here — a class with no registered fields yielded nil and then had
+    // .length() called on it. Spell the miss out instead.
+    var fields: String = ""
+    if (this.class_fields.has(__gft_lookup)) { fields = this.class_fields.get(__gft_lookup) }
     if (fields.length() == 0) return "Int"
     var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
@@ -14118,14 +14102,21 @@ class Codegen {
     }
 
     fun get_field_index(class_name: String, field: String): Float {
-    var fields: String = this.class_fields.get(class_name)
+    // Unguarded `.get()` on a Map is String|Nil; the reverse lookup below is the
+    // recovery path for a miss, so the miss has to produce "" rather than nil.
+    var fields: String = ""
+    if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
     // Cross-module: if prefixed name not found, try bare name via reverse lookup
     if (fields.length() == 0) {
         var __fkeys: List<String> = this.class_struct_names.keys()
         var __fki: Float = 0
         while (__fki < __fkeys.length()) {
             if (this.class_struct_names.get(__fkeys[__fki]) == class_name) {
-                fields = this.class_fields.get(__fkeys[__fki])
+                // The key came from class_struct_names, which does not imply a
+                // class_fields entry — the .get() was unguarded and nullable.
+                if (this.class_fields.has(__fkeys[__fki])) {
+                    fields = this.class_fields.get(__fkeys[__fki])
+                }
                 if (fields.length() > 0) { __fki = __fkeys.length() }
             }
             __fki = __fki + 1
@@ -14134,7 +14125,7 @@ class Codegen {
     // Also try: strip current_prefix from class_name to get bare name
     if (fields.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
         var bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
-        fields = this.class_fields.get(bare)
+        if (this.class_fields.has(bare)) { fields = this.class_fields.get(bare) }
     }
     if (fields.length() == 0) return 0
     var parts: List<String> = this.split_respecting_generics(fields, ",")

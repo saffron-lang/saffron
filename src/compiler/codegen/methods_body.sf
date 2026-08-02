@@ -71,38 +71,16 @@
     }
 
     fun get_variable_name(expr: AST.Expr): String {
-    var name: Any = match (expr) {
+    // The 28 arms that used to follow, all returning "", are the `_` arm: only a
+    // name-shaped expression has a name. Written out by hand they were also
+    // wrong — the closing brace sat on the same line as the last arm, and the
+    // result was bound as `Any`, so the declared String return type was never
+    // actually checked (BUGS #76).
+    return match (expr) {
         Variable(n) => n
         Ref(rk, rn, rs) => rn
-        IntLit(v) => ""
-        FloatLit(v) => ""
-        BoolLit(v) => ""
-        StringLit(s) => ""
-        NilLit => ""
-        Binary(l, o, r) => ""
-        Unary(o, r) => ""
-        Call(c, a) => ""
-        Assign(n, v) => ""
-        Logical(l, o, r) => ""
-        MemberAccess(o, f) => ""
-        Match(s, a) => ""
-        EnumConstruct(e, v, a) => ""
-        Lambda(p, r, b) => ""
-        GetField(o, f) => ""
-        SetField(o, f, v) => ""
-        This => ""
-        ListLit(e) => ""
-        IndexGet(o, i) => ""
-        IndexSet(o, i, v) => ""
-        MethodCall(o, m, a) => ""
-        MapLit => ""
-        BlockExpr(s, v) => ""
-        IsCheck(val, t) => ""
-        IfExpr(c, tb, tv, eb, ev) => ""
-        TryExpr(tb, tv, cn, cb, cv) => ""
-        Yield(v) => ""
-        TupleLit(e) => ""    }
-    return name
+        _ => ""
+    }
     }
 
     fun get_string_literal(expr: AST.Expr): String {
@@ -3321,34 +3299,15 @@
     }
 
     fun is_this_expr(expr: AST.Expr): Bool {
-    var kind: Any = match (expr) {
-        This => "this"
-        IntLit(v) => "other"
-        FloatLit(v) => "other"
-        BoolLit(v) => "other"
-        StringLit(s) => "other"
-        NilLit => "other"
-        Variable(n) => "other"
-        Ref(rk, rn, rs) => "other"
-        Binary(l, o, r) => "other"
-        Unary(o, r) => "other"
-        Call(c, a) => "other"
-        Assign(n, v) => "other"
-        Logical(l, o, r) => "other"
-        MemberAccess(o, f) => "other"
-        Match(s, a) => "other"
-        EnumConstruct(e, v, a) => "other"
-        Lambda(p, r, b) => "other"
-        GetField(o, f) => "other"
-        SetField(o, f, v) => "other"
-        BlockExpr(s, v) => "other"
-        IsCheck(val, t) => "other"
-        IfExpr(c, tb, tv, eb, ev) => "other"
-        TryExpr(tb, tv, cn, cb, cv) => "other"
-        Yield(v) => "other"
-        TupleLit(e) => "other"
+    // The 28 arms that used to follow, each naming a variant and returning
+    // "other", were a `_ => false` written the long way — and being hand-written
+    // the list went stale: ListLit, IndexGet, IndexSet, MethodCall and MapLit
+    // were never added, so those five yielded an indeterminate value rather
+    // than false (BUGS #76).
+    return match (expr) {
+        This => true
+        _ => false
     }
-    return kind == "this"
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
@@ -3431,7 +3390,12 @@
             if (this.class_fields.has(__bare)) { __gft_lookup = __bare }
         }
     }
-    var fields: String = this.class_fields.get(__gft_lookup)
+    // `.get()` is typed String|Nil, and the has() checks above are inside the
+    // `if` block rather than immediately before this line, so no narrowing
+    // reaches here — a class with no registered fields yielded nil and then had
+    // .length() called on it. Spell the miss out instead.
+    var fields: String = ""
+    if (this.class_fields.has(__gft_lookup)) { fields = this.class_fields.get(__gft_lookup) }
     if (fields.length() == 0) return "Int"
     var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
@@ -3485,14 +3449,21 @@
     }
 
     fun get_field_index(class_name: String, field: String): Float {
-    var fields: String = this.class_fields.get(class_name)
+    // Unguarded `.get()` on a Map is String|Nil; the reverse lookup below is the
+    // recovery path for a miss, so the miss has to produce "" rather than nil.
+    var fields: String = ""
+    if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
     // Cross-module: if prefixed name not found, try bare name via reverse lookup
     if (fields.length() == 0) {
         var __fkeys: List<String> = this.class_struct_names.keys()
         var __fki: Float = 0
         while (__fki < __fkeys.length()) {
             if (this.class_struct_names.get(__fkeys[__fki]) == class_name) {
-                fields = this.class_fields.get(__fkeys[__fki])
+                // The key came from class_struct_names, which does not imply a
+                // class_fields entry — the .get() was unguarded and nullable.
+                if (this.class_fields.has(__fkeys[__fki])) {
+                    fields = this.class_fields.get(__fkeys[__fki])
+                }
                 if (fields.length() > 0) { __fki = __fkeys.length() }
             }
             __fki = __fki + 1
@@ -3501,7 +3472,7 @@
     // Also try: strip current_prefix from class_name to get bare name
     if (fields.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
         var bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
-        fields = this.class_fields.get(bare)
+        if (this.class_fields.has(bare)) { fields = this.class_fields.get(bare) }
     }
     if (fields.length() == 0) return 0
     var parts: List<String> = this.split_respecting_generics(fields, ",")
