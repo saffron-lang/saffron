@@ -1,0 +1,87 @@
+// enumfmt_payload_to_string.sf — BUGS #108 regression, in the pass suite.
+//
+// An enum's generated to_string() formats each payload field by its declared
+// type. The per-type chain in emit_enum_to_string had arms for String, Bool and
+// Float/Number and nothing else, so a List, a Map or a nested enum payload fell
+// through to the integer default and printed the heap address of the payload —
+// a different number on every run, which is how the differential oracle caught
+// it (its nondeterminism gate fired).
+//
+// The fix reuses the formatters that already exist rather than adding new ones:
+// __list_to_string, __map_to_string, and, for a nested enum, that enum's own
+// generated <Enum>__to_string. Stringification of a value must therefore be a
+// pure function of the value: same input, same bytes, every run and every
+// backend.
+//
+// test/oracle_enum_payload_tostring.sf is the differential-oracle version.
+
+import "@test" as Test
+
+enum Inner {
+    I(n: Int),
+    Nothing
+}
+
+enum Holder {
+    WithList(items: List<Int>),
+    WithStrList(items: List<String>),
+    WithMap(m: Map<String, Int>),
+    WithInner(inner: Inner),
+    WithInt(n: Int),
+    WithStr(s: String)
+}
+
+// --- the three payload types that used to print an address ---
+
+Test.assert_eq(Holder.WithList([1, 2, 3]).to_string(), "WithList([1, 2, 3])",
+               "a List payload formats by value")
+
+Test.assert_eq(Holder.WithList([]).to_string(), "WithList([])",
+               "an empty List payload formats as []")
+
+Test.assert_eq(Holder.WithStrList(["a", "b"]).to_string(), "WithStrList([a, b])",
+               "a List<String> payload formats by value")
+
+var m: Map<String, Int> = {"k": 1}
+Test.assert_eq(Holder.WithMap(m).to_string(), "WithMap({k: 1})",
+               "a Map payload formats by value")
+
+Test.assert_eq(Holder.WithInner(Inner.I(7)).to_string(), "WithInner(I(7))",
+               "a nested enum payload calls that enum's own to_string()")
+
+Test.assert_eq(Holder.WithInner(Inner.Nothing).to_string(),
+               "WithInner(Nothing)",
+               "a nested no-payload variant formats by name")
+
+// --- the types that already worked must keep working ---
+
+Test.assert_eq(Holder.WithInt(42).to_string(), "WithInt(42)",
+               "an Int payload still formats as an integer")
+
+Test.assert_eq(Holder.WithStr("hi").to_string(), "WithStr(hi)",
+               "a String payload still formats as its text")
+
+// --- purity: the same value stringifies identically every time ---
+//
+// This is the assertion that would have caught #108 on its own. An address
+// differs between two separately-allocated payloads holding equal contents, and
+// differs run to run; a value-based formatting does not.
+
+Test.assert_eq(Holder.WithList([1, 2]).to_string(),
+               Holder.WithList([1, 2]).to_string(),
+               "two equal List payloads stringify identically")
+
+Test.assert_eq(Holder.WithInner(Inner.I(3)).to_string(),
+               Holder.WithInner(Inner.I(3)).to_string(),
+               "two equal nested-enum payloads stringify identically")
+
+var held = Holder.WithList([5, 6])
+Test.assert_eq(held.to_string(), held.to_string(),
+               "stringifying one value twice gives the same bytes")
+
+// A List payload must not read as an address even accidentally: an address
+// renders as a bare number, so assert the brackets are present.
+Test.assert(Holder.WithList([9]).to_string().contains("["),
+            "a List payload renders with brackets, not as a bare address")
+
+Test.summary()
