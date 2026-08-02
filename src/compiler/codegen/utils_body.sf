@@ -271,7 +271,7 @@
                 this.collect_vars_expr(value, names, types)
             }
             FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
+            EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}

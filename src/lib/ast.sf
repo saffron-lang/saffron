@@ -105,7 +105,7 @@ fun find_enums(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            EnumDecl(name, variants, docstring) => {
+            EnumDecl(name, variants, docstring, e_vis) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -120,7 +120,7 @@ fun stmt_name(stmt: Any): String {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, docstring) => name
         ClassDecl(name, type_params, parents, fields, methods, docstring) => name
-        EnumDecl(name, variants, docstring) => name
+        EnumDecl(name, variants, docstring, e_vis) => name
         VarDecl(name, type_ann, initializer, docstring) => name
         _ => ""
     }
@@ -131,7 +131,7 @@ fun stmt_doc(stmt: Any): String {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, docstring) => docstring
         ClassDecl(name, type_params, parents, fields, methods, docstring) => docstring
-        EnumDecl(name, variants, docstring) => docstring
+        EnumDecl(name, variants, docstring, e_vis) => docstring
         VarDecl(name, type_ann, initializer, docstring) => docstring
         _ => ""
     }
@@ -180,7 +180,7 @@ fun is_class(stmt: Any): Bool {
 /// Check if a statement is an enum declaration.
 fun is_enum(stmt: Any): Bool {
     return match (stmt) {
-        EnumDecl(name, variants, docstring) => true
+        EnumDecl(name, variants, docstring, e_vis) => true
         _ => false
     }
 }

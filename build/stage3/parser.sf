@@ -1908,7 +1908,9 @@ class Parser {
             this.match_kind(",")
         }
         this.consume("}")
-        return AST.Stmt.EnumDecl(name, variants, docstring)
+        // No visibility syntax exists yet (access-modifiers.md Phase 4 adds it), so
+        // every declaration is parsed as "public" — the documented default.
+        return AST.Stmt.EnumDecl(name, variants, docstring, "public")
     }
 
     fun parse_this_stmt(): AST.Stmt {
@@ -2884,7 +2886,7 @@ class Parser {
             ExprStmt(e) => "expr"
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
-            EnumDecl(n, v, d) => "other"
+            EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, tp, ps, f, m, d) => "other"
             Return(v) => "other"
             If(c, t, e) => "if"

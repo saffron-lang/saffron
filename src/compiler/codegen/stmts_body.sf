@@ -113,7 +113,7 @@
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.gen_enum_decl(name, variants)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
@@ -1149,13 +1149,13 @@
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
-        return match (stmt) { EnumDecl(n, v, d) => n
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => n
             _ => ""
         }
     }
 
     fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
-        return match (stmt) { EnumDecl(n, v, d) => v
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => v
             _ => ""
         }
     }
@@ -1170,7 +1170,7 @@
 
     fun try_register_enum(decl: AST.Stmt) {
         match (decl) {
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum_variants(name, variants)
             }
             VarDecl(n, t, i, d) => {}
@@ -1344,7 +1344,7 @@
             ExprStmt(expr) => "expr"
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
-            EnumDecl(n, v, d) => "enum"
+            EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
@@ -1369,7 +1369,7 @@
             ExprStmt(expr) => "other"
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
-            EnumDecl(n, v, d) => "other"
+            EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
