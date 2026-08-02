@@ -2079,6 +2079,65 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         mi = mi + 1
     }
 
+    // Pre-register every extension method's SYMBOL (BUGS #103).
+    //
+    // gen_extend_method registers `Ctx__bx -> core_Ctx__bx` in func_prefix_map
+    // only as it lowers that method, so a call generated BEFORE the callee is
+    // lowered found nothing and resolve_method_symbol fell through to an
+    // unprefixed guess — `@Ctx__bx` against a definition named `@core_Ctx__bx`,
+    // which survives codegen and dies at link time. Two `extend fun`s in
+    // different modules calling each other hit it in BOTH import orders, each
+    // naming the other direction's symbol, so no ordering fixed it.
+    //
+    // Invisible in a single file because there the prefix is "" and the guess is
+    // accidentally right. It only breaks once the code lives in a module.
+    //
+    // Runs AFTER the class pre-registration loop above, not merged into the
+    // extend_map pre-scan further up: extend_class_prefix needs
+    // class_struct_names, and that loop is what fills it.
+    mi = 0
+    while (mi < prefixes.length()) {
+        prefix = prefixes[mi]
+        start = boundaries[mi]
+        end = boundaries[mi + 1]
+        si = start
+        while (si < end) {
+            var xdoc: String = gen.get_fun_doc(all_stmts[si])
+            if (xdoc.starts_with("@extend:")) {
+                var xname: String = gen.get_fun_name(all_stmts[si])
+                var xcls: String = xdoc.slice(8, xdoc.length())
+                if (xname.length() > 0 and xcls.length() > 0) {
+                    var xfull: String = xcls + "__" + xname
+                    // The same helper gen_extend_method uses, so the symbol
+                    // registered here is the symbol that actually gets defined.
+                    var xprefix: String = gen.extend_class_prefix(xcls, prefix)
+                    var xprefixed: String = xprefix + xfull
+                    gen.func_prefix_map.set(xfull, xprefixed)
+                    if (!gen.str_in_list(gen.known_functions, xprefixed)) {
+                        gen.known_functions.push(xprefixed)
+                    }
+                    if (!gen.str_in_list(gen.known_functions, xfull)) {
+                        gen.known_functions.push(xfull)
+                    }
+                    // The receiver's method list too, or gen_method_call's
+                    // "type 'X' has no method 'y'" check rejects a call compiled
+                    // before the extend fun is lowered.
+                    if (gen.class_methods.has(xcls)) {
+                        var xmethods: List<String> = gen.class_methods.get(xcls)
+                        if (!gen.str_in_list(xmethods, xname)) { xmethods.push(xname) }
+                    }
+                    var xret: String = gen.get_fun_ret(all_stmts[si])
+                    if (xret.length() > 0) {
+                        gen.func_ret_types.set(xprefixed, gen.str_to_type(xret))
+                        gen.func_ret_types.set(xfull, gen.str_to_type(xret))
+                    }
+                }
+            }
+            si = si + 1
+        }
+        mi = mi + 1
+    }
+
     // Pre-scan: register main program top-level VarDecls as globals
     var gvi: Float = 0
     while (gvi < program.length()) {
