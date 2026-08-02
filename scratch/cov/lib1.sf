@@ -1,0 +1,7 @@
+class NoInit { var a: Int }
+class WithInit {
+    var b: Int
+    fun init(b: Int) { this.b = b }
+}
+extend fun WithInit.m1(): Int { return this.b + 1 }
+extend fun NoInit.n1(): Int { return 7 }

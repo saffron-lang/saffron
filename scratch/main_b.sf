@@ -1,0 +1,5 @@
+import "./other.sf" as Other
+import "./core.sf" as Core
+
+var c = Core.Ctx(10)
+IO.println(c.ay(5))
