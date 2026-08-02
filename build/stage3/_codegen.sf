@@ -2152,6 +2152,31 @@ class Codegen {
         return result
     }
 
+    /// Does this static type name settle the *representation* of an ordering
+    /// comparison, so `<` can be a direct icmp/fcmp with no tag inspection?
+    ///
+    /// Only the numeric primitives qualify. Everything else — `Any`, a class, a
+    /// union, a generic parameter, or the empty string get_expr_type returns when
+    /// inference gave up — leaves the representation unknown at compile time, and
+    /// a comparison on an unknown representation has to ask the value itself.
+    ///
+    /// `Bool` is deliberately absent: it is TAG_SPEC, not an integer, so an icmp
+    /// on the boxed bit pattern is not its order. It falls to the runtime helper
+    /// along with everything else.
+    fun is_ordered_primitive(t: String): Bool {
+        return t == "Int" or t == "Number" or t == "Float"
+    }
+
+    /// The runtime helper implementing `op` for operands whose static types do
+    /// not settle the comparison. Empty for a non-relational op.
+    fun ordering_helper(op: String): String {
+        if (op == "<") { return "__val_lt" }
+        if (op == "<=") { return "__val_le" }
+        if (op == ">") { return "__val_gt" }
+        if (op == ">=") { return "__val_ge" }
+        return ""
+    }
+
     fun op_to_method(op: String): String {
         if (op == "+") { return "add" }
         if (op == "-") { return "sub" }
@@ -2568,13 +2593,45 @@ class Codegen {
         else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
             this.last_type = AST.Type.BoolType
             var cmp_local: String = this.fresh_local()
-            if ((left_type2 == "String" or right_type2 == "String") and (op == "<" or op == "<=" or op == ">" or op == ">=")) {
+            var __ord_helper: String = this.ordering_helper(op)
+            var __ord_static: Bool = this.is_ordered_primitive(left_type2) and this.is_ordered_primitive(right_type2)
+            if (__ord_helper.length() > 0 and (left_type2 == "String" or right_type2 == "String")) {
                 var strcmp_result: String = this.fresh_local()
                 this.emit_indent(strcmp_result + " = call i64 @__safe_strcmp(i64 " + lhs + ", i64 " + rhs + ")")
                 if (op == "<") { this.emit_indent(cmp_local + " = icmp slt i64 " + strcmp_result + ", 0") }
                 else if (op == "<=") { this.emit_indent(cmp_local + " = icmp sle i64 " + strcmp_result + ", 0") }
                 else if (op == ">") { this.emit_indent(cmp_local + " = icmp sgt i64 " + strcmp_result + ", 0") }
                 else { this.emit_indent(cmp_local + " = icmp sge i64 " + strcmp_result + ", 0") }
+            }
+            // Ordering with at least one operand whose static type does not pin
+            // down its representation. This is the #104 arm, and it must sit
+            // ABOVE the Float and integer arms: those untag both sides as a
+            // number, so reaching them with a TAG_PTR operand compares the bit
+            // patterns of two heap pointers. The comparison then depended on heap
+            // layout, which is how the same program answered differently at -O0
+            // and -O2 while `run_tests.sh` (which builds -O2) stayed green.
+            //
+            // `Any` is not a rare annotation to sprinkle a special case on: it is
+            // what every generic container's elements are, so `_bisect(value: Any)`
+            // in sorted_set.sf, heap.sf's default comparators and test.sf's
+            // assert_lt all landed here. The dispatch is deferred to __val_cmp,
+            // which reads the tags of both operands (BUGS #104).
+            //
+            // Numeric comparison does NOT regress into a call: when both static
+            // types are Int/Number/Float, __ord_static is true and control falls
+            // through to the fcmp/icmp arms below exactly as before.
+            else if (__ord_helper.length() > 0 and !__ord_static) {
+                // Registering the call is what emits `declare i64 @__val_lt(i64,
+                // i64)`: output_body's trailing loop declares every
+                // called_function that this module does not itself define. That
+                // keeps the four helpers out of runtime_declares(), which matters
+                // because runtime.sf *defines* them — a declare there would
+                // collide with the definition.
+                this.called_functions.push(__ord_helper)
+                this.called_function_arity.set(__ord_helper, 2)
+                var ord_raw: String = this.fresh_local()
+                this.emit_indent(ord_raw + " = call i64 @" + __ord_helper + "(i64 " + lhs + ", i64 " + rhs + ")")
+                this.emit_indent(cmp_local + " = icmp ne i64 " + ord_raw + ", 0")
             } else if (left_type2 == "Float" or right_type2 == "Float") {
                 var cld: String = this.emit_untag_float(lhs)
                 var crd: String = this.emit_untag_float(rhs)
