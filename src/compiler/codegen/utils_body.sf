@@ -286,7 +286,7 @@
             }
             LetPattern(pattern, value) => {
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 

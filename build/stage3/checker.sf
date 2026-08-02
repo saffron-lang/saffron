@@ -1069,7 +1069,7 @@ class NullChecker {
             TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -1435,7 +1435,7 @@ class NullChecker {
             LetPattern(pattern, value) => {
                 this.infer_expr(value)
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 

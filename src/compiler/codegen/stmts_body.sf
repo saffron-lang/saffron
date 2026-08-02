@@ -129,7 +129,7 @@
                 }
                 this.gen_class_decl_with_parents(name, parents, fields, methods)
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -1186,7 +1186,7 @@
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -1359,7 +1359,7 @@
             // here: `classify_stmt` returns one tag per variant, and until BUGS
             // #76 made the checker walk method bodies, a missing arm yielded an
             // indeterminate string rather than an error.
-            TypeAlias(ta_n, ta_t) => "type_alias"
+            TypeAlias(ta_n, ta_t, ta_vis) => "type_alias"
         }
     }
 
@@ -1379,7 +1379,7 @@
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(ta_n, ta_t) => "other"
+            TypeAlias(ta_n, ta_t, ta_vis) => "other"
         }
         return kind == "if"
     }

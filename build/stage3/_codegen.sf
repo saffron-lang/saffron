@@ -5432,7 +5432,7 @@ class Codegen {
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -6366,7 +6366,7 @@ class Codegen {
                 }
                 this.gen_class_decl_with_parents(name, parents, fields, methods)
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -7423,7 +7423,7 @@ class Codegen {
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -7596,7 +7596,7 @@ class Codegen {
             // here: `classify_stmt` returns one tag per variant, and until BUGS
             // #76 made the checker walk method bodies, a missing arm yielded an
             // indeterminate string rather than an error.
-            TypeAlias(ta_n, ta_t) => "type_alias"
+            TypeAlias(ta_n, ta_t, ta_vis) => "type_alias"
         }
     }
 
@@ -7616,7 +7616,7 @@ class Codegen {
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(ta_n, ta_t) => "other"
+            TypeAlias(ta_n, ta_t, ta_vis) => "other"
         }
         return kind == "if"
     }
@@ -8535,7 +8535,7 @@ class Codegen {
             }
             LetPattern(pattern, value) => {
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -10292,7 +10292,7 @@ class Codegen {
             TryCatch(t, n, c, f) => false
             Throw(v) => false
             LetPattern(p, v) => false
-            TypeAlias(ta_n, ta_t) => false
+            TypeAlias(ta_n, ta_t, ta_vis) => false
         }
     }
 
@@ -10551,7 +10551,7 @@ class Codegen {
                 TryCatch(t, n, c, f) => {}
                 Throw(v) => {}
                 LetPattern(p, v) => {}
-                TypeAlias(ta_n, ta_t) => {}
+                TypeAlias(ta_n, ta_t, ta_vis) => {}
             }
             pri = pri + 1
         }

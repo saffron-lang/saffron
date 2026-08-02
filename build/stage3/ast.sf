@@ -176,7 +176,17 @@ enum Stmt {
     TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>, finally_body: List<Stmt>),
     Throw(value: Expr),
     LetPattern(pattern: Pattern, value: Expr),
-    TypeAlias(name: String, target: String)
+    // `visibility` is one of "public" / "private" / "internal" / "protected".
+    // Phase 3 of docs/design/access-modifiers.md adds the field and nothing else:
+    // there is no syntax for it yet, so the parser writes "public" everywhere and
+    // no reader consults it. It is appended *after* `docstring` on every widened
+    // node deliberately — appending leaves every pre-existing field at the index it
+    // already had, so a match arm that was missed still binds its old fields
+    // correctly and merely lacks `visibility`. Inserting it first or mid-payload
+    // would shift `name`/`docstring` by one, and since both are `String` a missed
+    // arm would read a plausible *wrong string* instead of nothing, which is
+    // exactly BUGS #96's failure shape.
+    TypeAlias(name: String, target: String, visibility: String)
 }
 
 enum Variant {
