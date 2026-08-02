@@ -1,3 +1,17 @@
+// Generic enums and generic functions.
+//
+// Graded on exit status alone until now (BUGS #107), which is how its first three
+// lines came to print `5.21502e-310` while the test counted as passing. No
+// `.expected` file is recorded: those three lines are BUGS #105 —
+// `IO.println(enum_value)` never calls `to_string()`, so the runtime formats the
+// `tag << 56` immediate as an unboxed double. Recording that would enshrine the
+// bug as the expected answer.
+//
+// The IO.println calls stay so the #105 output remains visible. The assertions
+// below cover what #105 does not touch: generic payload round-tripping, the match
+// arms, and generic function instantiation at two different type arguments.
+import "@test" as Test
+
 // Test: Generic enums
 enum Option<T> {
     Some(value: T),
@@ -32,3 +46,30 @@ fun identity<T>(x: T): T {
 
 IO.println(identity(99))
 IO.println(identity("hello"))
+
+// --- checks ---------------------------------------------------------------
+// The match must select Ok and bind v=100, not fall through to the Err arm.
+// A non-exhaustive or mis-bound match yields an indeterminate value (BUGS #76)
+// rather than an error, so this assertion is the only thing standing between
+// `doubled` and silent garbage.
+Test.assert_eq(doubled, 200, "Ok(100) selects the Ok arm and binds v=100")
+
+// Generic instantiation at two distinct type arguments from one definition.
+Test.assert_eq(identity(99), 99, "identity at T=Int")
+Test.assert_eq(identity("hello"), "hello", "identity at T=String")
+Test.assert_eq(identity(99) + 1, 100, "the Int instantiation is still an Int")
+Test.assert_eq(identity("ab").length(), 2, "the String instantiation is still a String")
+
+// Generic payloads survive construction and stringify through to_string(), the
+// path that is correct today.
+Test.assert_eq("${x}", "Some(42)", "generic payload keeps its value")
+Test.assert_eq("${y}", "None", "the no-payload variant of a generic enum")
+Test.assert_eq("${r}", "Ok(100)", "two-parameter generic enum payload")
+
+// Distinct variants must not collide (the BUGS #102 failure shape).
+Test.assert_neq("${x}", "${y}", "Some and None stringify differently")
+
+// Purity of stringification, valid whatever the correct rendering turns out to be.
+Test.assert_eq("${r}", "${r}", "stringifying one value twice agrees")
+
+Test.summary()

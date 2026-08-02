@@ -173,8 +173,34 @@ const cstr = (p) => {
 // Buffer output and write once at the end. The differential compares whole
 // streams, so a tail lost to an interleaved crash would read as a mismatch — a
 // wrong finding, and the expensive kind to chase.
-const out = [];
-const emit = (s) => out.push(s);
+//
+// LINE DISCIPLINE — why this is a byte buffer and not an array of lines.
+//
+// It used to be `out.push(s)` joined by '\n' at exit, i.e. the HOST decided that
+// every js_log_* call ends a line. That is wrong, and wrongly blamed the
+// compiler. On wasm32 both __io_println AND __io_print call js_log_str
+// (wasm_base_32.ll:1751) — the base has no separate no-newline host import — so
+// a program's every IO.print gained a newline it does not have natively, where
+// __io_print is printf("%s") with no terminator (base_nanbox.ll:113-119).
+//
+// The visible symptom was test/pass/narrowing.sf, five IO.print calls: native
+// prints `truefalsetruetruetrue` on one line, wasm printed five lines. That was
+// filed as a MISMATCH by the differential and looked exactly like a codegen bug.
+// It is the failure mode this file's header warns about — a harness that
+// manufactures its own failures — so the newline now comes from the runtime
+// contract rather than from the host's data structure.
+//
+// RESIDUAL LIMIT, stated because it cannot be fixed from this file: since both
+// entry points land on js_log_str, the host cannot tell println from print. It
+// appends '\n' for every call, which is right for println (the common case) and
+// still wrong for print. Distinguishing them needs a second import in all four
+// .ll bases (src/runtime/), so a program whose output depends on IO.print is
+// still not gradeable on the wasm axis. differential.sh should treat such a
+// program as a capability skip rather than a mismatch.
+let out = '';
+const emit = (s) => {
+  out += s + '\n';
+};
 
 // The four logging hosts are the ones whose behaviour actually matters; their
 // formatting must match the native runtime's exactly, because a formatting
@@ -280,5 +306,5 @@ try {
   status = 4;
 }
 
-if (out.length) process.stdout.write(out.join('\n') + '\n');
+if (out.length) process.stdout.write(out);
 process.exit(status);

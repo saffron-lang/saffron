@@ -25,11 +25,11 @@ Two consequences worth stating, because they contradict earlier drafts of this d
 
 ### `protected` is in scope and blocked; it is now the critical path
 
-Kotlin parity means `protected` ships. It is currently **unimplementable soundly**, so the blocker below is promoted from "deferred Phase 8" into a prerequisite of the `protected` slice.
+Kotlin parity means `protected` ships. It **was** unimplementable soundly, so the blocker below was promoted from "deferred Phase 8" into a prerequisite of the `protected` slice — and then done, as Phase 3b (BUGS #111). The diagnosis is kept below because it is the reason for the sequencing, and because the fix is only half-landed: it waits at the gen2 promotion gate.
 
-### Why not `protected`
+### Why `protected` was blocked (historical — resolved by Phase 3b)
 
-`protected` is not merely unattractive here; it is **currently unimplementable soundly**, and that is a fact about the tree, not a preference.
+`protected` was not merely unattractive here; it was **unimplementable soundly**, and that was a fact about the tree, not a preference.
 
 `ClassDecl.parent` is a single `String` (`ast.sf:82`). The parser reads the first parent and then throws the rest away:
 
@@ -194,7 +194,11 @@ Two hazards, both with precedent in `BUGS.md`, both must be designed for:
 
 Parser touch points:
 - statement dispatch (`parser.sf:1420ff`): `is_ident_named("private")` / `("public")` before the `var`/`fun`/`class`/`enum`/`interface`/`actor` tests, consuming the modifier and threading it down.
-- class-body loop (`parse_class_decl_with_doc`, `parser.sf:1985-2041`): the loop advances only inside its `var` / `@` / `fun` branches. **A token it recognizes in none of them does not advance the cursor — the loop spins forever.** So `private` must be handled in that loop before anything else, or a `private var` inside a class hangs the compiler. Needs verification against gen2's behavior; do not discover it by compiling.
+- class-body loop (`parse_class_decl_with_doc`, `parser.sf:2020`; loop at `:2068`): **verified 2026-08-02 by reading the loop, not by compiling.** The condition tests only `}` and `eof`; the body has exactly three branches (`match_kind_check("var")`, `is_ident_named("@")`, `match_kind_check("fun")`), each of which advances, and **there is no `else` and no unconditional advance**. So a member token matching none of the three spins forever: `private var x: Int` inside a class body would **hang the compiler**, not produce a parse error. `private` must therefore be handled in that loop *before* the three existing tests.
+
+  Systematic fix worth taking while in there, rather than just dodging this instance: add an unconditional `else` that emits a diagnostic. The hang is not specific to visibility — *any* future member syntax hits it, and a hang is the worst possible failure mode because it has no error message to grep for. Do it as its own commit so it is reviewable separately from the feature.
+
+  Relevant sites for threading visibility through, verified at the post-#111 tree: fields constructed at `:2101`, methods at `:2119` / `:2122` via `parse_fun_decl_with_doc`, and the node returned at `:2129`. Note the `extends` list at `:2055-2062` is now correct (it collects every base) — do not "fix" it.
 
 ## 6. Coverage by declaration kind, and the leakage check
 
@@ -254,7 +258,7 @@ There is a wart to consume rather than fix: `Param.type_ann` is an `AST.Type` no
 
 **L6, unions.** Purely lexical decomposition on `|`. **The leak check never emits a runtime type test and never lowers to `is`**, so #69 (`is` broken on unions) is untouched by design. Say this out loud in the doc so nobody later "improves" the check into a runtime one.
 
-**L7, and its coverage hole.** Only the *first* parent is recorded (§1), so for `public class C extends PrivateA, PrivateB` this check catches `PrivateA` and silently misses `PrivateB`. That is the same parser truncation that blocks `protected`, and it must be recorded as a known hole with the same fix.
+**L7, and its former coverage hole — now closed.** The earlier draft recorded that only the *first* parent was known, so `public class C extends PrivateA, PrivateB` would catch `PrivateA` and silently miss `PrivateB`. **Phase 3b / BUGS #111 closed that**: `class_parents` holds every base, so the L7 check must iterate the full list. Stated as a positive requirement rather than a hole: L7 loops `parents`, and the diagnostic names *which* base leaks.
 
 **L8, `Fun`.** `AST.Type` has `FuncType(params, ret)`, but the surface `Fun` erases to a signature-free type: #56 says plainly *"the static type of an indirect call's result is not recovered (`Fun` carries no return type)"*, and #86 is the same root for block parameters. So `public fun subscribe(cb: Fun)` where `cb` is expected to receive a private type is **structurally unable to be checked**. Not "hard" — impossible with the information present. Closing it requires giving `Fun` a signature, which is a language change already tracked by #56. State the hole; do not pretend coverage.
 
@@ -282,7 +286,7 @@ Conflicts in `build/saffronc` and `build/stage3/*.ll` are expected and are **gen
 
 **Phase 1 — leak-check machinery (no new syntax).** *Can* it land before promotion? Technically yes: it is checker-only and needs no syntax, so gen2 compiles it fine. **But it should not.** With nothing annotatable, the pass has zero reachable inputs, and "a check that ran and found nothing" is indistinguishable from "a check that never ran" — the precise failure that hid #76 for as long as it did, and that a green bootstrap over a broken gen3 hid in #100. So: **build the pass in Phase 1, but land it in the same commit as Phase 4's parser support**, where it has real inputs and real tests. This refutes the guess that it can usefully go first.
 
-**Phase 2 — module plumbing into the checker (no new syntax, pre-promotion). ✅ DONE, `85bfb13`, pending merge.** Threaded `module_boundaries` + `prefixes_joined` into the checker via `check_errors_with_modules(...)`, decoding them exactly as `Resolve.resolve_imports` does rather than inventing a second scheme; `check_errors_with_imports` is now a thin wrapper that degrades to the old flat behaviour on an empty boundary list. Class tables re-keyed by prefix + name, with the missing `ambiguous_classes` guard added — an ambiguous bare name answers `Any` (widening) rather than inventing a mismatch, matching `get_variant_fields`' posture.
+**Phase 2 — module plumbing into the checker (no new syntax, pre-promotion). ✅ DONE and merged to `main` (`fcf0bc1`, source `85bfb13`).** Threaded `module_boundaries` + `prefixes_joined` into the checker via `check_errors_with_modules(...)`, decoding them exactly as `Resolve.resolve_imports` does rather than inventing a second scheme; `check_errors_with_imports` is now a thin wrapper that degrades to the old flat behaviour on an empty boundary list. Class tables re-keyed by prefix + name, with the missing `ambiguous_classes` guard added — an ambiguous bare name answers `Any` (widening) rather than inventing a mismatch, matching `get_variant_fields`' posture.
 
 Two findings worth carrying forward:
 
@@ -291,9 +295,23 @@ Two findings worth carrying forward:
 
 Verified: bootstrap both stages; failure sets byte-identical to base (28 failures, same names, no swap; passing 147 → 148); `build/stage2/saffronc` provably unchanged. `test/pass/visibility_response_collision.sf` was confirmed to **fail on base** — the unchanged gen2 rejects it with `ERROR: client_payload: cannot assign Int to String`, the misattribution itself — so it proves what it claims. Helpers live in `test/support/`, since both `test/*.sf` and `test/fail/*.sf` are globbed as tests.
 
-**Phase 2b — file → owning package mapping (no new syntax, pre-promotion).** Required by `internal`, which is package-scoped. Build it alongside `collect_modules`' existing `path_to_prefix` machinery, reusing `main.sf`'s existing `pantry.toml` reading (now inside `8b5eadf`'s consolidated import helper) rather than a second manifest parser — I10, and BUGS #27 records what a duplicate parser costs. **"No owning package" must be an explicit distinct value**, never an empty string and never a synthetic name: a bare script and most of `test/*.sf` have no manifest above them, and spelling that unknown as a concrete package is I2's exact prohibition. Nested manifests exist (`bazaar/pantry.toml` and `bazaar/frontend/pantry.toml`), so nearest-above governs.
+**Phase 2b — file → owning package mapping (no new syntax, pre-promotion). ✅ DONE and merged to `main` (`29b4b8f`, source `6a85fc9`).** `file_has_package`, `package_root_of_file`, `package_name_of_file`, `same_module_file`, `same_package`, `loaded_file_paths` in `main.sf`, with `test/package_map_test.sh` (8 assertions). Reused `main.sf`'s existing manifest scanner generalised to `_read_toml_value(source, section, key)` rather than adding a third TOML parser — I10, BUGS #27. `@toml` was tried and rejected: its `Map<String, Any>` is refused by the checker, and it would put `main.sf`'s own compilation behind a closure-heavy parse.
 
-**Phase 3b — widen `ClassDecl.parent: String` → `parents: List<String>` (prerequisite of `protected`).** Independent of visibility itself: it adds no modifier and no keyword, and fixes a real existing defect — `parser.sf` parses `class Duck extends Flyable, Swimmable, Walkable` and discards every parent after the first. Propagate through `class_parents`, `class_parent_of`, `is_subtype_node`, conformance, and codegen's field-prepending and `__class_parent_tag` switch, **preserving single-parent layout exactly** (a layout change is an ABI break against the checked-in gen2). Note `test/pass/multi_inherit.sf` passes today, which means it exercises only the first parent; strengthening it must be verified to *fail* before the fix. Interfaces and actors route through `ClassDecl` too, so both are in blast radius. Promotion-gated for the same #96/#100 reason as Phase 3.
+Three findings, all of which corrected premises in this document's earlier drafts:
+
+- **Package *names* are not unique.** The repo root and `src/compiler/` both declare `name = "saffron"`, so identity is the manifest **directory**; the name is carried for diagnostics only.
+- **"most of `test/*.sf` has no manifest above them" was wrong.** The repo root has a `pantry.toml`, so every file in the tree inherits it, `test/` included. Genuinely packageless files exist only outside the repo. This is what settles §11 decision 1.
+- **Path spellings had to be canonicalised**, or root-package files reached via `--stdlib` vs `--lib-path` compared unequal — "different package" about one package.
+
+"No owning package" is an explicit sentinel, never an empty string and never a synthetic name (I2), and `same_package` answers false when **either** side lacks a package rather than calling two packageless files siblings. Nested manifests exist (11 in the tree, including `bazaar/pantry.toml` and `bazaar/frontend/pantry.toml`), so nearest-above governs. Side fix found on the way: the old scanner matched any line *starting with* the key, so `entrypoint =` matched `entry`.
+
+**Phase 3b — widen `ClassDecl.parent: String` → `parents: List<String>` (prerequisite of `protected`). ✅ DONE and merged to `main` (`dc42fbc`, source `0ada95a`), BUGS #111.** Independent of visibility itself: it adds no modifier and no keyword, and fixed a real existing defect. `class_parents` is now `Map<String, List<String>>`, `inherits_from` does a BFS over the inheritance DAG with a visited set, conformance consults every base, and `__class_is_a` is a flattened tag→ancestor-set nested switch rather than a chain walk.
+
+Field layout is deliberately unchanged — only `parents[0]` contributes fields, and only its `init` is forwarded, because the invariant the lowering rests on (parent field index i == child field index i) can hold for exactly one base. Verified no ABI break: for a single-inheritance program the `getelementptr` sets are identical between old and new compilers, and the only IR diff outside the `__class_is_a` rewrite is the removed `@__class_parent_tag` call.
+
+**The premise "`test/pass/multi_inherit.sf` passes today" was wrong.** It *failed* on base with `[codegen] Error: type 'Duck' has no method 'swim'`, as did `test/pass/interfaces.sf` — multiple inheritance was broken outright, not merely unsound for `protected`. Two further bugs surfaced only after the widening, both invisible in totals and caught only by diffing failure name sets: `test/fail/conformance.sf` stopped being rejected (a child's inherited-name set included abstract names, so a requirement satisfied itself), and `class Both extends Requires, Provides` compiled clean and returned 0 because first-wins forwarding aimed at the bodyless symbol. This is also where §11 decision 2's precedence rule comes from.
+
+**This phase reached the promotion gate without crossing it.** Per #96/#100 it is not truly landed until gen2 is promoted; that is a separate, explicitly-approved ceremony.
 
 **Phase 3 — widen the AST, promotion-gated.** One commit per node, smallest-first, each with **all** its match arms updated in the same commit (`Param` 34, `FunDecl` 44, `ClassDecl` 67, then `EnumDecl`/`VarDecl`/`TypeAlias`). Extend `test/pass/enum_wide_payload.sf` to a seven-field variant, since it exists as the regression test for exactly this hazard. Bootstrap with stage 2 after each. Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.**
 
@@ -326,13 +344,13 @@ Nothing in Phases 1, 2, 2b, 3 or 3b may use a visibility modifier in compiler so
 Sequential spine, each step gated on the one above:
 
 ```
-Phase 2   file identity in checker        DONE (85bfb13)   ─┐ parallel,
-Phase 2b  file → package mapping          in progress      ─┤ independent
-Phase 3b  ClassDecl.parents: List<String> in progress      ─┘ (3 worktrees)
+Phase 2   file identity in checker        DONE  merged fcf0bc1   ─┐ ran in
+Phase 2b  file → package mapping          DONE  merged 29b4b8f   ─┤ parallel,
+Phase 3b  ClassDecl.parents: List<String> DONE  merged dc42fbc   ─┘ 3 worktrees
                     │
-Phase 3   widen declaration nodes for visibility
+Phase 3   widen declaration nodes for visibility     ← in progress
                     │
-            ⟵ GEN2 PROMOTION ⟶
+            ⟵ GEN2 PROMOTION ⟶   (covers 3b and 3 together)
                     │
 Phase 4   parser + class-member enforcement + leak pass (public/private)
 Phase 5   package-level enforcement (internal)   ← needs 2b
@@ -340,13 +358,19 @@ Phase 5b  protected                              ← needs 3b
 Phase 6   annotate the stdlib
 ```
 
-**What can be parallelised, and what cannot.** Phases 2, 2b and 3b are genuinely independent — different files, no shared tables — and are being run concurrently in separate worktrees. Everything from Phase 3 onward is **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase can start before it. Parallelising across the gate would produce two incompatible gen2 candidates; do not attempt it.
+**What can be parallelised, and what cannot.** Phases 2, 2b and 3b were genuinely independent — different files, no shared tables — and were run concurrently in three worktrees, then merged with one hand-resolved hunk (the `ClassDecl` arm of `check_stmt`, where Phase 2's prefix-keyed sets and Phase 3b's list-valued parents are complementary and had to be *combined*, not chosen between). Failure name sets went 32 → 30 with zero regressions.
+
+Everything from Phase 3 onward is **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase can start before it. Parallelising across the gate would produce two incompatible gen2 candidates; do not attempt it. Phase 3 additionally cannot be parallelised *with* anything that writes match arms on these nodes — an agent editing a `FunDecl(` arm while Phase 3 changes its arity is #96's exact mechanism.
+
+Since 3b and 3 both widen declaration nodes and 3b stopped at the gate, **one promotion covers both.** Promoting after 3b alone would spend the ceremony twice for no benefit.
 
 ## 8. Test plan
 
 The fail suite is how visibility is proven to actually deny — a `test/fail/` file that compiles cleanly is itself a suite failure.
 
-**Runner requirement, found while planning.** `tools/run_tests.sh` globs `for f in "$ROOT"/test/fail/*.sf` and applies **no** skip list in that loop (`NOT_A_TEST` / `STALE_TESTS` are only consulted in the `test/*.sf` loop). So a *helper* module placed in `test/fail/` would be executed as a test and would have to fail on its own, which is impossible for a helper that must compile. Cross-module fail tests therefore need helpers outside that glob — a `test/fail_support/` directory, with the runner left unchanged. This is a real plumbing prerequisite for Phase 5's tests, not a detail.
+**Runner requirement, found while planning — and already satisfied.** `tools/run_tests.sh` globs `for f in "$ROOT"/test/fail/*.sf` (`:353`) and applies **no** skip list in that loop (`NOT_A_TEST` / `STALE_TESTS` are only consulted in the `test/*.sf` loop, `:317-326`). So a *helper* module placed in `test/fail/` would be executed as a test and would have to fail on its own, which is impossible for a helper that must compile. Cross-module fail tests therefore need helpers outside that glob.
+
+No new directory is needed: **`test/support/` already exists** and is globbed by none of the three loops, which read only `test/*.sf`, `test/pass/*.sf` and `test/fail/*.sf`. Phase 2 created it for `visibility_collision_client.sf` / `visibility_collision_server.sf`. Put Phase 5's cross-module fail helpers there and leave the runner unchanged (§11 decision 4).
 
 **`test/fail/` — must be rejected. Every one uses a statically-known receiver, so none can escape down §3's soft-fail path.**
 
@@ -363,7 +387,10 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 - `leak_generic_private_nested.sf` — `Map<String, List<Private>>`, proving L5 is transitive and not top-level-only
 - `leak_union_private.sf` (L6)
 - `leak_public_extends_private.sf` (L7)
+- `leak_public_extends_private_secondary.sf` — `public class C extends PublicA, PrivateB`, the base that Phase 3b made visible. Without it L7 would silently regress to first-base-only and nothing would notice (§6b).
 - `leak_inferred_private_global.sf` (L9, the anchored/error half)
+- `internal_cross_package.sf` — an `internal` declaration read from a *different* package. Needs a helper under a second `pantry.toml`; `test/testpkg/pantry.toml` already exists as a precedent (§11 decision 1).
+- `protected_from_unrelated_class.sf` — a `protected` member read from a class that is not a subclass (§5b).
 
 **`test/pass/` — must compile and run.**
 
@@ -374,7 +401,10 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 - `private_module_internal.sf` — private top-level function called from inside its own module, public wrapper exported.
 - `leak_private_to_private_ok.sf` — private function taking a private type: no diagnostic.
 - `leak_public_member_of_private_class.sf` — L4's no-op.
-- `visibility_response_collision.sf` — two same-named classes in two modules, one with a private field, the other's like-named field read publicly. This is the `http/server.Response` / `http/client.Response` regression, and it fails before Phase 2.
+- `visibility_response_collision.sf` — two same-named classes in two modules, one with a private field, the other's like-named field read publicly. This is the `http/server.Response` / `http/client.Response` regression, and it fails before Phase 2. **Landed with Phase 2**, and verified to fail on base with the misattribution itself (`client_payload: cannot assign Int to String`) rather than passing on both sides.
+- `internal_same_package.sf` — an `internal` declaration read from a *different file in the same package*. This is the case that distinguishes `internal` from `private`; without it, an `internal` implemented as a synonym for `private` would pass the whole suite.
+- `internal_no_package_warns.sf` — `internal` in a file with no owning `pantry.toml` degrades to file-scope **and warns** (§11 decision 1). Needs a `.expected` for the warning, per the soft-fail note below. Note this test cannot live in the repo tree, since the root `pantry.toml` gives every file in it a package — it needs the runner to compile a file from a temp dir, as `test/package_map_test.sh` already does.
+- `protected_from_subclass_of_secondary_base.sf` — a `protected` member on base 2 or 3, read from a subclass. This is the case Phase 3b unblocked and the one §11 decision 2's precedence rule governs.
 - extend `enum_wide_payload.sf` to seven fields (Phase 3's guard).
 
 **Soft-fail warning path.** Warnings do not block, so this cannot be a fail test. The runner diffs stdout against an optional `.expected` file (added in `e5b4a7b` for #90), and `error_report` prints warnings via `IO.println("[checker] Warning: ...")`. So `test/pass/private_unresolved_receiver.sf` plus a `.expected` capturing the warning text is the right instrument — and it is what stops the soft-fail from silently becoming a no-op.
@@ -400,12 +430,18 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 
 ## 10. Blockers, stated plainly
 
-1. **`protected` is currently unimplementable soundly** — parser discards all but the first parent (`parser.sf:1977-1979`); `ClassDecl.parent` is a `String`; `class_parents` is `Map<String,String>`.
-2. **Module-level visibility is blocked** until the checker receives `module_boundaries` / `prefixes_joined` (`main.sf:1104` passes neither). Phase 2.
-3. **Bare-name class keying will produce a false denial today** on `http/server.Response` vs `http/client.Response`; there is an `ambiguous_enums` guard and no `ambiguous_classes`. Phase 2.
-4. **Closure-mediated visibility is structurally uncheckable** — `Fun` carries no signature (#56, #86).
+**Cleared (2026-08-02):**
+
+1. ~~**`protected` is currently unimplementable soundly** — parser discards all but the first parent; `ClassDecl.parent` is a `String`; `class_parents` is `Map<String,String>`.~~ **Cleared by Phase 3b / BUGS #111.** `parents` is a list, `class_parents` is `Map<String, List<String>>`, and `inherits_from` searches the whole DAG. `protected` still waits on the promotion gate, but nothing about the representation blocks it now.
+2. ~~**Module-level visibility is blocked** until the checker receives `module_boundaries` / `prefixes_joined`.~~ **Cleared by Phase 2.** `check_errors_with_modules(...)` receives both.
+3. ~~**Bare-name class keying will produce a false denial today** on `http/server.Response` vs `http/client.Response`.~~ **Cleared by Phase 2**, which keys the class tables by prefix + name and adds the missing `ambiguous_classes` guard. `test/pass/visibility_response_collision.sf` pins it, and was confirmed to fail on base with the misattribution itself.
+
+**Still live:**
+
+4. **Closure-mediated visibility is structurally uncheckable** — `Fun` carries no signature (#56, #86). L8. Not "hard" — impossible with the information present.
 5. **Private enum variants cannot be made coherent** against exhaustiveness given #76/#73's indeterminate-value semantics.
-6. **`ClassDecl` at 7 fields re-enters #96/#100 territory** — mitigated only by the promotion ordering in Phase 3, not by cleverness.
+6. **`ClassDecl` at 7 fields re-enters #96/#100 territory** — mitigated only by the promotion ordering in Phase 3, not by cleverness. Still live, and now the *only* thing on the critical path: 3b already widened this node once and is itself waiting at the gate, so one promotion has to carry both.
+7. **`ambiguous_enums` was not retired**, though Phase 2 makes it possible: `enum_fields`' key is already compound (`"EnumName.Variant"`), so adding a prefix makes it three-part and all ~10 read sites must agree simultaneously.
 
 ## 11. Open decisions for the repo owner
 
@@ -417,9 +453,28 @@ Recorded here rather than resolved, because they are judgment calls about what t
 - ~~Is Phase 2 in scope?~~ **Yes.** The whole plan is in scope; Phase 2 is a confirmed prerequisite, not a candidate for splitting out.
 - ~~Which modifiers?~~ **Kotlin parity**: `public`/`private`/`internal`/`protected` (§1).
 
-**Still open:**
+**Resolved 2026-08-02 by evidence in the tree, not by preference. All four are reversible — they are design-doc decisions, and nothing has been built on them yet.**
 
-1. **`internal` in a file with no owning `pantry.toml`** — bare scripts and most of `test/`. Options: (a) degrade to file-scope with a warning; (b) hard error, "`internal` requires a package"; (c) treat the file as its own singleton package. (a) is the I2-consistent default and is what this document assumes, but (b) is defensible and stricter, and (c) silently makes `internal` mean `private` — which is spelling unknown as something concrete, so it is the weakest of the three.
-2. **`protected` and multiple inheritance.** Once `ClassDecl.parents` is a list, `class Duck extends Flyable, Swimmable` inherits `protected` members from several parents at once. Kotlin has no multiple inheritance, so parity gives no answer here — a name declared `protected` in two parents is a genuine ambiguity Saffron has to decide (error at the collision? first-parent wins? require qualification?).
-3. **L9's error/warn split** — error only when the initializer is syntactically a private constructor call, warn otherwise. Chosen to avoid #56's over-erroring; uniform error is the alternative, at the cost of some false rejections.
-4. **Is `test/fail_support/` acceptable** as a new directory, versus changing `run_tests.sh` to skip designated helpers in the fail glob?
+1. **`internal` in a file with no owning `pantry.toml`** → **(a) degrade to file-scope with a warning.**
+
+   The options were (a) degrade with a warning; (b) hard error, "`internal` requires a package"; (c) treat the file as its own singleton package. (c) is out on principle: it silently makes `internal` mean `private`, which is spelling unknown as something concrete — I2's exact prohibition.
+
+   Between (a) and (b), one measured fact settles it and it corrected a premise in this document's own earlier drafts: **the repo root has a `pantry.toml`, so every file in the tree inherits it, including all of `test/`.** Genuinely packageless files exist only *outside* the repo — a bare script someone runs from `/tmp`. So (b)'s strictness would buy nothing inside any real project and would reject exactly the throwaway-script case where a hard error is most annoying. (a) it is, and Phase 2b already built the I2-compliant substrate for it: `_no_package_marker()` is a distinct sentinel, never an empty string, and `same_package` answers false when *either* side lacks a package rather than calling two packageless files siblings.
+
+2. **`protected` and multiple inheritance** → **follow the rule the tree already has: earlier bases win ties, in declaration order, and abstract names do not claim a tie.**
+
+   Kotlin has no multiple inheritance so parity gives no answer, but Saffron does not need to invent one — BUGS #111 already had to settle this exact question for *method forwarding*, and it did (`codegen/stmts_body.sf:442-448`):
+
+   > Register inherited methods: if child doesn't define a method, map it to parent's — for EVERY base, in declaration order, not just the first. […] Earlier bases win ties, since `str_in_list(child_methods, ...)` sees names pushed by previous iterations — the same first-wins rule an override already had.
+
+   plus the refinement that a base's **bodyless** names are skipped, so a concrete method on a later base is not shadowed by an abstract declaration on an earlier one (`class Both extends Requires, Provides`).
+
+   A `protected` member visible through two bases is the same shape of question, so it gets the same answer rather than a second, competing precedence rule. Erroring at the collision was the alternative and is rejected: it would make a `protected` annotation on a widely-inherited interface a breaking change for every existing multiple-inheritance user, and it contradicts a rule already shipped one layer down. Requiring qualification is rejected for the same reason plus there is no syntax for it.
+
+3. **L9's error/warn split** → **keep it as designed** (error when the initializer is syntactically a private constructor call, warning otherwise).
+
+   The precedent is direct and recorded in #56: erroring unconditionally on the `MemberAccess` fallback "broke `pass/math` and `test_reflect` — one silent wrong answer traded for a batch of false rejections." A uniform error here would repeat that trade on inferred types, where the anchor for the diagnostic is the compiler's own guess. This is the §3 posture applied to inference: say what you know, and say when you do not know.
+
+4. **`test/fail_support/`** → **not needed. Use the existing `test/support/`, and leave `run_tests.sh` unchanged.**
+
+   The premise behind the question was right — the fail loop (`run_tests.sh:353`) applies no skip list, so a helper placed in `test/fail/` would be run as a test and would have to fail on its own, which a helper cannot do. But the conclusion was wrong: **`test/support/` already exists** (Phase 2 created it for `visibility_collision_client.sf` / `visibility_collision_server.sf`) and is globbed by none of the three loops, which only read `test/*.sf`, `test/pass/*.sf` and `test/fail/*.sf`. So the plumbing prerequisite §8 flagged is already satisfied, no new directory is warranted, and the runner needs no change.

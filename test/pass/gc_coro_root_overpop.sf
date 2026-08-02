@@ -1,4 +1,5 @@
 import "@async" as Async
+import "@test" as Test
 
 @extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
 @extern("void __gc_collect()") fun gc_collect()
@@ -64,3 +65,20 @@ while (r < 60) {
 }
 IO.println("over-pop check bad = " + bad.to_string())
 IO.println("final depth = " + ss_depth().to_string())
+
+// --- checks ---------------------------------------------------------------
+// Every corruption branch above prints a CORRUPT line, bumps `bad` and then sets
+// r = 60 to stop early. None of that affected the exit status, so before BUGS
+// #107 this test detected an over-pop, said so on stdout, and still passed. `bad`
+// is the whole point of the file; assert on it.
+Test.assert_eq(bad, 0, "no round saw an entry-frame root corrupted by an over-pop")
+
+// `bad == 0` is also what an early exit produces if the loop never ran, so pin
+// down that all 60 rounds actually executed and the roots are still readable now.
+Test.assert_eq(r, 60, "all 60 spawn/await/collect rounds ran to completion")
+Test.assert_eq(held.length(), 40, "the held list still has its 40 elements")
+Test.assert_eq(held[0], 90000, "held[0] survived")
+Test.assert_eq(held[39], 90039, "held[39] survived")
+Test.assert_eq(witness, "witness-intact", "the witness string survived")
+
+Test.summary()
