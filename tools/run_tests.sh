@@ -245,6 +245,24 @@ run_positive_test() {   # file label
         return
     fi
 
+    # Exit-status check. The gate above deliberately ignores the exit code of an
+    # `exit_code_is_result` test, because for those a nonzero status is the answer
+    # and not a failure. The cost was that four of them — mini_1param,
+    # mini_arithmetic, mini_ifelse, mini_while — had NOTHING checked whatsoever:
+    # they print no output, so the .expected diff below has nothing to compare,
+    # and the one value each computes was thrown away. `fun main(): Int { return
+    # 0 }` passed all four (BUGS #107). A sibling `<name>.exit` file holding the
+    # expected status makes that value load-bearing, and applies to any test, not
+    # just the mini_* set.
+    local expected_exit="${f%.sf}.exit"
+    if [[ -f "$expected_exit" ]]; then
+        local want; want=$(tr -d '[:space:]' <"$expected_exit")
+        if [[ "$run_ec" != "$want" ]]; then
+            record_fail "exit-mismatch" "$label" "exit $run_ec, expected $want" "$runlog"
+            return
+        fi
+    fi
+
     # Expected-output check. Every test above this line is an exit-code check, so
     # a test whose value *is* its output could truncate silently and still pass:
     # `test_async.sf` was green for the entire life of BUGS #38 while emitting 2
@@ -253,6 +271,20 @@ run_positive_test() {   # file label
     # stripped. Assertion-based tests need no such file — @test already sets a
     # non-zero exit — so this stays opt-in per test rather than becoming a
     # blanket requirement that would have to be back-filled for 165 files.
+    #
+    # THE TWO MECHANISMS COMPOSE. Assertions and `.expected` are not alternatives,
+    # and carrying both is supported: the assertion gate above returns early only
+    # when an assertion actually FAILED, so a test whose assertions all pass still
+    # falls through to the diff below. BUGS #107's survey found 0 of 174 tests
+    # carrying both, which reads like a policy and is not one — it is an accident
+    # of how the two were adopted. Prefer both where a test has real invariants AND
+    # a stable full output: the assertion says *why* a value is right, the
+    # `.expected` catches everything the assertions forgot to mention.
+    #
+    # The one case to NOT record is an output that is currently WRONG. Freezing a
+    # known-bad output is worse than leaving a test blind, because the eventual fix
+    # then reads as a regression. test/pass/enums.sf and test/pass/generics.sf are
+    # deliberately assertion-only for this reason (BUGS #105).
     local expected="${f%.sf}.expected"
     if [[ -f "$expected" ]]; then
         # filter_noise strips trailing structure, so compare through the same
@@ -362,8 +394,8 @@ fi
 echo ""
 echo "=== Category breakdown ==="
 for cat in pass compile-error link-error invalid-ir segfault crash-signal \
-           assertion-failure runtime-error nonzero-exit timeout not-rejected \
-           network stale not-a-test; do
+           assertion-failure runtime-error nonzero-exit exit-mismatch \
+           output-mismatch timeout not-rejected network stale not-a-test; do
     n=$(count_category "$cat")
     [[ ${n:-0} -gt 0 ]] && printf '  %-18s %d\n' "$cat" "$n"
 done
