@@ -1,0 +1,41 @@
+// BUGS #105: IO.println of an enum value printed raw bits, not the variant name.
+//
+// A fieldless variant is the bare immediate `tag << 56`, which carries no
+// NaN-box tag, so __io_println took it for an unboxed double: Color.Red
+// (0 << 56) printed "0" and Color.Green (1 << 56) printed "7.29112e-304".
+// A payload variant is an untagged heap [tag, f0, ...] pointer, which reads as
+// a denormal and printed "5.21502e-310".
+//
+// Interpolation was always correct because the lexer inserts an explicit
+// .to_string(); this test pins the direct-println path to that same output, so
+// the two cannot drift apart again. The .expected file is the assertion — a
+// value-comparing assert_eq cannot see what __io_println actually wrote.
+
+enum Color { Red, Green, Blue }
+enum Shape { Circle(r: Int), Square(s: Int) }
+
+// Direct println: the broken path.
+IO.println(Color.Red)
+IO.println(Color.Green)
+IO.println(Color.Blue)
+
+// Interpolation: the path that was already right. Must agree with the above.
+IO.println("${Color.Red}")
+IO.println("${Color.Green}")
+IO.println("${Color.Blue}")
+
+// Payload variants, both println and interpolation.
+IO.println(Shape.Circle(3))
+IO.println(Shape.Square(4))
+IO.println("${Shape.Circle(3)}")
+
+// IO.print takes the same arm, so it needs the same conversion.
+IO.print(Color.Green)
+IO.println("")
+
+// An enum held in a variable, not constructed at the call site.
+var c: Color = Color.Blue
+IO.println(c)
+
+// Via an explicit .to_string(), which must not be double-converted.
+IO.println(Color.Red.to_string())
