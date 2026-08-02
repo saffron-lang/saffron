@@ -1,0 +1,11 @@
+// BUGS #24, the return end of the same asymmetry. The return path's final
+// `else` boxed with `__val_tag_int(i64 %r)` regardless of what LLVM actually
+// types the result as. A `void**` return is held as `i8**`, so the boxing call
+// was a type error: "'%t8' defined with type 'ptr' but expected 'i64'".
+//
+// The parameter side and the return side each had their own `else` covering a
+// different set of C types; making the two ends agree is the whole of this fix.
+@extern("void** sf_unboxable(i64)") fun ptrptr(n: Int): Ptr
+
+var p = ptrptr(1)
+IO.println("unreachable")

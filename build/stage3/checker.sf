@@ -160,7 +160,11 @@ class NullChecker {
     var warnings: List<String>
     var current_func_ret: AST.Type
     var current_class: String
-    var class_parents: Map<String, String>
+    // Every declared base of each class that has one, in source order. This was
+    // `Map<String, String>` — one parent — which is why `class Duck extends
+    // Flyable, Swimmable, Walkable` was invisible past Flyable: conformance only
+    // ever consulted one base and is_subtype_node walked one chain.
+    var class_parents: Map<String, List<String>>
     var class_method_names: Map<String, String>
     // The declared generic parameter names of each class, comma-joined:
     // `class Box<T>` → "T", `class Pair<K, V>` → "K,V". Keyed by the bare class
@@ -175,6 +179,25 @@ class NullChecker {
     // comma-joined method-name list, matching class_method_names' encoding.
     var class_abstract_methods: Map<String, String>
     var receiver_params: Map<String, String>
+    // What a callee declares about the SHAPE of a function-typed parameter, keyed
+    // "funcname:index" (and "Class__method:index"), exactly like receiver_params.
+    //
+    // This is the table that makes a block-syntax argument typed. A block
+    // (`f(x) { p => ... }`) can never carry annotations — there is nowhere to
+    // write them — so the only place its parameter types can come from is the
+    // parameter it is being passed to. Without this the block's parameters stayed
+    // AnyType, field-offset resolution fell through, and every field read answered
+    // 0 or "" with no diagnostic (BUGS #86).
+    //
+    // The value encodes three distinct states, which is the whole point:
+    //   absent      → the callee's parameter is not a function type at all (or the
+    //                 callee is unknown). Nothing to say; leave the lambda alone.
+    //   "?"         → declared a function type that carries NO parameter types
+    //                 (bare `Fun`). The source does not contain the type, so an
+    //                 untyped lambda parameter here is an error, not a guess.
+    //   "" / "A,B"  → the declared parameter types (empty = declared zero params).
+    //                 These get written into the lambda's own Param nodes.
+    var fun_param_sigs: Map<String, String>
     var actor_classes: Map<String, Bool>
     // Bare enum names declared by two different modules with different variant
     // lists — see register_enum.
@@ -239,6 +262,7 @@ class NullChecker {
         this.class_type_params = {}
         this.class_abstract_methods = {}
         this.receiver_params = {}
+        this.fun_param_sigs = {}
         this.actor_classes = {}
         this.ambiguous_enums = []
         this.current_prefix = ""
@@ -434,8 +458,11 @@ class NullChecker {
         if (typ.starts_with("List") or typ.starts_with("Map")) return false
         if (typ.starts_with("Fun") or typ.contains("=>")) return false
         if (this.class_parents.has(typ)) {
-            var parent: String = this.class_parents.get(typ)
-            if (parent.contains("Sendable")) return true
+            var parents: List<String> = this.class_parents.get(typ)
+            // `extends Sendable` in any position, not only the first. The old
+            // single-String form used `.contains("Sendable")`, a substring test
+            // that also accepted a base named `NotSendable`.
+            if (this.list_has_string(parents, "Sendable")) return true
         }
         return false
     }
@@ -656,15 +683,36 @@ class NullChecker {
             var inner: AST.Type = this.strip_nil_from_node(parent)
             return this.is_subtype_node(child, inner)
         }
-        // Check inheritance chain via stored parent types
-        var current: String = cs
-        while (current.length() > 0) {
-            if (current == ps) return true
-            var parent_key: String = current + "__parent"
-            var next_type: AST.Type = this.env.get_var_type(parent_key)
-            var next: String = this.type_to_str(next_type)
-            if (next == "Any" or next == current) return false
-            current = next
+        return this.inherits_from(cs, ps)
+    }
+
+    // Does `child` name `parent`, or any of its transitive bases? Breadth-first
+    // over class_parents, which holds *every* declared base rather than one.
+    //
+    // This used to be a single `current = current.__parent` chain walk, so for
+    // `class Duck extends Flyable, Swimmable, Walkable` only Flyable was ever
+    // reachable and `d is Swimmable` was statically false. The visited list is
+    // what makes a diamond (two bases sharing a grandparent) terminate instead
+    // of re-expanding the shared ancestor, and it also bounds a cyclic
+    // `extends` rather than looping forever.
+    fun inherits_from(child: String, parent: String): Bool {
+        if (child == parent) return true
+        var visited: List<String> = []
+        var work: List<String> = [child]
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (cur == parent) return true
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.class_parents.has(cur)) {
+                    var ps: List<String> = this.class_parents.get(cur)
+                    var i: Float = 0
+                    while (i < ps.length()) {
+                        if (!this.list_has_string(visited, ps[i])) { work.push(ps[i]) }
+                        i = i + 1
+                    }
+                }
+            }
         }
         return false
     }
@@ -742,40 +790,118 @@ class NullChecker {
         var i: Float = 0
         while (i < classes.length()) {
             var child_name: String = classes[i]
-            var parent_name: String = this.class_parents.get(child_name)
-            // The parent of an `extends` must actually name a class or interface.
-            // Both register in class_fields during the first pass; List/Map/Sendable
-            // are built-in bases. Without this check, `class OhNo extends NotClass`
-            // where NotClass is a String variable compiled cleanly — inheriting from
-            // a value is meaningless and must be rejected.
-            if (!this.env.class_fields.has(parent_name)
-                and parent_name != "List" and parent_name != "Map"
-                and parent_name != "Sendable") {
-                this.error(child_name + " extends unknown type " + parent_name + " (not a class or interface)")
+            // Every base, not just the first. `class Duck extends Flyable,
+            // Swimmable, Walkable` used to be conformance-checked against
+            // Flyable alone, so an unimplemented abstract method on Swimmable or
+            // Walkable was accepted silently.
+            var parent_names: List<String> = this.class_parents.get(child_name)
+            // What the child can offer: its own methods plus every concrete
+            // method reachable through any ancestor. Without the inherited half,
+            // `extends Abstract, Provider` — where Provider supplies a default
+            // body for what Abstract declares bodyless — would be rejected, and
+            // that combination is the whole point of multiple bases.
+            var child_methods: List<String> = []
+            if (this.class_method_names.has(child_name)) {
+                child_methods = this.class_method_names.get(child_name).split(",")
             }
-            if (this.class_abstract_methods.has(parent_name)) {
-                var required_str: String = this.class_abstract_methods.get(parent_name)
-                var required_methods: List<String> = required_str.split(",")
-                var child_methods: List<String> = []
-                if (this.class_method_names.has(child_name)) {
-                    child_methods = this.class_method_names.get(child_name).split(",")
+            var inherited: List<String> = this.inherited_method_names(child_name)
+            var ii: Float = 0
+            while (ii < inherited.length()) {
+                if (!this.list_has_string(child_methods, inherited[ii])) {
+                    child_methods.push(inherited[ii])
                 }
-                var j: Float = 0
-                while (j < required_methods.length()) {
-                    var method_name: String = required_methods[j]
-                    if (method_name != "init" and method_name.length() > 0) {
-                        // Exact name comparison, not substring: `.contains()` on the
-                        // joined list meant a child method named `draw_border` would
-                        // wrongly satisfy a required `draw`.
-                        if (!this.list_has_string(child_methods, method_name)) {
-                            this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
+                ii = ii + 1
+            }
+            var pi: Float = 0
+            while (pi < parent_names.length()) {
+                var parent_name: String = parent_names[pi]
+                // The parent of an `extends` must actually name a class or interface.
+                // Both register in class_fields during the first pass; List/Map/Sendable
+                // are built-in bases. Without this check, `class OhNo extends NotClass`
+                // where NotClass is a String variable compiled cleanly — inheriting from
+                // a value is meaningless and must be rejected.
+                if (!this.env.class_fields.has(parent_name)
+                    and parent_name != "List" and parent_name != "Map"
+                    and parent_name != "Sendable") {
+                    this.error(child_name + " extends unknown type " + parent_name + " (not a class or interface)")
+                }
+                if (this.class_abstract_methods.has(parent_name)) {
+                    var required_str: String = this.class_abstract_methods.get(parent_name)
+                    var required_methods: List<String> = required_str.split(",")
+                    var j: Float = 0
+                    while (j < required_methods.length()) {
+                        var method_name: String = required_methods[j]
+                        if (method_name != "init" and method_name.length() > 0) {
+                            // Exact name comparison, not substring: `.contains()` on the
+                            // joined list meant a child method named `draw_border` would
+                            // wrongly satisfy a required `draw`.
+                            if (!this.list_has_string(child_methods, method_name)) {
+                                this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
+                            }
                         }
+                        j = j + 1
                     }
-                    j = j + 1
                 }
+                pi = pi + 1
             }
             i = i + 1
         }
+    }
+
+    // Every method name reachable from `cls` through any base, at any depth,
+    // that some base actually supplies a BODY for. Breadth-first over all
+    // parents with a visited set, so a diamond visits the shared ancestor once
+    // and a cyclic `extends` terminates.
+    //
+    // Abstract (bodyless) names are excluded, and that exclusion is the whole
+    // point: this list is used to answer "is the requirement already satisfied
+    // from above?". Including abstracts would let a requirement satisfy itself —
+    // `class Circle extends Shape` with `Shape.area()` bodyless would find
+    // `area` inherited from Shape and be accepted, which is precisely what
+    // test/fail/conformance.sf is written to catch.
+    fun inherited_method_names(cls: String): List<String> {
+        var out: List<String> = []
+        var visited: List<String> = [cls]
+        var work: List<String> = []
+        if (this.class_parents.has(cls)) {
+            var seed: List<String> = this.class_parents.get(cls)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.class_method_names.has(cur)) {
+                    var names: List<String> = this.class_method_names.get(cur).split(",")
+                    // The bodyless subset of `cur`'s own methods, to subtract.
+                    var cur_abstract: List<String> = []
+                    if (this.class_abstract_methods.has(cur)) {
+                        cur_abstract = this.class_abstract_methods.get(cur).split(",")
+                    }
+                    var ni: Float = 0
+                    while (ni < names.length()) {
+                        if (names[ni].length() > 0 and !this.list_has_string(out, names[ni])
+                            and !this.list_has_string(cur_abstract, names[ni])) {
+                            out.push(names[ni])
+                        }
+                        ni = ni + 1
+                    }
+                }
+                if (this.class_parents.has(cur)) {
+                    var ups: List<String> = this.class_parents.get(cur)
+                    var ui: Float = 0
+                    while (ui < ups.length()) {
+                        if (!this.list_has_string(visited, ups[ui])) { work.push(ups[ui]) }
+                        ui = ui + 1
+                    }
+                }
+            }
+        }
+        return out
     }
 
     fun list_has_string(haystack: List<String>, needle: String): Bool {
@@ -814,11 +940,14 @@ class NullChecker {
                     }
                     rpi = rpi + 1
                 }
+                // Record what each function-typed parameter says about its own
+                // parameters, so a block-syntax argument can be typed (BUGS #86).
+                this.register_fun_param_sigs(name, params)
             }
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, type_params, parent, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -831,9 +960,14 @@ class NullChecker {
                 this.register_class_identity(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
-                if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
-                    this.class_parents.set(name, parent)
+                if (parents.length() > 0) {
+                    // `X__parent` keeps naming the *first* base only. It is read
+                    // by nothing but the old chain walk's replacement (which now
+                    // goes through class_parents instead) and by anything treating
+                    // a class as having a single supertype; preserving the
+                    // single-inheritance value keeps that meaning unchanged.
+                    this.env.define_var(name + "__parent", this.parse_type_node(parents[0]))
+                    this.class_parents.set(name, parents)
                 }
                 // Register methods with their return types and param types
                 // Also populate class_method_names for receiver closure desugaring
@@ -865,6 +999,18 @@ class NullChecker {
                     if (method_name.length() > 0) {
                         this.env.define_func_str(name + "__" + method_name, method_ret)
                         this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
+                        // Same as the FunDecl arm: a method taking a callback has to
+                        // be able to type a block passed to it (BUGS #86).
+                        //
+                        // Registered ONLY under the receiver-qualified key, unlike
+                        // receiver_params which also registers the bare method name.
+                        // A bare key is ambiguous across classes — `Map.get(key)` and
+                        // `App.get(path, handler)` are both `get` — and here an
+                        // ambiguous hit does not merely fail to help, it can raise an
+                        // error against a signature belonging to some other class.
+                        // Missing a case costs nothing beyond the status quo; a
+                        // spurious error breaks a correct program.
+                        this.register_fun_param_sigs(name + "__" + method_name, method_params)
                         method_names_list.push(method_name)
                     }
                     mi = mi + 1
@@ -1227,7 +1373,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parent, fields, methods, doc) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc) => {
                 // Unlike register_decl this runs only over the statements being
                 // checked, never over the imported list, so the class here is
                 // the one whose body is about to be walked. Setting the bare key
@@ -1243,9 +1389,12 @@ class NullChecker {
                 if (!this.local_classes.contains(name)) {
                     this.local_classes.push(name)
                 }
-                if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
-                    this.class_parents.set(name, parent)
+                if (parents.length() > 0) {
+                    // Only parents[0] contributes fields, so it alone defines
+                    // __parent; class_parents keeps the whole list for the
+                    // inheritance-DAG search.
+                    this.env.define_var(name + "__parent", this.parse_type_node(parents[0]))
+                    this.class_parents.set(name, parents)
                 }
                 // Walk the method bodies. This arm used to stop at the fields, so
                 // no statement inside any method was checked at all — not
@@ -1992,6 +2141,11 @@ class NullChecker {
             if (has_recv and is_lambda) {
                 var recv_class: String = this.receiver_params.get(recv_key)
                 this.desugar_receiver_closure(args, di, recv_class)
+            } else if (is_lambda and this.fun_param_sigs.has(recv_key)) {
+                // Type the lambda's own parameters from what the callee declares
+                // about its callback (BUGS #86). Runs after the receiver-closure
+                // branch so the two desugarings never fight over the same argument.
+                this.apply_fun_param_sig(args, di, this.fun_param_sigs.get(recv_key), name)
             }
             di = di + 1
         }
@@ -2091,6 +2245,15 @@ class NullChecker {
             }
             if (md_recv.length() > 0 and this.is_lambda_expr(args[mdi])) {
                 this.desugar_receiver_closure(args, mdi, md_recv)
+            } else if (this.is_lambda_expr(args[mdi])) {
+                // Type a block passed to a method from the method's own declared
+                // callback type (BUGS #86). Prefer the receiver-qualified key: two
+                // classes can both declare `get(path, handler)` with different
+                // callback shapes, and the bare key cannot tell them apart.
+                var md_sig_key: String = this.generic_base(obj_type) + "__" + method + ":" + mdi.floor().to_string()
+                if (this.fun_param_sigs.has(md_sig_key)) {
+                    this.apply_fun_param_sig(args, mdi, this.fun_param_sigs.get(md_sig_key), method)
+                }
             }
             mdi = mdi + 1
         }
@@ -2540,6 +2703,128 @@ class NullChecker {
         return methods_str.split(",")
     }
 
+    // --- Function-typed parameter signatures (BUGS #86) ---
+
+    // Read the parameter-type list out of a declared function type. Returns "?" when
+    // the spelling names a function but says nothing about its parameters, so callers
+    // can tell "declared zero parameters" (`""`) apart from "declared nothing"
+    // (`"?"`) — collapsing those two is exactly how a guess gets laundered into a
+    // type. Returns "!" for a parameter that is not a function type at all.
+    //
+    // The input must come from type_to_str, NOT type_node_to_string: the latter is
+    // ast.sf's renderer, which prints every GenericType as its bare base name, so
+    // `Fun<Box, String>` would arrive here as "Fun" with the two type arguments
+    // already gone. type_to_str renders the arguments.
+    //
+    // Which spellings actually carry information, as of today:
+    //   "Fun"            bare `Fun`              → "?"  (no information)
+    //   "Fun<A,B,R>"     `Fun<A, B, R>`          → "A,B" (trailing arg is the return)
+    //
+    // `(A) => R` does NOT reach here with its types intact, and that is a defect
+    // OUTSIDE this file: parser.sf's parse_type_ast has
+    //     if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }
+    // which throws away the parameter and return types that parse_single_type had
+    // just finished encoding into the string "Fun(A):R". Every consumer downstream
+    // therefore sees an empty FuncType and cannot distinguish `(Box) => String` from
+    // a bare `Fun`. Until that one line parses its own input, `Fun<A, R>` is the only
+    // spelling that can type a block, which is what the error message below says.
+    fun fun_param_types_of(type_str: String): String {
+        if (type_str == "Fun") return "?"
+        if (type_str.starts_with("Fun<")) {
+            // `Fun<A, B, R>` is (A, B) => R: the trailing argument is the return
+            // type, so `Fun<R>` declares no parameters at all.
+            var inner: String = type_str.slice(4, type_str.length() - 1)
+            var parts: List<String> = this.split_type_args(inner)
+            if (parts.length() <= 1) return ""
+            var kept: List<String> = []
+            var pi: Float = 0
+            while (pi < parts.length() - 1) {
+                kept.push(parts[pi])
+                pi = pi + 1
+            }
+            return kept.join(",")
+        }
+        // Not a function type — the caller must not treat this parameter as one.
+        return "!"
+    }
+
+    // Record, for every function-typed parameter of `name`, what that parameter
+    // declares about its own parameters. Called from both registration sites so a
+    // free function and a method are indistinguishable at the call site.
+    fun register_fun_param_sigs(name: String, params: List<AST.Param>) {
+        var i: Float = 0
+        while (i < params.length()) {
+            var p: AST.Param = params[i]
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var sig: String = this.fun_param_types_of(this.type_to_str(pt))
+            if (sig != "!") {
+                this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
+            }
+            i = i + 1
+        }
+    }
+
+    // Push the callee's declared parameter types into a lambda argument whose own
+    // parameters carry no annotation, and report the case where there is nothing to
+    // push. This is what turns a block-syntax parameter from "no type" into either
+    // the declared type or a hard error.
+    //
+    // Only AnyType parameters are touched: an explicitly annotated lambda states
+    // its own types and must keep them, so that a genuine mismatch stays visible
+    // rather than being overwritten to agree.
+    fun apply_fun_param_sig(args: List<AST.Expr>, arg_idx: Float, sig: String, callee: String) {
+        var lambda: AST.Expr = args[arg_idx]
+        var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p    _ => [] }
+        var ret_type: String = match (lambda) { Lambda(p, r, b) => r    _ => "Any" }
+        var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b    _ => [] }
+        if (params.length() == 0) return nil
+
+        // How many parameters were declared, and what are they?
+        var declared: List<String> = []
+        if (sig != "?" and sig.length() > 0) {
+            declared = this.split_type_args(sig)
+        }
+
+        var new_params: List<AST.Param> = []
+        var changed: Bool = false
+        var i: Float = 0
+        while (i < params.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d) => d }
+            if (this.is_any_type(pt) and pname != "self") {
+                if (i < declared.length()) {
+                    var declared_str: String = declared[i].trim()
+                    if (declared_str.length() > 0 and declared_str != "Any") {
+                        pt = this.parse_type_node(declared_str)
+                        changed = true
+                    } else {
+                        this.error("parameter '" + pname + "' of the function passed to '" + callee
+                            + "' has no type: '" + callee + "' declares its parameter " + i.floor().to_string()
+                            + " as 'Any'. Annotate the lambda parameter, or give '" + callee
+                            + "' a parameter type that says what it calls back with.")
+                    }
+                } else {
+                    // Either the callee said nothing about its callback's shape
+                    // (bare `Fun`) or it declared fewer parameters than the lambda
+                    // takes. Both mean the type is genuinely not in the source, and a
+                    // guess here is what BUGS #86 was: a field read answering 0.
+                    this.error("parameter '" + pname + "' of the function passed to '" + callee
+                        + "' has no type, and none can be derived: '" + callee
+                        + "' does not declare what it calls that function with."
+                        + " Annotate the parameter (`fun (" + pname
+                        + ": T): R => ...`), or declare the callee's parameter as `Fun<T, R>`"
+                        + " so a block can be typed from it.")
+                }
+            }
+            new_params.push(AST.Param.Param(pname, pt, pdef))
+            i = i + 1
+        }
+        if (changed) {
+            args[arg_idx] = AST.Expr.Lambda(new_params, ret_type, body)
+        }
+    }
+
     fun desugar_receiver_closure(args: List<AST.Expr>, arg_idx: Float, receiver_class: String) {
         // Transform a Lambda at args[arg_idx] to add 'self' param and rewrite body
         var lambda: AST.Expr = args[arg_idx]
@@ -2866,15 +3151,10 @@ class NullChecker {
     fun type_satisfies_constraint(typ: String, constraint: String): Bool {
         // Check if a type satisfies a constraint (interface name)
         // 1. Check if the type has the constraint as a parent (interface conformance)
-        if (this.class_parents.has(typ)) {
-            var parent: String = this.class_parents.get(typ)
-            if (parent == constraint) return true
-            // Check comma-separated parent list
-            if (parent.contains(",")) {
-                var parents: List<String> = parent.split(",")
-                if (parents.contains(constraint)) return true
-            }
-        }
+        // Any base at any depth satisfies the constraint. The comma-splitting
+        // that used to live here was vestigial — class_parents held a single
+        // name, never a joined list — and it only ever looked one level up.
+        if (this.inherits_from(typ, constraint)) return true
         // 2. Check if the constraint's methods are all present on the type
         if (this.class_method_names.has(constraint)) {
             var required_methods_str: String = this.class_method_names.get(constraint)
