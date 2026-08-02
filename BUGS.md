@@ -64,7 +64,7 @@ default and each override the explicit exception. That is the generator paying
 for itself on its first real use: the drift became visible as three overrides
 whose `reason =` lines could not be written honestly.
 
-### 104. relational operators on `Any`-typed operands compare untagged garbage
+### 104. relational operators on `Any`-typed operands compare untagged garbage — FIXED
 
 **Severity: critical.** Silent wrong answers, and the answer depends on heap
 layout, so it changes with optimization level.
@@ -149,9 +149,53 @@ the runtime that inspects the NaN-box tags of both operands, with codegen callin
 it whenever either operand's static type is not a known primitive. `rt_list_sort`
 should call the same helper.
 
+**FIXED (2026-08-02) — with a runtime type dispatch, because the static types
+genuinely do not settle the question.** The gate above was a static test, so two
+`Any` operands failed it and fell to the integer path. New `__val_cmp` in
+`runtime.sf` (three-way, strcmp convention) inspects the NaN-box tags of *both*
+operands: both TAG_PTR compares contents via `rt_strcmp`; anything else compares
+through an order-preserving double key that normalizes Int and Float in one
+call. Exposed as `__val_lt/le/gt/ge`, which codegen calls whenever the static
+types do not settle the comparison — the new arm sits **above** the Float and
+integer arms, per the dispatch-preamble ordering hazard.
+
+`rt_list_sort` now uses `__val_cmp(a, b) > 0` rather than `a > b`, so `.sort()`
+and `<` cannot disagree about order. That closes the wider half of this entry:
+`List.sort()` returned string lists **untouched** at every optimization level, so
+the idiomatic `m.keys().sort()` was a silent no-op.
+
+The fast path is preserved and this was measured, not assumed: an all-numeric
+program emits **zero** `__val_*` calls and 7 direct `icmp`/`fcmp`. `Int` stays
+`icmp slt i64`, `Float` stays `fcmp olt double`, static `String < String` still
+uses `__safe_strcmp`.
+
+**No `.ll` base change was required** — the helpers live in `runtime.sf`, which is
+compiled for all three targets, and their `declare` is auto-emitted by
+`output_body.sf`'s `called_functions` loop. `__rt_float_bits` reuses the existing
+`__val_untag_float`, so no new base symbol at all.
+
+Evidence: `test/pass/cmp_any_ordering.sf` (63 assertions, green at both -O0 and
+-O2) and `test/oracle_any_compare.sf` (**25/41 → 41/41** at -O0).
+`tools/differential.sh test/test_sorted_collections.sf` went from **2 mismatches
+to 0**. Confirmed directly against the two compilers: `["cherry","apple",
+"banana"].sort()` prints `cherry banana apple` before and `apple banana cherry`
+after — while `a < b` on two `Any` strings answers `true` at -O2 *both* ways,
+which is precisely the -O2 address accident that kept the suite green.
+
+Two follow-ups this exposed and deliberately did not fix. `sorted_map.sf`'s
+`_str_cmp`/`_alphabet` workaround is now redundant — and *worse* than plain `<`,
+verified rather than assumed: `_alphabet` is a printable-ASCII table, so
+`"café" < "cafz"` is wrong through the table and right through `<`. And `<` on two
+Lists still orders by address, because a List reaches `__val_cmp` untagged
+(upper == 0) rather than as TAG_PTR, so it takes the numeric path; the right fix
+is for the checker to reject the comparison, not for the runtime to invent an
+order. A `__rt_is_gc_non_string` guard was added to keep a GC non-string out of
+`strcmp`, and its comment says plainly that it currently only covers TAG_PTR
+non-strings — a guard against a future tagging change, not a live fix.
+
 ---
 
-### 105. `IO.println(enum_value)` prints a reinterpreted bit pattern
+### 105. `IO.println(enum_value)` prints a reinterpreted bit pattern — FIXED
 
 **Severity: high.** Silent, and currently producing garbage in two tests that
 count as passing.
@@ -193,6 +237,45 @@ generated `to_string()`; this path never calls `to_string()` at all, which is wh
 and both PASS, because they have no assertions and no `.expected` file (see #107).
 
 Regression test: `test/oracle_enum_println.sf` + `.expected`.
+
+**FIXED (2026-08-02) — by routing through the enum's own `to_string`, not by
+teaching `__io_println` the encoding.** The live `IO.println`/`IO.print` arm
+passed the value straight through, so `__io_println` found no NaN-box tag on the
+bare `tag << 56` immediate, took it for an unboxed double, and formatted the raw
+bits. Fixing it inside `__io_println` would have put the `tag << 56` encoding in a
+*second* place obliged to stay in step with `gen_enum_construct` and
+`emit_enum_to_string` — the shape that produced this bug. Instead the arm converts
+through the enum's own generated `to_string()`, so there is one path.
+
+This was feasible even though `get_expr_type` reports `"Any"` here:
+`gen_enum_construct` sets `last_type = EnumType(name)`, so immediately after
+`gen_arg_value` the type *is* in hand.
+
+**Why it stayed hidden:** string interpolation was always correct, because the
+lexer inserts an explicit `.to_string()`. So the enum's `to_string` looked
+well-tested while direct `println` silently used a parallel route that skipped it.
+`test/pass/enums.sf` and `generics.sf` printed these subnormals on **every run**
+and passed regardless, because they assert nothing — #107 exactly.
+
+Verified: `Color.Red` / `Color.Green` / `Shape.Circle(5)` / `Shape.Rect(3, 4)`
+printed `0`, `7.29112e-304`, `5.21502e-310`, `5.21502e-310` before and `Red`,
+`Green`, `Circle(5)`, `Rect(3, 4)` after. Regression test
+`test/pass/enum_println_to_string.sf` + `.expected` (6 of 12 lines were wrong
+pre-fix) additionally asserts that direct `println` agrees with interpolation
+line-for-line, so the two paths cannot drift apart again.
+
+`enums.sf` and `generics.sf` were **not** given `.expected` files while this bug
+was open — see #107, which deliberately refused to record their output. That
+refusal is what made this fix a clean change rather than a suite-wide break.
+
+**Still open — an enum *inside* a printed collection.** `IO.println([Color.Red])`
+prints `[0, 4.77831e-299]`. Elements are formatted by `__rt_elem_to_string` →
+`__any_to_string` at *runtime*, where no static type exists, and a payload variant
+is allocated with `__sf_malloc` — no GC header — so the sentinel check
+`__rt_as_list_ptr` relies on can never identify it. That needs
+`src/runtime/runtime.sf` and/or `base_nanbox.ll`, not codegen. Note
+`IO.println(xs[0])` is correct; only elements nested inside a printed collection
+are affected.
 
 ---
 
@@ -506,7 +589,7 @@ This is the prerequisite §1 of `docs/design/access-modifiers.md` names for
 `protected`, which it calls "currently unimplementable soundly" precisely because
 a `protected` member on `Swimmable` could not be resolved from `Duck`.
 
-### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link
+### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link — FIXED
 
 This is the measured blocker for rewrite stage 10 (`docs/design/compiler-rewrite.md`
 records it in that stage's Notes). It is **not** an import-system gap and **not**
@@ -552,6 +635,57 @@ instead of `return full`.
 This is the **fifth** instance of one pattern: a resolution helper that cannot
 fail, so it guesses instead of reporting "not found" (#22, #40, #78, #37, and
 this). The pattern, not the instance, is the thing worth fixing.
+
+**FIXED (2026-08-02).** `gen_extend_method` registered an extension method's
+prefixed symbol in `func_prefix_map` only as it *lowered* that method, so a call
+compiled earlier found nothing and `resolve_method_symbol` fell back to an
+unprefixed guess — `@Ctx__bx` emitted against a definition named `@core_Ctx__bx`.
+Valid IR that dies at link time.
+
+**Why it stayed hidden:** in a single file the module prefix is `""`, so the guess
+is *accidentally right* and the defect is invisible. It needed mutual recursion
+across a module boundary to surface, since a one-directional call happens to lower
+the callee first. Both import orders failed, each naming the other direction's
+symbol, so no reordering diagnosed it.
+
+Fixed by `Codegen.prescan_extend_symbols`, which registers every extension
+method's emitted symbol before any body is lowered, on all three live paths. The
+symbol uses the **extended class's** prefix, not the source file's — an
+`extend fun Ctx2.cz()` written in `main.sf` against a `Ctx2` from `core2.sf` must
+emit `@core2_Ctx2__cz` — so a shared `extend_class_prefix` derives it once and the
+pre-scan and the lowering agree by construction rather than by coincidence.
+
+`resolve_method_symbol`'s `return full` tail is now a diagnostic instead of a
+guess, which is the same shape as the rest of this family (#22, #40, #78, #37,
+#113): a resolver that could not say "not found" invented an answer.
+
+**Completeness was measured, not argued, before that tail was hardened.** A
+temporary `[PRESCAN-MISS]`/`[PRESCAN-DISAGREE]` probe inside `gen_extend_method`
+fired whenever a method reached lowering absent from `func_prefix_map`, or present
+under a *different* symbol; an instrumented compiler was bootstrapped and run
+against a matrix of 8 extension methods spanning class-with-`init` /
+without-`init`, extended from its own module / a sibling module / the main
+program, mutually recursive pairs within and across modules, and the single-file
+path. **Zero MISS, zero DISAGREE.** Only then was the guess replaced. The
+hardening was then swept across all 100+ `test/*.sf` and `test/pass/*.sf`: zero
+occurrences of the new diagnostic, and the five link failures that appear
+(`async`, `docstrings`, `qualified_type_helper`, `test_dns`, `pass/math`)
+reproduce identically on the pre-work baseline.
+
+A coverage gap in the first version was found the same way: it walked only
+imported-module ranges, leaving main-program and single-file `extend fun`s still
+broken.
+
+Also established while mapping the call sites: `generate_with_modules` (`:1289`)
+and `generate_with_modules_flat_opts` (`:1969`) have **no callers** —
+`main.sf:1394` calls only `generate_with_modules_flat_opts3`. The fourth site,
+`Codegen.generate` (`output_body.sf:657`), is live and needed the fix too.
+
+Regression test `test/pass/extend_cross_module.sf` (5 assertions, mutual
+cross-module recursion both directions), with its helper in `test/fixtures/`
+because `run_tests.sh` globs `test/*.sf` non-recursively and the helper genuinely
+cannot link alone. Confirmed against both compilers: the pre-fix one dies with
+`use of undefined value '@Ctx__down'`, the fixed one passes 5/5.
 
 ### 102. FIXED — an enum's auto-generated `to_string()` segfaulted on a String field, printed every Bool as `true`, and read a one-field enum as its first variant
 
