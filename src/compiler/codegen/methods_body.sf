@@ -597,15 +597,44 @@
     return val
     }
 
+    /// The module prefix an extension method's symbol must carry: the prefix of
+    /// the class being EXTENDED, not of the file the `extend fun` is written in.
+    /// `extend fun Ctx.ay()` in other.sf, with Ctx declared in core.sf, emits
+    /// @core_Ctx__ay.
+    ///
+    /// Factored out because two callers must agree exactly: this and the
+    /// pre-registration loop in generate_with_modules_flat_opts3. If they
+    /// disagreed, the pre-registered symbol would name a function that is never
+    /// defined — trading BUGS #103's link error for a different one.
+    ///
+    /// The two lookups are ordered so both callers land on the same answer even
+    /// though they run at different times. At pre-scan time no class has been
+    /// lowered, so func_prefix_map is empty and class_struct_names (filled by the
+    /// class pre-registration loop) answers. At lowering time func_prefix_map has
+    /// the entry and answers first. Both are `<module prefix> + <class name>` for
+    /// the same class, so the two agree by construction.
+    fun extend_class_prefix(ext_class: String, fallback: String): String {
+        var init_key: String = ext_class + "__init"
+        if (this.func_prefix_map.has(init_key)) {
+            var mapped: String = this.func_prefix_map.get(init_key)
+            return mapped.slice(0, mapped.length() - init_key.length())
+        }
+        // A class with no `init` at all has no entry above. Without this second
+        // lookup such a class fell back to the *source file's* prefix, so an
+        // extension method on it emitted under the wrong module.
+        if (this.class_struct_names.has(ext_class)) {
+            var struct_name: String = this.class_struct_names.get(ext_class)
+            if (struct_name.ends_with(ext_class)) {
+                return struct_name.slice(0, struct_name.length() - ext_class.length())
+            }
+        }
+        return fallback
+    }
+
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
     // Use target class's prefix (not source file's prefix)
-    var class_prefix: String = this.current_prefix
-    var init_key: String = ext_class + "__init"
-    if (this.func_prefix_map.has(init_key)) {
-        var mapped: String = this.func_prefix_map.get(init_key)
-        class_prefix = mapped.slice(0, mapped.length() - init_key.length())
-    }
+    var class_prefix: String = this.extend_class_prefix(ext_class, this.current_prefix)
     var prefixed: String = class_prefix + full_name
     this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
