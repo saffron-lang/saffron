@@ -143,14 +143,21 @@ enum Pattern {
 }
 
 enum Param {
-    Param(name: String, type_ann: Type, default_val: Expr)
+    // Param carries class *fields* and function *params* — the same node in two
+    // roles — so `visibility` here is read by two different rules in Phase 4:
+    // a field's visibility is class-scoped, a parameter's is meaningless and stays
+    // "public" forever. Appended last, as on every widened declaration node; see
+    // the note on TypeAlias in `Stmt` for why that position.
+    Param(name: String, type_ann: Type, default_val: Expr, visibility: String)
 }
 
 enum Stmt {
     ExprStmt(expr: Expr),
-    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
-    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String),
-    EnumDecl(name: String, variants: List<Variant>, docstring: String),
+    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String, visibility: String),
+    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String, visibility: String),
+    // `visibility` is appended last on every declaration node — see the note on
+    // TypeAlias at the bottom of this enum for why that position and not another.
+    EnumDecl(name: String, variants: List<Variant>, docstring: String, visibility: String),
     // `type_params` holds the declared generic parameter names of `class Box<T>`
     // — ["T"], or [] for a non-generic class. The parser used to consume and
     // *discard* them ("// Skip generic type parameters"), so `T` did not exist
@@ -166,7 +173,11 @@ enum Stmt {
     // could not see that Duck derives from Swimmable at all. Order is
     // load-bearing: parents[0] keeps the field layout and `init`-forwarding
     // behaviour single inheritance has always had, and later parents only add.
-    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String),
+    // `visibility` takes this node to seven fields, which is precisely the shape
+    // BUGS #96 segfaulted on: an arm binding only six read the seventh as 0, and
+    // `0.starts_with(...)` is `strncmp(NULL, ...)`. `interface` and `actor` parse
+    // through this same node, so all three are in the blast radius.
+    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String, visibility: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
@@ -176,7 +187,17 @@ enum Stmt {
     TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>, finally_body: List<Stmt>),
     Throw(value: Expr),
     LetPattern(pattern: Pattern, value: Expr),
-    TypeAlias(name: String, target: String)
+    // `visibility` is one of "public" / "private" / "internal" / "protected".
+    // Phase 3 of docs/design/access-modifiers.md adds the field and nothing else:
+    // there is no syntax for it yet, so the parser writes "public" everywhere and
+    // no reader consults it. It is appended *after* `docstring` on every widened
+    // node deliberately — appending leaves every pre-existing field at the index it
+    // already had, so a match arm that was missed still binds its old fields
+    // correctly and merely lacks `visibility`. Inserting it first or mid-payload
+    // would shift `name`/`docstring` by one, and since both are `String` a missed
+    // arm would read a plausible *wrong string* instead of nothing, which is
+    // exactly BUGS #96's failure shape.
+    TypeAlias(name: String, target: String, visibility: String)
 }
 
 enum Variant {

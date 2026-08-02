@@ -15,13 +15,13 @@
 
 import "@ast" as AST
 
-var s: AST.Stmt = AST.Stmt.VarDecl("x", "Int", AST.Expr.NilLit, "")
+var s: AST.Stmt = AST.Stmt.VarDecl("x", "Int", AST.Expr.NilLit, "", "public")
 
 fun fallback(): String { return "0" }
 
 // VarDecl's first field is declared String. Assigning it to Int must be an error.
 var bad: Int = match (s) {
-    VarDecl(name, type_ann, initializer, docstring) => name
+    VarDecl(name, type_ann, initializer, docstring, v_vis) => name
     _ => fallback()
 }
 
