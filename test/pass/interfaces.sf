@@ -1,3 +1,15 @@
+// Interface default method bodies, multiple inheritance, is-checks and override.
+//
+// Graded on exit status alone until BUGS #107, which mattered here more than most:
+// every one of the six things this file tests is observable ONLY through what it
+// prints. A `doc.serialize()` that dispatched to the wrong default body, or an
+// override that silently called the interface's body instead of Parrot's, would
+// have produced different output and still exited 0.
+//
+// Each line of interfaces.expected is checked against the source rather than just
+// recorded. Note that `serialized` and the second `true` both depend on the second
+// base of `extends Printable, Serializable` contributing methods at all, which the
+// parser discarded before BUGS #111.
 // Test: Default method bodies
 interface Greeter {
     fun greet() {

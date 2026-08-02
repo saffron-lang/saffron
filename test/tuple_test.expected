@@ -1,3 +1,4 @@
-ERROR: return: cannot return nullable Int from function expecting Tuple<Int,Int>
-
-saffron: compilation failed: test/tuple_test.sf
+42
+hello
+2
+1

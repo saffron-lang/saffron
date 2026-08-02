@@ -196,7 +196,7 @@ Regression test: `test/oracle_enum_println.sf` + `.expected`.
 
 ---
 
-### 106. a match-arm binding collides with a same-named variable in the enclosing scope
+### 106. FIXED — a match-arm binding was stored into the enclosing variable's slot
 
 **Severity: high.** One face is loud, the other is silent.
 
@@ -230,7 +230,51 @@ both -O0 and -O2).
 
 ---
 
-### 107. 64 of 174 positive tests assert nothing and would pass on any output
+**FIXED (2026-08-02).** A match arm's bindings are a scope of their own, but
+codegen has no scope chain — only one flat `%<name>` slot per name — so an arm
+binding was stored straight into the enclosing variable's slot.
+
+`resolve.sf` already had this right: `resolve_arms` pushes a scope per arm and
+`declare_pattern` declares each binding `"local"`, so the binding reaches codegen
+as `Ref("local", name, "")` and reads from `%<name>`. The arm was scoped in the
+AST and codegen was not honouring it. That means the slot for an arm binding is
+always the local one, never `@__g_`, which splits the fix in two:
+
+- **At module scope** that local slot was never allocated, because
+  `output_body.sf`'s alloca loop skips names that are module globals. `gen_match`
+  now emits it itself via `ensure_arm_slots` from the pre-switch block, which
+  dominates every arm block. The global is untouched by construction.
+- **Inside a function** the outer local and the binding genuinely share one
+  alloca, so the arm is bracketed instead: snapshot the slot on entry, restore
+  before the terminator — not at the shared end label, where the restore would not
+  dominate.
+
+The flat `typed_vars`/`string_vars` side tables are bracketed the same way, since
+a binding's type otherwise overwrote the enclosing variable's and left a `String`
+local dispatching as an `Int`. Applies to all three lowerings in `gen_match` —
+enum switch, class pattern, and unknown-enum fallback.
+
+Bookkeeping uses an `"__armslot:"` key in `current_fn_locals`, the same
+namespaced-key convention `stmts_body.sf` uses for `"__nestedfn:"`, so it gets
+per-frame lifetime for free and needs no new class field. It is needed because two
+matches binding the same colliding name would otherwise emit a duplicate `alloca`
+that LLVM rejects.
+
+Regression tests: `test/oracle_match_shadow.sf` (4 assertions; it **segfaulted**,
+exit 139, before the fix) and `test/pass/scope_match_arm_binding.sf` (11).
+`test/oracle_stringify.sf`'s bindings were renamed back from `mr`/`ms`/`mn` to
+their natural `r`/`s`/`n`, where `s` deliberately collides with a module-global
+`var s: String` — so that oracle now exercises the fix incidentally and stops
+compiling if #106 regresses.
+
+One case is deliberately absent from the test: an inner match nested directly
+inside an arm *body*, the stronger rebinding check. A block-bodied arm currently
+types as `Nil|String` and the checker rejects returning it as `String` — a
+separate limitation. Sequential matches cover the same slot-sharing question
+meanwhile.
+
+
+### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
 **Severity: high — this is the reason the other entries survived.**
 
@@ -258,7 +302,56 @@ refuses when configurations disagree.
 
 ---
 
-### 108. enum `to_string()` prints heap addresses for List, Map and nested-enum payloads
+**LARGELY CLOSED (2026-08-02).** The blind set was re-derived independently rather
+than trusting the "64" above, which predated several merges. At the time of the
+work: **184 positive files — 0 with both mechanisms, 86 assertions-only, 55
+`.expected`-only, 43 blind.**
+
+After the pass: **23 still blind, and 21 of those already FAIL in the baseline**
+(build-fail / timeout / segfault / runtime-error). A test that produces no output
+cannot enshrine a wrong one, so those 21 are not the hazard this entry is about.
+Only **2 are green-and-blind**, both deliberately.
+
+Coverage added across 27 files, via three mechanisms: 21 `.expected`, 2 empty
+`.expected` (which pin the two import helpers to printing *nothing*), 4 `.exit`
+(a **new** mechanism), 5 files given assertions, and 1 carrying both. Every
+recorded output was read against the source before acceptance, then cross-checked
+through the oracle: **36 AGREE, 0 MISMATCH** across native-O2 / native-O0 /
+wasm32.
+
+**What was deliberately NOT recorded is the more important half.**
+`test/pass/enums.sf` and `test/pass/generics.sf` print `0` and `7.29112e-304` from
+`IO.println(Color.Red)` — that is #105. Recording it would have frozen a bug as
+intended behaviour and made this entry worse, so each instead got 10 assertions
+via *interpolation* (which inserts `.to_string()` and is correct), leaving every
+`IO.println` untouched so the garbage stays visible.
+
+`gc_coro_root_{depth,order,overpop}.sf` were also left unfrozen, and this one was
+*proven* rather than argued: adding the three locals needed to capture shadow-stack
+depths moved the reported value 18 → 24. The depth is frame-layout dependent, so
+freezing it would flag unrelated codegen as a regression. Their *invariants* are
+asserted instead — depths equal across rounds, each frame above its spawner.
+
+**Three harness defects found and fixed, all of which were this entry's own
+mechanism one layer up:**
+
+1. **The oracle compared stdout only.** It set `RUN_EC` per config and never used
+   it. The four `mini_*` tests print nothing, so all four "AGREEd" by matching two
+   empty files — a wasm32 run returning 0 where native returned 55 was a unanimous
+   pass. It now compares exit status too, verified by injecting `RUN_EC=7`.
+2. **`output-mismatch` was missing from `run_tests.sh`'s category breakdown**, so a
+   `.expected` regression counted in the total but vanished from the summary.
+3. **The two grading mechanisms compose**, contrary to what "0 files with both"
+   suggested: the assertion gate returns early *only on failure*, so passing
+   assertions fall through to the diff. The 0 was an accident, not policy;
+   `interfaces.sf` is now the first file carrying both.
+
+Also: `test/gc_deep_test.sf` was stable over **25 consecutive runs**, so the
+"nondeterministic" label it carries elsewhere in this file is doubtful and should
+not be used to dismiss a failure there.
+
+
+### 108. FIXED — enum `to_string()` printed heap addresses for List, Map and nested-enum payloads
 
 **Severity: medium-high.** Silent, and nondeterministic between runs of one
 binary.
@@ -291,6 +384,35 @@ diff against its own second run. Regression test:
 require only that stringification be a pure function of the value — one value
 twice, and two equal values — so they hold regardless of what the correct
 rendering is.
+
+**FIXED (2026-08-02).** `emit_enum_to_string` formats each payload field by
+declared type, and the per-type chain had arms for String, Bool and Float/Number
+only — List, Map and nested-enum payloads fell through to the integer default and
+printed the payload's heap address. That is why the differential oracle's
+*nondeterminism* gate caught it: the address varies per run, so the file failed a
+diff against its own second run.
+
+Three arms added, reusing formatters that already exist rather than adding new
+ones: `__list_to_string`, `__map_to_string`, and for a nested enum that enum's own
+generated `<Enum>__to_string`. All three already return a raw `char*` — exactly
+what `__sb_append` wants — so no tag/untag step belongs on any of them, which is
+what avoided repeating #102's segfault.
+
+`__any_to_string` was deliberately **not** used: it is absent from
+`wasm_base.ll`, and a static field type is already in hand at this site, so
+routing through it would have bought nothing and cost wasm64. No wasm64 gap is
+introduced, and wasm32 differential agreement confirms both container helpers
+exist there.
+
+Stringification is now a pure function of the value. Regression tests:
+`test/oracle_enum_payload_tostring.sf` (14 assertions, 6 of which failed before)
+and `test/pass/enumfmt_payload_to_string.sf` (12), the latter pinning exact
+renderings — `WithList([1, 2, 3])`, `WithMap({k: 1})`, `WithInner(I(7))` — rather
+than merely asserting "not an address".
+
+Verified byte-identical across native-O2, native-O0 and wasm32 via
+`tools/differential.sh`.
+
 ### 111. FIXED — the parser discarded every base after the first, so `class Duck extends Flyable, Swimmable, Walkable` was `extends Flyable`
 
 `ClassDecl.parent` was a single `String`. The parser read the first name after
@@ -4624,6 +4746,74 @@ This is the fourth of five instances of one pattern: a resolution helper that
 cannot fail, so it guesses instead of reporting not-found (#22, #40, #78, #37,
 #103).
 
+
+### 112. A range literal `0..5` lexes as `0.` `.` `5` and silently compiles to a list index
+
+There is no range syntax. `TkDot` is the only dot token; `grep -n "Range\|DotDot"`
+finds nothing in `lexer.sf`, `parser.sf` or `ast.sf`. What happens instead is that
+the number scanner (`lexer.sf:294-301`) consumes one trailing `.` as a decimal
+point, so `0..5` tokenizes as **`TkFloat(0.)` `TkDot` `TkInt(5)`**. `parse_call`
+(`parser.sf:597-606`) then takes its numeric-dot-access branch — the one meant for
+`tuple.0` — and builds `IndexGet(FloatLit(0.), IntLit(5))`.
+
+Emitted IR for `var r = 1..5`:
+
+```llvm
+%t2 = call i64 @__val_tag_float(double 1.)
+%t7 = call i64 @__list_length(i64 %t2)   ; length of a *float*
+%t10 = call i64 @__list_get(i64 %t2, i64 %t9)
+```
+
+A float is passed to `__list_length` / `__list_get` as if it were a list. The only
+output is `[checker] Warning: r: cannot infer type` — **no diagnostic names the
+real problem** at any stage: not the lexer, not the parser, not the checker, not
+codegen.
+
+Runtime behaviour depends on the left operand: `0..5` gives
+`Runtime Error: NullError`; `1..5` **segfaults**. Annotating
+(`var r: List<Int> = 0..5`) does not help — the checker accepts it. Hand-writing
+`0. . 5` reproduces it exactly, confirming the token sequence.
+
+**This is the root cause of the existing suite failure `test/pass/ranges.sf`**
+(`Runtime Error: NullError: null pointer dereference`). That file is four range
+literals and nothing else; its first line is `var nums = 0..5`.
+
+Two defensible fixes: reject `Float . Int` in `parse_call`'s numeric-dot branch
+(the receiver can never be a tuple), or have the number scanner refuse a `.`
+followed by another `.`, which also leaves room for real range syntax later.
+
+Note this is a *syntax* gap wearing a codegen costume. The language has no ranges;
+the defect is that asking for one produces a running program instead of a parse
+error.
+
+---
+
+### 113. Over-applying a zero-arity function is silently accepted, because the arity check exempts arity zero
+
+`expr_body.sf:2302` and `:2308` both guard with
+`args.length() != expected and expected > 0`, and **`expected > 0` exempts every
+0-arity function from arity checking entirely**:
+
+```saffron
+fun c() { IO.println("in c") }
+c("too", "many")        // compiles clean, rc=0, no diagnostic
+```
+
+Verified by bisection that only `expected == 0` slips through: `f(1,2,3)` against a
+1-arity function and `g()` against a 2-arity one both produce
+`[codegen] Error: 'f' expects 1 arguments, got 3`.
+
+The `expected > 0` clause reads as a guard against an *unrecorded* arity — a map
+lookup that answered 0 because nothing was registered — but it is written as a
+test on the arity value itself, so it cannot distinguish "takes no arguments" from
+"we never found out". Fix: drop `expected > 0` and guard on whether an arity was
+recorded at all, which both `has()` calls immediately above already establish.
+
+This makes `test/functions.sf` hang, which is how it was noticed.
+
+Same family as #22, #40, #78, #37 and #103 — a check that cannot express "unknown"
+so it conflates unknown with a legitimate value. Here the conflated value is zero,
+which is also the sentinel.
 
 ## Fixed
 

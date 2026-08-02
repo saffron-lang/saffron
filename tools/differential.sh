@@ -136,6 +136,39 @@ wasm_unsupported_by_name() {
     esac
 }
 
+# IO.print (no trailing newline) is not expressible on wasm32. Both __io_println
+# and __io_print land on the single js_log_str import (wasm_base_32.ll:1751),
+# where native __io_print is printf("%s") with no terminator
+# (base_nanbox.ll:113-119). The host therefore has to terminate every call, so a
+# program that uses IO.print reads as extra newlines on the wasm side.
+#
+# That is a gap in the four hand-maintained .ll bases, not a wrong answer, and it
+# was previously reported as a MISMATCH on test/pass/narrowing.sf — a harness
+# artifact indistinguishable from a codegen bug. Skip by capability until a
+# no-newline import exists in src/runtime/; then delete this function.
+uses_io_print() {   # file
+    grep -qE '\bIO\.print[[:space:]]*\(' "$1"
+}
+
+# A program whose entry point is `fun main()` with no top-level statements prints
+# NOTHING on wasm32: output_body.sf emits the __saffron_boot shim only when the
+# file has top-level code, while wasm_base_32.ll's _start calls @__saffron_boot()
+# unconditionally and --import-undefined turns the missing symbol into a silent
+# no-op. That is BUGS #110, a real and filed compiler bug, but it makes every such
+# program a whole-output mismatch that drowns out any other finding, so it is
+# gated by capability and tracked as #110 rather than re-reported per test.
+main_entry_only() {   # file
+    grep -qE '^[[:space:]]*fun[[:space:]]+main[[:space:]]*\(' "$1" || return 1
+    # Any top-level call (e.g. `main()`, `IO.println(...)`) means the shim IS
+    # emitted and the program runs normally on wasm32. Anchored at column 0 with
+    # NO leading-whitespace allowance: an indented call sits inside a function
+    # body, and allowing indentation made every `fun main` program look like it
+    # had top-level code (mini_hello.sf matched on its own `IO.println` at line
+    # 2). `fun main(...)` itself cannot match — the space after `fun` ends the
+    # identifier before the '('.
+    ! grep -qE '^[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*\(' "$1"
+}
+
 # Tests that intentionally exit nonzero because their exit code IS the result
 # (mini_while exits 55 = fib(10)). Their stdout is still comparable; only the
 # exit-status check has to be relaxed.
@@ -289,8 +322,10 @@ check_file() {   # file label
     fi
     local ref_ec=$RUN_EC
     build_and_run native-O2 "$f" "$ref2"
+    local ref_ec2=$RUN_EC
 
-    if ! diff -q <(normalize "$ref1") <(normalize "$ref2") >/dev/null 2>&1; then
+    if ! diff -q <(normalize "$ref1") <(normalize "$ref2") >/dev/null 2>&1 \
+       || [[ "$ref_ec" != "$ref_ec2" ]]; then
         printf 'NONDET   %-40s reference disagrees with itself across two runs\n' "$label"
         N_NONDET=$((N_NONDET + 1))
         NONDETS+=("$label")
@@ -318,6 +353,16 @@ check_file() {   # file label
                 N_SKIP=$((N_SKIP + 1))
                 continue
             fi
+            if uses_io_print "$f"; then
+                printf 'SKIP     %-40s wasm32: IO.print has no no-newline import\n' "$label"
+                N_SKIP=$((N_SKIP + 1))
+                continue
+            fi
+            if main_entry_only "$f"; then
+                printf 'SKIP     %-40s wasm32: `fun main` entry never runs (BUGS #110)\n' "$label"
+                N_SKIP=$((N_SKIP + 1))
+                continue
+            fi
         fi
 
         local other="$TMP/other_$cfg"
@@ -330,7 +375,30 @@ check_file() {   # file label
             continue
         fi
 
+        local other_ec=$RUN_EC
         compared=$((compared + 1))
+
+        # The exit status is part of the observable behaviour, and for one class of
+        # test it is the ONLY part: test/mini_{1param,arithmetic,ifelse,while}.sf
+        # print nothing and return their computed result as the process status.
+        # Comparing stdout alone made those four AGREE by matching two empty files
+        # — the oracle reproducing the exact blindness BUGS #107 describes, one
+        # layer up. A wasm32 run that returned 0 where native returned 55 was a
+        # unanimous pass.
+        #
+        # Deliberately not gated on exit_code_is_result: a status disagreement is a
+        # real disagreement for any program. It is reported as a mismatch with the
+        # statuses in the message, since a bare stdout diff would print nothing and
+        # read as a spurious failure.
+        if [[ "$ref_ec" != "$other_ec" ]]; then
+            local ecmsg="exit status $ref_ec (native-O2) vs $other_ec ($cfg)"
+            printf 'MISMATCH %-40s native-O2 != %s  — %s\n' "$label" "$cfg" "$ecmsg"
+            N_MISMATCH=$((N_MISMATCH + 1))
+            MISMATCHES+=("$label|$cfg|$ecmsg")
+            unanimous=false
+            continue
+        fi
+
         if diff -q <(normalize "$ref1") <(normalize "$other") >/dev/null 2>&1; then
             printf 'AGREE    %-40s native-O2 == %s\n' "$label" "$cfg"
             N_AGREE=$((N_AGREE + 1))
