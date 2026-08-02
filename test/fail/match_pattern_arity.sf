@@ -1,0 +1,20 @@
+// BUGS #98(a) — a match pattern binding the wrong number of fields must be
+// rejected. Before the fix both directions compiled and ran: too few bindings
+// left the trailing fields unread, too many invented a binding whose slot was
+// never stored (so it read as 0). No diagnostic either way, which is how the
+// stdlib AST mirrors drifted to a stale ClassDecl field count unnoticed.
+
+enum E {
+    A(x: Int, y: Int),
+    B
+}
+
+var e: E = E.A(1, 2)
+
+// Too few: one binding for a two-field variant.
+var too_few: Int = match (e) {
+    A(x) => x
+    B => 0
+}
+
+IO.println(too_few)

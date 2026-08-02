@@ -9,6 +9,179 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 100. FIXED — #96's fix was in gen3 but not in gen2, so every bootstrap rebuilt a gen3 that segfaulted on any class
+
+```bash
+./bootstrap.sh          # both stages green
+echo 'fun g(): Int { return 2 }' > lib/other.sf
+printf 'import "@other" as Other\nclass A { }\n' > p.sf
+build/saffronc --stdlib lib p.sf out.ll     # Segmentation fault: 11
+```
+
+A green bootstrap produced a gen3 that crashed on any program containing a class
+*and* an import — which is nearly every real program, including 2 of the suite's
+own tests. `--no-check` returned 0, so the fault was in the checker; lldb showed
+`EXC_BAD_ACCESS address=0x0` inside `_platform_strncmp`, the signature of reading
+an enum field that was never stored.
+
+The mechanism is #96 seen from the other side. `ClassDecl` has six fields and
+`docstring` is the sixth; #96 fixed codegen so a match arm binds all of them
+instead of the first five. The fix landed in the *source*, so gen3 has it — but
+`build/stage2/saffronc` was still the pre-#96 binary, and gen2 is what compiles
+the source. So gen2 emitted a `register_decl` whose `ClassDecl` arm never stored
+`doc`, `doc.starts_with("@actor")` handed a null pointer to strncmp, and the
+resulting gen3 died on the first class it type-checked. Only the checker path
+needs an import present, which is why `class A { }` alone survived.
+
+Nothing in the bootstrap could see this. STAGE 1 only proves gen2 accepts the
+source. STAGE 2 builds gen4 with gen3 — and gen4 is *correct*, because gen3
+compiled it with the fixed codegen, so gen3-crashes-but-gen4-is-fine looked like
+gen2 miscompiling whatever change was in flight. Three separate bisections of an
+unrelated in-flight change (#98) each ended at "the crash is still here", because
+the crash was in HEAD all along: reverting to a pristine HEAD checkout and
+bootstrapping reproduced it exactly.
+
+The remedy is the promotion ceremony in CLAUDE.md, which #96 needed and did not
+get: `cp build/saffronc build/stage2/saffronc`. Once gen2 knows how to read a
+six-field payload, the gen3 it builds no longer crashes and the fixed point holds.
+
+The general rule this makes concrete: **a codegen fix for how the compiler reads
+its own AST is not landed until gen2 is promoted.** The committed gen3 was fine;
+the committed gen2 was not, and gen2 is the root of trust. A single direct check
+catches it — after any bootstrap, compile a program with a class and an import,
+not just `test/hello_bootstrap.sf`.
+
+### 99. FIXED — a bare `return` swallowed the following statement as its value
+
+```saffron
+fun f(a: String) {
+    if (a == "x") return
+    var key: String = a + "!"
+    IO.println(key)
+}
+```
+
+```
+[codegen] Error: undefined variable 'key'
+```
+
+There are no statement terminators in Saffron, so `parse_return` decided a
+`return` was bare only when the next token was `}` or eof. Anywhere else it
+called `parse_expr` — which consumed the *next statement* as the return value.
+The statement then vanished from the enclosing body, so every name it declared
+became undefined and the error pointed at the use, never at the return.
+
+Fixed in `parse_return`: a `return` is also bare when the next token is on a
+later line. `prev_line_num()` was already there for this kind of check.
+
+Two things made this hard to see. First, the diagnostic names the wrong
+construct and the wrong line. In the compiler's own source it came out of the
+LLVM verifier as `use of undefined value '%key'` in a function one away from the
+cause, which reads exactly like BUGS #97 — a different bug with the same
+signature. Second, the failure mode depends on what follows:
+
+- a `var` declaration whose name is used later → `undefined variable`
+- an expression statement → **silently miscompiled**: the call becomes the
+  return value, so its side effect moves into the guarded path and the guard
+  returns the wrong thing
+- a bare `return` before `}` → correct, which is the shape everything in the
+  tree happened to use
+
+That last point is why this survived: `grep` over the whole tree finds no
+pre-existing occurrence of the broken shape. It was reachable but unreached, and
+the first two writes of `if (c) return` in `checker.sf` for #98 hit it
+immediately.
+
+`checker.sf`'s guards are written `if (c) { return }` rather than
+`if (c) return`, because gen2 is still the root of trust for the bootstrap and
+gen2 parses the unbraced form the old way. Once gen2 is promoted past this fix
+the braces are no longer required.
+
+Test: `test/pass/bare_return_statement_boundary.sf`. Every function in it is
+untyped — a bare return yields nil, and the checker correctly rejects nil from a
+function declared to return `String`, so the assertions go through observable
+effects instead of return values.
+
+
+### 98. FIXED — a match pattern's arity was never checked, and bindings on an imported enum were all typed Any
+
+Three defects in the same corner of `checker.sf`, each of which silences the
+type system rather than mistyping something. Together they mean a `match` on an
+imported enum was, in practice, unchecked.
+
+**(a) Pattern arity was never compared against the declaration.**
+
+```saffron
+enum E { A(x: Int, y: Int), B }
+var e: E = E.A(1, 2)
+var r1: Int = match (e) { A(x) => x        B => 0 }   // 1 binding, 2 fields
+var r2: Int = match (e) { A(x, y, z) => z  B => 0 }   // 3 bindings, 2 fields
+```
+
+Both compiled and ran. Too few bindings left the trailing fields unread; too
+many invented a binding whose alloca was never stored, so it read as 0. No
+diagnostic either way.
+
+This is how the stdlib AST mirrors drifted. `src/lib/ast.sf`,
+`src/lib/formatter.sf` and `src/lib/lang.sf` all matched `ClassDecl` with five
+bindings; `tools/gen_docs.sf` used four. The declaration has had six since #95
+and five before that, so gen_docs was already reading `parent` as `fields` and
+`fields` as `methods` — and had been for as long as the fifth field existed.
+
+**(b) Field types were split on every comma, not top-level commas.**
+
+`enum_fields` stores a variant's payload as one string, `"name:Type,name:Type"`.
+`get_enum_binding_type` split it with `.split(",")`, so a field declared
+`Map<String, Int>` became two entries and every field after it had its type
+read off by one position. Codegen got this right — `match_body.sf` uses
+`split_respecting_generics` — so the checker and codegen disagreed about what
+type each binding had. The checker now uses `split_type_args`, which it already
+had for exactly this.
+
+The same function also split `"name:Type"` with `.split(":")` and took part
+`[1]`, which truncates any type containing a colon. It now takes everything
+after the first colon.
+
+**(c) A qualified enum name never resolved, so every binding was Any.**
+
+```saffron
+import "@ast" as AST
+var n: Int = match (stmts[0]) {
+    VarDecl(name, t, i, d) => name    // name is String. No error.
+    _ => 0
+}
+```
+
+`enum_fields` is keyed by the *declared* name (`"Stmt"`), but a subject's
+inferred type is the qualified spelling the importer sees (`"AST.Stmt"`).
+`get_enum_binding_type` looked up `"AST.Stmt.VarDecl"`, missed, and returned
+`Any` — for every binding of every arm. `check_exhaustiveness` had open-coded
+the prefix-stripping fallback and so worked correctly, which is why
+non-exhaustive matches on `AST.Stmt` *were* reported while nothing else about
+those matches was. The identical local enum errored as expected, which is what
+made this hard to see: the checker looked like it worked.
+
+Fixed by extracting `resolve_enum_key_name`, used by all three call sites, plus
+`get_variant_fields` as the single place that parses a payload string. New
+`check_pattern_arity` runs on both `match` arms and `let`-destructuring, which
+go through separate paths in the checker.
+
+Tests: `test/fail/match_pattern_arity.sf`, `match_pattern_arity_excess.sf`,
+`enum_binding_type_generic_field.sf`, `enum_binding_type_qualified.sf`. All four
+compile cleanly under the pre-fix gen2 and are rejected by the fixed compiler,
+which is the property that makes them worth having — a test in `test/fail/` only
+proves *something* was rejected.
+
+The (c) tests need care to avoid passing vacuously: with one arm String and one
+arm Int the result unifies to `String|Int` and an assignment to `Int` is accepted
+for a legitimate unrelated reason. Both arms have to return the same wrong type
+for the binding's own type to be what is under test.
+
+Consequence of turning (a) on: the four stdlib/tool mirrors above had to be
+corrected to six-field `ClassDecl` patterns in the same change, since they now
+fail to compile. That is the point — they were wrong before and nothing said so.
+
+
 ### 97. FIXED — a module global assigned inside a closure was treated as a capture, emitting IR that did not verify
 
 ```saffron

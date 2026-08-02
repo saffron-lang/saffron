@@ -1,0 +1,25 @@
+// BUGS #98(b) — a field whose type contains a comma is ONE field.
+//
+// `enum_fields` stores a variant's payload as "name:Type,name:Type" and
+// get_enum_binding_type split it with `.split(",")`, so `Map<String, Int>`
+// became two entries and every later field's type was read off by one position.
+// Here `n` is declared Int but the shifted list made the checker see it as
+// whatever followed the split — an unrelated type, or nothing at all, in which
+// case the binding fell back to Any and the assignment below was accepted.
+//
+// Codegen always got this right (match_body.sf uses split_respecting_generics),
+// so the checker and codegen disagreed about the binding's type. The checker now
+// uses split_type_args, which it already had.
+
+enum Box {
+    Of(m: Map<String, Int>, n: Int)
+}
+
+var b: Box = Box.Of({"k": 7}, 5)
+
+// n is Int; assigning it to a String must be an error.
+var bad: String = match (b) {
+    Of(m, n) => n
+}
+
+IO.println(bad)

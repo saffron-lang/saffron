@@ -1,0 +1,19 @@
+// BUGS #98(a), the other direction — more bindings than the variant declares.
+// This was the more dangerous half: the extra binding's alloca was never stored,
+// so it read as 0 and the arm computed a plausible wrong answer instead of
+// failing. Kept separate from match_pattern_arity.sf because a test in
+// test/fail/ only proves the compiler rejected *something*.
+
+enum E {
+    A(x: Int, y: Int),
+    B
+}
+
+var e: E = E.A(1, 2)
+
+var too_many: Int = match (e) {
+    A(x, y, z) => x + y + z
+    B => 0
+}
+
+IO.println(too_many)
