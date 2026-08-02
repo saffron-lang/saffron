@@ -180,6 +180,54 @@ class NullChecker {
     // lists — see register_enum.
     var ambiguous_enums: List<String>
 
+    // --- Module identity (Phase 2 of docs/design/access-modifiers.md) ---
+    //
+    // The prefix of the module whose declarations are being registered right
+    // now, e.g. "stdlib_http_client_". Set by check_errors_with_modules while it
+    // walks module by module, exactly as Resolve.resolve_imports sets
+    // Resolver.current_prefix, and "" for the main program. Every declaration
+    // registered while this is set is recorded as belonging to that module.
+    var current_prefix: String
+    // Owning module prefix per declared class/interface/actor name, keyed by the
+    // *qualified* name (prefix + bare name) so two modules declaring the same
+    // class are two entries rather than one overwritten one.
+    //
+    // Identity is deliberately recorded as a structure of separate questions
+    // rather than one opaque string, because the two boundaries above `public`
+    // are different questions:
+    //
+    //   file-scope   ("private")  → decl_module_file, populated here. A module
+    //                               IS a file: main.sf's module_prefix_from_file
+    //                               derives the prefix from the file path, so
+    //                               the file prefix already is the file's
+    //                               identity and no second notion is needed.
+    //   package-scope ("internal") → decl_module_package, the seam. NOT
+    //                               populated in Phase 2: the authority for
+    //                               package membership is main.sf's pantry.toml
+    //                               reading (_is_package_entry / the [package]
+    //                               name field), which is not threaded here yet.
+    //                               A later phase fills this in from that
+    //                               reading and must not re-derive package
+    //                               membership from the prefix string — that
+    //                               re-derivation is the M1 antipattern.
+    var decl_module_file: Map<String, String>
+    var decl_module_package: Map<String, String>
+    // Bare class/interface/actor names declared by two different modules with
+    // different field lists. The class-table analogue of ambiguous_enums; see
+    // register_class_identity. `Response` in both src/lib/http/client.sf and
+    // src/lib/http/server.sf is the live instance in the tree.
+    var ambiguous_classes: List<String>
+    // Bare names of classes declared by the statement list actually being
+    // checked. Locality cannot be recovered from the key alone, because the
+    // program under check is unprefixed: its qualified key and its bare key are
+    // the same string. So it is recorded rather than inferred — a declaration
+    // here always wins the bare name, and the ambiguity guard never fires for
+    // it, because the checker is standing inside the module that declared it.
+    var local_classes: List<String>
+    // True while registering the statements under check rather than the imported
+    // ones, so register_class_identity can tell a local declaration from a rival.
+    var registering_local: Bool
+
     fun init() {
         this.env = TypeEnv()
         this.errors = []
@@ -193,6 +241,12 @@ class NullChecker {
         this.receiver_params = {}
         this.actor_classes = {}
         this.ambiguous_enums = []
+        this.current_prefix = ""
+        this.decl_module_file = {}
+        this.decl_module_package = {}
+        this.ambiguous_classes = []
+        this.local_classes = []
+        this.registering_local = false
     }
 
     fun error(msg: String) {
@@ -655,12 +709,18 @@ class NullChecker {
     // --- Check program ---
 
     fun check_program(stmts: List<AST.Stmt>) {
+        // These statements are the module being checked, so a class declared
+        // among them wins its bare name outright: it is not one of two rival
+        // imported declarations, it is the one the code under check is talking
+        // about. register_class_identity reads this to skip the ambiguity guard.
+        this.registering_local = true
         // First pass: register declarations
         var i: Float = 0
         while (i < stmts.length()) {
             this.register_decl(stmts[i])
             i = i + 1
         }
+        this.registering_local = false
         // Second pass: check bodies
         i = 0
         while (i < stmts.length()) {
@@ -765,7 +825,10 @@ class NullChecker {
                 if (type_params.length() > 0) {
                     this.class_type_params.set(name, type_params.join(","))
                 }
-                this.env.class_fields.set(name, this.params_list_to_string(fields))
+                // Keyed by prefix + name as well as by the bare name, so two
+                // modules declaring the same class stay distinguishable
+                // (register_class_identity; the `Response` collision).
+                this.register_class_identity(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
                 if (parent.length() > 0) {
@@ -878,16 +941,30 @@ class NullChecker {
             i = i + 1
         }
         var joined: String = variant_names.join(",")
-        // enum_variants is keyed by the *bare* declared name, and the checker is
-        // handed a flat list of every imported declaration with no module
-        // boundaries and no aliases (check_errors_with_imports), so two modules
-        // declaring the same enum name are indistinguishable here. The compiler
-        // is its own witness: `enum Type` exists in both src/compiler/ast.sf and
-        // src/lib/llvm/types.sf, and whichever registered last used to silently
-        // win — reporting `match` on an AST.Type as missing Void/I1/I8/... The
-        // honest answer with the information available is that the name is
-        // ambiguous, so exhaustiveness and payload-binding inference are both
-        // skipped for it rather than answered from the wrong declaration.
+        // enum_variants is keyed by the *bare* declared name. The compiler is its
+        // own witness that this collides: `enum Type` exists in both
+        // src/compiler/ast.sf and src/lib/llvm/types.sf, and whichever registered
+        // last used to silently win — reporting `match` on an AST.Type as missing
+        // Void/I1/I8/... The honest answer with the information available is that
+        // the name is ambiguous, so exhaustiveness and payload-binding inference
+        // are both skipped for it rather than answered from the wrong
+        // declaration.
+        //
+        // The clause "no module boundaries" that used to be here is no longer
+        // true: since Phase 2 of docs/design/access-modifiers.md the checker
+        // receives module_boundaries/prefixes_joined and holds current_prefix
+        // while registering, so this workaround COULD now be replaced by real
+        // qualified keys the way register_class_identity does for classes.
+        //
+        // It deliberately is not, because unlike class_fields the enum side is
+        // two tables and enum_fields' key is already compound — "EnumName.Variant"
+        // — so a prefix would make it three-part and every one of the ~10 read
+        // sites (resolve_enum_key_name, get_variant_fields, check_variant_arity,
+        // check_exhaustiveness, the two MemberAccess arms, is_type_param, ...)
+        // would have to agree on the new spelling at once. That is a larger and
+        // riskier change than the collision it fixes, and it is not needed by any
+        // later phase of the access-modifiers plan, so it is left as its own
+        // piece of work. The prerequisite it was waiting on is now in place.
         if (this.env.enum_variants.has(name)) {
             // Bound to a String first: `.get()` is typed `String|Nil`, so comparing
             // its result directly emits __any_ne, which base.ll (the bootstrap
@@ -908,6 +985,90 @@ class NullChecker {
     // keyed on its bare name can be trusted. See register_enum.
     fun is_ambiguous_enum(enum_type: String): Bool {
         return this.ambiguous_enums.contains(this.resolve_enum_key_name(enum_type))
+    }
+
+    // --- Class module identity (Phase 2 of docs/design/access-modifiers.md) ---
+
+    // Record which module declared `name`, and flag the bare name as ambiguous
+    // when a second module declares it with a different field list.
+    //
+    // This is register_enum's shape applied to classes, and it closes a real
+    // misattribution rather than a hypothetical one: `class Response` is declared
+    // in BOTH src/lib/http/client.sf (a `headers: Map<String,String>` and a
+    // `body: String`) and src/lib/http/server.sf (`_headers: List<String>`,
+    // `_body_bytes`, `_stream_fn`, ...). Both used to set the single key
+    // "Response" in env.class_fields, so whichever registered last decided what
+    // every `.field` on either one was typed — and a lookup that landed on the
+    // wrong declaration reports a type error about a field the receiver does not
+    // have. The qualified entry below is what a later phase reads to answer "was
+    // this declared in my file?" without re-deriving it.
+    fun register_class_identity(name: String, fields_str: String) {
+        var qualified: String = this.current_prefix + name
+        this.decl_module_file.set(qualified, this.current_prefix)
+        // The package seam. Left unset on purpose in Phase 2 — see the field's
+        // comment: main.sf's pantry.toml reading is the authority and is not
+        // threaded here yet.
+        this.env.class_fields.set(qualified, fields_str)
+        // A declaration in the module under check wins its bare name outright.
+        // It is not one of two rival imported declarations that the checker has
+        // to choose between — it is the one the code being checked means. Marking
+        // it local both takes the bare key and exempts it from the guard below,
+        // which is what keeps a program's own class precise even when an import
+        // happens to declare the same name.
+        if (this.registering_local) {
+            if (!this.local_classes.contains(name)) {
+                this.local_classes.push(name)
+            }
+            this.env.class_fields.set(name, fields_str)
+            return
+        }
+        // The bare key stays populated so every existing unqualified lookup
+        // keeps working; what changes is that a *conflicting* redeclaration no
+        // longer silently overwrites it. Once two modules disagree, the bare
+        // name is ambiguous and answering from either declaration would be an
+        // invention, so it is recorded as such and the bare entry is left as it
+        // was rather than flipped to the newcomer.
+        if (this.env.class_fields.has(name)) {
+            // Bound to a String first: `.get()` is typed `String|Nil`, and
+            // comparing that directly emits __any_ne, which base.ll (the
+            // bootstrap base) does not define — gen3 fails to link with an
+            // undefined symbol rather than any compile-time complaint. Same
+            // hazard register_enum documents.
+            var prior: String = this.env.class_fields.get(name)
+            if (prior != fields_str) {
+                if (!this.ambiguous_classes.contains(name)) {
+                    this.ambiguous_classes.push(name)
+                }
+                return
+            }
+        }
+        this.env.class_fields.set(name, fields_str)
+    }
+
+    // True when `class_name` names more than one distinct declaration. A caller
+    // holding only the bare name cannot tell the two apart, so anything keyed on
+    // it is untrustworthy. See register_class_identity.
+    fun is_ambiguous_class(class_name: String): Bool {
+        var base: String = this.generic_base(class_name)
+        // A local declaration is never ambiguous: the checker is inside the
+        // module that declared it, so there is no question which one is meant.
+        if (this.local_classes.contains(base)) return false
+        return this.ambiguous_classes.contains(base)
+    }
+
+    // The qualified key for a class as seen from the module currently being
+    // checked: prefix + bare name when that module declared it, else the bare
+    // name. This is the lookup a later phase uses for a visibility decision;
+    // Phase 2 uses it to prefer the local declaration over a same-named one from
+    // another module.
+    fun qualified_class_key(class_name: String): String {
+        var base: String = this.generic_base(class_name)
+        // A class declared by the module under check owns the bare key, so that
+        // is already the right entry.
+        if (this.local_classes.contains(base)) return base
+        var qualified: String = this.current_prefix + base
+        if (this.env.class_fields.has(qualified)) return qualified
+        return base
     }
 
 
@@ -1067,7 +1228,21 @@ class NullChecker {
                 this.env.pop_scope()
             }
             ClassDecl(name, __tps, parent, fields, methods, doc) => {
-                this.env.class_fields.set(name, this.params_list_to_string(fields))
+                // Unlike register_decl this runs only over the statements being
+                // checked, never over the imported list, so the class here is
+                // the one whose body is about to be walked. Setting the bare key
+                // unconditionally is therefore deliberate rather than a
+                // collision: it makes `this.field` inside these methods resolve
+                // to THIS declaration even when another module also declares the
+                // name. The qualified entry is recorded too, so the identity
+                // table stays complete for later phases.
+                var cs_fields_str: String = this.params_list_to_string(fields)
+                this.env.class_fields.set(this.current_prefix + name, cs_fields_str)
+                this.decl_module_file.set(this.current_prefix + name, this.current_prefix)
+                this.env.class_fields.set(name, cs_fields_str)
+                if (!this.local_classes.contains(name)) {
+                    this.local_classes.push(name)
+                }
                 if (parent.length() > 0) {
                     this.env.define_var(name + "__parent", this.parse_type_node(parent))
                     this.class_parents.set(name, parent)
@@ -1495,7 +1670,20 @@ class NullChecker {
     }
 
     fun get_class_field_type(class_name: String, field: String): String {
-        var fields_str: String = this.env.class_fields.get(class_name)
+        // Prefer the declaration from the module being checked. Two modules can
+        // declare the same class name — `Response` exists in both
+        // src/lib/http/client.sf and src/lib/http/server.sf — and the bare key
+        // holds only one of them.
+        var lookup: String = this.qualified_class_key(class_name)
+        // Ambiguous name and no local declaration to prefer: the field list on
+        // file may be the other module's, so a type read from it is invented.
+        // `Any` is the honest answer — it widens rather than reporting a
+        // mismatch about a field the receiver does not have. Same posture as
+        // get_variant_fields for an ambiguous enum.
+        if (lookup == this.generic_base(class_name) and this.is_ambiguous_class(class_name)) {
+            return "Any"
+        }
+        var fields_str: String = this.env.class_fields.get(lookup)
         if (fields_str.length() == 0) return "Any"
         var parts: List<String> = fields_str.split(",")
         var i: Float = 0
@@ -2795,13 +2983,58 @@ fun check_errors_only(program: List<AST.Stmt>): String {
     return checker.error_report()
 }
 
+// Register every imported declaration with no idea which module it came from.
+// Kept as a thin wrapper over check_errors_with_modules so existing callers and
+// tests keep working; anything that HAS the boundaries should pass them, because
+// without them two modules declaring the same class are indistinguishable here.
 fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
+    return check_errors_with_modules(program, imports, [], "")
+}
+
+// Phase 2 of docs/design/access-modifiers.md: the checker learns which module
+// each imported declaration came from.
+//
+// `boundaries` and `prefixes_joined` are decoded exactly as
+// Resolve.resolve_imports decodes them — boundaries[i]..boundaries[i+1] is
+// module i's slice of the flat statement list, and prefixes_joined is the
+// "|"-joined prefix list indexed by the same i. Deliberately the same decoding
+// and not a second scheme: two readers of one encoding that disagree is how the
+// module identity would drift from what codegen and resolve believe.
+//
+// With an empty boundary list this degrades to the old flat behaviour rather
+// than failing, which is what makes check_errors_with_imports above still valid.
+fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): String {
     var checker: NullChecker = NullChecker()
-    var i: Float = 0
-    while (i < imports.length()) {
-        checker.register_decl(imports[i])
-        i = i + 1
+    var prefixes: List<String> = prefixes_joined.split("|")
+    if (boundaries.length() > 1) {
+        // Walk module by module, restoring each module's prefix first, so every
+        // declaration is registered as belonging to the module that declared it.
+        var bi: Float = 0
+        while (bi + 1 < boundaries.length()) {
+            var start: Float = boundaries[bi]
+            var end: Float = boundaries[bi + 1]
+            if (bi < prefixes.length()) {
+                checker.current_prefix = prefixes[bi]
+            } else {
+                checker.current_prefix = ""
+            }
+            var si: Float = start
+            while (si < end) {
+                checker.register_decl(imports[si])
+                si = si + 1
+            }
+            bi = bi + 1
+        }
+    } else {
+        var i: Float = 0
+        while (i < imports.length()) {
+            checker.register_decl(imports[i])
+            i = i + 1
+        }
     }
+    // The main program is its own module, and it is not prefixed — same
+    // convention as Resolve.resolve_main.
+    checker.current_prefix = ""
     checker.check_program(program)
     return checker.error_report()
 }
