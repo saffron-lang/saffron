@@ -173,7 +173,11 @@ enum Stmt {
     // could not see that Duck derives from Swimmable at all. Order is
     // load-bearing: parents[0] keeps the field layout and `init`-forwarding
     // behaviour single inheritance has always had, and later parents only add.
-    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String),
+    // `visibility` takes this node to seven fields, which is precisely the shape
+    // BUGS #96 segfaulted on: an arm binding only six read the seventh as 0, and
+    // `0.starts_with(...)` is `strncmp(NULL, ...)`. `interface` and `actor` parse
+    // through this same node, so all three are in the blast radius.
+    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String, visibility: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),

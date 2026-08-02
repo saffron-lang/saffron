@@ -2129,7 +2129,7 @@ class Parser {
         if (field_defaults.length() > 0) {
             this.inject_field_defaults(methods, field_defaults)
         }
-        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring)
+        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring, "public")
     }
 
     fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {
@@ -2894,7 +2894,7 @@ class Parser {
             VarDecl(n, t, i, d, v_vis) => "other"
             FunDecl(n, p, r, b, d, f_vis) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
-            ClassDecl(n, tp, ps, f, m, d) => "other"
+            ClassDecl(n, tp, ps, f, m, d, c_vis) => "other"
             Return(v) => "other"
             If(c, t, e) => "if"
             While(c, b) => "other"

@@ -145,7 +145,7 @@ fun stmt_to_source(stmt: Any): String {
     return match (stmt) {
         VarDecl(name, type_ann, init, doc, v_vis) => "var " + name + ": " + type_ann + " = " + expr_to_source(init)
         FunDecl(name, params, ret, body, doc, f_vis) => "fun " + name + "(...) { ... }"
-        ClassDecl(name, type_params, parents, fields, methods, doc) => "class " + name + " { ... }"
+        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => "class " + name + " { ... }"
         EnumDecl(name, variants, doc, e_vis) => "enum " + name + " { ... }"
         ExprStmt(expr) => expr_to_source(expr)
         Return(value) => "return " + expr_to_source(value)

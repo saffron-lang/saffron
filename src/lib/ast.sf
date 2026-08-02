@@ -41,7 +41,7 @@ fun walk_children(stmt: Any, visitor: Any) {
         FunDecl(name, params, ret_type, body, docstring, f_vis) => {
             walk_stmts(body, visitor)
         }
-        ClassDecl(name, type_params, parents, fields, methods, docstring) => {
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => {
             walk_stmts(methods, visitor)
         }
         If(condition, then_branch, else_branch) => {
@@ -89,7 +89,7 @@ fun find_classes(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            ClassDecl(name, type_params, parents, fields, methods, docstring) => {
+            ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -119,7 +119,7 @@ fun find_enums(stmts: List<Any>): List<Any> {
 fun stmt_name(stmt: Any): String {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, docstring, f_vis) => name
-        ClassDecl(name, type_params, parents, fields, methods, docstring) => name
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => name
         EnumDecl(name, variants, docstring, e_vis) => name
         VarDecl(name, type_ann, initializer, docstring, v_vis) => name
         _ => ""
@@ -130,7 +130,7 @@ fun stmt_name(stmt: Any): String {
 fun stmt_doc(stmt: Any): String {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, docstring, f_vis) => docstring
-        ClassDecl(name, type_params, parents, fields, methods, docstring) => docstring
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => docstring
         EnumDecl(name, variants, docstring, e_vis) => docstring
         VarDecl(name, type_ann, initializer, docstring, v_vis) => docstring
         _ => ""
@@ -172,7 +172,7 @@ fun is_fun(stmt: Any): Bool {
 /// Check if a statement is a class declaration.
 fun is_class(stmt: Any): Bool {
     return match (stmt) {
-        ClassDecl(name, type_params, parents, fields, methods, docstring) => true
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => true
         _ => false
     }
 }

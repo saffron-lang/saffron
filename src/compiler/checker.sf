@@ -947,7 +947,7 @@ class NullChecker {
             EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -1373,7 +1373,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parents, fields, methods, doc) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis) => {
                 // Unlike register_decl this runs only over the statements being
                 // checked, never over the imported list, so the class here is
                 // the one whose body is about to be walked. Setting the bare key

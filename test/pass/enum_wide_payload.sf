@@ -23,6 +23,13 @@ enum Wide {
     Six(a: String, b: String, c: String, d: String, e: String, f: String),
     Seven(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int),
     Mixed(name: String, items: List<String>, count: Int, label: String, flag: Bool, doc: String),
+    // The seven-field mixed shape is `AST.Stmt.ClassDecl` itself, as of Phase 3 of
+    // docs/design/access-modifiers.md: name, type_params, parents, fields, methods,
+    // docstring, visibility. Two trailing Strings behind two Lists is the layout
+    // that matters — #96 was a *String* read as 0, and only a method call on it
+    // (starts_with -> strncmp) turns that into an observable crash rather than a
+    // silently wrong value.
+    SevenMixed(name: String, type_params: List<String>, parents: List<String>, fields: List<String>, methods: List<String>, doc: String, visibility: String),
     Nothing
 }
 
@@ -52,6 +59,26 @@ Test.assert_eq(match (m) { Mixed(name, items, count, label, flag, doc) => items.
     _ => 0 }, 2, "and an interior List field still round-trips")
 Test.assert_eq(match (m) { Mixed(name, items, count, label, flag, doc) => label
     _ => "?" }, "lbl", "as does the field before the last")
+
+// Seven fields with the mixed layout of a real ClassDecl. The seventh is a String
+// and the sixth is a String, so an arm capped at six would read `visibility` as 0
+// and an arm capped at five would read `doc` as 0 — distinguished below so a cap at
+// either position names itself.
+var cd: Wide = Wide.SevenMixed("Response", ["T"], ["Base", "Shown"], ["status", "body"], ["init", "send"], "//! doc", "public")
+Test.assert_eq(match (cd) { SevenMixed(nm, tps, ps, fs, ms, dc, vis) => vis.starts_with("pub")
+    _ => false }, true, "field 7 of 7 is a live String, not 0 — the ClassDecl shape")
+Test.assert_eq(match (cd) { SevenMixed(nm, tps, ps, fs, ms, dc, vis) => dc.starts_with("//!")
+    _ => false }, true, "field 6 of 7 is still a live String behind two Lists")
+Test.assert_eq(match (cd) { SevenMixed(nm, tps, ps, fs, ms, dc, vis) => ms.length()
+    _ => 0 }, 2, "field 5 of 7, an interior List, round-trips")
+Test.assert_eq(match (cd) { SevenMixed(nm, tps, ps, fs, ms, dc, vis) => ps[1]
+    _ => "?" }, "Shown", "field 3 of 7, a List, keeps its elements")
+Test.assert_eq(match (cd) { SevenMixed(nm, tps, ps, fs, ms, dc, vis) => nm
+    _ => "?" }, "Response", "field 1 of 7")
+
+// Destructuring the seven-field mixed variant goes through extract_arm_bindings too.
+let Wide.SevenMixed(dnm, dtps, dps, dfs, dms, ddc, dvis) = Wide.SevenMixed("C", [], [], [], [], "d", "private")
+Test.assert_eq(dvis, "private", "let-destructuring reaches the seventh field")
 
 // A no-field variant of the same enum still uses the tag-only path. Named
 // `nothing` rather than `e`: a match binding whose name matches a module global

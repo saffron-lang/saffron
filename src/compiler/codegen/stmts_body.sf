@@ -116,7 +116,7 @@
             EnumDecl(name, variants, doc, e_vis) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 // Registered before the body is generated: a method returning a
                 // class type parameter is typed by substituting the receiver's
                 // own type arguments, and that has to be known by the time any
@@ -1175,7 +1175,7 @@
             }
             VarDecl(n, t, i, d, v_vis) => {}
             FunDecl(n, p, r, b, d, f_vis) => {}
-            ClassDecl(n, __tps, ps, f, m, d) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -1345,7 +1345,7 @@
             VarDecl(n, t, i, d, v_vis) => "var"
             FunDecl(n, p, r, b, d, f_vis) => "fun"
             EnumDecl(n, v, d, e_vis) => "enum"
-            ClassDecl(n, __tps, ps, f, m, d) => "class"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -1370,7 +1370,7 @@
             VarDecl(n, t, i, d, v_vis) => "other"
             FunDecl(n, p, r, b, d, f_vis) => "other"
             EnumDecl(n, v, d, e_vis) => "other"
-            ClassDecl(n, __tps, ps, f, m, d) => "other"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
