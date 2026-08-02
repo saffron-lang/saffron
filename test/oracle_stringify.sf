@@ -176,24 +176,29 @@ IO.println(Color.Blue.to_string())
 // #102 made to_string() report the wrong variant while match still dispatched
 // correctly. Printing the match result next to the direct print puts the two
 // readings of one value side by side, so a disagreement is local.
-// The bindings below are named `mr`/`ms`/`mn` rather than the obvious `r`/`s`/`n`
-// to avoid a SEPARATE compiler bug that this file tripped over while being
-// written: a match-arm binding whose name collides with a module-global variable
-// emits `store i64 %tN, i64* %s` against a global that lives at `@__g_s`, which
-// is invalid IR ("use of undefined value '%s'"). Inside a function the same
-// collision is worse — it type checks, compiles, and silently overwrites the
-// outer variable's slot with the payload. See test/oracle_match_shadow.sf, which
-// is the dedicated regression case; this file works around it so that it can go
-// on testing stringification, which is what it is for.
+// The `s` binding below deliberately collides with the module-global
+// `var s: String = "bound"` declared above, and that is load-bearing. These
+// bindings were originally named `mr`/`ms`/`mn` to work around a SEPARATE
+// compiler bug this file tripped over while being written: a match-arm binding
+// whose name collided with an enclosing variable was stored into that variable's
+// slot, which at module scope emitted `store i64 %tN, i64* %s` against a global
+// living at `@__g_s` (invalid IR, "use of undefined value '%s'") and inside a
+// function silently overwrote the outer variable instead. That is BUGS #106,
+// fixed, with test/oracle_match_shadow.sf as its dedicated regression case. The
+// natural names are restored here so that this file also exercises the fix
+// incidentally — if #106 ever regresses, this oracle stops compiling too.
 var m1 = match (Shape.Square(4)) {
-    Circle(mr) => "matched Circle ${mr}"
-    Square(ms) => "matched Square ${ms}"
-    Named(mn) => "matched Named ${mn}"
+    Circle(r) => "matched Circle ${r}"
+    Square(s) => "matched Square ${s}"
+    Named(n) => "matched Named ${n}"
 }
 IO.println(m1)
 
+// The outer `s` must still read "bound" after the arm above bound the same name.
+IO.println("outer s after match: ${s}")
+
 var m2 = match (OneBool.OB(false)) {
-    OB(mv) => "matched OB ${mv}"
+    OB(v) => "matched OB ${v}"
 }
 IO.println(m2)
 

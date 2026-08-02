@@ -1,0 +1,144 @@
+// scope_match_arm_binding.sf — BUGS #106 regression, in the pass suite.
+//
+// A match arm's bindings are scoped to the arm. Binding a name the enclosing
+// scope already uses must shadow it for the arm's extent and leave it alone
+// afterwards. Before the fix, codegen wrote the arm binding into the enclosing
+// variable's own slot, which was invalid IR at module scope and silent
+// corruption inside a function.
+//
+// test/oracle_match_shadow.sf is the differential-oracle version of this.
+// This file covers the same ground plus the shapes that only show up at module
+// scope, where the collision is against a global rather than an alloca.
+
+import "@test" as Test
+
+enum Payload {
+    Num(side: Int),
+    Text(body: String)
+}
+
+enum Shape {
+    Circle(r: Int),
+    Square(side: Int)
+}
+
+// --- module scope: the binding collides with a global ---
+//
+// The global lives at @__g_s. The arm binding is a local, and gen_match has to
+// allocate its slot itself because the frame's hoist list skips names that are
+// module globals. Before the fix this emitted `store ..., i64* %s` with no such
+// slot: "use of undefined value '%s'".
+
+var s: String = "bound"
+
+var at_module_scope = match (Payload.Num(4)) {
+    Num(s) => "arm saw ${s}"
+    Text(s) => "arm saw ${s}"
+}
+
+Test.assert_eq(at_module_scope, "arm saw 4",
+               "a module-scope match arm sees its own binding")
+Test.assert_eq(s, "bound",
+               "a module-global String survives a same-named arm binding")
+Test.assert_eq(s.length(), 5,
+               "and is still a String afterwards, not a tagged Int")
+
+// Two matches at module scope binding the SAME colliding name. The slot is
+// allocated once per frame, so a second match must reuse it rather than emit a
+// duplicate `%s = alloca i64`, which LLVM rejects outright.
+var second_at_module_scope = match (Shape.Square(7)) {
+    Circle(s) => "circle ${s}"
+    Square(s) => "square ${s}"
+}
+
+Test.assert_eq(second_at_module_scope, "square 7",
+               "a second module-scope match may rebind the same name")
+Test.assert_eq(s, "bound",
+               "and the global is still untouched after both")
+
+// --- function scope: the binding shares an alloca with a local ---
+
+fun local_collision(): String {
+    var s: String = "inner"
+    var m = match (Payload.Num(9)) {
+        Num(s) => "arm saw ${s}"
+        Text(s) => "arm saw ${s}"
+    }
+    return "${m} | outer=${s}"
+}
+
+Test.assert_eq(local_collision(), "arm saw 9 | outer=inner",
+               "a local String survives a same-named arm binding")
+
+fun local_collision_length(): Int {
+    var s: String = "inner"
+    var ignored = match (Payload.Num(9)) {
+        Num(s) => "${s}"
+        Text(s) => "${s}"
+    }
+    return s.length()
+}
+
+Test.assert_eq(local_collision_length(), 5,
+               "the local is still a String, so length() is 5 and not 0")
+
+// --- the shadowed variable may be an Int, not only a String ---
+//
+// The static side of the shadowing is bracketed too (typed_vars/string_vars are
+// flat), so check the other direction: a String binding over an Int local must
+// not leave the local registered as a String, or `+` on it becomes concatenation.
+
+fun int_shadowed_by_string(): Int {
+    var v: Int = 10
+    var m = match (Payload.Text("hi")) {
+        Num(v) => "num ${v}"
+        Text(v) => "text ${v}"
+    }
+    Test.assert_eq(m, "text hi", "the arm's String binding is visible in the arm")
+    return v + 5
+}
+
+Test.assert_eq(int_shadowed_by_string(), 15,
+               "an Int local shadowed by a String binding is still an Int after")
+
+// --- a named wildcard binds a name too ---
+//
+// `x => ...` binds the subject itself, and it shadows an enclosing `x` exactly
+// the same way a variant binding does.
+
+fun named_wildcard_collision(): String {
+    var whole: String = "kept"
+    var m = match (Payload.Num(3)) {
+        Num(n) => "num ${n}"
+        whole => "wildcard"
+    }
+    return "${m}/${whole}"
+}
+
+Test.assert_eq(named_wildcard_collision(), "num 3/kept",
+               "a named wildcard does not clobber a same-named outer variable")
+
+// --- rebinding the same name in a second match, at function scope ---
+//
+// Each arm's binding is restored on the way out, so a later match binding the
+// same name must read its own payload rather than the earlier one's. (An inner
+// match nested directly inside an arm BODY would be the stronger test, but a
+// block-bodied arm currently types as Nil|String, which is a separate checker
+// limitation; sequencing them gets at the same slot-sharing question.)
+
+fun sequential_rebind(): String {
+    var first = match (Shape.Circle(1)) {
+        Circle(n) => "c${n}"
+        Square(n) => "s${n}"
+    }
+    var second = match (Shape.Square(2)) {
+        Circle(n) => "c${n}"
+        Square(n) => "s${n}"
+    }
+    return "${first}/${second}"
+}
+
+Test.assert_eq(sequential_rebind(), "c1/s2",
+               "a later match rebinding a name reads its own payload")
+
+Test.summary()
