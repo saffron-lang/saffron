@@ -4,6 +4,14 @@
         var result_ptr: String = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
+        // Give every arm binding a slot to be stored into before any arm block
+        // exists, so the alloca dominates all of them (BUGS #106). Only names that
+        // collide with a module global get one here; every other binding already
+        // has an alloca from the enclosing frame's hoist list. Emitted for all
+        // three lowerings below — enum switch, class pattern, unknown enum — since
+        // each stores into the same `%<name>` slots.
+        this.ensure_arm_slots(this.all_arm_bound_names(arms))
+
         // Determine which enum from first arm's pattern
         var first_arm: AST.MatchArm = arms[0]
         var first_pattern: AST.Pattern = match (first_arm) { Arm(p, b) => p
@@ -413,37 +421,57 @@
         return this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)
     }
 
-    /// Allocate the slots the enclosing frame did not. Must be called while the
-    /// pre-switch block is current, so the allocas dominate all arm blocks, and at
-    /// most once per name per function — `emitted_arm_slots` enforces that, since
-    /// two matches in one scope binding the same name would otherwise emit
-    /// `%s = alloca i64` twice and LLVM rejects the duplicate local name.
+    /// Allocate the slots the enclosing frame did not, and record that we did.
+    ///
+    /// Called from gen_match while the pre-switch block is current: an alloca
+    /// outside the entry block is legal IR and this block dominates every arm
+    /// block, which is all the store and load sites need. (`result_ptr` above is
+    /// allocated the same way.)
+    ///
+    /// The bookkeeping key is `"__armslot:" + name` in `current_fn_locals`, the
+    /// same namespaced-key trick stmts_body.sf uses for `"__nestedfn:"`. Two
+    /// properties come for free: that map is saved and restored around every
+    /// function body, so the record has exactly per-frame lifetime; and nothing
+    /// reads a key with that prefix, so no dispatch or alloca decision shifts. It
+    /// has to be recorded somewhere, because two matches in one scope binding the
+    /// same colliding name would otherwise emit `%s = alloca i64` twice and LLVM
+    /// rejects the duplicate name.
     fun ensure_arm_slots(names: List<String>) {
         var i: Float = 0
         while (i < names.length()) {
             var n: String = names[i]
-            if (this.arm_slot_missing(n) and !this.emitted_arm_slots.has(n)) {
-                this.emitted_arm_slots.set(n, true)
+            var key: String = "__armslot:" + n
+            if (this.arm_slot_missing(n) and !this.current_fn_locals.has(key)) {
+                this.current_fn_locals.set(key, true)
                 this.emit_indent("%" + this.sanitize_name(n) + " = alloca i64")
-                // Zeroed for the same reason the alloca loops zero GC-root
-                // locals: this slot becomes a save/restore source below, and an
-                // undef load is not something to hand to the GC or to strlen.
+                // Zeroed for the same reason output_body.sf zeroes GC-root
+                // allocas: this slot is a save/restore source below, and an undef
+                // load is not something to hand to the GC or to rt_strlen. Note
+                // the slot is NOT registered as a GC root — the payload it holds
+                // is reachable through the subject for the arm's extent, and
+                // adding a root here would need a matching pop on every arm exit.
                 this.emit_indent("store i64 0, i64* %" + this.sanitize_name(n))
             }
             i = i + 1
         }
     }
 
-    /// Every name an arm pattern binds, in one list — a NamedWildcard binds one
-    /// too, and it shadows an enclosing variable exactly the same way.
-    fun arm_bound_names(pattern: AST.Pattern): List<String> {
+    /// Every name any arm of this match binds. Collected across all arms up front
+    /// rather than per arm, because the allocas have to be emitted once, in the
+    /// single block that dominates all the arm blocks.
+    fun all_arm_bound_names(arms: List<AST.MatchArm>): List<String> {
         var out: List<String> = []
-        var nw: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
-        if (nw.length() > 0) { out.push(nw) }
-        var bs: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
         var i: Float = 0
-        while (i < bs.length()) {
-            out.push(bs[i])
+        while (i < arms.length()) {
+            var pat: AST.Pattern = this.get_arm_pattern(arms[i])
+            // get_pattern_bindings already folds a NamedWildcard's name in, so
+            // `x => ...` shadowing an enclosing `x` is covered too.
+            var bs: List<String> = this.get_pattern_bindings(pat)
+            var j: Float = 0
+            while (j < bs.length()) {
+                if (!out.contains(bs[j])) { out.push(bs[j]) }
+                j = j + 1
+            }
             i = i + 1
         }
         return out
