@@ -121,6 +121,13 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
         var parent: String = dir_of(dir)
         return parent + "/" + import_path.slice(3, import_path.length())
     }
+    // An absolute path is already resolved. This branch was missing, so such a
+    // path fell into the "package submodule" case below on the strength of
+    // containing a slash, found nothing, and came back as a nonexistent
+    // stdlib file that nothing downstream checked (BUGS #78).
+    if (import_path.starts_with("/")) {
+        return import_path
+    }
     // Bare import with slash: "turmeric/signal" → package submodule
     if (import_path.contains("/")) {
         var slash_idx: Float = import_path.index_of("/")
@@ -590,6 +597,16 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
+            // _find_in_lib_paths ends in an unconditional
+            // `stdlib_dir + "/" + name + ".sf"`, so an unresolvable import
+            // yields a path that does not exist. Nothing downstream noticed:
+            // collect_modules read it as an empty file, registered no
+            // declarations, and every use of the alias failed later in a way
+            // that never mentioned the import (BUGS #78). Say so here instead.
+            if (!OS.file_exists(full_path)) {
+                IO.println("Error: cannot resolve import \"" + imp_path + "\" in " + file_path + " (tried " + full_path + ")")
+                c_exit(1)
+            }
             // Ensure path_to_prefix is populated before recursing
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
@@ -695,7 +712,25 @@ fun main(): Int {
             epi = epi + 1
         }
     }
-    _lib_paths = lib_path_args
+    // Canonicalise before deduping. The same directory named twice — once
+    // relative, once absolute, which happens naturally when a caller passes
+    // --lib-path and the driver's auto-discovery adds it again — used to count
+    // as two packages, so every module's globals were emitted twice and LLVM
+    // rejected the output with a redefinition of an internal symbol that gave
+    // no hint the duplicated flag was the cause (BUGS #57).
+    var canon_lib_paths: List<String> = []
+    var cli: Float = 0
+    while (cli < lib_path_args.length()) {
+        var lp: String = lib_path_args[cli]
+        if (!lp.starts_with("/")) {
+            if (lp.starts_with("./")) { lp = lp.slice(2, lp.length()) }
+            lp = OS.cwd() + "/" + lp
+        }
+        while (lp.ends_with("/")) { lp = lp.slice(0, lp.length() - 1) }
+        if (!canon_lib_paths.contains(lp)) { canon_lib_paths.push(lp) }
+        cli = cli + 1
+    }
+    _lib_paths = canon_lib_paths
 
     // Find the last .sf arg (input) and anything after it (output)
     var last_sf_idx: Float = -1
@@ -924,6 +959,12 @@ fun main(): Int {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
+            // Same unresolvable-import guard as in collect_modules; this is the
+            // entry module's copy of that loop (BUGS #78).
+            if (!OS.file_exists(full_path)) {
+                IO.println("Error: cannot resolve import \"" + imp_path + "\" in " + input_path + " (tried " + full_path + ")")
+                c_exit(1)
+            }
             // Ensure path_to_prefix is populated before recursing
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))

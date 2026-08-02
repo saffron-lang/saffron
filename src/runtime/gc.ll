@@ -47,6 +47,33 @@ target triple = "arm64-apple-macosx14.0.0"
 ;
 ; Layout: each nursery object has the same 24-byte header as old-gen objects,
 ; enabling uniform scanning and seamless promotion.
+;
+; THE NURSERY IS CURRENTLY OFF. __gc_init no longer calls __gc_nursery_init, so
+; __gc_nursery_inited stays 0 and __gc_alloc goes straight to the old-generation
+; mark-and-sweep path. Everything below is kept intact and reachable — calling
+; __gc_nursery_init() by hand turns it back on — but it cannot be correct as
+; written, for a reason that is about codegen rather than about this file:
+;
+;   Minor GC MOVES objects (__gc_minor_promote copies them out and
+;   __gc_minor_collect resets the bump pointer), and it forwards only the
+;   shadow-stack roots. Codegen routinely holds a receiver pointer in an LLVM
+;   SSA temp across an allocating call:
+;
+;     %t3  = load i64, i64* @__g_xs            ; receiver
+;     %t14 = call i8* @__sf_malloc(...)        ; may run a minor GC -> moves it
+;     %t19 = call i64 @__list_push(i64 %t3, ...)  ; %t3 is now stale
+;
+;   An SSA temp is not a root, so no forwarding pass can find it. That is
+;   BUGS #63, and it is not fixable inside the collector: any moving collector
+;   is wrong against this codegen. Turning the nursery off also removes #81,
+;   whose remembered set was never populated because __gc_write_barrier is
+;   defined but never emitted — with no nursery there is no old-to-young edge
+;   for it to track.
+;
+; Both bug entries independently name this ("retire the nursery, or make it
+; non-moving") as the fix that closes them together. Re-enabling the nursery
+; requires either rooting receivers across allocating calls in codegen or a
+; non-moving young generation, and re-enabling #81's write barrier.
 
 @__gc_nursery_start = global i64 0   ; base address of nursery arena
 @__gc_nursery_ptr = global i64 0     ; current bump pointer (next free byte)
@@ -594,11 +621,50 @@ do_push:
   ret void
 }
 
+; Strip TAG_PTR from a value, leaving anything else alone.
+;
+; This is the single most load-bearing function in the collector, and its
+; absence was a silent, total failure of tracing. Roots, list elements, map
+; keys/values and instance fields all hold *NaN-boxed* i64s: a heap pointer
+; there reads as 0x7FF8_0000_0000_0000 | payload. `__gc_is_heap_ptr` rejects
+; anything above 0x0000FFFFFFFFFFFF as "a tagged NaN-boxed value or a kernel
+; address", so every such pointer was classified not-a-pointer and
+; `__gc_mark_object` returned without marking it. The mark phase therefore
+; marked nothing at all, and the sweep freed the entire live heap.
+;
+; It stayed invisible for two reasons. The compiler self-hosts against base.ll,
+; where tagging is the identity, so its own roots are bare pointers that pass
+; the bounds check — the bootstrap could never see this (see the
+; identity-mode blind spot). And in user programs the nursery kept new objects
+; off @__gc_head entirely, so the sweep had nothing to free; the moment the
+; nursery was retired for BUGS #63/#81 the underlying breakage surfaced as
+; strings and map keys losing their first byte, then as segfaults.
+;
+; Only TAG_PTR (0x7FF8) is stripped. TAG_INT (0x7FF9) and TAG_SPEC (0x7FFA)
+; must survive untouched so they keep failing the pointer test, and an unboxed
+; double's bit pattern is left alone for the bounds check to reject.
+define private i64 @__gc_strip_tag(i64 %val) {
+entry:
+  %upper = lshr i64 %val, 48
+  %is_tag_ptr = icmp eq i64 %upper, 32760      ; 0x7FF8
+  br i1 %is_tag_ptr, label %strip, label %keep
+
+strip:
+  %raw = and i64 %val, 281474976710655         ; 0x0000FFFFFFFFFFFF
+  ret i64 %raw
+
+keep:
+  ret i64 %val
+}
+
 ; Check if a value is a valid GC heap pointer.
 ; Uses a two-stage filter:
 ;   1. Quick checks: zero, alignment, and heap bounds (no memory access needed)
 ;   2. Magic number verification at header + 16 (safe because within known bounds)
 ; Magic = 0x5AFF_C0DE_DEAD_BEEF
+;
+; %val must already be untagged — callers that read a slot out of the object
+; graph run it through @__gc_strip_tag first.
 define private i64 @__gc_is_heap_ptr(i64 %val) {
 entry:
   %is_zero = icmp eq i64 %val, 0
@@ -644,8 +710,17 @@ no:
 
 ; Mark a single object: validate, set mark bit, push onto worklist.
 ; Does NOT recurse — children are processed by __gc_mark_drain.
-define void @__gc_mark_object(i64 %user_ptr) {
+;
+; Accepts a value in either representation. Values read out of the object graph
+; (roots, list elements, map keys/values, instance fields) are NaN-boxed;
+; the collector's own internal links (a list's data array, a map's key/value
+; arrays, a closure's env) are raw pointers straight from __gc_alloc. Stripping
+; TAG_PTR normalises both to a raw pointer, and everything downstream — the mark
+; bit, the worklist, the drain phase's header reads — then operates on the one
+; representation the headers are actually addressed by.
+define void @__gc_mark_object(i64 %val_in) {
 entry:
+  %user_ptr = call i64 @__gc_strip_tag(i64 %val_in)
   %is_zero = icmp eq i64 %user_ptr, 0
   br i1 %is_zero, label %done, label %validate
 
@@ -998,7 +1073,9 @@ set_default:
 
 init_ss:
   call void @__gc_init_shadow_stack()
-  call void @__gc_nursery_init()
+  ; No @__gc_nursery_init() here on purpose — see the nursery section header.
+  ; The moving minor collector invalidates receiver pointers held in SSA temps
+  ; (BUGS #63) and its remembered set is never filled (BUGS #81).
   ret i64 0
 }
 
@@ -1584,8 +1661,16 @@ done:
 ; more now than it used to: the BUGS #81 old-gen scan reaches far more objects
 ; per collection, including half-initialized ones the reachability-driven walk
 ; never used to see.
-define private void @__gc_minor_mark_value(i64 %val) optnone noinline {
+;
+; Values reached through the object graph are NaN-boxed, so strip TAG_PTR the
+; same way @__gc_mark_object does. Without this the nursery collector marked
+; nothing either — see the note on @__gc_strip_tag. (The nursery is off today;
+; this is fixed here so re-enabling it does not resurrect that bug. The
+; forwarding pass in @__gc_minor_visit_slot is NOT tag-correct yet and is
+; called out there.)
+define private void @__gc_minor_mark_value(i64 %val_in) optnone noinline {
 entry:
+  %val = call i64 @__gc_strip_tag(i64 %val_in)
   %in_nursery = call i64 @__gc_is_nursery_ptr(i64 %val)
   %not_nursery = icmp eq i64 %in_nursery, 0
   br i1 %not_nursery, label %done, label %check_magic
@@ -1953,6 +2038,14 @@ do_fwd:
   ; __gc_get_forwarded requires both a nursery-range hit AND the forwarding
   ; sentinel in the header, so a small integer (a count or capacity that shares
   ; a struct with a real pointer) cannot be mistaken for a forwarded object.
+  ;
+  ; NOT tag-correct, and deliberately left that way while the nursery is off:
+  ; %val here is NaN-boxed for graph slots, so __gc_get_forwarded misses them,
+  ; and even with a strip the raw forwarded address would have to be re-tagged
+  ; before the store below — a raw pointer written into a NaN-boxed slot is its
+  ; own corruption. Re-enabling the nursery means fixing this pair together
+  ; (BUGS #63 / #81), on top of the SSA-temp root problem that is the real
+  ; blocker.
   %fwd = call i64 @__gc_get_forwarded(i64 %val)
   %has_fwd = icmp ne i64 %fwd, 0
   br i1 %has_fwd, label %store_fwd, label %done
