@@ -566,6 +566,19 @@ entry:
 ; NaN-Boxing Value Helpers (identity mode — matches base.ll)
 ; =============================================================================
 
+; @generated-values:begin -- DO NOT EDIT BELOW THIS LINE
+; Generated from src/runtime/values.spec for target `wasm64` (discipline:
+; identity) by tools/gen_runtime_values.py. Edit the spec, then re-run:
+;
+;     python3 tools/gen_runtime_values.py
+;
+; These 19 helpers are shared across four IR bases. They were hand-copied and
+; drifted -- BUGS #77 had `true` printing as "false" on wasm32 for months because
+; one base out of four untagged twice. Editing this block directly reintroduces
+; exactly that failure mode, and `--check` in CI will fail.
+
+; --- Tag/Untag Helpers ---
+
 define i64 @__val_tag_int(i64 %n) {
 entry:
   ret i64 %n
@@ -657,30 +670,33 @@ entry:
 define i1 @__val_is_int(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
-  %r = icmp eq i64 %upper, 32761
-  ret i1 %r
+  %result = icmp eq i64 %upper, 32761         ; 0x7FF9
+  ret i1 %result
 }
 
 define i1 @__val_is_ptr(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
-  %r = icmp eq i64 %upper, 32760
-  ret i1 %r
-}
-
-define i1 @__val_is_bool(i64 %v) {
-entry:
-  %is_t = icmp eq i64 %v, 9221683186994511873
-  %is_f = icmp eq i64 %v, 9221683186994511872
-  %result = or i1 %is_t, %is_f
+  %result = icmp eq i64 %upper, 32760         ; 0x7FF8
   ret i1 %result
 }
 
 define i1 @__val_is_nil(i64 %v) {
 entry:
-  %result = icmp eq i64 %v, 9221683186994511874
+  ; nil = 0x7FFA000000000002
+  %result = icmp eq i64 %v, 9221683186994511874 ; 0x7FFA000000000002
   ret i1 %result
 }
+
+define i1 @__val_is_bool(i64 %v) {
+entry:
+  %is_t = icmp eq i64 %v, 9221683186994511873  ; true  (0x7FFA000000000001)
+  %is_f = icmp eq i64 %v, 9221683186994511872  ; false (0x7FFA000000000000)
+  %result = or i1 %is_t, %is_f
+  ret i1 %result
+}
+
+; --- Heap Object Type ID ---
 
 define i1 @__val_is_string(i64 %v) {
 entry:
@@ -698,6 +714,12 @@ entry:
   ret i1 false
 }
 
+; @generated-values:end
+
+; Kept OUTSIDE the generated block on purpose: values.spec does not declare
+; __val_class_tag, so were it above the end marker the generator would delete it
+; on the next run.
+;
 ; __val_class_tag: 0 means "no per-class tag available", and on wasm64 that is
 ; always the truth: this base's __gc_alloc is a bare malloc that *discards*
 ; %type_tag, so there is no header to read it back from. Returning 0 makes

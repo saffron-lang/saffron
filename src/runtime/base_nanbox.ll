@@ -207,14 +207,27 @@ declare i32 @snprintf(i8*, i64, i8*, ...)
 @__TYPE_MAP = constant i64 3
 @__TYPE_FLOAT_BOXED = constant i64 4
 
-; --- Tag/Untag Helpers ---
-; ACTIVE NaN-boxing implementations.
+; The value helpers below run in NANBOX mode. base.ll is the identity-mode
+; counterpart, generated from the same spec.
 ; TAG_INT  = 0x7FF9000000000000 = 9221401712017801216
 ; TAG_PTR  = 0x7FF8000000000000 = 9221120237041090560
 ; VAL_TRUE  = 0x7FFA000000000001 = 9221683186994511873
 ; VAL_FALSE = 0x7FFA000000000000 = 9221683186994511872
 ; VAL_NIL   = 0x7FFA000000000002 = 9221683186994511874
 ; PAYLOAD_MASK = 0x0000FFFFFFFFFFFF = 281474976710655
+
+; @generated-values:begin -- DO NOT EDIT BELOW THIS LINE
+; Generated from src/runtime/values.spec for target `native` (discipline:
+; nanbox) by tools/gen_runtime_values.py. Edit the spec, then re-run:
+;
+;     python3 tools/gen_runtime_values.py
+;
+; These 19 helpers are shared across four IR bases. They were hand-copied and
+; drifted -- BUGS #77 had `true` printing as "false" on wasm32 for months because
+; one base out of four untagged twice. Editing this block directly reintroduces
+; exactly that failure mode, and `--check` in CI will fail.
+
+; --- Tag/Untag Helpers ---
 
 define i64 @__val_tag_int(i64 %n) {
 entry:
@@ -292,6 +305,8 @@ ret_zero:
 
 define i64 @__val_tag_ptr(i8* %ptr) {
 entry:
+  ; ptrtoint widens a 32-bit pointer by zero-extension on wasm32; on a 64-bit
+  ; host the mask below is what keeps the tag bits clear.
   %int_ptr = ptrtoint i8* %ptr to i64
   %masked = and i64 %int_ptr, 281474976710655
   %tagged = or i64 %masked, 9221120237041090560
@@ -318,6 +333,8 @@ entry:
 
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
+  ; Mask off the tag bits to get the raw pointer value. inttoptr is a no-op on a
+  ; 64-bit host and truncates to a 32-bit pointer on wasm32.
   %ptr_int = and i64 %v, 281474976710655
   %ptr = inttoptr i64 %ptr_int to i8*
   ret i8* %ptr
@@ -607,6 +624,8 @@ read_gc_tag:
 no:
   ret i1 false
 }
+
+; @generated-values:end
 
 
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
