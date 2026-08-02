@@ -49,7 +49,7 @@ fun is_top_level_decl(stmt: AST.Stmt): Bool {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, doc) => true
         ClassDecl(name, type_params, parents, fields, methods, doc) => true
-        EnumDecl(name, variants, doc) => true
+        EnumDecl(name, variants, doc, e_vis) => true
         ExprStmt(expr) => false
         VarDecl(name, type_ann, init, doc) => false
         Return(value) => false
@@ -179,7 +179,7 @@ fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt
             ExprStmt(expr) => " => " + format_expr(expr)
             VarDecl(n, t, i, d) => " {\n    " + format_stmt(single, 1) + "}"
             FunDecl(n, p, r, b, d) => " {\n    " + format_stmt(single, 1) + "}"
-            EnumDecl(n, v, d) => " {\n    " + format_stmt(single, 1) + "}"
+            EnumDecl(n, v, d, e_vis) => " {\n    " + format_stmt(single, 1) + "}"
             ClassDecl(n, tps, ps, f, m, d) => " {\n    " + format_stmt(single, 1) + "}"
             If(c, t, e) => " {\n    " + format_stmt(single, 1) + "}"
             While(c, b) => " {\n    " + format_stmt(single, 1) + "}"
@@ -283,7 +283,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append("}\n")
             sb.to_string()
         }
-        EnumDecl(name, variants, doc) => {
+        EnumDecl(name, variants, doc, e_vis) => {
             var sb: StringBuilder = StringBuilder()
             if (doc.length() > 0 and !doc.starts_with("@")) {
                 sb.append(pad)

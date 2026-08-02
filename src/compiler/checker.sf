@@ -944,7 +944,7 @@ class NullChecker {
                 // parameters, so a block-syntax argument can be typed (BUGS #86).
                 this.register_fun_param_sigs(name, params)
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum(name, variants)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
@@ -1411,7 +1411,7 @@ class NullChecker {
                 this.check_stmts(methods)
                 this.current_class = saved_class
             }
-            EnumDecl(n, v, d) => {}
+            EnumDecl(n, v, d, e_vis) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {

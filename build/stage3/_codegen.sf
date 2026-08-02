@@ -5419,7 +5419,7 @@ class Codegen {
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
             FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
+            EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}
@@ -6350,7 +6350,7 @@ class Codegen {
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.gen_enum_decl(name, variants)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
@@ -7386,13 +7386,13 @@ class Codegen {
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
-        return match (stmt) { EnumDecl(n, v, d) => n
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => n
             _ => ""
         }
     }
 
     fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
-        return match (stmt) { EnumDecl(n, v, d) => v
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => v
             _ => ""
         }
     }
@@ -7407,7 +7407,7 @@ class Codegen {
 
     fun try_register_enum(decl: AST.Stmt) {
         match (decl) {
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum_variants(name, variants)
             }
             VarDecl(n, t, i, d) => {}
@@ -7581,7 +7581,7 @@ class Codegen {
             ExprStmt(expr) => "expr"
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
-            EnumDecl(n, v, d) => "enum"
+            EnumDecl(n, v, d, e_vis) => "enum"
             ClassDecl(n, __tps, ps, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
@@ -7606,7 +7606,7 @@ class Codegen {
             ExprStmt(expr) => "other"
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
-            EnumDecl(n, v, d) => "other"
+            EnumDecl(n, v, d, e_vis) => "other"
             ClassDecl(n, __tps, ps, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
@@ -8520,7 +8520,7 @@ class Codegen {
                 this.collect_vars_expr(value, names, types)
             }
             FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
+            EnumDecl(n, v, d, e_vis) => {}
             ClassDecl(n, __tps, ps, f, m, d) => {}
             Break => {}
             Continue => {}
@@ -10279,7 +10279,7 @@ class Codegen {
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true
-            EnumDecl(n, v, d) => true
+            EnumDecl(n, v, d, e_vis) => true
             ClassDecl(n, __tps, ps, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
             VarDecl(n, t, i, d) => d.starts_with("@import:")
@@ -10520,7 +10520,7 @@ class Codegen {
                     }
                     this.class_own_methods.set(pr_type_name, pr_own)
                 }
-                EnumDecl(pr_ename, pr_variants, pr_edoc) => {
+                EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis) => {
                     // Register enum variant constructor names AND variant tags
                     // so that match expressions work regardless of declaration order
                     var pr_vnames: List<String> = []
@@ -14992,10 +14992,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     }
                 }
             } else if (pr_kind == "enum") {
-                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -15056,10 +15056,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
@@ -15654,10 +15654,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     }
                 }
             } else if (pr_kind == "enum") {
-                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -15726,10 +15726,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
@@ -16320,10 +16320,10 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     }
                 }
             } else if (pr_kind2 == "enum") {
-                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -16384,10 +16384,10 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {

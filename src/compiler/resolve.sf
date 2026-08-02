@@ -132,7 +132,7 @@ class Resolver {
             ClassDecl(name, type_params, parents, fields, methods, doc) => {
                 this.types.set(name, true)
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.types.set(name, true)
             }
             TypeAlias(name, target, ta_vis) => {
@@ -264,9 +264,9 @@ class Resolver {
                 this.declare_pattern(pattern)
                 AST.Stmt.LetPattern(pattern, new_value)
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.types.set(name, true)
-                AST.Stmt.EnumDecl(name, variants, doc)
+                AST.Stmt.EnumDecl(name, variants, doc, e_vis)
             }
             TypeAlias(name, target, ta_vis) => {
                 this.types.set(name, true)

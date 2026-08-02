@@ -150,7 +150,9 @@ enum Stmt {
     ExprStmt(expr: Expr),
     VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
     FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String),
-    EnumDecl(name: String, variants: List<Variant>, docstring: String),
+    // `visibility` is appended last on every declaration node — see the note on
+    // TypeAlias at the bottom of this enum for why that position and not another.
+    EnumDecl(name: String, variants: List<Variant>, docstring: String, visibility: String),
     // `type_params` holds the declared generic parameter names of `class Box<T>`
     // — ["T"], or [] for a non-generic class. The parser used to consume and
     // *discard* them ("// Skip generic type parameters"), so `T` did not exist

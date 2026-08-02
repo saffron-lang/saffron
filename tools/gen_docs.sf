@@ -181,7 +181,7 @@ fun render_enum(stmt: AST.Stmt): String {
     }
 
     match (stmt) {
-        EnumDecl(enum_name, variants, docstring) => {
+        EnumDecl(enum_name, variants, docstring, e_vis) => {
             if (variants.length() > 0) {
                 out.push("**Variants:**")
                 out.push("")
