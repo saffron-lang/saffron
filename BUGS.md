@@ -9,6 +9,61 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 110. wasm32 never auto-invokes `fun main()`, so a main-only program silently prints nothing
+
+**Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
+seven tests — which means it also hides whatever else is wrong on that target.
+
+Minimal repro — a file whose entire contents are:
+
+```saffron
+fun main(): Int { IO.println("inside main"); return 0 }
+```
+
+prints `inside main` natively and **nothing at all** on wasm32. Adding an
+explicit `main()` call at top level makes both agree.
+
+`output_body.sf:1276` emits the `__saffron_boot` shim only when
+`has_top_level`, but `wasm_base_32.ll:2188`'s `_start` calls `@__saffron_boot()`
+unconditionally. A main-only program has no top-level statements, so no shim is
+emitted, `_start`'s call resolves to an undefined symbol, and
+`--import-undefined` turns it into a silent no-op import. Nothing fails; the
+module simply does nothing.
+
+The native path one screen away is correct, which is what makes this a drift
+rather than an oversight: line 1301 guards on
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, i.e.
+it has the explicit `__saffron_main` branch that the wasm path lacks. The fix is
+to give the wasm branch the same case.
+
+Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
+`tools/differential.sh` sweep share this one signature — wasm32 emits nothing —
+and none of them are value-layer bugs. Worth fixing before the remaining
+value-layer drift, since it currently makes wasm32 output unobservable for those
+seven programs.
+
+### 109. FIXED — `is String` / `is List` / `is Map` were unconditionally false on wasm32
+
+`__val_type_id` on wasm32 read the type id from `user+0`, which is the object's
+first *payload* word — for a list, its element count. Every wasm32 allocator
+stores the tag at `raw+0` and the magic at `raw+8` and returns `user = raw+16`,
+so the tag is at `user-16` and the magic at `user-8`: exactly where native puts
+them, and exactly where wasm32's own `__gc_get_type_tag` already looked. This
+reader was the one site not updated when the wasm32 GC header gained its tag and
+magic words — the work recorded as #39, which is listed as fixed but evidently
+did not reach every reader of that header.
+
+`__val_is_list` and `__val_is_map` had drifted separately — they still carried
+pre-`88297ca` identity-mode bodies — *and* routed through the broken reader, so
+one change fixed all three. Verified by probe: `String/List/Int` natively versus
+`other/other/Int` on wasm32 before, agreeing after.
+
+The fix was three deleted `@override` blocks and no new code, because
+`values.spec` (rewrite stage 9) had by then made the shared `@nanbox` body the
+default and each override the explicit exception. That is the generator paying
+for itself on its first real use: the drift became visible as three overrides
+whose `reason =` lines could not be written honestly.
+
 ### 104. relational operators on `Any`-typed operands compare untagged garbage
 
 **Severity: critical.** Silent wrong answers, and the answer depends on heap
