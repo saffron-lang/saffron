@@ -322,8 +322,10 @@ check_file() {   # file label
     fi
     local ref_ec=$RUN_EC
     build_and_run native-O2 "$f" "$ref2"
+    local ref_ec2=$RUN_EC
 
-    if ! diff -q <(normalize "$ref1") <(normalize "$ref2") >/dev/null 2>&1; then
+    if ! diff -q <(normalize "$ref1") <(normalize "$ref2") >/dev/null 2>&1 \
+       || [[ "$ref_ec" != "$ref_ec2" ]]; then
         printf 'NONDET   %-40s reference disagrees with itself across two runs\n' "$label"
         N_NONDET=$((N_NONDET + 1))
         NONDETS+=("$label")
@@ -373,7 +375,30 @@ check_file() {   # file label
             continue
         fi
 
+        local other_ec=$RUN_EC
         compared=$((compared + 1))
+
+        # The exit status is part of the observable behaviour, and for one class of
+        # test it is the ONLY part: test/mini_{1param,arithmetic,ifelse,while}.sf
+        # print nothing and return their computed result as the process status.
+        # Comparing stdout alone made those four AGREE by matching two empty files
+        # — the oracle reproducing the exact blindness BUGS #107 describes, one
+        # layer up. A wasm32 run that returned 0 where native returned 55 was a
+        # unanimous pass.
+        #
+        # Deliberately not gated on exit_code_is_result: a status disagreement is a
+        # real disagreement for any program. It is reported as a mismatch with the
+        # statuses in the message, since a bare stdout diff would print nothing and
+        # read as a spurious failure.
+        if [[ "$ref_ec" != "$other_ec" ]]; then
+            local ecmsg="exit status $ref_ec (native-O2) vs $other_ec ($cfg)"
+            printf 'MISMATCH %-40s native-O2 != %s  — %s\n' "$label" "$cfg" "$ecmsg"
+            N_MISMATCH=$((N_MISMATCH + 1))
+            MISMATCHES+=("$label|$cfg|$ecmsg")
+            unanimous=false
+            continue
+        fi
+
         if diff -q <(normalize "$ref1") <(normalize "$other") >/dev/null 2>&1; then
             printf 'AGREE    %-40s native-O2 == %s\n' "$label" "$cfg"
             N_AGREE=$((N_AGREE + 1))
