@@ -1154,6 +1154,24 @@ unbounded leak plus a real read-after-free, but unproven as a fault — ranked b
 **Fix.** Emit `__gc_pop_roots(n)` in `__coro_final` before `coro.end`, and on the
 coroutine return path. Small and low-risk.
 
+**FIXED**, and the fix needed one thing this entry did not anticipate: the pop has
+to be **guarded**, not unconditional. The shadow stack is a single global LIFO
+while coroutine lifetimes are *not* nested — a task spawned later can still be
+live, with its roots stacked above ours, when we finish. Popping a fixed count
+there discards *its* roots and collects objects still in use, trading a leak for
+a use-after-free. So `__coro_final` records the depth at entry, recomputes the
+expected top, and pops only when our region is provably still the top; otherwise
+it leaves the roots, because leaking a root is recoverable and freeing a live one
+is not (`output_body.sf:579-591`).
+
+Re-measured 2026-08-02 against the same repro shape — depth is flat, not growing:
+
+```
+depth before any spawn = 13
+after 50 rounds  = 13
+after 200 rounds = 13     (was 414)
+```
+
 ### 78. An absolute import path silently resolves to a nonexistent stdlib file
 
 `import "/abs/path/m.sf" as M` does not import anything. `resolve_import_path`
@@ -3403,6 +3421,19 @@ from the type checker then trigger `runtimeError()` which corrupts VM state duri
 
 **Impact:** Blocks `@test` import with mock/async features. Inline usage works.
 **Workaround:** Inline test functions or avoid nil-initialized captured variables.
+
+**NO LONGER REPRODUCES** (checked 2026-08-02). The original repro cannot be run at
+all: `src/lib/test.sf` has no `mock` function any more, so `T.mock("x")` is a
+different error entirely. Rebuilding the equivalent — a module function with a
+`nil`-initialised local captured by a closure returning `Any`, imported and called
+from another file — compiles and runs clean both inline and across a module
+boundary.
+
+The stated root cause also describes a component that no longer exists: "triggers
+`runtimeError()` which corrupts VM state during import" is the **C bytecode VM**,
+which is dead and in `legacy/`. This entry predates the self-hosted compiler and
+is retained only as history; if a checker segfault on nil-captured closures ever
+returns, it wants a fresh entry measured against `build/saffronc`.
 
 
 
