@@ -102,10 +102,29 @@ check_raw:
 raw_int:
   ret i64 %v
 from_float:
-  ; A double. Guard NaN/Inf (exponent all ones) before fptosi, which is
-  ; undefined for them.
+  ; A fourth shape reaches here that the list above missed: a raw *pointer*.
+  ; Coroutine frame handles, GC heap pointers and closure envs are untagged
+  ; i64s that overflow 32 bits (macOS heap sits around 0x6000_0000_0000), so
+  ; they are neither NaN-boxed nor "small". Reinterpreting one as a double
+  ; gives a denormal — exponent field zero — and `fptosi` of a denormal
+  ; truncates to 0. That silently turned every coroutine handle into 0, and
+  ; `__sched_coro_done(0)` answers "done" by its null guard, so the scheduler
+  ; retired all three tasks of a two-task program without resuming any of them
+  ; (BUGS #38, third defect).
+  ;
+  ; A genuine Float never lands here with a zero exponent: 0.0 and every value
+  ; codegen produces has either the NaN tag or a non-zero exponent, and a true
+  ; denormal (|x| < 2.2e-308) converts to 0 anyway. So exponent == 0 with a
+  ; non-zero value means pointer — pass it through untouched.
   %exp_bits = lshr i64 %v, 52
   %exp_masked = and i64 %exp_bits, 2047
+  %is_denormal = icmp eq i64 %exp_masked, 0
+  br i1 %is_denormal, label %raw_ptr, label %check_special
+raw_ptr:
+  ret i64 %v
+check_special:
+  ; A double. Guard NaN/Inf (exponent all ones) before fptosi, which is
+  ; undefined for them.
   %is_special = icmp eq i64 %exp_masked, 2047
   br i1 %is_special, label %ret_zero, label %safe_convert
 safe_convert:
@@ -116,7 +135,7 @@ ret_zero:
   ret i64 0
 }
 @override wasm32
-reason = wasm32 has no sign-extended-raw-int case: pointers and indices are 32-bit and zero-extended, so `high_bits == 0xFFFFFFFF` cannot arise from a raw value. DRIFT SUSPECT: harmless today but the two bodies must be reconciled, see BUGS #82/#83.
+reason = Differs from native in ONE respect only: no sign-extended-raw-int case, because wasm32 pointers and indices are 32-bit and zero-extended, so `high_bits == 0xFFFFFFFF` cannot arise from a raw value. The BUGS #38 denormal guard IS present in both (it lands on `raw_int` here rather than a separate `raw_ptr` block; same `ret i64 %v`). Block order also differs, cosmetically. Reconciling the remaining sign-ext gap is BUGS #82/#83 territory; until then this override is what keeps the guard from being lost.
 define i64 @__val_untag_int(i64 %v) {
 entry:
   ; Check if value is NaN-boxed (top 16 bits in 0x7FF8..0x7FFF)
@@ -144,10 +163,18 @@ extract_int:
   %sign_ext = ashr i64 %shift_left, 16
   ret i64 %sign_ext
 from_float:
-  ; Value has bits in upper 32 — it's a float from arithmetic. Convert to int.
-  ; Guard against NaN/Inf (exponent field all 1s)
+  ; Value has bits in upper 32 — a float from arithmetic, or a raw pointer.
+  ; A pointer reinterpreted as a double is a denormal (exponent field zero) and
+  ; `fptosi` of a denormal truncates to 0, which silently zeroes coroutine
+  ; handles; see the same guard in base_nanbox.ll (BUGS #38). wasm32 addresses
+  ; fit in 32 bits so this is unreachable there today, but the two bases must
+  ; not disagree on what an untag means.
   %exp_bits = lshr i64 %v, 52
   %exp_masked = and i64 %exp_bits, 2047
+  %is_denormal = icmp eq i64 %exp_masked, 0
+  br i1 %is_denormal, label %raw_int, label %check_special
+check_special:
+  ; Guard against NaN/Inf (exponent field all 1s)
   %is_special = icmp eq i64 %exp_masked, 2047
   br i1 %is_special, label %ret_zero, label %safe_convert
 safe_convert:
@@ -175,6 +202,27 @@ entry:
   %masked = and i64 %int_ptr, 281474976710655
   %tagged = or i64 %masked, 9221120237041090560
   ret i64 %tagged
+}
+
+[helper __val_tag_ptr_nullable]
+targets = native wasm32
+@nanbox
+; Tag a pointer returned by a `void*` @extern, mapping a NULL to int-tagged 0
+; rather than to TAG_PTR|0. A C function that returns NULL on failure (fopen,
+; fgets, strstr, ...) is guarded in Saffron with `== 0`, which lowers to a raw
+; icmp against __val_tag_int(0) = 9221401712017801216. Plain __val_tag_ptr(NULL)
+; is 0x7FF8000000000000 (TAG_PTR|0), a value that is not equal to that, passes
+; __val_is_ptr, and is then dereferenced far from the call — BUGS #84. A
+; non-NULL pointer keeps its normal TAG_PTR representation, so the ~50 other
+; emit_tag_ptr sites and the String-returning void* stdlib wrappers are
+; untouched; only the NULL case changes.
+define i64 @__val_tag_ptr_nullable(i8* %ptr) {
+entry:
+  %int_ptr = ptrtoint i8* %ptr to i64
+  %isnull = icmp eq i64 %int_ptr, 0
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  %r = select i1 %isnull, i64 9221401712017801216, i64 %tagged
+  ret i64 %r
 }
 
 [helper __val_untag_ptr]
@@ -483,15 +531,93 @@ is_string:
   ; Plain malloc'd buffer (no GC header) = string (type 1)
   ret i64 1
 }
-@override wasm32
-reason = DRIFT (confirmed live bug): loads the type id from user+0, but every wasm32 allocator stores it at user-16 and the magic at user-8. user+0 is the object's first payload word (a list's `count`), so `is String`/`is List`/`is Map` are all false on wasm32.
-define i64 @__val_type_id(i64 %v) {
+
+[helper __val_class_tag]
+targets = native wasm64 wasm32
+@nanbox
+; __val_class_tag: the per-class GC type tag of a value, or 0 if it does not
+; have one. Class tags start at 10, so 0 is an unambiguous "not a class
+; instance" and every caller can treat it as "I don't know" rather than
+; guessing a plausible answer.
+;
+; Accepts a class instance in *either* representation. Codegen's class
+; constructors return a bare `ptrtoint` — an untagged pointer, upper 16 bits
+; zero — while a value that has been through a Map, a list, or an interpolation
+; carries TAG_PTR. Only accepting TAG_PTR made every `is` on a freshly
+; constructed object answer false, which is indistinguishable from the bug this
+; helper exists to fix. __rt_tag_ptr in runtime.sf treats upper == 0 the same
+; way, for the same reason.
+;
+; The guards before the magic load are the ones __gc_is_heap_ptr uses, and they
+; are not optional: this is called on values of static type Any, so %v may be a
+; boxed Int or a small enum tag, and loading ptr-8 off one of those is a wild
+; read. Reject NUL, misalignment, and anything below 4 GB (all Darwin heap
+; allocations are above it), then the magic sentinel decides.
+;
+; Codegen calls this rather than reading the header itself, so the header layout
+; stays a runtime detail — the four IR bases do not agree on it.
+define i64 @__val_class_tag(i64 %v) {
 entry:
-  ; For a heap pointer, read the type ID from the first field of the object
-  %ptr_int = and i64 %v, 281474976710655      ; mask off tag
-  %ptr = inttoptr i64 %ptr_int to i64*
-  %type_id = load i64, i64* %ptr
-  ret i64 %type_id
+  %upper = lshr i64 %v, 48
+  %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
+  %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
+  %ptr_like = or i1 %is_tagged, %is_raw
+  br i1 %ptr_like, label %check_align, label %not_a_class
+check_align:
+  %ptr_int = and i64 %v, 281474976710655       ; mask off any tag
+  %align_bits = and i64 %ptr_int, 7
+  %aligned = icmp eq i64 %align_bits, 0
+  br i1 %aligned, label %check_bounds, label %not_a_class
+check_bounds:
+  %too_low = icmp ult i64 %ptr_int, 4294967296 ; 4 GB
+  br i1 %too_low, label %not_a_class, label %check_gc
+check_gc:
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %not_a_class
+read_tag:
+  %tag = call i64 @__gc_get_type_tag(i64 %ptr_int)
+  ret i64 %tag
+not_a_class:
+  ret i64 0
+}
+@override wasm64
+reason = CAPABILITY GAP, not drift: this base's __gc_alloc is a bare malloc that *discards* %type_tag, so there is no header to read the tag back from. Returning 0 makes __class_is_a answer false rather than loading garbage. `x is SomeClass` is therefore unanswerable on wasm64 until this base grows real headers, the way wasm_base_32.ll already has.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  ret i64 0
+}
+@override wasm32
+reason = Same logic as native with ONE deliberate difference: the 4 GB lower bound is not applied, because wasm32 linear memory starts near zero and the bound would reject every real pointer. The floor is 16 instead (the header size), so a user pointer is always above it. Alignment plus the magic sentinel carry the check, and a stray load cannot fault outside the sandbox -- worst case is a wrong tag, not a crash.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
+  %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
+  %ptr_like = or i1 %is_tagged, %is_raw
+  br i1 %ptr_like, label %check_align, label %not_a_class
+check_align:
+  %ptr_int = and i64 %v, 281474976710655       ; mask off any tag
+  %align_bits = and i64 %ptr_int, 7
+  %aligned = icmp eq i64 %align_bits, 0
+  br i1 %aligned, label %check_low, label %not_a_class
+check_low:
+  ; The header is 16 bytes, so a real user pointer is at least 16.
+  %too_low = icmp ult i64 %ptr_int, 16
+  br i1 %too_low, label %not_a_class, label %check_gc
+check_gc:
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %not_a_class
+read_tag:
+  %tag = call i64 @__gc_get_type_tag(i64 %ptr_int)
+  ret i64 %tag
+not_a_class:
+  ret i64 0
 }
 
 [helper __val_is_string]
@@ -571,20 +697,6 @@ define i1 @__val_is_list(i64 %v) {
 entry:
   ret i1 false
 }
-@override wasm32
-reason = DRIFT: still the pre-88297ca identity-mode body. It reads the type id from the object's first user word, but wasm32's allocators store the tag in the 16-byte header BEFORE the user pointer. See the report.
-define i1 @__val_is_list(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 2               ; TYPE_LIST
-  ret i1 %result
-no:
-  ret i1 false
-}
 
 [helper __val_is_map]
 targets = boot native wasm64 wasm32
@@ -638,20 +750,6 @@ no:
 reason = wasm64 has no heap type tags at all (its __gc_alloc is a bare malloc with no header), so it cannot answer this and returns false.
 define i1 @__val_is_map(i64 %v) {
 entry:
-  ret i1 false
-}
-@override wasm32
-reason = DRIFT: same as __val_is_list on wasm32.
-define i1 @__val_is_map(i64 %v) {
-entry:
-  %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
-check:
-  %tid = call i64 @__val_type_id(i64 %v)
-  %result = icmp eq i64 %tid, 3               ; TYPE_MAP
-  ret i1 %result
-no:
   ret i1 false
 }
 

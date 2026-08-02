@@ -17,6 +17,14 @@ RUNTIME="${SAFFRON_RUNTIME:-$SCRIPT_DIR/build/stage3/runtime.ll}"
 RUNTIME_SRC="${SAFFRON_RUNTIME_SRC:-$SCRIPT_DIR/src/runtime/runtime.sf}"
 RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base_nanbox.ll}"
 RUNTIME_GC="${SAFFRON_RUNTIME_GC:-$SCRIPT_DIR/src/runtime/gc.ll}"
+# The wasm bases get the same treatment as the native one, so that A/B-ing a
+# candidate base against the shipped one is a one-line env override on every
+# target rather than only on native. This matters for the value layer in
+# particular: base.ll/wasm_base.ll are identity-discipline and
+# base_nanbox.ll/wasm_base_32.ll are nanbox, so a tag/untag change has to be
+# exercised on one base of each discipline before it can be trusted.
+WASM_BASE_64="${SAFFRON_WASM_BASE:-$SCRIPT_DIR/src/runtime/wasm_base.ll}"
+WASM_BASE_32="${SAFFRON_WASM32_BASE:-$SCRIPT_DIR/src/runtime/wasm_base_32.ll}"
 
 usage() {
     echo "saffron — The Saffron Programming Language"
@@ -333,7 +341,7 @@ build_project() {
 
     [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
     if [[ "$TARGET" == "wasm" || "$TARGET" == "wasm64" ]]; then
-        local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base.ll"
+        local WASM_BASE="$WASM_BASE_64"
         local WASM_CLANG="${WASM_CLANG:-/opt/homebrew/opt/llvm/bin/clang}"
         local WASM_LD_PATH="${WASM_LD:-/opt/homebrew/bin/wasm-ld}"
         if [[ ! -x "$WASM_CLANG" ]]; then
@@ -352,7 +360,7 @@ build_project() {
             exit 1
         }
     elif [[ "$TARGET" == "wasm32" ]]; then
-        local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base_32.ll"
+        local WASM_BASE="$WASM_BASE_32"
         local WASM_CLANG="${WASM_CLANG:-/opt/homebrew/opt/llvm/bin/clang}"
         local WASM_LD_PATH="${WASM_LD:-/opt/homebrew/bin/wasm-ld}"
         if [[ ! -x "$WASM_CLANG" ]]; then
