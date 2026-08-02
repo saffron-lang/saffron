@@ -1,0 +1,105 @@
+// BUGS #99 — a bare `return` must not swallow the following statement.
+//
+// Saffron has no statement terminators, so `parse_return` decided a `return` was
+// bare only when the next token was `}` or eof. Anywhere else it called
+// parse_expr, which happily consumed the *next statement* as the return value.
+//
+//     if (a == "x") return
+//     var key: String = a + "!"     // parsed as the return value
+//     return key                    // "undefined variable 'key'"
+//
+// The statement disappeared from the enclosing body, so every name it declared
+// became undefined and the error pointed at the *use*, never at the return. In
+// the compiler's own source it surfaced as `use of undefined value '%key'` from
+// the LLVM verifier, one function away from the cause.
+//
+// The fix: a `return` is also bare when the next token is on a later line.
+//
+// Every function below is untyped, because a bare return yields nil and the
+// checker rightly rejects nil from a function declared to return String or Int.
+// These tests are about the parse, so each asserts via an observable effect that
+// the statement after the bare return survived.
+
+import "@test" as Test
+
+// The reported shape: unbraced if-body, then a var declaration whose name is
+// used afterwards. Before the fix this failed to compile at all.
+var seen: List<String> = []
+fun after_var(a: String) {
+    if (a == "x") return
+    var key: String = a + "!"
+    seen.push(key)
+}
+after_var("x")
+Test.assert_eq(seen.length(), 0, "the guard returns before the var decl")
+after_var("z")
+Test.assert_eq(seen.length(), 1, "a var decl after a bare return still runs")
+Test.assert_eq(seen[0], "z!", "and its initializer ran, rather than becoming a return value")
+
+// Two bare returns in a row: the second must not eat the third statement.
+var guarded: List<String> = []
+fun two_guards(a: String) {
+    if (a == "x") return
+    if (a == "y") return
+    var out: String = a + "?"
+    guarded.push(out)
+}
+two_guards("x")
+two_guards("y")
+Test.assert_eq(guarded.length(), 0, "consecutive bare returns each stop cleanly")
+two_guards("z")
+Test.assert_eq(guarded[0], "z?", "and the statement after the second one survives")
+
+// A bare return followed by an expression statement — the case that would have
+// been silently *miscompiled* rather than rejected, since the call would become
+// the return value and its side effect would move into the guarded path.
+var log: List<String> = []
+fun with_effect(a: String) {
+    if (a == "x") return
+    log.push(a)
+}
+with_effect("x")
+Test.assert_eq(log.length(), 0, "the guard returns without running the effect")
+with_effect("keep")
+Test.assert_eq(log.length(), 1, "and the effect runs when the guard does not fire")
+Test.assert_eq(log[0], "keep", "the pushed value is the argument, not a return value")
+
+// Same-line values must keep working — the fix keys off the line number, so a
+// value on the return's own line is unaffected.
+fun same_line(n: Int): Int {
+    if (n > 0) return n * 2
+    return 0
+}
+Test.assert_eq(same_line(4), 8, "a same-line return value still parses")
+Test.assert_eq(same_line(-1), 0, "and the fallthrough return works")
+
+// A bare return directly before `}` was already handled; keep it covered so a
+// future rewrite of the condition cannot drop the original case.
+var braced: Int = 0
+fun bare_before_brace(n: Int) {
+    if (n < 0) {
+        return
+    }
+    braced = braced + n
+}
+bare_before_brace(-2)
+Test.assert_eq(braced, 0, "a braced bare return still returns")
+bare_before_brace(7)
+Test.assert_eq(braced, 7, "and the code after the braced if still runs")
+
+// Inside a loop, where the statement after the guard is the loop's own
+// increment — swallowing it would have hung rather than produced a diagnostic.
+fun loop_guard(limit: Int): Int {
+    var i: Int = 0
+    var total: Int = 0
+    while (i < 10) {
+        if (i == limit) return total
+        total = total + i
+        i = i + 1
+    }
+    return total
+}
+Test.assert_eq(loop_guard(3), 3, "a return inside a loop leaves the body intact")
+Test.assert_eq(loop_guard(10), 45, "and a guard that never fires walks the whole range")
+
+Test.summary()
