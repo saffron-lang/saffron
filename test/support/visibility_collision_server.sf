@@ -1,0 +1,20 @@
+// Helper for test/pass/visibility_response_collision.sf.
+//
+// Stands in for src/lib/http/server.sf, which declares a DIFFERENT `class
+// Response` — same bare name, different fields. Its `payload` is an Int where
+// the client Response's is a String, so whichever declaration wins a bare-name
+// field table decides what `.payload` is typed for BOTH.
+
+class Response {
+    var status: Int
+    var payload: Int
+
+    fun init() {
+        this.status = 500
+        this.payload = 42
+    }
+}
+
+fun make_server_response(): Response {
+    return Response()
+}

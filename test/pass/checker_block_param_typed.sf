@@ -1,0 +1,82 @@
+// BUGS #86: a block-syntax parameter (`{ x => ... }`) got no type, so every field
+// read on it silently answered 0 (Int) or "" (String) — no error, only a
+// `dispatching '...' on untyped value` warning that is easy to scroll past.
+//
+// A block can never carry annotations: `{ x => ... }` has nowhere to write them. So
+// the only place its parameter types can come from is the parameter it is being
+// passed to. The checker now reads the callee's declared function type and writes
+// those types into the block's own Param nodes before codegen sees them.
+//
+// `Fun<A, B, R>` is the spelling that carries the information: the trailing type
+// argument is the return type, the ones before it are the parameters. (`(A) => R`
+// is parsed and then discarded by parser.sf's parse_type_ast, so it cannot type a
+// block today — see the comment on fun_param_types_of in checker.sf.)
+//
+// Every assertion below is about OUTPUT, not about compiling: the pre-fix compiler
+// accepted this file and printed "v=0 n=" for the block form.
+
+import "@test" as Test
+
+class Box {
+    var v: Int
+    var name: String
+    fun init(v: Int, name: String) { this.v = v; this.name = name }
+}
+
+// The callee's parameter says what it calls back with: one Box, returning String.
+fun apply_block(b: Box, f: Fun<Box, String>): String {
+    return f(b)
+}
+
+// Two parameters of different types: the second must get Int, not Box, and not the
+// return type.
+fun apply_two(b: Box, n: Int, f: Fun<Box, Int, String>): String {
+    return f(b, n)
+}
+
+fun apply_int(n: Int, f: Fun<Int, Int>): Int {
+    return f(n)
+}
+
+// A method taking a callback, to cover infer_method_call as well as infer_call.
+class Applier {
+    var factor: Int
+    fun init(factor: Int) { this.factor = factor }
+    fun run(b: Box, f: Fun<Box, String>): String {
+        return f(b)
+    }
+}
+
+fun main() {
+    var box: Box = Box(42, "hello")
+
+    // --- The exact BUGS #86 repro ---
+    var blocked: String = apply_block(box) { x => "v=" + x.v.to_string() + " n=" + x.name }
+    Test.assert_eq(blocked, "v=42 n=hello", "a block parameter reads its fields")
+
+    // The annotated lambda was always correct; it is the control, and both forms
+    // must agree. Before the fix these two disagreed on identical input.
+    var annotated: String = apply_block(box, fun (x: Box): String => "v=" + x.v.to_string() + " n=" + x.name)
+    Test.assert_eq(annotated, "v=42 n=hello", "an annotated lambda still reads its fields")
+    Test.assert_eq(blocked, annotated, "the block form and the annotated form agree")
+
+    // --- More than one parameter, mixed types ---
+    var two: String = apply_two(box, 7) { x, n => x.name + ":" + (x.v + n).to_string() }
+    Test.assert_eq(two, "hello:49", "each block parameter gets its own declared type")
+
+    // --- The method-call path ---
+    var applier: Applier = Applier(3)
+    var via_method: String = applier.run(box) { x => "m=" + (x.v * 3).to_string() }
+    Test.assert_eq(via_method, "m=126", "a block passed to a method is typed too")
+
+    // --- A block over a primitive parameter type ---
+    Test.assert_eq(apply_int(5) { n => n * 2 }, 10, "a primitive block parameter is typed")
+
+    // --- An explicit annotation is left alone, not overwritten ---
+    var explicit: String = apply_block(box, fun (x: Box): String => "e=" + x.v.to_string())
+    Test.assert_eq(explicit, "e=42", "an explicitly annotated parameter is left alone")
+
+    Test.summary()
+}
+
+main()

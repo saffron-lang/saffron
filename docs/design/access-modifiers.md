@@ -50,6 +50,10 @@ Prerequisite for `protected`, stated rather than hidden: widen `ClassDecl.parent
 
 Sequencing consequence: `protected` is the **last** modifier to land, not because it is least wanted but because it is the only one gated on a structural change to inheritance representation. `public`/`private`/`internal` do not depend on it and ship first.
 
+**Update (2026-08-02): the widening is done — see BUGS #111.** The diagnosis above was accurate, with one correction: `test/pass/multi_inherit.sf` did not "exercise" the form, it *failed* on it (`[codegen] Error: type 'Duck' has no method 'swim'`), as did `test/pass/interfaces.sf` — multiple inheritance was not merely unsound for `protected`, it did not work at all past the first base. `class_parents` is now `Map<String, List<String>>`, `is_subtype_node` searches the full inheritance DAG breadth-first, conformance consults every base, and `__class_is_a` is a flattened ancestor-set table rather than a chain walk (a `switch` arm returns one value, so no walk can traverse a DAG). Field layout is deliberately unchanged: only `parents[0]` contributes fields, because parent field index i == child field index i can hold for exactly one base.
+
+So `protected` is no longer blocked on representation — the checker can now resolve `Duck` → `Swimmable` and a `protected` member on any base is answerable. The sequencing above still holds for a different reason: the widening changes how the compiler reads its own `ClassDecl`, so it has its own promotion gate (§5, #96/#100) which must close before `protected` work can begin on top of it.
+
 ### `internal`: package-scoped, on a boundary that already exists
 
 Kotlin's `internal` is module-scoped, where a Kotlin "module" is a compilation unit (Gradle module / Maven project). Saffron's closest true analogue is the **package** — a `pantry.toml` — not the file, since Saffron already calls a file a module.
@@ -270,11 +274,26 @@ Two things it must **not** do: it must not consult `last_type` or anything codeg
 
 Phases, in order. The promotion point is marked.
 
-**Phase 0 — rebase, do not race.** The working tree has uncommitted `src/compiler/codegen/stmts_body.sf` changes to enum tag encoding and payload untagging, plus a modified `build/saffronc`. Land or coordinate around those first; Phase 3 widens AST enum payloads and would collide.
+**Phase 0 — rebase, do not race. Ongoing, not a one-off.** The original instance of this (uncommitted `stmts_body.sf` enum-encoding work) landed as `99ed527`/`febd0de`. It recurred immediately: a "spans" rewrite (`65f821a`, `5411058`) added `AST.Span` and spanned tokens — **+79 lines in `ast.sf`, +127 in `parser.sf`** — and `8b5eadf` folded BUGS #78's three import-resolution loops into one guarded helper, reshaping the area Phase 2 and the package mapping both work in.
+
+Treat this as a standing condition of the repo, not an obstacle to clear once: **another person commits to `main` continuously.** Every phase below must rebase before finishing, and any phase touching `ast.sf` or `parser.sf` must re-count the arguments at every affected construction site *by hand* after merging. A clean auto-merge is not evidence of correctness there — a `ClassDecl(` site left with the wrong argument count is BUGS #96's exact segfault (an unbound field reads as 0, then `0.starts_with(...)` is `strncmp(NULL, ...)`).
+
+Conflicts in `build/saffronc` and `build/stage3/*.ll` are expected and are **generated artifacts**. Never hand-merge them; take either side and let `./bootstrap.sh` regenerate. Observed empirically: merging Phase 2 into `main` conflicted *only* in those two files.
 
 **Phase 1 — leak-check machinery (no new syntax).** *Can* it land before promotion? Technically yes: it is checker-only and needs no syntax, so gen2 compiles it fine. **But it should not.** With nothing annotatable, the pass has zero reachable inputs, and "a check that ran and found nothing" is indistinguishable from "a check that never ran" — the precise failure that hid #76 for as long as it did, and that a green bootstrap over a broken gen3 hid in #100. So: **build the pass in Phase 1, but land it in the same commit as Phase 4's parser support**, where it has real inputs and real tests. This refutes the guess that it can usefully go first.
 
-**Phase 2 — module plumbing into the checker (no new syntax, pre-promotion).** Thread `module_boundaries` + `prefixes_joined` into the checker, mirroring `Resolve.resolve_imports` exactly. New entry point `check_errors_with_modules(program, imports, boundaries, prefixes_joined)`. Re-key the class tables by prefix + name and add the missing `ambiguous_classes` guard. Independently valuable and independently testable: the `http/server.Response` vs `http/client.Response` collision, and the ability to retire `ambiguous_enums`'s bare-name workaround, are both provable without any `private` existing. Land and bootstrap on its own. No promotion needed.
+**Phase 2 — module plumbing into the checker (no new syntax, pre-promotion). ✅ DONE, `85bfb13`, pending merge.** Threaded `module_boundaries` + `prefixes_joined` into the checker via `check_errors_with_modules(...)`, decoding them exactly as `Resolve.resolve_imports` does rather than inventing a second scheme; `check_errors_with_imports` is now a thin wrapper that degrades to the old flat behaviour on an empty boundary list. Class tables re-keyed by prefix + name, with the missing `ambiguous_classes` guard added — an ambiguous bare name answers `Any` (widening) rather than inventing a mismatch, matching `get_variant_fields`' posture.
+
+Two findings worth carrying forward:
+
+- **Locality cannot be inferred from the key.** The module under check is unprefixed, so its qualified and bare keys are the *same string*. A first implementation therefore widened a program's own class to `Any` whenever any import declared that name. Locality is now recorded explicitly and a local declaration wins its bare name. Any later phase keying on qualified names must not re-derive locality from the key shape.
+- **`ambiguous_enums` was NOT retired**, though Phase 2 makes it possible. `enum_fields`' key is already compound (`"EnumName.Variant"`), so adding a prefix makes it three-part and all ~10 read sites must agree simultaneously. Deferred with a comment recording that it is now possible.
+
+Verified: bootstrap both stages; failure sets byte-identical to base (28 failures, same names, no swap; passing 147 → 148); `build/stage2/saffronc` provably unchanged. `test/pass/visibility_response_collision.sf` was confirmed to **fail on base** — the unchanged gen2 rejects it with `ERROR: client_payload: cannot assign Int to String`, the misattribution itself — so it proves what it claims. Helpers live in `test/support/`, since both `test/*.sf` and `test/fail/*.sf` are globbed as tests.
+
+**Phase 2b — file → owning package mapping (no new syntax, pre-promotion).** Required by `internal`, which is package-scoped. Build it alongside `collect_modules`' existing `path_to_prefix` machinery, reusing `main.sf`'s existing `pantry.toml` reading (now inside `8b5eadf`'s consolidated import helper) rather than a second manifest parser — I10, and BUGS #27 records what a duplicate parser costs. **"No owning package" must be an explicit distinct value**, never an empty string and never a synthetic name: a bare script and most of `test/*.sf` have no manifest above them, and spelling that unknown as a concrete package is I2's exact prohibition. Nested manifests exist (`bazaar/pantry.toml` and `bazaar/frontend/pantry.toml`), so nearest-above governs.
+
+**Phase 3b — widen `ClassDecl.parent: String` → `parents: List<String>` (prerequisite of `protected`).** Independent of visibility itself: it adds no modifier and no keyword, and fixes a real existing defect — `parser.sf` parses `class Duck extends Flyable, Swimmable, Walkable` and discards every parent after the first. Propagate through `class_parents`, `class_parent_of`, `is_subtype_node`, conformance, and codegen's field-prepending and `__class_parent_tag` switch, **preserving single-parent layout exactly** (a layout change is an ABI break against the checked-in gen2). Note `test/pass/multi_inherit.sf` passes today, which means it exercises only the first parent; strengthening it must be verified to *fail* before the fix. Interfaces and actors route through `ClassDecl` too, so both are in blast radius. Promotion-gated for the same #96/#100 reason as Phase 3.
 
 **Phase 3 — widen the AST, promotion-gated.** One commit per node, smallest-first, each with **all** its match arms updated in the same commit (`Param` 34, `FunDecl` 44, `ClassDecl` 67, then `EnumDecl`/`VarDecl`/`TypeAlias`). Extend `test/pass/enum_wide_payload.sf` to a seven-field variant, since it exists as the regression test for exactly this hazard. Bootstrap with stage 2 after each. Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.**
 
@@ -298,9 +317,30 @@ Phases, in order. The promotion point is marked.
 
 **Phase 7 — annotate the compiler's own source. Deferred, not part of this work.** See §9.
 
-**Phase 8+ — deferred features.** Widen `ClassDecl.parent` to `List<String>`, which unblocks `protected` and closes L7's coverage hole.
+**Phase 8+ — deferred features.** ~~Widen `ClassDecl.parent` to `List<String>`, which unblocks `protected` and closes L7's coverage hole.~~ **Done — it became Phase 3b and landed 2026-08-02** (BUGS #111): it is independent of visibility, and multiple inheritance was not merely unsound for `protected` but broken outright, so it was worth doing on its own account. What remains deferred here is `protected` itself and L7's coverage hole.
 
-Nothing in Phases 1, 2 or 3 may use `private` in compiler source. Nothing at all may use it before the Phase 3 promotion.
+Nothing in Phases 1, 2, 2b, 3 or 3b may use a visibility modifier in compiler source. Nothing at all may use one before the Phase 3 promotion.
+
+### Ordering summary
+
+Sequential spine, each step gated on the one above:
+
+```
+Phase 2   file identity in checker        DONE (85bfb13)   ─┐ parallel,
+Phase 2b  file → package mapping          in progress      ─┤ independent
+Phase 3b  ClassDecl.parents: List<String> in progress      ─┘ (3 worktrees)
+                    │
+Phase 3   widen declaration nodes for visibility
+                    │
+            ⟵ GEN2 PROMOTION ⟶
+                    │
+Phase 4   parser + class-member enforcement + leak pass (public/private)
+Phase 5   package-level enforcement (internal)   ← needs 2b
+Phase 5b  protected                              ← needs 3b
+Phase 6   annotate the stdlib
+```
+
+**What can be parallelised, and what cannot.** Phases 2, 2b and 3b are genuinely independent — different files, no shared tables — and are being run concurrently in separate worktrees. Everything from Phase 3 onward is **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase can start before it. Parallelising across the gate would produce two incompatible gen2 candidates; do not attempt it.
 
 ## 8. Test plan
 
@@ -341,11 +381,17 @@ The fail suite is how visibility is proven to actually deny — a `test/fail/` f
 
 ## 9. Explicitly out of scope
 
-- **`protected`** — blocked on `ClassDecl.parent: String` and the parser discarding parents 2..n. Phase 8.
-- **Module-private *fields*** — the 24 underscore fields read by same-module free functions would need it; they stay public instead. A third scope is a separate design.
+**Superseded by the Kotlin-parity decision — these are now IN scope, and were out of scope only in this document's first draft:**
+
+- ~~`protected`~~ — **in scope**, ships last of the four, as Phase 5b (§7). It was blocked on `ClassDecl.parent: String` and the parser discarding parents 2..n; **that block is removed** (BUGS #111), so the checker can now resolve a base at any position. It still waits on the widening's own promotion gate.
+- ~~a distinct `internal`~~ — **in scope**, package-scoped, gated on Phase 2b (§7).
+- ~~module-private fields~~ — **resolved**: the 24 underscore fields read by same-file free functions become `internal`, not "permanently public" (§2).
+
+**Genuinely out of scope:**
+
 - **Private enum variants** — incoherent against exhaustiveness plus #76's indeterminate-value semantics (§6a).
 - **`Fun`-mediated leaks (L8)** — structurally impossible; blocked on #56.
-- **`friend` / `internal` / package or workspace visibility** — no boundary the checker can currently see.
+- **`friend` / workspace-level visibility** — no boundary the checker can see. (`internal` is now in scope because the *package* boundary does exist — `pantry.toml`, already read at `main.sf:48-49` and `:475`.)
 - **Visibility on `@extern` symbols** — C linkage is a different namespace.
 - **Runtime enforcement.** `--no-check` ignores visibility entirely, and reflection reads fields dynamically by design (`test/test_reflect.sf`). Visibility is a compile-time hygiene feature, not a security boundary. Intended, documented, not to be "fixed".
 - **Re-export control** (`public import`) — separate feature.
