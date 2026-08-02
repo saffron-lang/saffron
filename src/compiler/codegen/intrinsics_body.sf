@@ -132,6 +132,42 @@
         return t
     }
 
+    // The C types the two ends of gen_extern_call actually know how to convert.
+    //
+    // These two lists exist because the parameter side and the return side each
+    // ended in a bare `else` that assumed "anything I did not recognise is an
+    // i64" — and the two `else`s disagreed about which types they covered, which
+    // is BUGS #24's asymmetry in its general form. The param `else` emitted
+    // `i64 %v` for an `i8**`/`i16`/`float` declaration whose `declare` says
+    // otherwise; the return `else` emitted `__val_tag_int(i64 %r)` on a value
+    // LLVM types as `i8**` or `i1`. Both produce a module that fails to
+    // assemble, with the failure reported by `opt` against generated IR rather
+    // than against the `@extern` line that caused it.
+    //
+    // The fix is not to add more conversions — a `float` param needs an
+    // fptrunc, an `i16` needs a trunc, an `i8**` return needs a real box, and
+    // each is its own change with its own tagging question. The fix is that an
+    // unhandled type must be a DIAGNOSTIC naming the signature, so the failure
+    // arrives at the declaration instead of three layers down in the assembler.
+    fun extern_param_type_supported(norm: String): Bool {
+        if (norm == "i64") { return true }
+        if (norm == "i8*") { return true }
+        if (norm == "i8**") { return true }
+        if (norm == "i32") { return true }
+        if (norm == "double") { return true }
+        if (norm == "...") { return true }
+        return false
+    }
+
+    fun extern_ret_type_supported(norm: String): Bool {
+        if (norm == "void") { return true }
+        if (norm == "i64") { return true }
+        if (norm == "i8*") { return true }
+        if (norm == "i32") { return true }
+        if (norm == "double") { return true }
+        return false
+    }
+
     fun emit_extern_declare(sig: String): String {
         var parsed: List<String> = this.parse_extern_sig(sig)
         var c_name: String = parsed[0]
@@ -177,6 +213,12 @@
                 ptype = parsed[i + 2]
             }
             var norm: String = this.normalize_c_type(ptype)
+            // Reject an unconvertible declared C type here, at the signature,
+            // rather than letting the `else` below claim it is an i64 (BUGS #24).
+            if (!this.extern_param_type_supported(norm)) {
+                IO.println("[codegen] Error: @extern \"" + sig + "\": parameter " + (i + 1).floor().to_string() + " has C type '" + ptype + "', which the FFI boundary cannot convert. Supported: i64, i32, double, void*/i8*, void**/i8**.")
+                this.has_errors = true
+            }
             // An `Any` i64 param is an opaque box in transit: the C side only
             // stores and returns it, so the value must arrive with its tag
             // intact. Untagging it here destroys the type — the scheduler's
@@ -219,6 +261,14 @@
                 call_args.push("i64 " + untagged64)
             }
             i = i + 1
+        }
+        // Symmetric with the parameter check above: the return path's own final
+        // `else` boxes with __val_tag_int(i64 ...), which is a type error on any
+        // return LLVM does not already hold in an i64. `void**` and `i1` both
+        // reach it today and both produce IR that fails to assemble.
+        if (!this.extern_ret_type_supported(llvm_ret)) {
+            IO.println("[codegen] Error: @extern \"" + sig + "\": return C type '" + ret_c + "' cannot be boxed at the FFI boundary. Supported: void, i64, i32, double, void*/i8*.")
+            this.has_errors = true
         }
         if (llvm_ret == "void") {
             this.emit_indent("call void @" + c_name + "(" + call_args.join(", ") + ")")
