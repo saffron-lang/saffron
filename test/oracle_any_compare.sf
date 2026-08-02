@@ -1,0 +1,179 @@
+// oracle_any_compare.sf — relational operators on statically-`Any` operands must
+// compare by VALUE, not by untagged bit pattern.
+//
+// Found by the differential oracle: test_sorted_collections.sf disagreed between
+// native-O2 (76/76 assertions passed) and native-O0 (74/76, exit 1). The two
+// configurations run the SAME source through the SAME compiler, so a disagreement
+// on a pure-native axis cannot be a wasm or FFI problem — it is codegen.
+//
+// MECHANISM. src/compiler/codegen/expr_body.sf:1127 gates the string-comparison
+// path on a STATIC type test:
+//
+//     if ((left_type2 == "String" or right_type2 == "String")
+//         and (op == "<" or op == "<=" or op == ">" or op == ">="))
+//         ... call i64 @__safe_strcmp ...
+//
+// When both operands are declared `Any` — which is what any generic container
+// does — `left_type2` and `right_type2` are "Any", the test fails, and codegen
+// falls through to the integer path:
+//
+//     %t5 = call i64 @__val_untag_int(i64 %t3)
+//     %t6 = call i64 @__val_untag_int(i64 %t4)
+//     %t8 = icmp slt i64 %t5, %t6
+//
+// __val_untag_int on a TAG_PTR value does not yield an integer, so this compares
+// garbage. This is mechanism M1 from docs/design/compiler-rewrite.md — codegen
+// re-infers types and reaches a different answer than the checker — combined with
+// M3, representation being a convention rather than something enforced.
+//
+// The two sibling stdlib modules are a controlled experiment for this. Both do a
+// binary search over string keys:
+//
+//   src/lib/sorted_map.sf declares `fun _binary_search(key: String)` and calls an
+//     explicit hand-rolled `_str_cmp` built on an `_alphabet` lookup table. Its
+//     comment says the table exists "enabling correct < ordering" — i.e. somebody
+//     already hit this and worked around it in the library instead of fixing the
+//     compiler. It gets the right answer.
+//   src/lib/sorted_set.sf declares `fun _bisect(value: Any)` and uses bare `<`.
+//     It gets the wrong answer.
+//
+// Same algorithm, same data, different declared parameter type, different result.
+//
+// WHY -O0 AND -O2 DISAGREE. Both are wrong, but they are wrong differently,
+// because the comparison reads bits that depend on where the allocator happened
+// to put each string. At -O2 the addresses of the three interned literals in
+// test_sorted_collections.sf happen to fall in an order that agrees with
+// alphabetical order, so all 76 assertions pass BY LUCK. At -O0 they do not, and
+// two assertions fail. A test that passes because of heap layout is not passing.
+//
+// SCOPE. Wider than the sorted_* modules: `List.sort()` does not sort strings at
+// all, at either optimization level. rt_list_sort (src/runtime/runtime.sf:1759)
+// is a bubble sort whose comparison is `if (a > b)` on two `Int`-declared locals
+// holding NaN-boxed values; for pointers the comparison is never true, so the
+// list is returned in its original order with no error. The only two `.sort()`
+// calls in the whole test suite (test/lists.sf:19, test/test_stdlib.sf:39) sort
+// NUMBERS, which is why this has never been caught.
+
+import "@test" as T
+
+// --- the primitive: `<` through an Any-typed parameter -----------------------
+//
+// Every pair is asserted in BOTH directions. A one-directional test can pass
+// against a broken comparator by coincidence, since exactly one of the two
+// answers is "false" and a comparator that always says false gets it half right.
+
+fun lt_any(a: Any, b: Any): Bool { return a < b }
+fun gt_any(a: Any, b: Any): Bool { return a > b }
+fun le_any(a: Any, b: Any): Bool { return a <= b }
+fun ge_any(a: Any, b: Any): Bool { return a >= b }
+
+T.section("`<` on Any-typed string operands")
+T.assert(lt_any("apple", "banana"), "apple < banana")
+T.assert(lt_any("apple", "cherry"), "apple < cherry")
+T.assert(lt_any("banana", "cherry"), "banana < cherry")
+T.assert(lt_any("banana", "apple") == false, "banana not < apple")
+T.assert(lt_any("cherry", "apple") == false, "cherry not < apple")
+T.assert(lt_any("cherry", "banana") == false, "cherry not < banana")
+
+T.section("`>` on Any-typed string operands")
+T.assert(gt_any("banana", "apple"), "banana > apple")
+T.assert(gt_any("cherry", "banana"), "cherry > banana")
+T.assert(gt_any("apple", "banana") == false, "apple not > banana")
+T.assert(gt_any("banana", "cherry") == false, "banana not > cherry")
+
+T.section("`<=` and `>=` on Any-typed string operands")
+T.assert(le_any("apple", "banana"), "apple <= banana")
+T.assert(le_any("apple", "apple"), "apple <= apple (equal)")
+T.assert(ge_any("banana", "apple"), "banana >= apple")
+T.assert(ge_any("apple", "apple"), "apple >= apple (equal)")
+T.assert(le_any("banana", "apple") == false, "banana not <= apple")
+
+// The statically-typed String path, which takes the __safe_strcmp branch and is
+// correct today. Having both here means a "fix" that broke the working path to
+// match the broken one would not look like a pass.
+T.section("`<` on statically-typed String operands (control)")
+var sa: String = "apple"
+var sb: String = "banana"
+T.assert(sa < sb, "static: apple < banana")
+T.assert((sb < sa) == false, "static: banana not < apple")
+
+// Numbers through the same Any-typed parameter, to show the bug is specific to
+// the pointer-payload case and this test is not just broken everywhere.
+T.section("numbers through Any (control)")
+T.assert(lt_any(1, 2), "1 < 2")
+T.assert(lt_any(2, 1) == false, "2 not < 1")
+T.assert(gt_any(2, 1), "2 > 1")
+T.assert(lt_any(1.5, 2.5), "1.5 < 2.5")
+
+// Strings built at runtime rather than interned literals. If a fix accidentally
+// relies on interning it will pass the cases above and fail these.
+T.section("runtime-built strings through Any")
+var built_a: String = "ap" + "ple"
+var built_b: String = "ban" + "ana"
+T.assert(lt_any(built_a, built_b), "built: apple < banana")
+T.assert(lt_any(built_b, built_a) == false, "built: banana not < apple")
+
+// --- List.sort() on strings --------------------------------------------------
+
+T.section("List.sort() orders strings")
+var l = ["cherry", "apple", "banana"]
+l.sort()
+T.assert_eq(l[0], "apple", "sort[0] is apple")
+T.assert_eq(l[1], "banana", "sort[1] is banana")
+T.assert_eq(l[2], "cherry", "sort[2] is cherry")
+
+var l2 = ["delta", "alpha", "charlie", "bravo"]
+l2.sort()
+T.assert_eq(l2[0], "alpha", "sort4[0] is alpha")
+T.assert_eq(l2[1], "bravo", "sort4[1] is bravo")
+T.assert_eq(l2[2], "charlie", "sort4[2] is charlie")
+T.assert_eq(l2[3], "delta", "sort4[3] is delta")
+
+// Numeric sort, the case the existing suite already covers and which works.
+T.section("List.sort() orders numbers (control)")
+var n = [3, 1, 2]
+n.sort()
+T.assert_eq(n[0], 1, "numeric sort[0]")
+T.assert_eq(n[2], 3, "numeric sort[2]")
+
+// --- SortedSet, the module the differential actually caught ------------------
+
+import "@sorted_set" as SortedSet
+
+T.section("SortedSet keeps strings in order")
+var ss = SortedSet.new()
+ss.add("cherry")
+ss.add("apple")
+ss.add("banana")
+var sl = ss.to_list()
+T.assert_eq(sl.length(), 3, "set has 3 elements")
+T.assert_eq(sl[0], "apple", "set[0] is apple")
+T.assert_eq(sl[1], "banana", "set[1] is banana")
+T.assert_eq(sl[2], "cherry", "set[2] is cherry")
+
+// Insert in an order that cannot be rescued by heap layout luck: reverse
+// alphabetical, so a comparator that returns false always leaves it reversed.
+var ss2 = SortedSet.new()
+ss2.add("zebra")
+ss2.add("yak")
+ss2.add("xerus")
+ss2.add("walrus")
+var sl2 = ss2.to_list()
+T.assert_eq(sl2[0], "walrus", "rev set[0] is walrus")
+T.assert_eq(sl2[3], "zebra", "rev set[3] is zebra")
+
+// SortedMap, the sibling that hand-rolls _str_cmp and therefore works. Asserting
+// it here documents that the two modules must agree.
+import "@sorted_map" as SortedMap
+
+T.section("SortedMap keeps string keys in order (works today)")
+var sm = SortedMap.new()
+sm.set("cherry", 3)
+sm.set("apple", 1)
+sm.set("banana", 2)
+var ks = sm.keys()
+T.assert_eq(ks[0], "apple", "map key[0] is apple")
+T.assert_eq(ks[1], "banana", "map key[1] is banana")
+T.assert_eq(ks[2], "cherry", "map key[2] is cherry")
+
+T.summary()
