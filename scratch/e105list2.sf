@@ -1,0 +1,5 @@
+enum Shape { Circle(r: Int), Square(s: Int) }
+IO.println([Shape.Circle(3), Shape.Square(4)])
+var xs: List<Shape> = [Shape.Circle(7)]
+IO.println(xs)
+IO.println(xs[0])

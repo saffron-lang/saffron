@@ -1,0 +1,5 @@
+enum Color { Red, Green, Blue }
+IO.println([Color.Red, Color.Blue])
+var m: Map<String, Color> = {}
+m.set("a", Color.Green)
+IO.println(m)
