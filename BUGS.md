@@ -9,6 +9,53 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 103. Extension-method resolution returns an unprefixed symbol on a miss, so mutually recursive `extend fun`s across modules fail to link
+
+This is the measured blocker for rewrite stage 10 (`docs/design/compiler-rewrite.md`
+records it in that stage's Notes). It is **not** an import-system gap and **not**
+a missing language feature — `extend fun` parses and lowers correctly under the
+current gen2, so no promotion is needed to fix it.
+
+`gen_extend_method` (`codegen/methods_body.sf:600`) registers
+`Ctx__m → core_Ctx__m` in `func_prefix_map` only as it lowers that method. The
+call site — `resolve_method_symbol` (`methods_body.sf:759`, duplicated inline at
+`:940`) — tries `func_prefix_map`, then `current_prefix + name`, then a suffix
+scan of `known_functions`, and when all three miss it does `return full`,
+handing back the **unprefixed** name:
+
+```
+error: use of undefined value '@Ctx__bx'
+  %t20 = call i64 @Ctx__bx(i64 %t12, i64 %t19)   ; definition is @core_Ctx__bx
+```
+
+Two properties make this specifically a stage-10 blocker rather than a general
+annoyance:
+
+- **Prefix-dependent.** The identical forward reference in a *single file*
+  compiles and runs correctly, because there `current_prefix` is `""` and the
+  guess is accidentally right. It breaks the moment the code lives in a module,
+  i.e. exactly when a class is split across files.
+- **Order cannot route around it.** One-directional dependencies work if the
+  callee is imported first, but the codegen split is *mutually* recursive
+  (`gen_arg_value` lives in `expr_body.sf` and is called from `methods_body.sf`;
+  `expr_body.sf` calls back into stmt generation). Both orders fail, each naming
+  the other direction's symbol.
+
+Verified working, so not part of this bug: `extend fun Ctx.m()` in an importing
+file; `this.field` read and write; a core method calling an extension in another
+file; extensions calling extensions later in the same module.
+
+**Fix shape, no new machinery needed.** `codegen.sf:737` already walks every
+module and computes the correct prefix for each `@extend:` method in order to
+fill `extend_map`; it needs to write `func_prefix_map` at the same time. Once
+every extension method is pre-registered, the fallback at `:759` is reachable
+only on a genuine "not found" — at which point it must become a diagnostic
+instead of `return full`.
+
+This is the **fifth** instance of one pattern: a resolution helper that cannot
+fail, so it guesses instead of reporting "not found" (#22, #40, #78, #37, and
+this). The pattern, not the instance, is the thing worth fixing.
+
 ### 102. FIXED — an enum's auto-generated `to_string()` segfaulted on a String field, printed every Bool as `true`, and read a one-field enum as its first variant
 
 Found while verifying #77 (`__bool_to_string` double-untag on wasm32). Checking
