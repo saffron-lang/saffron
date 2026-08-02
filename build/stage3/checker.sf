@@ -300,8 +300,8 @@ class NullChecker {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
             var ptype: String = this.type_node_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -929,7 +929,7 @@ class NullChecker {
                 var rpi: Float = 0
                 while (rpi < params.length()) {
                     var p: AST.Param = params[rpi]
-                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
                     var pt_str: String = this.type_node_to_string(pt)
                     if (pt_str.starts_with("Fun[")) {
                         // Record: "funcname:index" → receiver class name
@@ -1041,8 +1041,8 @@ class NullChecker {
                             var api: Float = 0
                             while (api < am_params.length()) {
                                 var ap: AST.Param = am_params[api]
-                                var ap_name: String = match (ap) { Param(n, t, d) => n }
-                                var ap_type: AST.Type = match (ap) { Param(n, t, d) => t }
+                                var ap_name: String = match (ap) { Param(n, t, d, p_vis) => n }
+                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis) => t }
                                 var ap_type_str: String = this.type_node_to_string(ap_type)
                                 if (ap_type_str != "Any" and !this.is_sendable(ap_type_str)) {
                                     this.warn("actor '" + name + "' method '" + am_name + "' parameter '" + ap_name + "' has non-Sendable type '" + ap_type_str + "'")
@@ -1322,8 +1322,8 @@ class NullChecker {
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
-                    var pname: String = match (p) { Param(n, t, d) => n }
-                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
                     this.env.define_var(pname, pt)
                     j = j + 1
                 }
@@ -2755,7 +2755,7 @@ class NullChecker {
         var i: Float = 0
         while (i < params.length()) {
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
             var sig: String = this.fun_param_types_of(this.type_to_str(pt))
             if (sig != "!") {
                 this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
@@ -2789,9 +2789,13 @@ class NullChecker {
         var changed: Bool = false
         var i: Float = 0
         while (i < params.length()) {
-            var pname: String = match (params[i]) { Param(n, t, d) => n }
-            var pt: AST.Type = match (params[i]) { Param(n, t, d) => t }
-            var pdef: AST.Expr = match (params[i]) { Param(n, t, d) => d }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis) => d }
+            // Rebuilding an existing Param below, so carry its visibility across
+            // rather than resetting to "public": this rewrite exists only to fill in
+            // an inferred type and must not otherwise alter the declaration.
+            var pvis: String = match (params[i]) { Param(n, t, d, p_vis) => p_vis }
             if (this.is_any_type(pt) and pname != "self") {
                 if (i < declared.length()) {
                     var declared_str: String = declared[i].trim()
@@ -2817,7 +2821,7 @@ class NullChecker {
                         + " so a block can be typed from it.")
                 }
             }
-            new_params.push(AST.Param.Param(pname, pt, pdef))
+            new_params.push(AST.Param.Param(pname, pt, pdef, pvis))
             i = i + 1
         }
         if (changed) {
@@ -2834,7 +2838,7 @@ class NullChecker {
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
         if (params.length() > 0) {
-            var first_param_name: String = match (params[0]) { Param(n, t, d) => n }
+            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis) => n }
             if (first_param_name == "self") return nil
         }
 
@@ -2853,7 +2857,7 @@ class NullChecker {
 
         // Build new params: prepend 'self' parameter
         var new_params: List<AST.Param> = []
-        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit))
+        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public"))
         var pi: Float = 0
         while (pi < params.length()) {
             new_params.push(params[pi])

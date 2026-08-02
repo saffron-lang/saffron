@@ -143,7 +143,12 @@ enum Pattern {
 }
 
 enum Param {
-    Param(name: String, type_ann: Type, default_val: Expr)
+    // Param carries class *fields* and function *params* — the same node in two
+    // roles — so `visibility` here is read by two different rules in Phase 4:
+    // a field's visibility is class-scoped, a parameter's is meaningless and stays
+    // "public" forever. Appended last, as on every widened declaration node; see
+    // the note on TypeAlias in `Stmt` for why that position.
+    Param(name: String, type_ann: Type, default_val: Expr, visibility: String)
 }
 
 enum Stmt {

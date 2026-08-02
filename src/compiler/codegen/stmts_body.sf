@@ -68,8 +68,8 @@
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
-                        var pname: String = match (p) { Param(n, t, d) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -101,8 +101,8 @@
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
-                        var pname: String = match (p) { Param(n, t, d) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -734,7 +734,7 @@
         var mpi: Float = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mpn: String = match (mp) { Param(n, t, d) => n }
+            var mpn: String = match (mp) { Param(n, t, d, p_vis) => n }
             method_param_names.push(mpn)
             mpi = mpi + 1
         }
@@ -748,7 +748,7 @@
         mpi = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mdval: AST.Expr = match (mp) { Param(n, t, d) => d }
+            var mdval: AST.Expr = match (mp) { Param(n, t, d, p_vis) => d }
             method_defaults.push(mdval)
             mpi = mpi + 1
         }

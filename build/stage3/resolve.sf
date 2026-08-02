@@ -180,7 +180,7 @@ class Resolver {
                 var pi: Float = 0
                 while (pi < params.length()) {
                     var p: AST.Param = params[pi]
-                    var pname: String = match (p) { Param(n, t, d) => n }
+                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                     this.declare(pname, "param")
                     pi = pi + 1
                 }
@@ -204,7 +204,7 @@ class Resolver {
                     var fi: Float = 0
                     while (fi < fields.length()) {
                         var f: AST.Param = fields[fi]
-                        var fname: String = match (f) { Param(n, t, d) => n }
+                        var fname: String = match (f) { Param(n, t, d, p_vis) => n }
                         this.declare(fname, "local")
                         fi = fi + 1
                     }
@@ -347,7 +347,7 @@ class Resolver {
                 var pi: Float = 0
                 while (pi < params.length()) {
                     var p: AST.Param = params[pi]
-                    var pname: String = match (p) { Param(n, t, d) => n }
+                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                     this.declare(pname, "param")
                     pi = pi + 1
                 }
