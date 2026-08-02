@@ -1,0 +1,8 @@
+class S {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+extend fun S.f1(): Int { return this.f2() + 1 }
+extend fun S.f2(): Int { return this.v }
+var s = S(41)
+IO.println(s.f1())

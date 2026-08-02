@@ -1,0 +1,9 @@
+import "./lib1.sf" as L1
+extend fun WithInit.m2(): Int { return this.m1() * 2 }
+extend fun NoInit.n2(): Int { return this.n1() + 1 }
+class Local2 {
+    var c: Int
+    fun init(c: Int) { this.c = c }
+}
+extend fun Local2.p1(): Int { return this.p2() + 1 }
+extend fun Local2.p2(): Int { return this.c }

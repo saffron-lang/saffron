@@ -1,0 +1,3 @@
+import "./lib.sf" as Lib
+var c = Lib.Ctx(41)
+IO.println(c.outer())

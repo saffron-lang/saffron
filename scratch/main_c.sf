@@ -1,0 +1,6 @@
+import "./core2.sf" as Core2
+extend fun Ctx2.cz(k: Int): Int {
+    return this.bx(k) + 1
+}
+var c = Core2.Ctx2(10)
+IO.println(c.cz(3))

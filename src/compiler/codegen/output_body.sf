@@ -771,6 +771,12 @@
             }
             ei = ei + 1
         }
+        // ...and their emitted symbols, so a call lowered before the `extend fun`
+        // itself resolves to the right name instead of guessing (BUGS #103).
+        // Idempotent with the module-path calls in generate_with_modules_flat_opts3:
+        // same key, same value, because extend_class_prefix is the single source of
+        // the prefix for both.
+        this.prescan_extend_symbols(program, 0, program.length(), this.current_prefix)
 
         // Pre-registration pass: add all declaration names to known_functions
         // BEFORE compiling any bodies, so forward references don't trigger warnings

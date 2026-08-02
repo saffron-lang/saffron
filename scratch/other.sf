@@ -1,0 +1,5 @@
+import "./core.sf" as Core
+
+extend fun Ctx.ay(k: Int): Int {
+    return this.bx(k) + 1
+}

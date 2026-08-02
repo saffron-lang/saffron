@@ -1,0 +1,11 @@
+enum Color { Red, Green, Blue }
+enum Shape { Circle(r: Int), Square(s: Int) }
+
+IO.println(Color.Red)
+IO.println(Color.Green)
+IO.println(Color.Blue)
+IO.println("${Color.Green}")
+IO.println([Color.Red, Color.Blue])
+IO.println(Shape.Circle(3))
+IO.print(Color.Green)
+IO.println("")

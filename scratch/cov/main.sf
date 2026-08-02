@@ -1,0 +1,17 @@
+import "./lib1.sf" as L1
+import "./lib2.sf" as L2
+class MainCls {
+    var d: Int
+    fun init(d: Int) { this.d = d }
+}
+extend fun MainCls.q1(): Int { return this.q2() + 1 }
+extend fun MainCls.q2(): Int { return this.d }
+extend fun WithInit.m3(): Int { return this.m2() + 100 }
+var w = L1.WithInit(5)
+IO.println(w.m1())
+IO.println(w.m2())
+IO.println(w.m3())
+var l2 = L2.Local2(9)
+IO.println(l2.p1())
+var mc = MainCls(3)
+IO.println(mc.q1())

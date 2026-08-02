@@ -1,0 +1,126 @@
+// BUGS #86, the arrow-spelling half.
+//
+// #86's fix made the checker push a callee's declared function-parameter types into
+// a block-syntax lambda `{ x => ... }`, which has nowhere to write annotations of
+// its own. But it could only do that for the `Fun<A, B, R>` spelling, because
+// parser.sf's parse_type_ast had, for the OTHER spelling:
+//
+//     if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }
+//
+// parse_single_type encodes `(A, B) => R` into the string "Fun(A,B):R" and that line
+// then threw the parameter list and the return type away. So a callee declared
+// `f: (Box) => String` was indistinguishable from `f: Fun` — and after #86 that is a
+// hard error, not a silent 0:
+//
+//   ERROR: parameter 'x' of the function passed to 'apply_arrow' has no type, and
+//   none can be derived
+//
+// Which meant the arrow spelling — the one `src/lib/iter.sf` uses for every one of
+// map/filter/reduce/any/all/each/count/find/flat_map — could not accept a block at
+// all. parse_type_ast now parses its own encoding, and #86's existing checker code
+// types the block from it with no further change.
+//
+// Every assertion here is about OUTPUT. Pre-fix this file did not compile; the
+// closest thing to a pre-fix number is the `Fun` spelling's, which answered "v=0 n=".
+
+import "@test" as Test
+
+class Box {
+    var v: Int
+    var name: String
+    fun init(v: Int, name: String) { this.v = v; this.name = name }
+}
+
+// The arrow spelling. This is the line the fix is about.
+fun apply_arrow(b: Box, f: (Box) => String): String {
+    return f(b)
+}
+
+// Two parameters of different types: the second must come out Int, and the return
+// type must not be mistaken for a parameter (`Fun<A, B, R>` puts the return type
+// last in the same list; the arrow spelling keeps it after the `:`, so a fix that
+// confused the two shows up here).
+fun apply_two(b: Box, n: Int, f: (Box, Int) => String): String {
+    return f(b, n)
+}
+
+// A generic in the parameter list. "Fun(Map<String,Int>):Int" contains both a `<`
+// and a comma inside it — the comma must not split the parameter list, and the
+// generic branch of parse_type_ast must not claim the string before the function
+// branch does.
+fun apply_map(m: Map<String, Int>, f: (Map<String, Int>) => Int): Int {
+    return f(m)
+}
+
+// A list-of-class parameter, the shape `iter.map` has.
+fun apply_list(xs: List<Box>, f: (List<Box>) => Int): Int {
+    return f(xs)
+}
+
+// Zero parameters: "Fun():Int" must give an empty parameter list, not a
+// single parameter whose name is the empty string.
+fun apply_none(f: () => Int): Int {
+    return f()
+}
+
+// A nested function type in the parameter position: "Fun(Fun(Int):Int):Int". The
+// inner `)` must not be read as the outer one.
+fun apply_nested(f: ((Int) => Int) => Int): Int {
+    return f(fun (n: Int): Int => n + 1)
+}
+
+// A method taking an arrow-typed callback, to cover infer_method_call as well as
+// infer_call.
+class Applier {
+    var factor: Int
+    fun init(factor: Int) { this.factor = factor }
+    fun run(b: Box, f: (Box) => String): String {
+        return f(b)
+    }
+}
+
+fun main() {
+    var box: Box = Box(42, "hello")
+
+    // --- The point of the whole file: a block typed from an arrow-spelled type ---
+    var blocked: String = apply_arrow(box) { x => "v=" + x.v.to_string() + " n=" + x.name }
+    Test.assert_eq(blocked, "v=42 n=hello", "a block reads its fields when the callee uses (A) => R")
+
+    // The annotated lambda was always correct. It is the control: both forms must
+    // agree, and it is what the block form was silently disagreeing with.
+    var annotated: String = apply_arrow(box, fun (x: Box): String => "v=" + x.v.to_string() + " n=" + x.name)
+    Test.assert_eq(annotated, "v=42 n=hello", "the annotated form still reads its fields")
+    Test.assert_eq(blocked, annotated, "the block form and the annotated form agree")
+
+    // --- Two parameters, mixed types ---
+    var two: String = apply_two(box, 7) { x, n => x.name + ":" + (x.v + n).to_string() }
+    Test.assert_eq(two, "hello:49", "each arrow-spelled parameter gets its own type")
+
+    // --- A generic with a comma inside it, in the parameter list ---
+    var counts: Map<String, Int> = {"a": 1, "b": 2}
+    Test.assert_eq(apply_map(counts) { m => m.keys().length() }, 2, "a Map<K,V> parameter survives the split")
+
+    // --- List<Box>: the element type has to reach the field read ---
+    var boxes: List<Box> = [Box(3, "x"), Box(4, "y")]
+    var list_sum: Int = apply_list(boxes) { xs => xs.length() }
+    Test.assert_eq(list_sum, 2, "a List<Box> parameter is typed")
+
+    // --- Zero parameters ---
+    Test.assert_eq(apply_none(fun (): Int => 11), 11, "() => R declares no parameters")
+
+    // --- Nested function type ---
+    Test.assert_eq(apply_nested(fun (g: (Int) => Int): Int => g(5)), 6, "a nested function type parses")
+
+    // --- The method-call path ---
+    var applier: Applier = Applier(3)
+    var via_method: String = applier.run(box) { x => "m=" + (x.v * 3).to_string() }
+    Test.assert_eq(via_method, "m=126", "a block passed to an arrow-typed method parameter is typed")
+
+    // --- An explicit annotation is still left alone, not overwritten ---
+    var explicit: String = apply_arrow(box, fun (x: Box): String => "e=" + x.v.to_string())
+    Test.assert_eq(explicit, "e=42", "an explicitly annotated parameter is left alone")
+
+    Test.summary()
+}
+
+main()
