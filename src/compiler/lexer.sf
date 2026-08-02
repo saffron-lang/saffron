@@ -80,9 +80,27 @@ enum TokenKind {
     TkEof
 }
 
+// `line` and `col` name the token's FIRST character; `offset` is its 0-based
+// byte offset into the source and `len` its length in bytes. Together the last
+// three make up a span (see `AST.Span`) — they are stored inline rather than as
+// a nested Span value so that reading a token's position costs one match instead
+// of two, and so that widening this variant did not also require every existing
+// `Token(kind, line, col)` arm to learn a new type.
+//
+// `line`/`col` used to be the position *after* the token was consumed, because
+// `emit` read the lexer's cursor at emit time and `advance()` had already moved
+// it. Every parse diagnostic's caret therefore pointed one column past the token
+// it was complaining about, and multi-character tokens reported the column of
+// their last character. `token_start_*`, captured before the token is scanned,
+// is what makes the caret land on the offending character.
 enum Token {
-    Token(kind: TokenKind, line: Float, col: Float)
+    Token(kind: TokenKind, line: Float, col: Float, offset: Float, len: Float)
 }
+
+// The Token -> AST.Span conversion lives in parser.sf rather than here on
+// purpose: this file imports nothing, and bootstrap compiles it as its own unit
+// (SOURCES=(lexer parser)). Importing ast.sf just to name a return type would
+// make the lexer's compilation depend on the AST for no other reason.
 
 class Lexer {
     var source: String
@@ -90,6 +108,12 @@ class Lexer {
     var line: Float
     var col: Float
     var tokens: List<Token>
+    // Position of the first character of the token currently being scanned.
+    // `tokenize` and `read_interpolation` set these immediately before dispatching
+    // on the lead character; `emit` reads them rather than the live cursor.
+    var token_start_pos: Float
+    var token_start_line: Float
+    var token_start_col: Float
 
     fun init(source: String) {
         this.source = source
@@ -97,6 +121,17 @@ class Lexer {
         this.line = 1
         this.col = 1
         this.tokens = []
+        this.token_start_pos = 0
+        this.token_start_line = 1
+        this.token_start_col = 1
+    }
+
+    /// Record where the token about to be scanned begins. Called with the cursor
+    /// still on the token's first character.
+    fun begin_token() {
+        this.token_start_pos = this.pos
+        this.token_start_line = this.line
+        this.token_start_col = this.col
     }
 
     fun peek(): String {
@@ -122,7 +157,25 @@ class Lexer {
     }
 
     fun emit(kind: TokenKind) {
-        this.tokens.push(Token.Token(kind, this.line, this.col))
+        // Length is measured from the recorded start to the live cursor, so a
+        // multi-character token (an identifier, a number, `>>=`) gets its real
+        // extent without each scanner having to report one.
+        var len: Float = this.pos - this.token_start_pos
+        if (len < 0) { len = 0 }
+        this.tokens.push(Token.Token(kind, this.token_start_line, this.token_start_col,
+            this.token_start_pos, len))
+    }
+
+    /// Emit a token at an explicitly supplied position, with length 0.
+    ///
+    /// Used for the scaffolding tokens `read_string` synthesizes when it
+    /// desugars an interpolation — the parens, `+`s and `.to_string()` that no
+    /// one wrote. They are given the span of the string literal they came from,
+    /// so a diagnostic on the desugared expression still points at that string
+    /// rather than at whatever token the interpolation lexer happened to leave
+    /// in `token_start_*`. Length 0 marks them as standing for no source text.
+    fun emit_at(kind: TokenKind, line: Float, col: Float, offset: Float) {
+        this.tokens.push(Token.Token(kind, line, col, offset, 0))
     }
 
     fun is_digit(ch: String): Bool {
@@ -289,6 +342,13 @@ class Lexer {
     fun read_string() {
         var result: StringBuilder = StringBuilder()
         var has_interp: Bool = false
+        // The opening quote's position. read_interpolation() re-enters the normal
+        // token scanners and so overwrites token_start_*; capturing the literal's
+        // own start here is what lets the synthesized scaffolding tokens point
+        // back at the string the user actually wrote.
+        var lit_line: Float = this.token_start_line
+        var lit_col: Float = this.token_start_col
+        var lit_off: Float = this.token_start_pos
         while (this.pos < this.source.length() and this.peek() != "\"") {
             var ch: String = this.advance()
             if (ch == "\\") {
@@ -312,20 +372,20 @@ class Lexer {
                         // a raw-pointer garbage read (BUGS #25). The matching
                         // close paren is emitted after the trailing segment below.
                         if (!has_interp) {
-                            this.emit(TokenKind.TkLParen)
+                            this.emit_at(TokenKind.TkLParen, lit_line, lit_col, lit_off)
                         }
                         // Emit prefix string + plus
-                        this.emit(TokenKind.TkString(result.to_string()))
-                        this.emit(TokenKind.TkPlus)
+                        this.emit_at(TokenKind.TkString(result.to_string()), lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkPlus, lit_line, lit_col, lit_off)
                         // Lex the interpolated expression, wrapped in (expr).to_string()
-                        this.emit(TokenKind.TkLParen)
+                        this.emit_at(TokenKind.TkLParen, lit_line, lit_col, lit_off)
                         this.read_interpolation()
-                        this.emit(TokenKind.TkRParen)
-                        this.emit(TokenKind.TkDot)
-                        this.emit(TokenKind.TkIdent("to_string"))
-                        this.emit(TokenKind.TkLParen)
-                        this.emit(TokenKind.TkRParen)
-                        this.emit(TokenKind.TkPlus)
+                        this.emit_at(TokenKind.TkRParen, lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkDot, lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkIdent("to_string"), lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkLParen, lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkRParen, lit_line, lit_col, lit_off)
+                        this.emit_at(TokenKind.TkPlus, lit_line, lit_col, lit_off)
                         // Reset for rest of string
                         result = StringBuilder()
                         has_interp = true
@@ -340,11 +400,19 @@ class Lexer {
             }
         }
         this.advance() // closing quote
-        this.emit(TokenKind.TkString(result.to_string()))
-        // Close the paren group opened at the first ${ (BUGS #25). Only emitted
-        // when the string actually interpolated — a plain "abc" opens no group.
         if (has_interp) {
-            this.emit(TokenKind.TkRParen)
+            // The trailing segment of an interpolated string is scaffolding too:
+            // by here token_start_* names some token inside the last ${...}.
+            this.emit_at(TokenKind.TkString(result.to_string()), lit_line, lit_col, lit_off)
+            // Close the paren group opened at the first ${ (BUGS #25). Only
+            // emitted when the string actually interpolated — a plain "abc"
+            // opens no group.
+            this.emit_at(TokenKind.TkRParen, lit_line, lit_col, lit_off)
+        } else {
+            // A plain literal spans from its opening quote to its closing one.
+            // token_start_* still names the opening quote, so emit() measures
+            // the whole literal including both quotes.
+            this.emit(TokenKind.TkString(result.to_string()))
         }
     }
 
@@ -365,7 +433,7 @@ class Lexer {
                 depth = depth + 1
             }
             // Lex one token normally
-            var start_pos: Float = this.pos
+            this.begin_token()
             var tok_ch: String = this.advance()
             if (this.is_digit(tok_ch)) { this.read_number() }
             else if (this.is_alpha(tok_ch)) {
@@ -414,7 +482,7 @@ class Lexer {
         else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
         else if (ch == "^") { this.emit(TokenKind.TkCaret) }
         else if (ch == "~") { this.emit(TokenKind.TkTilde) }
-        else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
+        else if (ch == "@") { this.emit(TokenKind.TkIdent("@")) }
         else if (ch == "|") { this.emit(TokenKind.TkPipe) }
         else if (ch == "!") {
             if (this.peek() == "=") {
@@ -521,6 +589,9 @@ class Lexer {
             // Check for doc comments before advancing
             if (this.peek() == "/" and this.peek_next() == "/") {
                 if (this.pos + 2 < this.source.length()) {
+                    // A doc comment is a token too, and its span starts at the
+                    // first slash, not after the marker.
+                    this.begin_token()
                     var third: String = this.source.char_at(this.pos + 2)
                     if (third == "/") {
                         // /// doc comment
@@ -542,6 +613,7 @@ class Lexer {
                 }
             }
 
+            this.begin_token()
             var ch: String = this.advance()
 
             if (this.is_digit(ch)) { this.read_number() }
@@ -553,6 +625,7 @@ class Lexer {
             else { this.lex_operator(ch) }
         }
 
+        this.begin_token()
         this.emit(TokenKind.TkEof)
         return this.tokens
     }
