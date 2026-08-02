@@ -175,6 +175,25 @@ class NullChecker {
     // comma-joined method-name list, matching class_method_names' encoding.
     var class_abstract_methods: Map<String, String>
     var receiver_params: Map<String, String>
+    // What a callee declares about the SHAPE of a function-typed parameter, keyed
+    // "funcname:index" (and "Class__method:index"), exactly like receiver_params.
+    //
+    // This is the table that makes a block-syntax argument typed. A block
+    // (`f(x) { p => ... }`) can never carry annotations — there is nowhere to
+    // write them — so the only place its parameter types can come from is the
+    // parameter it is being passed to. Without this the block's parameters stayed
+    // AnyType, field-offset resolution fell through, and every field read answered
+    // 0 or "" with no diagnostic (BUGS #86).
+    //
+    // The value encodes three distinct states, which is the whole point:
+    //   absent      → the callee's parameter is not a function type at all (or the
+    //                 callee is unknown). Nothing to say; leave the lambda alone.
+    //   "?"         → declared a function type that carries NO parameter types
+    //                 (bare `Fun`). The source does not contain the type, so an
+    //                 untyped lambda parameter here is an error, not a guess.
+    //   "" / "A,B"  → the declared parameter types (empty = declared zero params).
+    //                 These get written into the lambda's own Param nodes.
+    var fun_param_sigs: Map<String, String>
     var actor_classes: Map<String, Bool>
     // Bare enum names declared by two different modules with different variant
     // lists — see register_enum.
@@ -191,6 +210,7 @@ class NullChecker {
         this.class_type_params = {}
         this.class_abstract_methods = {}
         this.receiver_params = {}
+        this.fun_param_sigs = {}
         this.actor_classes = {}
         this.ambiguous_enums = []
     }
@@ -754,6 +774,9 @@ class NullChecker {
                     }
                     rpi = rpi + 1
                 }
+                // Record what each function-typed parameter says about its own
+                // parameters, so a block-syntax argument can be typed (BUGS #86).
+                this.register_fun_param_sigs(name, params)
             }
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
@@ -802,6 +825,18 @@ class NullChecker {
                     if (method_name.length() > 0) {
                         this.env.define_func_str(name + "__" + method_name, method_ret)
                         this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
+                        // Same as the FunDecl arm: a method taking a callback has to
+                        // be able to type a block passed to it (BUGS #86).
+                        //
+                        // Registered ONLY under the receiver-qualified key, unlike
+                        // receiver_params which also registers the bare method name.
+                        // A bare key is ambiguous across classes — `Map.get(key)` and
+                        // `App.get(path, handler)` are both `get` — and here an
+                        // ambiguous hit does not merely fail to help, it can raise an
+                        // error against a signature belonging to some other class.
+                        // Missing a case costs nothing beyond the status quo; a
+                        // spurious error breaks a correct program.
+                        this.register_fun_param_sigs(name + "__" + method_name, method_params)
                         method_names_list.push(method_name)
                     }
                     mi = mi + 1
@@ -1804,6 +1839,11 @@ class NullChecker {
             if (has_recv and is_lambda) {
                 var recv_class: String = this.receiver_params.get(recv_key)
                 this.desugar_receiver_closure(args, di, recv_class)
+            } else if (is_lambda and this.fun_param_sigs.has(recv_key)) {
+                // Type the lambda's own parameters from what the callee declares
+                // about its callback (BUGS #86). Runs after the receiver-closure
+                // branch so the two desugarings never fight over the same argument.
+                this.apply_fun_param_sig(args, di, this.fun_param_sigs.get(recv_key), name)
             }
             di = di + 1
         }
@@ -1903,6 +1943,15 @@ class NullChecker {
             }
             if (md_recv.length() > 0 and this.is_lambda_expr(args[mdi])) {
                 this.desugar_receiver_closure(args, mdi, md_recv)
+            } else if (this.is_lambda_expr(args[mdi])) {
+                // Type a block passed to a method from the method's own declared
+                // callback type (BUGS #86). Prefer the receiver-qualified key: two
+                // classes can both declare `get(path, handler)` with different
+                // callback shapes, and the bare key cannot tell them apart.
+                var md_sig_key: String = this.generic_base(obj_type) + "__" + method + ":" + mdi.floor().to_string()
+                if (this.fun_param_sigs.has(md_sig_key)) {
+                    this.apply_fun_param_sig(args, mdi, this.fun_param_sigs.get(md_sig_key), method)
+                }
             }
             mdi = mdi + 1
         }
@@ -2350,6 +2399,128 @@ class NullChecker {
         var methods_str: String = this.class_method_names.get(class_name)
         if (methods_str.length() == 0) return result
         return methods_str.split(",")
+    }
+
+    // --- Function-typed parameter signatures (BUGS #86) ---
+
+    // Read the parameter-type list out of a declared function type. Returns "?" when
+    // the spelling names a function but says nothing about its parameters, so callers
+    // can tell "declared zero parameters" (`""`) apart from "declared nothing"
+    // (`"?"`) — collapsing those two is exactly how a guess gets laundered into a
+    // type. Returns "!" for a parameter that is not a function type at all.
+    //
+    // The input must come from type_to_str, NOT type_node_to_string: the latter is
+    // ast.sf's renderer, which prints every GenericType as its bare base name, so
+    // `Fun<Box, String>` would arrive here as "Fun" with the two type arguments
+    // already gone. type_to_str renders the arguments.
+    //
+    // Which spellings actually carry information, as of today:
+    //   "Fun"            bare `Fun`              → "?"  (no information)
+    //   "Fun<A,B,R>"     `Fun<A, B, R>`          → "A,B" (trailing arg is the return)
+    //
+    // `(A) => R` does NOT reach here with its types intact, and that is a defect
+    // OUTSIDE this file: parser.sf's parse_type_ast has
+    //     if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }
+    // which throws away the parameter and return types that parse_single_type had
+    // just finished encoding into the string "Fun(A):R". Every consumer downstream
+    // therefore sees an empty FuncType and cannot distinguish `(Box) => String` from
+    // a bare `Fun`. Until that one line parses its own input, `Fun<A, R>` is the only
+    // spelling that can type a block, which is what the error message below says.
+    fun fun_param_types_of(type_str: String): String {
+        if (type_str == "Fun") return "?"
+        if (type_str.starts_with("Fun<")) {
+            // `Fun<A, B, R>` is (A, B) => R: the trailing argument is the return
+            // type, so `Fun<R>` declares no parameters at all.
+            var inner: String = type_str.slice(4, type_str.length() - 1)
+            var parts: List<String> = this.split_type_args(inner)
+            if (parts.length() <= 1) return ""
+            var kept: List<String> = []
+            var pi: Float = 0
+            while (pi < parts.length() - 1) {
+                kept.push(parts[pi])
+                pi = pi + 1
+            }
+            return kept.join(",")
+        }
+        // Not a function type — the caller must not treat this parameter as one.
+        return "!"
+    }
+
+    // Record, for every function-typed parameter of `name`, what that parameter
+    // declares about its own parameters. Called from both registration sites so a
+    // free function and a method are indistinguishable at the call site.
+    fun register_fun_param_sigs(name: String, params: List<AST.Param>) {
+        var i: Float = 0
+        while (i < params.length()) {
+            var p: AST.Param = params[i]
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var sig: String = this.fun_param_types_of(this.type_to_str(pt))
+            if (sig != "!") {
+                this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
+            }
+            i = i + 1
+        }
+    }
+
+    // Push the callee's declared parameter types into a lambda argument whose own
+    // parameters carry no annotation, and report the case where there is nothing to
+    // push. This is what turns a block-syntax parameter from "no type" into either
+    // the declared type or a hard error.
+    //
+    // Only AnyType parameters are touched: an explicitly annotated lambda states
+    // its own types and must keep them, so that a genuine mismatch stays visible
+    // rather than being overwritten to agree.
+    fun apply_fun_param_sig(args: List<AST.Expr>, arg_idx: Float, sig: String, callee: String) {
+        var lambda: AST.Expr = args[arg_idx]
+        var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p    _ => [] }
+        var ret_type: String = match (lambda) { Lambda(p, r, b) => r    _ => "Any" }
+        var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b    _ => [] }
+        if (params.length() == 0) return nil
+
+        // How many parameters were declared, and what are they?
+        var declared: List<String> = []
+        if (sig != "?" and sig.length() > 0) {
+            declared = this.split_type_args(sig)
+        }
+
+        var new_params: List<AST.Param> = []
+        var changed: Bool = false
+        var i: Float = 0
+        while (i < params.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d) => d }
+            if (this.is_any_type(pt) and pname != "self") {
+                if (i < declared.length()) {
+                    var declared_str: String = declared[i].trim()
+                    if (declared_str.length() > 0 and declared_str != "Any") {
+                        pt = this.parse_type_node(declared_str)
+                        changed = true
+                    } else {
+                        this.error("parameter '" + pname + "' of the function passed to '" + callee
+                            + "' has no type: '" + callee + "' declares its parameter " + i.floor().to_string()
+                            + " as 'Any'. Annotate the lambda parameter, or give '" + callee
+                            + "' a parameter type that says what it calls back with.")
+                    }
+                } else {
+                    // Either the callee said nothing about its callback's shape
+                    // (bare `Fun`) or it declared fewer parameters than the lambda
+                    // takes. Both mean the type is genuinely not in the source, and a
+                    // guess here is what BUGS #86 was: a field read answering 0.
+                    this.error("parameter '" + pname + "' of the function passed to '" + callee
+                        + "' has no type, and none can be derived: '" + callee
+                        + "' does not declare what it calls that function with."
+                        + " Annotate the parameter (`fun (" + pname
+                        + ": T): R => ...`), or declare the callee's parameter as `Fun<T, R>`"
+                        + " so a block can be typed from it.")
+                }
+            }
+            new_params.push(AST.Param.Param(pname, pt, pdef))
+            i = i + 1
+        }
+        if (changed) {
+            args[arg_idx] = AST.Expr.Lambda(new_params, ret_type, body)
+        }
     }
 
     fun desugar_receiver_closure(args: List<AST.Expr>, arg_idx: Float, receiver_class: String) {
