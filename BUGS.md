@@ -1582,8 +1582,9 @@ ambiguous across classes (`Map.get(key)` vs `App.get(path, handler)`), and an
 ambiguous hit here does not merely fail to help, it raises an error against
 another class's signature.
 
-`Fun<A, B, R>` is currently the only spelling that can type a block. `(A, B) =>
-R` cannot, and that is a separate live defect: `parse_single_type` encodes it
+`Fun<A, B, R>` was, at the time of this fix, the only spelling that could type a
+block. `(A, B) => R` could not, and that was a separate defect — now also fixed,
+see the addendum below: `parse_single_type` encodes it
 into the string `"Fun(A,B):R"` and then `parse_type_ast` discards it with
 `if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }`
 (src/compiler/parser.sf ~line 1014). Fixing that one line would make `(A) => R`
@@ -1593,6 +1594,43 @@ Covered by `test/pass/checker_block_param_typed.sf` (7 assertions, which check
 that the block form and the annotated form agree on identical input — the
 pre-fix compiler accepted the file) and `test/fail/checker_block_param_untypeable.sf`
 (a bare `Fun` callee must be rejected).
+
+**The arrow half is now FIXED too (2026-08-02) — and the prediction above was
+wrong.** This entry claimed "fixing that one line would make `(A) => R` work with
+no further checker change." It took **two** further changes, and one of them was a
+silent-wrong-answer bug of its own:
+
+1. `parser.sf` now parses a function type's parameters and return type instead of
+   discarding them, so `(A, B) => R` produces a populated `FuncType` node.
+2. That populated node immediately broke `codegen.sf`'s paren-blind parameter
+   split — **#114**, which made `reduce` answer 12 instead of 10 in shipped
+   stdlib. The parser fix alone is *harmful*; the two must land together.
+3. The arrow spelling still could not type a block, because
+   `register_fun_param_sigs` rendered the parameter through `type_to_str` first,
+   and `type_to_str` collapses **every** `FuncType` to the bare `"Fun"`. The
+   populated node was flattened before `fun_param_types_of` ever saw it, landing
+   the arrow spelling in the `"?"` state — which this entry defines as an *error*
+   ("declares nothing"), not a guess.
+
+Point 3 was fixed by reading the **node**, in a new `fun_param_sig_of`, rather
+than by making `type_to_str` richer. That restraint was load-bearing:
+`type_to_str` has three consumers that depend on its collapsed `"Fun"` and would
+have regressed silently. `infer_expr` renders a Lambda's inferred
+`FuncType([], Any)` through it and `is_type_param` tests `typ == "Fun"` by exact
+equality — so a rich `"Fun():Any"` would make `is_type_param` answer **true**,
+reclassifying every lambda as a generic type parameter. `fun_param_types_of` tests
+`type_str == "Fun"` the same way, and `is_subtype_node` compares two *rendered
+strings*, so a rich rendering would stop equating two function types and invent
+new errors.
+
+That is exactly the reasoning this entry used when it chose `type_to_str` over
+`AST.type_to_string`, applied one level further in — and the reason a previous
+crude global probe of `type_to_str` produced a segfault.
+
+`test/pass/checker_block_param_arrow_type.sf` was written to **fail by design**
+(6 errors) until all three landed; it now passes 10/10, and
+`test/pass/checker_block_param_typed.sf` still passes 7/7, so the `Fun<A, B, R>`
+spelling did not regress. Both spellings now work.
 
 ### 85. FIXED — `__io_file_size` and `__io_read_binary` were missing from the known-function tables, so calling them from a stdlib module emitted a bad symbol
 
@@ -4948,6 +4986,59 @@ This makes `test/functions.sf` hang, which is how it was noticed.
 Same family as #22, #40, #78, #37 and #103 — a check that cannot express "unknown"
 so it conflates unknown with a legitimate value. Here the conflated value is zero,
 which is also the sentinel.
+
+---
+
+### 114. FIXED — a two-parameter function type was split in half, manufacturing a phantom parameter, so `reduce` silently returned the wrong answer
+
+**Severity: critical while live.** A wrong answer in shipped stdlib, with no error
+and no warning.
+
+`codegen.sf`'s `split_respecting_generics` tracked `<>` nesting but **not** `()` or
+`[]`. Meanwhile `type_to_string` renders a `FuncType` via `func_type_string` as
+`Fun(A,B):R` with a **plain comma**, and `params_to_string` joins parameters with a
+plain comma too. So `gen_function` split a two-parameter function type down the
+middle and manufactured a phantom parameter named `Int)`, which `sanitize_name`
+turned into `%Int_`:
+
+```
+fun arrow_two(b: Box, n: Int, f: (Box, Int) => String)
+"b:Box,n:Int,f:Fun(Box,Int):String"
+  -> [b:Box] [n:Int] [f:Fun(Box] [Int):String]      4 params, not 3
+```
+
+The phantom lands **between** the real parameters, so every parameter after it is
+read from the wrong slot. `src/lib/iter.sf:75` declares
+`reduce(iterable, func: (R, T) => R, initial: R)`, so `initial` shifted:
+`reduce([1,2,3,4], (a,b) => a+b, 0)` answered **12** instead of **10**.
+
+Confirmed by running the two compilers side by side — `reduce=10` before the
+parser change, `reduce=12` after it and before this fix.
+
+**Latent, not introduced.** Before the arrow-type parser fix (#86's other half)
+nothing put a *populated* `FuncType` into a parameter node from that path, so the
+`Fun(A,B):R` form never appeared there and the paren-blindness was harmless. It
+became reachable the moment the parser fix landed, which is why the two had to
+merge as one unit — the parser fix alone silently corrupts stdlib. That is also
+how it was caught: the agent that wrote the parser fix refused to merge it and
+reported this instead.
+
+Fixed by adding `(` and `[` to the depth tracking. One subtlety worth recording:
+unlike `parser.sf`'s `split_type_args`, a closer only decrements a depth that is
+**already positive**. The split is gated on `depth == 0`, so an unbalanced `)`
+would otherwise drive depth negative and silently disable **all** splitting for
+the rest of the string — worse than the bug being fixed. Clamping degrades to the
+old behaviour instead.
+
+Swept the whole stdlib for other victims. Only `reduce` has a comma *inside* its
+arrow parentheses; `map`/`filter`/`any`/`all`/`each`/`count`/`find`/`flat_map` are
+all single-parameter, so no split occurred. Verified all nine `iter` functions
+produce byte-identical output before and after, and separately checked 1-, 2- and
+3-parameter arrow types each followed by further parameters. Regression tests:
+`test/pass/iter_arrow_param_split.sf` and
+`test/pass/checker_block_param_arrow_type.sf`.
+
+---
 
 ## Fixed
 

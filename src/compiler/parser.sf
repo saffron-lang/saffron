@@ -725,7 +725,7 @@ class Parser {
                 var kl_name: String = this.expect_ident()
                 if (this.match_kind("=>")) {
                     var lparams: List<AST.Param> = []
-                    IO.println("[KL-PATH]"); lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    IO.println("[KL-PATH]"); lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -749,12 +749,12 @@ class Parser {
                     return AST.Expr.Lambda(lparams, "Any", lbody)
                 } else if (this.match_kind(",")) {
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lpname: String = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     while (this.match_kind(",")) {
                         lpname = this.expect_ident()
-                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     }
                     this.consume("=>")
                     var lbody: List<AST.Stmt> = []
@@ -791,7 +791,7 @@ class Parser {
                 // nested literals and bumps the counter.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public"))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
@@ -1056,6 +1056,29 @@ class Parser {
         if (s == "String") return AST.Type.StringType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
+        // Function type: "Fun(A,B):R", as parse_single_type encodes `(A, B) => R`.
+        //
+        // This is checked BEFORE the union and generic branches, not after, because
+        // both of those would claim the string first and mangle it. `Fun(Map<String,
+        // Int>):Bool` contains a `<`, so the generic branch below used to slice it
+        // into GenericType("Fun(Map", ...) — and it does not end in `>`, so even the
+        // argument slice was off by the trailing `):Bool`. Likewise `Fun(String|Nil):
+        // Int` contains a `|` and came out as a two-member union of two fragments.
+        // A function type is recognizable from its first four characters; recognize
+        // it there and the nesting is handled by recursion instead of by luck.
+        if (s.starts_with("Fun(")) {
+            return this.parse_fun_type_ast(s)
+        }
+        // Receiver function type: "Fun[Type](...):Ret"
+        //
+        // Also moved above the generic branch for the same reason: `Fun[Map<String,
+        // Int>]():Bool` was being read as a generic. This still returns ClassType(s)
+        // — the whole encoded string as a class name, which is what every downstream
+        // consumer of a receiver closure type already expects — so the only change is
+        // that it now reaches this line at all.
+        if (s.starts_with("Fun[")) {
+            return AST.Type.ClassType(s)
+        }
         // Union: "String|Nil" or "Int|String"
         if (s.contains("|")) {
             var parts: List<String> = s.split("|")
@@ -1089,16 +1112,93 @@ class Parser {
             }
             return AST.Type.GenericType(base, args)
         }
-        // Function type: "Fun(...):Ret"
-        if (s.starts_with("Fun(")) {
-            return AST.Type.FuncType([], AST.Type.AnyType)
-        }
-        // Receiver function type: "Fun[Type](...):Ret"
-        if (s.starts_with("Fun[")) {
-            return AST.Type.ClassType(s)
-        }
         // Class/Enum type
         return AST.Type.ClassType(s)
+    }
+
+    // Parse the "Fun(A,B):R" encoding that parse_single_type produces for the arrow
+    // spelling `(A, B) => R` into the FuncType node it describes.
+    //
+    // This used to be one line in parse_type_ast:
+    //     if (s.starts_with("Fun(")) { return AST.Type.FuncType([], AST.Type.AnyType) }
+    // which threw away the parameter list and the return type that parse_single_type
+    // had just finished encoding. Every consumer downstream then saw a FuncType with
+    // no parameters returning Any, and could not tell `(Box) => String` apart from a
+    // bare `Fun`. That is what made `Fun<A, B, R>` the only spelling able to type a
+    // block-syntax lambda `{ x => ... }` (BUGS #86): the checker's fun_param_types_of
+    // reads the rendered declared type, and there was nothing left in it to read.
+    //
+    // The shape is fixed by parse_single_type (see the `=>` branch there): literal
+    // "Fun(", the parameter types joined by "," with no spaces, then "):", then the
+    // return type. Both halves go back through parse_type_ast, so a nested function
+    // type or generic in either position parses by recursion.
+    fun parse_fun_type_ast(s: String): AST.Type {
+        // Find the ")" that closes the "(" in "Fun(". NOT the first ")": a nested
+        // function type in the parameter list — "Fun(Fun(Int):Int):Bool" — has its
+        // own, and stopping at that one would read the parameters as "Fun(Int" and
+        // the return type as "Int):Bool".
+        var depth: Float = 0
+        var close_paren: Float = 0 - 1
+        var i: Float = 4
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "(") {
+                depth = depth + 1
+            } else if (ch == ")") {
+                if (depth == 0) {
+                    close_paren = i
+                    i = s.length()
+                } else {
+                    depth = depth - 1
+                }
+            }
+            i = i + 1
+        }
+        // Unbalanced. Nothing parse_single_type emits looks like this, so it means
+        // the string came from somewhere else; there is no structure to recover and
+        // guessing one is what this function exists to stop doing.
+        if (close_paren < 0) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
+
+        var params_str: String = s.slice(4, close_paren)
+        var param_types: List<AST.Type> = []
+        // "Fun():Void" must give zero parameters, not one parameter named "". Guard
+        // on the slice being empty rather than splitting and filtering after, so the
+        // empty string never becomes a type name.
+        if (params_str.length() > 0) {
+            var param_strs: List<String> = this.split_type_args(params_str)
+            var pi: Float = 0
+            while (pi < param_strs.length()) {
+                var p: String = param_strs[pi].trim()
+                if (p.length() > 0) {
+                    param_types.push(this.parse_type_ast(p))
+                }
+                pi = pi + 1
+            }
+        }
+
+        // ":" + return type follows the ")". A missing return type cannot come out of
+        // parse_single_type, which always writes "):" before the return type — so
+        // reaching this default means the string was built elsewhere. Any is the same
+        // answer codegen's parse_func_type_str (types_body.sf) gives for the same
+        // input, and it keeps the two readings of one encoding in agreement.
+        var ret_type: AST.Type = AST.Type.AnyType
+        if (close_paren + 1 < s.length() and s.char_at(close_paren + 1) == ":") {
+            var ret_str: String = s.slice(close_paren + 2, s.length()).trim()
+            if (ret_str.length() > 0) {
+                // A top-level "|" here belongs to the RETURN type, not to the
+                // function type. parse_single_type builds the return type with a full
+                // parse_type() call, which consumes `?` and `|` itself — so by the
+                // time it returns "Fun(A):R", the token stream is already past any
+                // union, and the outer parse_type can never append one. `(A) => R?`
+                // and `(A) => R|Nil` both arrive here as "Fun(A):R|Nil", meaning a
+                // function returning `R|Nil`. The nullable-function type
+                // `((A) => R)|Nil` has no distinct spelling in this encoding.
+                ret_type = this.parse_type_ast(ret_str)
+            }
+        }
+        return AST.Type.FuncType(param_types, ret_type)
     }
 
     fun type_ast_to_string(t: AST.Type): String {
@@ -1118,6 +1218,20 @@ class Parser {
         }
     }
 
+    // Split a comma-separated type list on its TOP-LEVEL commas only.
+    //
+    // `<>`, `()` and `[]` all nest. Angle brackets were the only pair tracked here,
+    // which was enough while the sole caller was the generic branch of
+    // parse_type_ast — a generic argument list has no bare parentheses. It stopped
+    // being enough once parse_fun_type_ast started splitting a function type's
+    // parameter list, because a nested function type puts its own commas inside
+    // parentheses: the parameter list of `Fun(Fun(Int,Bool):Int,String)` is
+    // "Fun(Int,Bool):Int,String", whose first comma is inside the inner `Fun(...)`.
+    // Tracking `<>` alone split that into three fragments — "Fun(Int", "Bool):Int",
+    // "String" — and each fragment then parsed as a class named after the fragment.
+    //
+    // `[]` is tracked for the receiver form "Fun[Recv](A,B):R", which reaches the
+    // parameter list of an enclosing function type the same way.
     fun split_type_args(s: String): List<String> {
         var args: List<String> = []
         var current: String = ""
@@ -1125,10 +1239,10 @@ class Parser {
         var i: Float = 0
         while (i < s.length()) {
             var ch: String = s.char_at(i)
-            if (ch == "<") {
+            if (ch == "<" or ch == "(" or ch == "[") {
                 depth = depth + 1
                 current = current + ch
-            } else if (ch == ">") {
+            } else if (ch == ">" or ch == ")" or ch == "]") {
                 depth = depth - 1
                 current = current + ch
             } else if (ch == "," and depth == 0) {
@@ -1155,25 +1269,25 @@ class Parser {
             var pname: String = this.expect_ident()
             if (!this.match_kind_check(":")) {
                 this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
             } else {
                 this.consume(":")
                 var ptype: String = this.parse_type()
                 var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
             }
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
                     var pdefault: AST.Expr = AST.Expr.NilLit
                     if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
                 }
             }
         }
@@ -1401,7 +1515,7 @@ class Parser {
             var alias_name: String = this.expect_ident()
             this.consume("=")
             var alias_target: String = this.parse_type()
-            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias")
+            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias", "public")
         }
 
         // Extension methods: extend fun ClassName.method(params): RetType { body }
@@ -1417,21 +1531,21 @@ class Parser {
                 var pname: String = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
-                    ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
                 }
                 while (this.match_kind(",")) {
                     pname = this.expect_ident()
                     if (!this.match_kind_check(":")) {
                         this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                        ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     } else {
                         this.consume(":")
                         var ptype: String = this.parse_type()
-                        ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
                     }
                 }
             }
@@ -1444,7 +1558,7 @@ class Parser {
             if (this.match_kind_check("{")) {
                 ext_body = this.parse_block_stmts()
             }
-            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class)
+            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class, "public")
         }
 
         // Check for decorator: @intrinsic, @extern("..."), or general @name / @name("...")
@@ -1642,7 +1756,7 @@ class Parser {
         }
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        return AST.Stmt.VarDecl(name, type_ann, init, docstring)
+        return AST.Stmt.VarDecl(name, type_ann, init, docstring, "public")
     }
 
     fun parse_destructure(): AST.Stmt {
@@ -1683,11 +1797,11 @@ class Parser {
         var init: AST.Expr = this.parse_expr()
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, "", "public"))
         var i: Float = 0
         while (i < names.length()) {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
-            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
+            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, "", "public"))
             i = i + 1
         }
         return AST.Stmt.Block(stmts)
@@ -1790,12 +1904,12 @@ class Parser {
             var epi: Float = 0
             while (epi < params.length()) {
                 var ep: AST.Param = params[epi]
-                var ep_name: String = match (ep) { Param(n, t, d) => n }
-                var ep_type: AST.Type = match (ep) { Param(n, t, d) => t }
-                var ep_default: AST.Expr = match (ep) { Param(n, t, d) => d }
+                var ep_name: String = match (ep) { Param(n, t, d, p_vis) => n }
+                var ep_type: AST.Type = match (ep) { Param(n, t, d, p_vis) => t }
+                var ep_default: AST.Expr = match (ep) { Param(n, t, d, p_vis) => d }
                 var ep_type_str: String = this.type_ast_to_string(ep_type)
                 if (type_param_names.contains(ep_type_str)) {
-                    params[epi] = AST.Param.Param(ep_name, AST.Type.AnyType, ep_default)
+                    params[epi] = AST.Param.Param(ep_name, AST.Type.AnyType, ep_default, "public")
                 }
                 epi = epi + 1
             }
@@ -1820,7 +1934,7 @@ class Parser {
             while (ppi < body.length()) { new_body.push(body[ppi]); ppi = ppi + 1 }
             body = new_body
         }
-        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring)
+        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring, "public")
     }
 
     fun parse_one_param(params: List<AST.Param>, pattern_prepend: List<AST.Stmt>, idx: Float) {
@@ -1836,22 +1950,22 @@ class Parser {
             this.consume(":")
             var ptype: String = this.parse_type()
             var syn_name: String = "__p" + idx.floor().to_string()
-            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
             pattern_prepend.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(pname, pb), AST.Expr.Variable(syn_name)))
         } else if (pname == "_") {
             this.consume(":")
             var ptype: String = this.parse_type()
             var syn_name: String = "__p" + idx.floor().to_string()
-            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit, "public"))
         } else if (!this.match_kind_check(":")) {
             this.parse_error("Parameter '" + pname + "' requires a type annotation")
-            params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+            params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
         } else {
             this.consume(":")
             var ptype: String = this.parse_type()
             var pdefault: AST.Expr = AST.Expr.NilLit
             if (this.match_kind("=")) { pdefault = this.parse_expr() }
-            params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+            params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault, "public"))
         }
     }
 
@@ -1908,7 +2022,9 @@ class Parser {
             this.match_kind(",")
         }
         this.consume("}")
-        return AST.Stmt.EnumDecl(name, variants, docstring)
+        // No visibility syntax exists yet (access-modifiers.md Phase 4 adds it), so
+        // every declaration is parsed as "public" — the documented default.
+        return AST.Stmt.EnumDecl(name, variants, docstring, "public")
     }
 
     fun parse_this_stmt(): AST.Stmt {
@@ -2098,7 +2214,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit))
+                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit, "public"))
             } else if (this.is_ident_named("@")) {
                 // Decorator on method: @inline, @intrinsic, etc.
                 this.advance()
@@ -2127,18 +2243,25 @@ class Parser {
         if (field_defaults.length() > 0) {
             this.inject_field_defaults(methods, field_defaults)
         }
-        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring)
+        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring, "public")
     }
 
     fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {
         // Find existing init method and prepend defaults to its body
         var i: Int = 0
         while (i < methods.length()) {
-            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n    _ => "" }
+            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => n    _ => "" }
             if (mname == "init") {
-                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b    _ => [] }
-                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d) => p    _ => [] }
-                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r    _ => "" }
+                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => b    _ => [] }
+                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => p    _ => [] }
+                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => r    _ => "" }
+                // Rebuilding an *existing* init: carry its own visibility across
+                // rather than resetting it to "public". Today the parser only ever
+                // produces "public", so this is behaviour-identical -- but once
+                // Phase 4 adds the syntax, a hardcoded "public" here would silently
+                // strip `private init`, which is the one declaration §6a of
+                // access-modifiers.md most wants to honour.
+                var mvis: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis) => f_vis    _ => "public" }
                 // Build new body: defaults + original body
                 var new_body: List<AST.Stmt> = []
                 var di: Int = 0
@@ -2151,13 +2274,13 @@ class Parser {
                     new_body.push(mbody[bi])
                     bi = bi + 1
                 }
-                methods[i] = AST.Stmt.FunDecl("init", mparams, mret, new_body, "")
+                methods[i] = AST.Stmt.FunDecl("init", mparams, mret, new_body, "", mvis)
                 return nil
             }
             i = i + 1
         }
         // No init found — create one with just the defaults
-        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, ""))
+        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, "", "public"))
     }
 
     fun parse_import(): AST.Stmt {
@@ -2268,7 +2391,7 @@ class Parser {
             }
             this.consume("=")
             var init_expr: AST.Expr = this.parse_expr()
-            var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+            var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "", "public")
             this.consume(";")
             var cond: AST.Expr = this.parse_expr()
             this.consume(";")
@@ -2299,7 +2422,7 @@ class Parser {
             var desugar_body: List<AST.Stmt> = []
             var pdi: Float = 0
             while (pdi < pat_names.length()) {
-                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), ""))
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), "", "public"))
                 pdi = pdi + 1
             }
             pdi = 0
@@ -2338,7 +2461,7 @@ class Parser {
         }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
-        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "", "public")
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
@@ -2381,8 +2504,8 @@ class Parser {
         var uid: String = this.next_for_uid()
         var list_var: String = "__for_src" + uid
         var idx_var: String = "__for_i" + uid
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "", "public")
+        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "", "public")
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
         // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
         // For a List or String the two are the same thing, but for a Map `m[k]`
@@ -2397,7 +2520,7 @@ class Parser {
         // variant deliberately: a variant would need arms at ~30 match sites,
         // and a missing arm yields an indeterminate value rather than an error
         // (BUGS #76), so the variant is the riskier encoding of the same thing.
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "")
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "", "public")
         var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
@@ -2482,7 +2605,7 @@ class Parser {
         var params: List<AST.Param> = []
         var i: Float = 0
         while (i < names.length()) {
-            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
+            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit, "public"))
             i = i + 1
         }
         return AST.Expr.Lambda(params, "Any", body)
@@ -2662,7 +2785,7 @@ class Parser {
                 if (this.match_kind("=>")) {
                     // Single-param Kotlin lambda: {x => body}
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -2683,12 +2806,12 @@ class Parser {
                 } else if (this.match_kind(",")) {
                     // Multi-param Kotlin lambda: {x, y => body}
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     var lpname: String = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     while (this.match_kind(",")) {
                         lpname = this.expect_ident()
-                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit, "public"))
                     }
                     this.consume("=>")
                     var lbody: List<AST.Stmt> = []
@@ -2719,7 +2842,7 @@ class Parser {
                 // (BUGS #41). Bind before the recursive parse_expr calls below.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, ""))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public"))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
@@ -2882,10 +3005,10 @@ class Parser {
         // Otherwise return NilLit
         var kind: String = match (stmt) {
             ExprStmt(e) => "expr"
-            VarDecl(n, t, i, d) => "other"
-            FunDecl(n, p, r, b, d) => "other"
-            EnumDecl(n, v, d) => "other"
-            ClassDecl(n, tp, ps, f, m, d) => "other"
+            VarDecl(n, t, i, d, v_vis) => "other"
+            FunDecl(n, p, r, b, d, f_vis) => "other"
+            EnumDecl(n, v, d, e_vis) => "other"
+            ClassDecl(n, tp, ps, f, m, d, c_vis) => "other"
             Return(v) => "other"
             If(c, t, e) => "if"
             While(c, b) => "other"
@@ -2895,7 +3018,7 @@ class Parser {
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(ta_n, ta_t) => "other"
+            TypeAlias(ta_n, ta_t, ta_vis) => "other"
         }
         if (kind == "expr") {
             return match (stmt) { ExprStmt(e) => e   _ => AST.Expr.NilLit }

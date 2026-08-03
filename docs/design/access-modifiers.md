@@ -313,7 +313,19 @@ Field layout is deliberately unchanged — only `parents[0]` contributes fields,
 
 **This phase reached the promotion gate without crossing it.** Per #96/#100 it is not truly landed until gen2 is promoted; that is a separate, explicitly-approved ceremony.
 
-**Phase 3 — widen the AST, promotion-gated.** One commit per node, smallest-first, each with **all** its match arms updated in the same commit (`Param` 34, `FunDecl` 44, `ClassDecl` 67, then `EnumDecl`/`VarDecl`/`TypeAlias`). Extend `test/pass/enum_wide_payload.sf` to a seven-field variant, since it exists as the regression test for exactly this hazard. Bootstrap with stage 2 after each. Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.**
+**Phase 3 — widen the AST, promotion-gated. ✅ DONE and merged to `main` (`85f410b`, artifacts `1226958`).** One commit per node, smallest-first, each with **all** its match arms in the same commit: `TypeAlias` 2→3 (15 sites), `EnumDecl` 3→4 (39), `VarDecl` 4→5 (54), `FunDecl` 5→6 (52), `Param` 3→4 (65), `ClassDecl` 6→7 (71). `test/pass/enum_wide_payload.sf` gained a `SevenMixed` variant with `ClassDecl`'s exact payload shape (two interior `List`s, two trailing `String`s). Bootstrap with stage 2 after each, `SKIP_GEN4` never set.
+
+The arm counts predicted above were low across the board — the real site counts are the ones just listed. Three findings, each of which corrected a premise in this document or in `CLAUDE.md`:
+
+- **The field goes LAST on every node, and the position is the whole safety argument.** Appending leaves every pre-existing field at its old index, so an arm that gets missed merely lacks `visibility`. Inserting first or mid-node would shift `name` and `docstring` — both `String` — and a missed arm would read a *plausible wrong string*, which is #96's exact mechanism. Do not reorder these nodes later.
+- **`src/compiler/codegen.sf` past line 557 is live source, not a skeleton.** The class closes there; everything after is top-level free functions that `sed` copies through verbatim, holding 42 `ClassDecl`, 12 `EnumDecl` and 4 `VarDecl` sites on its own. `CLAUDE.md` claimed only `*_body.sf` files affect the build; corrected in `a55f4ae`. Following the old claim would have skipped all 58 sites — the single highest-risk item in the phase.
+- **`Param` names two unrelated nodes.** `src/lib/llvm/function.sf:7` declares an independent 2-field `class Param` for LLVM function parameters, spelled `Func.Param(...)` at 55 sites. It must not be widened. `tools/arity_check.py` (committed) excludes it by file *and* by qualifier.
+
+Two construction sites needed judgement rather than a literal: `parser.sf`'s `inject_field_defaults` and `checker.sf`'s block-parameter inference both **rebuild** an existing node, so both carry the original's visibility across. A hardcoded `"public"` at either would silently strip `private init` the moment Phase 4's parser starts producing it. The rule for the remaining ~50 literals: am I creating a declaration the user never wrote, or reconstructing one they did?
+
+Verified: failure name sets byte-identical, 26 = 26, 171 passed on both sides, both measured in detached `/tmp` worktrees (`11d4f94` vs `f7f9569`) per Phase 0; gen4 fixed point confirmed by grepping the log rather than trusting exit 0; `build/stage2/saffronc` unchanged. One real merge conflict, in `checker.sf`'s `register_fun_param_sigs`, where `main` had extracted a `fun_param_sig_of` helper on the same two lines this phase widened — both changes wanted, resolved by combination rather than choice. This is the second time the one hand-resolved hunk of a phase merge was in `checker.sf` and had to be *combined*.
+
+Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.** The parser writes `"public"` at every site for now; there is no syntax yet.
 
 > ### ⟵ PROMOTION POINT
 > After Phase 3, run the full ceremony:
@@ -327,7 +339,9 @@ Field layout is deliberately unchanged — only `parents[0]` contributes fields,
 > ```
 > This is a ceremony with a decision attached, not a build step. It also must not be done while someone else has `build/` in flight.
 
-**Phase 4 — lexer + parser + class-member enforcement (post-promotion).** Soft keywords; statement dispatch; the class-body loop (watching the non-advancing-token hang from §5); enforcement for private fields, methods and `init`. Land the Phase 1 leak pass here, with tests. Class-member visibility needs no module plumbing, so it is the narrowest useful slice and ships first.
+**Phase 4 — lexer + parser + class-member enforcement (post-promotion). ← in progress.** Soft keywords; statement dispatch; the class-body loop (watching the non-advancing-token hang from §5); enforcement for private fields, methods and `init`. Land the Phase 1 leak pass here, with tests. Class-member visibility needs no module plumbing, so it is the narrowest useful slice and ships first.
+
+**It can be *built* before the promotion, but not *landed*.** The distinction matters and is worth stating, because "post-promotion" reads as "cannot start". Phase 4 makes the parser accept modifiers in *user programs*; it does not put a modifier in compiler source, which is Phase 7 and deferred. So gen2 compiles Phase 4's source fine and its work can proceed concurrently with the promotion decision. What it cannot do is *rely* on the widened payloads being readable by the checked-in gen2 — per #100 that is exactly what promotion buys, so Phase 4 merges after the gate, not before.
 
 **Phase 5 — module-level enforcement (post-promotion, needs Phase 2).** Top-level `private`, all three access paths (named import, alias-qualified, bare cross-module). This is where Phase 2 pays off.
 
@@ -348,11 +362,12 @@ Phase 2   file identity in checker        DONE  merged fcf0bc1   ─┐ ran in
 Phase 2b  file → package mapping          DONE  merged 29b4b8f   ─┤ parallel,
 Phase 3b  ClassDecl.parents: List<String> DONE  merged dc42fbc   ─┘ 3 worktrees
                     │
-Phase 3   widen declaration nodes for visibility     ← in progress
+Phase 3   widen declaration nodes for visibility  DONE  merged 85f410b
                     │
-            ⟵ GEN2 PROMOTION ⟶   (covers 3b and 3 together)
-                    │
+            ⟵ GEN2 PROMOTION ⟶   (covers 3b and 3 together)  ← the gate, open
+                    │                                          decision, not yet taken
 Phase 4   parser + class-member enforcement + leak pass (public/private)
+          ← in progress; buildable pre-promotion, NOT landable
 Phase 5   package-level enforcement (internal)   ← needs 2b
 Phase 5b  protected                              ← needs 3b
 Phase 6   annotate the stdlib
