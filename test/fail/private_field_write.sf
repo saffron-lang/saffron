@@ -1,0 +1,22 @@
+// A private field may not be WRITTEN from outside the class either.
+//
+// Reads and writes are separate paths in the checker — a read is a MemberAccess
+// routed through infer_member_access, a write is a SetField whose arm in
+// infer_type inferred only the right-hand side and never looked at the receiver.
+// Enforcing the read path alone left `private` meaning "you may not observe this
+// field, but you may change it", which is a worse answer than no enforcement at
+// all: the natural way to test the feature is to read the field, so it looks
+// enforced while mutation goes through.
+//
+// Note `s.count = s.count + 1` was already rejected — but only incidentally, via
+// the read on the right-hand side. That is exactly why this hole stayed hidden.
+// The assignment below has no read in it.
+class Slot {
+    private var count: Int
+    fun init() { this.count = 0 }
+    fun show(): Int { return this.count }
+}
+
+var s: Slot = Slot()
+s.count = 5
+IO.println(s.show())

@@ -1393,6 +1393,28 @@ class NullChecker {
         this.error("private " + what + " '" + owner + "." + member + "' is not accessible" + where)
     }
 
+    /// The assignment-target half of check_member_visibility: `obj.field = v`.
+    ///
+    /// Reads and writes are separate paths in this checker — a read is a
+    /// MemberAccess routed through infer_member_access, a write is a SetField
+    /// whose arm in infer_type inferred only the right-hand side. So enforcing
+    /// the read path alone left `private` meaning "you may not observe this
+    /// field, but you may change it", which is a worse answer than no
+    /// enforcement: the natural way to test the feature is to read the field, so
+    /// it looks enforced. `s.count = s.count + 1` WAS rejected, but only because
+    /// the right-hand side contains a read, which is why the hole hid.
+    ///
+    /// `what` is spelled "field" here rather than shared with the read path
+    /// because a write is the only thing that can reach it: SetField's field is
+    /// never a method.
+    fun check_setfield_visibility(obj: AST.Expr, field: String) {
+        // `this.x = v` inside the class is the ordinary case and must not warn or
+        // error. It routes through the same owner comparison as a read, so it is
+        // not special-cased — current_class matches the declaring class.
+        var obj_type: String = this.infer_expr(obj)
+        this.check_member_visibility(obj_type, field, "field")
+    }
+
     fun check_spawn_captures(expr: AST.Expr) {
         var spawn_method: String = match (expr) {
             MethodCall(obj, method, args) => method
@@ -1853,7 +1875,16 @@ class NullChecker {
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
             Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
             GetField(obj, field) => AST.Type.AnyType
-            SetField(obj, field, value) => this.infer_type(value)
+            SetField(obj, field, value) => {
+                // A write is an access. This arm used to infer only `value` and
+                // never look at `obj` at all, so `private` stopped a field from
+                // being READ while still permitting it to be MUTATED — which is
+                // worse than no enforcement, because anyone who probes it with a
+                // read concludes it is protected. `s.count = s.count + 1` was
+                // rejected, but only incidentally, via the read on the RHS.
+                this.check_setfield_visibility(obj, field)
+                this.infer_type(value)
+            }
             This => AST.Type.ClassType(this.current_class)
             ListLit(elements) => AST.Type.GenericType("List", [AST.Type.AnyType])
             // A tuple is a List at runtime (expr_body.sf gen_tuple), typed
