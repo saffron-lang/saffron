@@ -716,6 +716,92 @@ fun __rt_as_string_ptr(v: Int): Int {
     return __rt_as_gc_ptr(v, 1)
 }
 
+// Deep, by-value equality for two NaN-boxed values. This is the shared body the
+// two hand-written `__any_eq` stubs (base_nanbox.ll and wasm_base_32.ll) now
+// delegate to, so the recursion lives in one place instead of being duplicated
+// as LLVM IR that can only compare scalars.
+//
+// The bug this closes: those stubs did `strcmp` on two pointer-tagged operands
+// and called it a match if the bytes agreed. On two Lists (or two Maps) that
+// meant comparing the two 24-byte structs' leading bytes — effectively address
+// identity — so `[1,2] == [1,2]` was false while `IO.println` showed them
+// identical. Strings and payload-enums already had structural `==` (via
+// __string_eq and the generated __enum_eq_<Name>); Lists and Maps are the two
+// builtin aggregates that were left comparing by address. They are runtime
+// primitives with no Saffron class or vtable, so a user-level `eq` overload
+// cannot reach them — the fix belongs here, at the one point every `Any`-typed
+// `==` converges.
+//
+// Order matters: recognise List and Map BEFORE the pointer/strcmp fall-through,
+// because a List is also pointer-tagged and would otherwise be strcmp'd.
+fun __rt_val_eq(a: Int, b: Int): Int {
+    // Bitwise-identical values (same immediate, or the same heap object) are
+    // always equal, and this is the only path that fires on wasm32, where
+    // __rt_gc_tag_of cannot recognise a sub-4GB pointer as a GC object.
+    if (a == b) { return 1 }
+
+    var la: Int = __rt_as_list_ptr(a)
+    var lb: Int = __rt_as_list_ptr(b)
+    if (la != 0 and lb != 0) {
+        var na: Int = load64(la)
+        var nb: Int = load64(lb)
+        if (na != nb) { return 0 }
+        var da: Int = load64(la + 16)
+        var db: Int = load64(lb + 16)
+        var i: Int = 0
+        while (i < na) {
+            if (__rt_val_eq(load64(da + i * 8), load64(db + i * 8)) == 0) { return 0 }
+            i = i + 1
+        }
+        return 1
+    }
+    // Exactly one operand is a List → unequal (a List never equals a non-List).
+    if (la != 0 or lb != 0) { return 0 }
+
+    var ma: Int = __rt_as_map_ptr(a)
+    var mb: Int = __rt_as_map_ptr(b)
+    if (ma != 0 and mb != 0) {
+        var mna: Int = load64(ma)
+        var mnb: Int = load64(mb)
+        if (mna != mnb) { return 0 }
+        // Equal counts plus "every key of a is in b with an equal value" is full
+        // set equality over entries; insertion order is not part of Map identity.
+        var keys: Int = load64(ma + 16)
+        var vals: Int = load64(ma + 24)
+        var j: Int = 0
+        while (j < mna) {
+            var k: Int = load64(keys + j * 8)
+            if (__map_has(mb, k) == 0) { return 0 }
+            if (__rt_val_eq(load64(vals + j * 8), __map_get(mb, k)) == 0) { return 0 }
+            j = j + 1
+        }
+        return 1
+    }
+    if (ma != 0 or mb != 0) { return 0 }
+
+    // Scalars, strings and class instances: the exact tag dispatch the old
+    // hand-written __any_eq used. Two pointer-tagged operands that are neither
+    // List nor Map are a string or an instance → compare by content via strcmp,
+    // the same conservative choice made throughout this file.
+    var ua: Int = a >> 48
+    var ub: Int = b >> 48
+    if (ua == 32760 and ub == 32760) {
+        var ra: Int = __rt_untag_ptr(a)
+        var rb: Int = __rt_untag_ptr(b)
+        if (ra == 0 or rb == 0) { return 0 }
+        if (rt_strcmp(ra, rb) == 0) { return 1 }
+        return 0
+    }
+    // A special-tagged value (nil/true/false) is settled by the a==b fast path
+    // above; reaching here with one means the two differ.
+    if (ua == 32762 or ub == 32762) { return 0 }
+    // Numeric: normalise both through __val_untag_float (sitofp for a TAG_INT
+    // operand, pass-through for a double) so an Int and a Float of the same
+    // value compare equal, then compare the resulting bit patterns.
+    if (__rt_float_bits(a) == __rt_float_bits(b)) { return 1 }
+    return 0
+}
+
 // Format a single collection element. Dispatches on the NaN-box tag via
 // __any_to_string (the same path that makes `IO.println(xs[0])` correct),
 // recursing for nested lists and maps. Returns a raw char*.

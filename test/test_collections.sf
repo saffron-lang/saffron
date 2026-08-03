@@ -43,7 +43,7 @@ T.assert_eq(dq3.pop_back(), nil, "deque pop_back on empty")
 var dq4 = Deque.from([7, 8, 9])
 var dq_items: List<Any> = []
 var dq_iter = dq4.iter()
-while (dq_iter.next?()) {
+while (dq_iter.has_next()) {
     dq_items.push(dq_iter.next())
 }
 T.assert_eq(dq_items, [7, 8, 9], "deque iter front-to-back")
@@ -88,7 +88,7 @@ h2.push(10)
 h2.push(20)
 var h_items: List<Any> = []
 var h_iter = h2.iter()
-while (h_iter.next?()) {
+while (h_iter.has_next()) {
     h_items.push(h_iter.next())
 }
 T.assert_eq(h_items, [10, 20, 30], "heap iter in priority order")
@@ -127,7 +127,7 @@ T.assert_eq(q3.dequeue(), nil, "queue dequeue on empty")
 var q4 = Queue.from([1, 2, 3])
 var q_items: List<Any> = []
 var q_iter = q4.iter()
-while (q_iter.next?()) {
+while (q_iter.has_next()) {
     q_items.push(q_iter.next())
 }
 T.assert_eq(q_items, [1, 2, 3], "queue iter front-to-back")
@@ -166,7 +166,7 @@ T.assert_eq(s3.pop(), nil, "stack pop on empty")
 var s4 = Stack.from([1, 2, 3])
 var s_items: List<Any> = []
 var s_iter = s4.iter()
-while (s_iter.next?()) {
+while (s_iter.has_next()) {
     s_items.push(s_iter.next())
 }
 T.assert_eq(s_items, [3, 2, 1], "stack iter top-to-bottom")

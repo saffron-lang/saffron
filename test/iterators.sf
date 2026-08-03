@@ -1,15 +1,27 @@
-// For-in with list (uses iterator protocol)
+import "@deque" as Deque
+
+// For-in is index-based, not protocol-based: it desugars to length() plus an
+// element read. This file pins what that actually supports.
 IO.println("=== List ===")
 for (item in [10, 20, 30, 40]) {
     IO.println(item)
 }
 
-// Map iteration via .iter() yielding [key, value] tuples
+// Map iteration yields a [key, value] pair per entry, in insertion order.
+// Map has no .iter() — there is no iterator protocol for it (BUGS #62), so
+// for-in over the map itself is the supported form.
 IO.println("=== Map ===")
-var scores: Map<String, Number> = {"alice": 95, "bob": 87, "carol": 92}
-var iter = scores.iter()
-while (iter.next?()) {
-    IO.println(iter.next())
+var scores: Map<String, Int> = {"alice": 95, "bob": 87, "carol": 92}
+for ([name, score] in scores) {
+    IO.println("${name}=${score}")
+}
+
+// A stdlib collection DOES expose an explicit iterator, with has_next()/next().
+IO.println("=== Explicit iterator ===")
+var dq = Deque.from([1, 2, 3])
+var dq_iter = dq.iter()
+while (dq_iter.has_next()) {
+    IO.println(dq_iter.next())
 }
 
 // Nested for-in
