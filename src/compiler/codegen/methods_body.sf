@@ -309,8 +309,8 @@
         }
         if (callee_name.contains(".")) {
             var cp: List<String> = callee_name.split(".")
-            if (cp.length() >= 2 and this.module_prefixes.has(cp[0])) {
-                var resolved_name: String = this.module_prefixes.get(cp[0]) + cp[1]
+            if (cp.length() >= 2 and this.has_module_alias(cp[0])) {
+                var resolved_name: String = this.module_alias_prefix(cp[0]) + cp[1]
                 if (this.func_ret_types.has(resolved_name)) {
                     return this.type_to_string(this.func_ret_types.get(resolved_name))
                 }
@@ -1330,7 +1330,7 @@
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
     }
-    if (this.module_prefixes.has(obj_name)) { return obj_name }
+    if (this.has_module_alias(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
         var vtype: String = this.get_var_type_str(obj_name)
@@ -1499,8 +1499,8 @@
     // was properly imported (has a real prefix like "stdlib_os_").
     // Builtins with empty prefix (IO/OS/GC registered as "") fall through
     // to their hardcoded blocks below.
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-        var __mp: String = this.module_prefixes.get(obj_name)
+    if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+        var __mp: String = this.module_alias_prefix(obj_name)
         if (__mp.length() > 0) {
             var __mp_func: String = __mp + method
             // Method name remapping for GC functions that conflict with gc.ll globals.
@@ -1886,8 +1886,8 @@
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+    if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+        var prefixed_name: String = this.module_alias_prefix(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
         if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
             return this.gen_intrinsic_call(prefixed_name, args)
@@ -2071,8 +2071,8 @@
                             var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
                             var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
                             var mc_ns: String = this.get_variable_name(mc_obj_expr)
-                            if (mc_ns.length() > 0 and this.module_prefixes.has(mc_ns)) {
-                                var mc_full: String = this.module_prefixes.get(mc_ns) + mc_method_name
+                            if (mc_ns.length() > 0 and this.has_module_alias(mc_ns)) {
+                                var mc_full: String = this.module_alias_prefix(mc_ns) + mc_method_name
                                 if (this.func_ret_types.has(mc_full)) {
                                     task_result_type = this.type_to_string(this.func_ret_types.get(mc_full))
                                 }
@@ -3130,13 +3130,13 @@
 
     // Check for imported module function calls (module alias or unknown name)
     // Also skip global variables (they should dispatch via class method resolution below)
-    if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
+    if (obj_name.length() > 0 and (this.has_module_alias(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
         var prefixed_name: String = method
         // Package namespace: check named_imports for "Alias.method" first
         if (this.named_imports.has(obj_name + "." + method)) {
             prefixed_name = this.named_imports.get(obj_name + "." + method)
-        } else if (this.module_prefixes.has(obj_name)) {
-            prefixed_name = this.module_prefixes.get(obj_name) + method
+        } else if (this.has_module_alias(obj_name)) {
+            prefixed_name = this.module_alias_prefix(obj_name) + method
         } else if (this.func_prefix_map.has(method)) {
             prefixed_name = this.func_prefix_map.get(method)
         } else {
@@ -3658,8 +3658,8 @@
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
     // Check for module global write: ModuleAlias._field = value
     var sf_obj_name: String = this.get_variable_name(object)
-    if (sf_obj_name.length() > 0 and this.module_prefixes.has(sf_obj_name)) {
-        var sf_mp_resolved: String = this.module_prefixes.get(sf_obj_name) + field
+    if (sf_obj_name.length() > 0 and this.has_module_alias(sf_obj_name)) {
+        var sf_mp_resolved: String = this.module_alias_prefix(sf_obj_name) + field
         if (this.module_globals.has(sf_mp_resolved)) {
             var sf_val: String = this.gen_arg_value(value)
             this.emit_indent("store i64 " + sf_val + ", i64* @__g_" + this.sanitize_name(sf_mp_resolved))

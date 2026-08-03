@@ -885,12 +885,25 @@ fun _build_package_exports(alias: String, entry_path: String, imp_path: String, 
     return exports
 }
 
+/// Key for the file-scoped alias table: the declaring module's prefix, a
+/// separator that cannot occur in either half, and the alias name.
+///
+/// A composite string key rather than a nested map: gen2 has no tuple literal
+/// syntax, and a nested map would cost a second lookup at every read. A module
+/// prefix matches [A-Za-z0-9_]* and an alias is an identifier, so the bar
+/// character cannot occur in either half. The entry file's prefix is empty,
+/// giving keys like |Lexer -- distinct from stdlib_lexer_|Internal, which is
+/// the whole point (BUGS #123).
+fun alias_scope_key(module_prefix: String, alias: String): String {
+    return module_prefix + "|" + alias
+}
+
 // `module_file_paths` is pushed in lockstep with `module_prefixes_list`, so index
 // i names the file that declared module i. Kept as a parallel list rather than
 // derived later from loaded_file_paths(): that map is in *load* order and also
 // holds files that are not modules, so recovering the correspondence afterwards
 // would be a re-derivation of something this walk already knows (M1).
-fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, module_file_paths: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
+fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, module_file_paths: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>, scoped_aliases: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
     // Owning package, recorded by the same walk that fills path_to_prefix.
@@ -899,6 +912,17 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     var source: String = IO.read_file(file_path)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse_with_source(tokens, source)
+
+    // This file's own module prefix. Hoisted from the tail of the function
+    // because it is the *scope key* for the alias bindings collected just
+    // below — an alias means whatever the file that wrote it says it means
+    // (BUGS #123).
+    var prefix: String = ""
+    if (path_to_prefix.has(file_path)) {
+        prefix = path_to_prefix.get(file_path)
+    } else {
+        prefix = module_prefix_from_file(file_path)
+    }
 
     // Collect this module's import aliases from text (robust)
     // Detect duplicate aliases within this file
@@ -923,6 +947,13 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
             if (!all_aliases.has(ma)) {
                 all_aliases.set(ma, ma_prefix)
             }
+            // File-scoped binding, keyed by (declaring module prefix, alias).
+            // `all_aliases` above is a whole-program union with first-writer-
+            // wins, so two files binding the same alias to different modules
+            // shared one answer and the loser silently resolved against the
+            // winner's prefix — no diagnostic, wrong symbol (BUGS #123).
+            // Codegen consults this map first and falls back to the union.
+            scoped_aliases.set(alias_scope_key(prefix, ma), ma_prefix)
         }
         mai = mai + 1
     }
@@ -937,18 +968,11 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
             }
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, all_aliases, path_to_prefix)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, all_aliases, path_to_prefix, scoped_aliases)
         }
         pi = pi + 1
     }
 
-    // Use path-based prefix from path_to_prefix (always populated by caller)
-    var prefix: String = ""
-    if (path_to_prefix.has(file_path)) {
-        prefix = path_to_prefix.get(file_path)
-    } else {
-        prefix = module_prefix_from_file(file_path)
-    }
     module_stmts.push(program)
     module_prefixes_list.push(prefix)
     module_file_paths.push(file_path)
@@ -1147,6 +1171,12 @@ fun main(): Int {
     // Map alias names to path-based prefixes for LLVM symbol uniqueness.
     // The alias is SOURCE-level sugar; the LLVM prefix is derived from the module path.
     var resolved_aliases: Map<String, String> = {}
+    // File-scoped alias bindings: alias_scope_key(declaring prefix, alias) →
+    // module prefix. `resolved_aliases` is the flat whole-program union kept
+    // for compatibility with everything that still reads a bare alias name;
+    // this map is what makes `Internal` mean different things in different
+    // files (BUGS #123).
+    var scoped_aliases: Map<String, String> = {}
     var path_to_prefix: Map<String, String> = {}
     var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
@@ -1169,6 +1199,9 @@ fun main(): Int {
                 path_to_prefix.set(full_imp_path, pprefix)
             }
             resolved_aliases.set(alias, pprefix)
+            // The entry file's own scope. Its module prefix is "" — entry
+            // symbols are unprefixed — so its keys are of the form "|Alias".
+            scoped_aliases.set(alias_scope_key("", alias), pprefix)
         }
         ak = ak + 1
     }
@@ -1303,6 +1336,9 @@ fun main(): Int {
                             if (!resolved_aliases.has(dp_alias)) {
                                 resolved_aliases.set(dp_alias, path_to_prefix.get(dp_full))
                             }
+                            // Same file-scoped binding collect_modules writes,
+                            // under the prelude's own prefix (BUGS #123).
+                            scoped_aliases.set(alias_scope_key(dep_prefix, dp_alias), path_to_prefix.get(dp_full))
                         }
                         dpi = dpi + 1
                     }
@@ -1316,7 +1352,7 @@ fun main(): Int {
                             if (!path_to_prefix.has(dp_imp_full)) {
                                 path_to_prefix.set(dp_imp_full, path_based_prefix(dp_imp, dp_imp_full, stdlib_dir))
                             }
-                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix)
+                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix, scoped_aliases)
                         }
                         dpj = dpj + 1
                     }
@@ -1338,7 +1374,7 @@ fun main(): Int {
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
             }
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix, scoped_aliases)
         }
         pi = pi + 1
     }
@@ -1498,7 +1534,7 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat_opts3(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib)
+        ir = Codegen.generate_with_modules_flat_opts4(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases)
     } else {
         ir = Codegen.generate_with_target_opts3(program, target, identity_mode, use_llvm_lib, emit_llvm_lib)
     }
