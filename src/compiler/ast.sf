@@ -92,29 +92,55 @@ enum Type {
     NullableType(inner: Type)
 }
 
+// Expressions carry spans on exactly the *reference-bearing* variants, and on
+// each one the span covers the identifier a user would click, not the whole
+// expression. That asymmetry is the point:
+//
+//   Variable / Ref / Assign   name_span   — the bare name
+//   MemberAccess / GetField / SetField
+//                             field_span  — the `.field` identifier, NOT the object
+//   MethodCall                method_span — the `.method` identifier, NOT the args
+//   Call                      full_span   — callee through the closing paren
+//
+// Go-to-definition, find-references and rename all resolve an *identifier*, so
+// a span covering `obj.field` would rename `obj` too. `Call` is the exception
+// because nothing in it is an identifier of its own — its callee has a span
+// already — and what a caller wants from it is the extent to underline for a
+// wrong-arity or wrong-argument-type error.
+//
+// Literals, `Binary`, `Logical`, `Unary`, `ListLit` and friends deliberately go
+// without: their sub-expressions carry the spans, and no editor feature resolves
+// a `+`. Adding a span to every node would double the sweep for nodes nothing
+// reads. Spans arrive where a consumer exists, not everywhere they could.
+//
+// Every span is appended LAST on its variant, for the same tag-stability reason
+// as the declaration nodes: an arm that was not updated binds the pre-existing
+// fields correctly and simply lacks the span, rather than reading a neighbour's
+// payload as one. And because the arity check is exact, such an arm is a named
+// compile error rather than a silent misread.
 enum Expr {
     IntLit(value: Float),
     FloatLit(value: String),
     BoolLit(value: Bool),
     StringLit(value: String),
     NilLit,
-    Variable(name: String),
+    Variable(name: String, name_span: Span),
     Binary(left: Expr, op: String, right: Expr),
     Unary(op: String, right: Expr),
-    Call(callee: Expr, args: List<Expr>),
-    Assign(name: String, value: Expr),
+    Call(callee: Expr, args: List<Expr>, full_span: Span),
+    Assign(name: String, value: Expr, name_span: Span),
     Logical(left: Expr, op: String, right: Expr),
-    MemberAccess(object: Expr, field: String),
+    MemberAccess(object: Expr, field: String, field_span: Span),
     Match(subject: Expr, arms: List<MatchArm>),
     EnumConstruct(enum_name: String, variant: String, args: List<Expr>),
     Lambda(params: List<Param>, ret_type: String, body: List<Stmt>),
-    GetField(object: Expr, field: String),
-    SetField(object: Expr, field: String, value: Expr),
+    GetField(object: Expr, field: String, field_span: Span),
+    SetField(object: Expr, field: String, value: Expr, field_span: Span),
     This,
     ListLit(elements: List<Expr>),
     IndexGet(object: Expr, index: Expr),
     IndexSet(object: Expr, index: Expr, value: Expr),
-    MethodCall(object: Expr, method: String, args: List<Expr>),
+    MethodCall(object: Expr, method: String, args: List<Expr>, method_span: Span),
     MapLit,
     BlockExpr(stmts: List<Stmt>, value: Expr),
     IsCheck(value: Expr, type_name: String),
@@ -127,7 +153,12 @@ enum Expr {
     // carries the module prefix for global/func and is "" otherwise. Consumers
     // must read `kind` rather than re-deriving scope from side tables — that
     // re-derivation is BUGS #40.
-    Ref(kind: String, name: String, slot: String)
+    //
+    // `name_span` is carried straight over from the Variable it replaced. resolve
+    // runs between the parser and codegen, so dropping it here would mean every
+    // post-resolve consumer — which is all of codegen — sees an unlocatable name,
+    // and the resolve pass is exactly where "which definition is this?" is known.
+    Ref(kind: String, name: String, slot: String, name_span: Span)
 }
 
 enum MatchArm {

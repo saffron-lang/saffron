@@ -312,8 +312,8 @@ class Resolver {
 
     fun resolve_expr(expr: AST.Expr): AST.Expr {
         return match (expr) {
-            Variable(name) => {
-                this.resolve_variable(name)
+            Variable(name, __vs) => {
+                this.resolve_variable(name, __vs)
             }
             Binary(left, op, right) => {
                 AST.Expr.Binary(this.resolve_expr(left), op, this.resolve_expr(right))
@@ -324,17 +324,17 @@ class Resolver {
             Logical(left, op, right) => {
                 AST.Expr.Logical(this.resolve_expr(left), op, this.resolve_expr(right))
             }
-            Call(callee, args) => {
-                AST.Expr.Call(this.resolve_expr(callee), this.resolve_exprs(args))
+            Call(callee, args, __cs) => {
+                AST.Expr.Call(this.resolve_expr(callee), this.resolve_exprs(args), __cs)
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 // The target keeps its name: codegen's Assign arm resolves the
                 // store destination itself, and rewriting it to a Ref here
                 // would change that arm's shape for no gain at this stage.
-                AST.Expr.Assign(name, this.resolve_expr(value))
+                AST.Expr.Assign(name, this.resolve_expr(value), __as)
             }
-            MemberAccess(object, field) => {
-                AST.Expr.MemberAccess(this.resolve_expr(object), field)
+            MemberAccess(object, field, __ms) => {
+                AST.Expr.MemberAccess(this.resolve_expr(object), field, __ms)
             }
             Match(subject, arms) => {
                 AST.Expr.Match(this.resolve_expr(subject), this.resolve_arms(arms))
@@ -355,11 +355,11 @@ class Resolver {
                 this.pop_scope()
                 AST.Expr.Lambda(params, ret_type, new_body)
             }
-            GetField(object, field) => {
-                AST.Expr.GetField(this.resolve_expr(object), field)
+            GetField(object, field, __gs) => {
+                AST.Expr.GetField(this.resolve_expr(object), field, __gs)
             }
-            SetField(object, field, value) => {
-                AST.Expr.SetField(this.resolve_expr(object), field, this.resolve_expr(value))
+            SetField(object, field, value, __ss) => {
+                AST.Expr.SetField(this.resolve_expr(object), field, this.resolve_expr(value), __ss)
             }
             ListLit(elements) => {
                 AST.Expr.ListLit(this.resolve_exprs(elements))
@@ -370,8 +370,8 @@ class Resolver {
             IndexSet(object, index, value) => {
                 AST.Expr.IndexSet(this.resolve_expr(object), this.resolve_expr(index), this.resolve_expr(value))
             }
-            MethodCall(object, method, args) => {
-                AST.Expr.MethodCall(this.resolve_expr(object), method, this.resolve_exprs(args))
+            MethodCall(object, method, args, __ks) => {
+                AST.Expr.MethodCall(this.resolve_expr(object), method, this.resolve_exprs(args), __ks)
             }
             BlockExpr(stmts, value) => {
                 this.push_scope()
@@ -413,10 +413,10 @@ class Resolver {
             TupleLit(elements) => {
                 AST.Expr.TupleLit(this.resolve_exprs(elements))
             }
-            Ref(kind, name, slot) => {
+            Ref(kind, name, slot, __rs) => {
                 // Already resolved. Idempotent so the pass can run twice
                 // (e.g. main program then an imported module) without harm.
-                AST.Expr.Ref(kind, name, slot)
+                AST.Expr.Ref(kind, name, slot, __rs)
             }
             IntLit(v) => { AST.Expr.IntLit(v) }
             FloatLit(v) => { AST.Expr.FloatLit(v) }
@@ -457,26 +457,28 @@ class Resolver {
 
     // The whole point of the pass. Order is: locals/params first, then
     // module-level names. #40 exists because codegen does the opposite.
-    fun resolve_variable(name: String): AST.Expr {
+    fun resolve_variable(name: String, name_span: AST.Span): AST.Expr {
         var local_kind: String = this.lookup_local(name)
         if (local_kind.length() > 0) {
-            return AST.Expr.Ref(local_kind, name, "")
+            return AST.Expr.Ref(local_kind, name, "", name_span)
         }
         if (this.is_receiver(name)) {
-            return AST.Expr.Ref("self", name, "")
+            return AST.Expr.Ref("self", name, "", name_span)
         }
         if (this.globals.has(name)) {
-            return AST.Expr.Ref("global", name, this.globals.get(name))
+            return AST.Expr.Ref("global", name, this.globals.get(name), name_span)
         }
         if (this.funcs.has(name)) {
-            return AST.Expr.Ref("func", name, this.funcs.get(name))
+            return AST.Expr.Ref("func", name, this.funcs.get(name), name_span)
         }
         if (this.types.has(name)) {
-            return AST.Expr.Ref("type", name, "")
+            return AST.Expr.Ref("type", name, "", name_span)
         }
-        // Unresolved. Reported by the consumer, which has the span; this pass
-        // records the fact rather than printing, so it stays reusable.
-        return AST.Expr.Ref("unknown", name, "")
+        // Unresolved. The span rides along precisely so the consumer can report
+        // it: this pass knows *that* the name is unresolved and where it was
+        // written, and the consumer knows how to phrase it. Splitting the
+        // knowledge that way is what keeps the pass reusable.
+        return AST.Expr.Ref("unknown", name, "", name_span)
     }
 }
 

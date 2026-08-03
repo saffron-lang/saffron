@@ -145,9 +145,9 @@
 
     fun resolve_callee(expr: AST.Expr): String {
         return match (expr) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
-            MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
+            MemberAccess(obj, field, __ms) => this.resolve_callee(obj) + "." + field
             x => ""
         }
     }
@@ -335,8 +335,8 @@
                 this.collect_vars_expr(right, names, types)
             }
             Unary(op, right) => { this.collect_vars_expr(right, names, types) }
-            Assign(name, value) => { this.collect_vars_expr(value, names, types) }
-            Call(callee, args) => {
+            Assign(name, value, __as) => { this.collect_vars_expr(value, names, types) }
+            Call(callee, args, __cs) => {
                 this.collect_vars_expr(callee, names, types)
                 var ci: Float = 0
                 while (ci < args.length()) {
@@ -344,7 +344,7 @@
                     ci = ci + 1
                 }
             }
-            MethodCall(obj, method, args) => {
+            MethodCall(obj, method, args, __ks) => {
                 this.collect_vars_expr(obj, names, types)
                 var mi: Float = 0
                 while (mi < args.length()) {
@@ -352,11 +352,11 @@
                     mi = mi + 1
                 }
             }
-            SetField(obj, field, value) => {
+            SetField(obj, field, value, __ss) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(value, names, types)
             }
-            GetField(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            GetField(obj, field, __gs) => { this.collect_vars_expr(obj, names, types) }
             IndexGet(obj, idx) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(idx, names, types)
@@ -366,14 +366,14 @@
                 this.collect_vars_expr(idx, names, types)
                 this.collect_vars_expr(value, names, types)
             }
-            MemberAccess(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            MemberAccess(obj, field, __ms) => { this.collect_vars_expr(obj, names, types) }
             IntLit(v) => {}
             FloatLit(v) => {}
             BoolLit(v) => {}
             StringLit(s) => {}
             NilLit => {}
-            Variable(n) => {}
-            Ref(rk, rn, rs) => {}
+            Variable(n, __vs) => {}
+            Ref(rk, rn, rs, __rs) => {}
             This => {}
             MapLit => {}
             // A container literal's ELEMENTS can declare variables, because the
@@ -472,23 +472,23 @@
             BoolLit(v) => "other"
             StringLit(s) => "other"
             NilLit => "other"
-            Variable(n) => "other"
-            Ref(rk, rn, rs) => "other"
+            Variable(n, __vs) => "other"
+            Ref(rk, rn, rs, __rs) => "other"
             Binary(l, o, r) => "other"
             Unary(o, r) => "other"
-            Call(c, a) => "other"
-            Assign(n, v) => "other"
+            Call(c, a, __cs) => "other"
+            Assign(n, v, __as) => "other"
             Logical(l, o, r) => "other"
-            MemberAccess(o, f) => "other"
+            MemberAccess(o, f, __ms) => "other"
             EnumConstruct(e, v, a) => "other"
             Lambda(p, r, b) => "other"
-            GetField(o, f) => "other"
-            SetField(o, f, v) => "other"
+            GetField(o, f, __gs) => "other"
+            SetField(o, f, v, __ss) => "other"
             This => "other"
             ListLit(e) => "other"
             IndexGet(o, i) => "other"
             IndexSet(o, i, v) => "other"
-            MethodCall(o, m, a) => "other"
+            MethodCall(o, m, a, __ks) => "other"
             MapLit => "other"
             BlockExpr(s, v) => "other"
             IsCheck(val, t) => "other"
@@ -513,16 +513,16 @@
             Yield(v) => true
             Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             Unary(o, r) => this.expr_has_yield(r)
-            Call(c, a) => this.call_is_suspend(c) or this.exprs_have_yield(a)
-            Assign(n, v) => this.expr_has_yield(v)
+            Call(c, a, __cs) => this.call_is_suspend(c) or this.exprs_have_yield(a)
+            Assign(n, v, __as) => this.expr_has_yield(v)
             Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
-            MethodCall(o, m, a) => m == "await" or this.expr_has_yield(o) or this.exprs_have_yield(a)
+            MethodCall(o, m, a, __ks) => m == "await" or this.expr_has_yield(o) or this.exprs_have_yield(a)
             ListLit(e) => this.exprs_have_yield(e)
             IndexGet(o, i) => this.expr_has_yield(o) or this.expr_has_yield(i)
             IndexSet(o, i, v) => this.expr_has_yield(o) or this.expr_has_yield(i) or this.expr_has_yield(v)
-            SetField(o, f, v) => this.expr_has_yield(o) or this.expr_has_yield(v)
-            GetField(o, f) => this.expr_has_yield(o)
-            MemberAccess(o, f) => this.expr_has_yield(o)
+            SetField(o, f, v, __ss) => this.expr_has_yield(o) or this.expr_has_yield(v)
+            GetField(o, f, __gs) => this.expr_has_yield(o)
+            MemberAccess(o, f, __ms) => this.expr_has_yield(o)
             EnumConstruct(e, v, a) => this.exprs_have_yield(a)
             Match(s, a) => this.expr_has_yield(s)
             BlockExpr(s, v) => this.stmts_have_yield(s) or this.expr_has_yield(v)
@@ -574,12 +574,12 @@
 
     fun collect_calls_from_expr(expr: AST.Expr, calls: List<String>) {
         match (expr) {
-            Call(callee, args) => {
+            Call(callee, args, __cs) => {
                 var name: String = this.get_variable_name(callee)
                 if (name.length() > 0) { calls.push(name) }
                 this.collect_calls_from_exprs(args, calls)
             }
-            MethodCall(o, m, a) => {
+            MethodCall(o, m, a, __ks) => {
                 // Extract module-qualified call: Async.sleep → stdlib_async_sleep
                 var obj_name: String = this.get_variable_name(o)
                 if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
@@ -594,7 +594,7 @@
                 this.collect_calls_from_expr(l, calls)
                 this.collect_calls_from_expr(r, calls)
             }
-            Assign(n, v) => { this.collect_calls_from_expr(v, calls) }
+            Assign(n, v, __as) => { this.collect_calls_from_expr(v, calls) }
             Logical(l, o, r) => {
                 this.collect_calls_from_expr(l, calls)
                 this.collect_calls_from_expr(r, calls)
@@ -610,12 +610,12 @@
                 this.collect_calls_from_expr(i, calls)
                 this.collect_calls_from_expr(v, calls)
             }
-            SetField(o, f, v) => {
+            SetField(o, f, v, __ss) => {
                 this.collect_calls_from_expr(o, calls)
                 this.collect_calls_from_expr(v, calls)
             }
-            GetField(o, f) => { this.collect_calls_from_expr(o, calls) }
-            MemberAccess(o, f) => { this.collect_calls_from_expr(o, calls) }
+            GetField(o, f, __gs) => { this.collect_calls_from_expr(o, calls) }
+            MemberAccess(o, f, __ms) => { this.collect_calls_from_expr(o, calls) }
             BlockExpr(s, v) => {
                 this.collect_calls_from_stmts(s, calls)
                 this.collect_calls_from_expr(v, calls)

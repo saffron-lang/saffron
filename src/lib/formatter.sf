@@ -76,13 +76,13 @@ fun format_expr(expr: AST.Expr): String {
         }
         StringLit(s) => "\"" + escape_string(s) + "\""
         NilLit => "nil"
-        Variable(name) => name
+        Variable(name, __vs) => name
         Binary(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
         Unary(op, right) => op + format_expr(right)
-        Call(callee, args) => format_expr(callee) + "(" + format_exprs(args) + ")"
-        Assign(name, value) => name + " = " + format_expr(value)
+        Call(callee, args, __cs) => format_expr(callee) + "(" + format_exprs(args) + ")"
+        Assign(name, value, __as) => name + " = " + format_expr(value)
         Logical(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
-        MemberAccess(obj, field) => format_expr(obj) + "." + field
+        MemberAccess(obj, field, __ms) => format_expr(obj) + "." + field
         Match(subject, arms) => format_match(subject, arms)
         EnumConstruct(enum_name, variant, args) => {
             var s: String = enum_name + "." + variant
@@ -92,13 +92,13 @@ fun format_expr(expr: AST.Expr): String {
             s
         }
         Lambda(params, ret_type, body) => format_lambda(params, ret_type, body)
-        GetField(obj, field) => format_expr(obj) + "." + field
-        SetField(obj, field, value) => format_expr(obj) + "." + field + " = " + format_expr(value)
+        GetField(obj, field, __gs) => format_expr(obj) + "." + field
+        SetField(obj, field, value, __ss) => format_expr(obj) + "." + field + " = " + format_expr(value)
         This => "this"
         ListLit(elements) => "[" + format_exprs(elements) + "]"
         IndexGet(obj, index) => format_expr(obj) + "[" + format_expr(index) + "]"
         IndexSet(obj, index, value) => format_expr(obj) + "[" + format_expr(index) + "] = " + format_expr(value)
-        MethodCall(obj, method, args) => format_expr(obj) + "." + method + "(" + format_exprs(args) + ")"
+        MethodCall(obj, method, args, __ks) => format_expr(obj) + "." + method + "(" + format_exprs(args) + ")"
         MapLit => "{}"
         BlockExpr(stmts, value) => format_block_expr(stmts, value)
         IsCheck(value, type_name) => format_expr(value) + " is " + type_name
