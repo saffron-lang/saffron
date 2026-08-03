@@ -221,18 +221,18 @@ check_entry      "root-package program: entry is the repo root" "$SEAM_ROOT" "$R
 rm -f "$ROOT/test/_seam_root.sf"
 
 # Case B: nearest-above governs per MODULE, not per program. An entry inside
-# test/testpkg/ pulls in that package's own modules AND the stdlib, so the same
+# test/packages/testpkg/ pulls in that package's own modules AND the stdlib, so the same
 # compile must report two different roots — this is the case a per-program
 # "which package am I building?" shortcut would get wrong.
 printf 'import "@iter" as Iter\nimport "./mod.sf" as Mod\nIO.println("seam")\n' \
-    > "$ROOT/test/testpkg/src/_seam_nested.sf"
-SEAM_NESTED="$(dump_seam "$ROOT/test/testpkg/src/_seam_nested.sf")"
+    > "$ROOT/test/packages/testpkg/src/_seam_nested.sf"
+SEAM_NESTED="$(dump_seam "$ROOT/test/packages/testpkg/src/_seam_nested.sf")"
 check_counts     "nested-package program: lists in lockstep" "$SEAM_NESTED"
 check_no_missing "nested-package program: every module has a package" "$SEAM_NESTED"
 check_entry      "nested-package program: entry is the inner package" \
-    "$SEAM_NESTED" "$ROOT/test/testpkg"
+    "$SEAM_NESTED" "$ROOT/test/packages/testpkg"
 if printf '%s\n' "$SEAM_NESTED" | grep -q "^MOD.*src/lib/iter.sf.*$ROOT\$" \
-   && printf '%s\n' "$SEAM_NESTED" | grep -q "^MOD.*testpkg/src/mod.sf.*$ROOT/test/testpkg\$"; then
+   && printf '%s\n' "$SEAM_NESTED" | grep -q "^MOD.*testpkg/src/mod.sf.*$ROOT/test/packages/testpkg\$"; then
     echo "ok    nested-package program: stdlib and package modules get different roots"
     PASS=$((PASS + 1))
 else
@@ -240,7 +240,7 @@ else
     printf '%s\n' "$SEAM_NESTED" | grep '^MOD' | sed 's/^/        /'
     FAIL=$((FAIL + 1))
 fi
-rm -f "$ROOT/test/testpkg/src/_seam_nested.sf"
+rm -f "$ROOT/test/packages/testpkg/src/_seam_nested.sf"
 
 # Case C: a packageless entry still crosses the seam, as the marker. It must not
 # inherit the stdlib's package just because it imports from it — that would grant
