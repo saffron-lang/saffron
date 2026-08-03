@@ -9,7 +9,7 @@
 
 /// The Float class — wraps a raw 64-bit double-precision float.
 class Float {
-    var _val: Float
+    private var _val: Float
 
     /// Convert this float to its string representation.
     fun to_string(): String {

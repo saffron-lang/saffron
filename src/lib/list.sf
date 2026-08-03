@@ -18,7 +18,7 @@
 
 /// The List class — wraps a pointer to a dynamic array managed by the runtime.
 class List {
-    var _ptr: Int
+    private var _ptr: Int
 
     /// Return the number of elements in this list.
     fun length(): Int {

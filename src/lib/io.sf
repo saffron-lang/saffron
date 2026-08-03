@@ -75,8 +75,8 @@
 /// b.get(0)        // 0     — the leading NUL of the wasm magic
 /// ```
 class Bytes {
-    var _ptr: Int
-    var _len: Int
+    private var _ptr: Int
+    private var _len: Int
 
     /// Wrap an existing heap pointer and byte count. Takes ownership: the
     /// pointer must remain valid for the lifetime of this object and must have
@@ -176,10 +176,10 @@ fun bytes_from_string(s: String): Bytes {
 // =============================================================================
 
 class File {
-    var _fp: Int
-    var _path: String
-    var _mode: String
-    var _closed: Bool
+    private var _fp: Int
+    private var _path: String
+    private var _mode: String
+    private var _closed: Bool
 
     fun init(fp: Int, path: String, mode: String) {
         this._fp = fp

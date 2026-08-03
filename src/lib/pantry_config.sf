@@ -34,11 +34,11 @@ class Project {
     var type: String
     var license: String
     var authors: List<String>
-    var _deps: List<Map<String, String>>
-    var _dev_deps: List<Map<String, String>>
-    var _scripts: Map<String, String>
-    var _env_vars: Map<String, Map<String, String>>
-    var _features: Map<String, List<String>>
+    internal var _deps: List<Map<String, String>>
+    internal var _dev_deps: List<Map<String, String>>
+    internal var _scripts: Map<String, String>
+    internal var _env_vars: Map<String, Map<String, String>>
+    internal var _features: Map<String, List<String>>
 
     fun init() {
         this.name = ""
@@ -152,8 +152,8 @@ class Project {
 
 /// Represents a workspace containing multiple packages.
 class Workspace {
-    var _members: List<String>
-    var _shared_deps: Map<String, String>
+    internal var _members: List<String>
+    internal var _shared_deps: Map<String, String>
 
     fun init() {
         this._members = []

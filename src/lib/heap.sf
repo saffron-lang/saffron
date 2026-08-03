@@ -2,8 +2,8 @@
 
 /// Iterator that pops elements in priority order (destructive).
 class HeapIter {
-    var _heap: Heap
-    var _has_next: Bool
+    private var _heap: Heap
+    private var _has_next: Bool
 
     fun init(heap: Heap) {
         this._heap = heap
@@ -31,8 +31,8 @@ class HeapIter {
 /// h.pop()    // 1
 /// ```
 class Heap {
-    var _data: List<Any>
-    var _cmp: Fun
+    private var _data: List<Any>
+    private var _cmp: Fun
 
     fun init(cmp: Fun) {
         this._data = []
@@ -95,7 +95,7 @@ class Heap {
     }
 
     // Restore heap property by moving element at idx upward.
-    fun _sift_up(idx: Int) {
+    private fun _sift_up(idx: Int) {
         while (idx > 0) {
             var parent = ((idx - 1) / 2).floor()
             if (this._cmp(this._data[idx], this._data[parent])) {
@@ -111,7 +111,7 @@ class Heap {
     }
 
     // Restore heap property by moving element at idx downward.
-    fun _sift_down(idx: Int) {
+    private fun _sift_down(idx: Int) {
         var size = this._data.length()
         while (true) {
             var smallest = idx

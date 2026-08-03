@@ -31,8 +31,8 @@ import "@sync" as Sync
 /// m.put_if_absent("other", "default")
 /// ```
 class ConcurrentMap {
-    var _map: Map<String, Any>
-    var _lock: Sync.Mutex
+    private var _map: Map<String, Any>
+    private var _lock: Sync.Mutex
 
     fun init() {
         this._map = {}

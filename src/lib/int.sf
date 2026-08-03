@@ -5,7 +5,7 @@
 
 /// The Int class — wraps a raw 64-bit signed integer.
 class Int {
-    var _val: Int
+    private var _val: Int
 
     /// Convert this integer to its string representation.
     fun to_string(): String {

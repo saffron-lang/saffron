@@ -2,8 +2,8 @@
 
 /// Iterator for traversing a Deque from front to back.
 class DequeIter {
-    var _items: List<Any>
-    var _pos: Int
+    private var _items: List<Any>
+    private var _pos: Int
 
     fun init(items: List<Any>) {
         this._items = items
@@ -33,9 +33,9 @@ class DequeIter {
 /// dq.pop_back()    // 2
 /// ```
 class Deque {
-    var _front: List<Any>
-    var _back: List<Any>
-    var _len: Int
+    private var _front: List<Any>
+    private var _back: List<Any>
+    private var _len: Int
 
     fun init() {
         this._front = []
@@ -141,7 +141,7 @@ class Deque {
     }
 
     // Move elements from _back to _front (reversed) when _front is empty.
-    fun _rebalance_front() {
+    private fun _rebalance_front() {
         var i = this._back.length() - 1
         while (i >= 0) {
             this._front.push(this._back[i])
@@ -151,7 +151,7 @@ class Deque {
     }
 
     // Move elements from _front to _back (reversed) when _back is empty.
-    fun _rebalance_back() {
+    private fun _rebalance_back() {
         var i = this._front.length() - 1
         while (i >= 0) {
             this._back.push(this._front[i])

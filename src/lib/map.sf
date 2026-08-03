@@ -11,7 +11,7 @@
 
 /// The Map class — wraps a pointer to a runtime hash table.
 class Map {
-    var _ptr: Int
+    private var _ptr: Int
 
     /// Return the number of key-value pairs in this map.
     fun length(): Int {
