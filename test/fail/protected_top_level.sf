@@ -1,0 +1,14 @@
+// `protected` means "this class and its subclasses", so on a top-level
+// declaration it names nothing and can restrict nothing. Kotlin makes that an
+// error rather than a synonym for `public` (§1's table), and so does Saffron.
+//
+// Accepting it would be the same wrong answer the `internal` placeholder existed
+// to avoid: a declaration the author asked to restrict, compiled with no
+// restriction and no diagnostic. This is the one positional legality rule in
+// take_visibility, which is why it needs its own test — the other three modifiers
+// are legal in both positions and differ only in meaning.
+protected fun helper(): Int {
+    return 1
+}
+
+IO.println(helper())

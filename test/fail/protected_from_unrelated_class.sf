@@ -1,0 +1,24 @@
+// §5b: `protected` widens class-private to subclasses, and to NOTHING else. A
+// class that merely holds an instance of the declaring class is not a subclass,
+// so it may not touch the member — otherwise `protected` would mean "public to
+// anyone who writes a class", which is no restriction at all.
+//
+// `Peer` is deliberately a class rather than a free function: a free function is
+// already refused by the plain class-private rule, so it would pass this test
+// even if the subclass clause were written as "allow any class". The receiver is
+// also deliberately a `Vault` instance held as a field, which is the shape that
+// makes the distinction load-bearing — the code has a legitimate reference to the
+// object and still may not read the protected member.
+class Vault {
+    protected var combination: Int
+    fun init() { this.combination = 7 }
+}
+
+class Peer {
+    var v: Vault
+    fun init() { this.v = Vault() }
+    fun peek(): Int { return this.v.combination }
+}
+
+var p = Peer()
+IO.println(p.peek())

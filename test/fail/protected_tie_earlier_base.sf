@@ -1,0 +1,29 @@
+// The other half of §11 decision 2, and the half that keeps the fix from being a
+// blanket allowance: when the base that wins dispatch is the RESTRICTED one, the
+// access is refused.
+//
+// `A` comes first, so `A.tag` is the body `c.tag()` would run, and it is
+// protected — so an outside call is an error even though a later base declares the
+// same name publicly. Without this test, "answer from the dispatch winner" could
+// be quietly weakened to "allow if any base is public" and the pass-side
+// counterpart (test/pass/protected_tie_dispatch_order.sf, which has the bases in
+// the other order) would still pass.
+class Holder {
+    var n: Int
+    fun init() { this.n = 0 }
+}
+
+interface A {
+    protected fun tag(): Int { return 1 }
+}
+
+interface B {
+    fun tag(): Int { return 2 }
+}
+
+class C extends Holder, A, B {
+    fun init() { this.n = 0 }
+}
+
+var c: C = C()
+IO.println(c.tag())
