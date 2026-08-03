@@ -926,8 +926,21 @@ class Parser {
                 return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar))
             }
             // Block expression: { stmts...; expr }
+            //
+            // The `;` skip mirrors parse_block_stmts (below): every other
+            // statement loop in this file drains separators before parse_stmt,
+            // and this one was the sole omission, so `{ var q = 5; q }` handed the
+            // bare `;` to parse_stmt and died with "expected a literal" (BUGS
+            // #136). The multi-line form worked only because newlines are not
+            // tokens here. Re-checking `}`/eof after the skip lets a trailing `;`
+            // (`{ 7; }`) close the block instead of demanding another statement.
             var block_stmts: List<AST.Stmt> = []
             while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                while (this.match_kind(";")) {}
+                if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                    this.consume("}")
+                    return AST.Expr.BlockExpr(block_stmts, AST.Expr.NilLit)
+                }
                 block_stmts.push(this.parse_stmt())
             }
             this.consume("}")

@@ -1,0 +1,43 @@
+// BUGS #136 — a semicolon inside a block EXPRESSION was a parse error.
+//
+// The parser desugars `{ stmts...; value }` in expression position via a loop
+// that, unlike every other statement loop in parser.sf, never drained the `;`
+// separator before calling parse_stmt. So `{ var q = 5; q }` handed the bare
+// `;` to parse_stmt and died with "expected a literal, name or '('". The
+// multi-line form worked only because newlines are not tokens — which is exactly
+// what hid it, since the natural way to write a multi-statement block is across
+// lines. parse_block_stmts (used for fun/if/while/try bodies) had the skip; the
+// block-expression loop was the sole omission.
+
+import "@test" as Test
+
+// The headline repro.
+var r = { var q = 5; q }
+Test.assert_eq(r, 5, "single semicolon between a stmt and the value works")
+
+// Several statements separated by semicolons, then the value.
+var s = { var a = 2; var b = 3; a + b }
+Test.assert_eq(s, 5, "multiple semicolon-separated statements before the value")
+
+// A leading semicolon (empty statement) is drained.
+var lead = { ; 7 }
+Test.assert_eq(lead, 7, "a leading semicolon is skipped")
+
+// A bare value with a trailing semicolon: the `;` makes it a statement, so the
+// block has no value expression and yields nil — the conventional trailing-`;`
+// semantics, and the point is only that it PARSES rather than erroring.
+var trail = { 7; }
+Test.assert(trail == nil, "a trailing semicolon discards the value (parses, yields nil)")
+
+// Two values separated by `;`: the last is the block value.
+var two = { 1; 2 }
+Test.assert_eq(two, 2, "the last expression is the block value")
+
+// The multi-line form must still work — the fix must not regress it.
+var ml = {
+    var x = 10
+    x + 1
+}
+Test.assert_eq(ml, 11, "the multi-line block form still works")
+
+Test.summary()
