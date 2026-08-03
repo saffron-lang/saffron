@@ -2379,6 +2379,19 @@
                 // `fun c() {}` then `c("too", "many")` compiled clean (BUGS #113).
                 // Consult the declaration-derived map first; where a key lives in
                 // both they agree, so the order only decides who answers.
+                //
+                // Measured, not assumed: a variant that drops `expected > 0` from
+                // BOTH arms and keeps the original order was built and run over the
+                // compiler's own source, the stdlib and the whole test corpus (285
+                // files). It produced byte-identical diagnostics to this version --
+                // no unrecorded-arity case is reachable today, so the exemption
+                // below is currently dead weight. It is kept because the call-site
+                // writers make 0 unfalsifiable in that map: the moment a
+                // gen_method_call path starts feeding this check, `expected > 0`
+                // is the only thing standing between a 0-arg call-site leftover
+                // and a fabricated "expects 0 arguments" on a function that takes
+                // three. Do NOT "simplify" it away without re-running that
+                // comparison.
                 if (this.func_param_count.has(resolved_callee)) {
                     var expected: Float = this.func_param_count.get(resolved_callee)
                     if (args.length() != expected and !has_real_defs) {
