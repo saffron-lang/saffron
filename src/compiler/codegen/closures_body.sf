@@ -4,7 +4,7 @@
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            var pname: String = match (p) { Param(n, t, d) => n }
+            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
             param_names.push(pname)
             pi = pi + 1
         }
@@ -444,7 +444,7 @@
 
     fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
         match (stmt) {
-            VarDecl(name, typ, init, doc) => {
+            VarDecl(name, typ, init, doc, v_vis) => {
                 this.find_free_vars_expr(init, bound, free)
                 bound.push(name)
             }
@@ -460,9 +460,9 @@
                 this.find_free_vars_stmts(body, bound, free)
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
-            FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
-            ClassDecl(n, __tps, ps, f, m, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
+            EnumDecl(n, v, d, e_vis) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -474,7 +474,7 @@
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -647,7 +647,7 @@
                 var inner_bound: List<String> = []
                 var pi2: Float = 0
                 while (pi2 < p.length()) {
-                    var pn: String = match (p[pi2]) { Param(n, t, d) => n }
+                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis) => n }
                     inner_bound.push(pn)
                     pi2 = pi2 + 1
                 }
@@ -737,7 +737,7 @@
     fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
         var sk: String = this.classify_stmt(stmt)
         if (sk == "var") {
-            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d) => init
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis) => init
                 _ => AST.Expr.NilLit
             }
             this.collect_lambda_assigned_expr(vi, out, in_lambda)

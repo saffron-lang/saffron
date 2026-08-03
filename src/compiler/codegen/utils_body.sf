@@ -250,7 +250,7 @@
             return
         }
         match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
@@ -270,9 +270,9 @@
             Return(value) => {
                 this.collect_vars_expr(value, names, types)
             }
-            FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
-            ClassDecl(n, __tps, ps, f, m, d) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
+            EnumDecl(n, v, d, e_vis) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -286,7 +286,7 @@
             }
             LetPattern(pattern, value) => {
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -560,14 +560,14 @@
     fun stmt_has_yield(stmt: AST.Stmt): Bool {
         return match (stmt) {
             ExprStmt(e) => this.expr_has_yield(e)
-            VarDecl(n, t, init, d) => this.expr_has_yield(init)
+            VarDecl(n, t, init, d, v_vis) => this.expr_has_yield(init)
             Return(v) => this.expr_has_yield(v)
             If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
             While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
             Block(s) => this.stmts_have_yield(s)
             TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
             Throw(v) => this.expr_has_yield(v)
-            FunDecl(n, p, r, b, d) => false
+            FunDecl(n, p, r, b, d, f_vis) => false
             _ => false
         }
     }
@@ -677,7 +677,7 @@
     fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
         match (stmt) {
             ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
-            VarDecl(n, t, init, d) => { this.collect_calls_from_expr(init, calls) }
+            VarDecl(n, t, init, d, v_vis) => { this.collect_calls_from_expr(init, calls) }
             Return(v) => { this.collect_calls_from_expr(v, calls) }
             If(c, tb, eb) => {
                 this.collect_calls_from_expr(c, calls)
@@ -741,7 +741,7 @@
                 var cls_name: String = ""
                 var cls_methods: List<AST.Stmt> = []
                 match (program[i]) {
-                    ClassDecl(cn, __tps, cps, cf, cm, cd) => {
+                    ClassDecl(cn, __tps, cps, cf, cm, cd, c_vis) => {
                         cls_name = cn
                         cls_methods = cm
                     }
@@ -1310,8 +1310,8 @@
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            defaults.push(match (p) { Param(n, t, d) => d })
-            pnames.push(match (p) { Param(n, t, d) => n })
+            defaults.push(match (p) { Param(n, t, d, p_vis) => d })
+            pnames.push(match (p) { Param(n, t, d, p_vis) => n })
             pi = pi + 1
         }
         this.func_defaults.set(emit_name, defaults)
@@ -1335,10 +1335,10 @@
     /// leading `self`, registered under both the bare `Class__method` name and
     /// the prefixed one.
     fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
-        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => n
+        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
             _ => ""
         }
-        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d) => m
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
             _ => []
         }
         var mi: Float = 0
@@ -1353,8 +1353,8 @@
                 var mpi: Float = 0
                 while (mpi < mparams.length()) {
                     var mp: AST.Param = mparams[mpi]
-                    mdefs.push(match (mp) { Param(n, t, d) => d })
-                    mpnames.push(match (mp) { Param(n, t, d) => n })
+                    mdefs.push(match (mp) { Param(n, t, d, p_vis) => d })
+                    mpnames.push(match (mp) { Param(n, t, d, p_vis) => n })
                     mpi = mpi + 1
                 }
                 var full: String = cname + "__" + mname

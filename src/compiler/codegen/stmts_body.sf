@@ -1,7 +1,7 @@
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init, doc) => {
+            VarDecl(name, type_ann, init, doc, v_vis) => {
                 if (!doc.starts_with("@import:")) {
                     this.gen_var_decl(stmt)
                 }
@@ -31,7 +31,7 @@
             LetPattern(pattern, value) => {
                 this.gen_let_pattern(pattern, value)
             }
-            FunDecl(name, params, ret_type, body, doc) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 // Capture and clear pending_extend_class to prevent stale state
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
@@ -68,8 +68,8 @@
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
-                        var pname: String = match (p) { Param(n, t, d) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -101,8 +101,8 @@
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
-                        var pname: String = match (p) { Param(n, t, d) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -113,10 +113,10 @@
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 // Registered before the body is generated: a method returning a
                 // class type parameter is typed by substituting the receiver's
                 // own type arguments, and that has to be known by the time any
@@ -129,24 +129,24 @@
                 }
                 this.gen_class_decl_with_parents(name, parents, fields, methods)
             }
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
     fun get_var_name(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => n
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => n
             _ => ""
         }
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => t
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => t
             _ => ""
         }
     }
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { VarDecl(n, t, i, d) => i
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => i
             // Was `_ => ""`: a String default on a function declared to return
             // AST.Expr. Nothing rejected it because the checker never walked
             // method bodies (BUGS #76), and every caller pre-checks for a
@@ -157,13 +157,13 @@
     }
 
     fun get_var_doc(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => d
+        return match (stmt) { VarDecl(n, t, i, d, v_vis) => d
             _ => ""
         }
     }
 
     fun get_fun_doc(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => d
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => d
             _ => ""
         }
     }
@@ -679,25 +679,25 @@
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => n
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => n
             _ => ""
         }
     }
 
     fun get_fun_params(stmt: AST.Stmt): List<AST.Param> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => p
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => p
             _ => []
         }
     }
 
     fun get_fun_ret(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => r
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => r
             _ => ""
         }
     }
 
     fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => b
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => b
             _ => ""
         }
     }
@@ -734,7 +734,7 @@
         var mpi: Float = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mpn: String = match (mp) { Param(n, t, d) => n }
+            var mpn: String = match (mp) { Param(n, t, d, p_vis) => n }
             method_param_names.push(mpn)
             mpi = mpi + 1
         }
@@ -748,7 +748,7 @@
         mpi = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mdval: AST.Expr = match (mp) { Param(n, t, d) => d }
+            var mdval: AST.Expr = match (mp) { Param(n, t, d, p_vis) => d }
             method_defaults.push(mdval)
             mpi = mpi + 1
         }
@@ -1192,13 +1192,13 @@
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
-        return match (stmt) { EnumDecl(n, v, d) => n
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => n
             _ => ""
         }
     }
 
     fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
-        return match (stmt) { EnumDecl(n, v, d) => v
+        return match (stmt) { EnumDecl(n, v, d, e_vis) => v
             _ => ""
         }
     }
@@ -1213,12 +1213,12 @@
 
     fun try_register_enum(decl: AST.Stmt) {
         match (decl) {
-            EnumDecl(name, variants, doc) => {
+            EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum_variants(name, variants)
             }
-            VarDecl(n, t, i, d) => {}
-            FunDecl(n, p, r, b, d) => {}
-            ClassDecl(n, __tps, ps, f, m, d) => {}
+            VarDecl(n, t, i, d, v_vis) => {}
+            FunDecl(n, p, r, b, d, f_vis) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -1229,7 +1229,7 @@
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {}
         }
     }
 
@@ -1244,10 +1244,10 @@
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
-        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
+        var vname: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => n
             _ => ""
         }
-        var vdoc: String = match (stmt) { VarDecl(n, t, init, d) => d
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => d
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
@@ -1385,10 +1385,10 @@
         return match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
-            VarDecl(n, t, i, d) => "var"
-            FunDecl(n, p, r, b, d) => "fun"
-            EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, __tps, ps, f, m, d) => "class"
+            VarDecl(n, t, i, d, v_vis) => "var"
+            FunDecl(n, p, r, b, d, f_vis) => "fun"
+            EnumDecl(n, v, d, e_vis) => "enum"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -1402,7 +1402,7 @@
             // here: `classify_stmt` returns one tag per variant, and until BUGS
             // #76 made the checker walk method bodies, a missing arm yielded an
             // indeterminate string rather than an error.
-            TypeAlias(ta_n, ta_t) => "type_alias"
+            TypeAlias(ta_n, ta_t, ta_vis) => "type_alias"
         }
     }
 
@@ -1410,10 +1410,10 @@
         var kind: Any = match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
-            VarDecl(n, t, i, d) => "other"
-            FunDecl(n, p, r, b, d) => "other"
-            EnumDecl(n, v, d) => "other"
-            ClassDecl(n, __tps, ps, f, m, d) => "other"
+            VarDecl(n, t, i, d, v_vis) => "other"
+            FunDecl(n, p, r, b, d, f_vis) => "other"
+            EnumDecl(n, v, d, e_vis) => "other"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
@@ -1422,7 +1422,7 @@
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(ta_n, ta_t) => "other"
+            TypeAlias(ta_n, ta_t, ta_vis) => "other"
         }
         return kind == "if"
     }
