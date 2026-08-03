@@ -2,7 +2,7 @@
 
 ## Open
 
-**14 open entries:** #2, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+**13 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
 #129, #130, #131, #132. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
@@ -276,108 +276,6 @@ exported function should be re-tagged (`__val_tag_float` on the integer, or a
 tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
 Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
 boundary.
-
-### 66. Binary files cannot be read or served — `IO.read_file` truncates at the first NUL, so `static_files` serves any wasm module as 0 bytes
-
-Found while verifying the playground before committing it. `GET /app.wasm` returns
-`200` with `Content-Length: 0` even though `playground/static/app.wasm` is 19569
-bytes on disk. The playground frontend therefore cannot load in a browser at all.
-
-**Reproduction** — no server needed:
-
-```saffron
-import "io" as IO
-
-// 13 bytes on disk, starting with the wasm magic \0asm
-var leading: String = IO.read_file("/tmp/nul_test.bin")
-IO.println(leading.length())   // 0
-
-// "abc\0def", 7 bytes on disk
-var mid: String = IO.read_file("/tmp/nul_mid.bin")
-IO.println(mid.length())       // 3
-```
-
-Create the fixtures with `printf '\0asm\x01\x00\x00\x00hello' > /tmp/nul_test.bin`
-and `printf 'abc\0def' > /tmp/nul_mid.bin`.
-
-**Cause.** `__io_read_file` (`src/runtime/runtime.sf:1096-1098`) is *not* the
-problem — it `rt_fread`s the full size and returns the whole buffer. The loss is
-in the representation: a Saffron `String` is a NUL-terminated C string, so
-`length()` is a `strlen` that stops at the first embedded NUL. Every byte after it
-is still in memory but unreachable. A wasm module's magic number is `\0asm`, so the
-very first byte terminates the string and the read yields `""`.
-
-**This is wider than the read.** The `@http/server` response path is String-typed
-end to end, so a binary body is unrepresentable even given a correct read:
-
-- `src/lib/http/server.sf:655` — `static_files` reads with
-  `var content: String = IO.read_file(full_path)`
-- `:168` — `Response.body` is declared `String`
-- `:251-252` — `Content-Length` is emitted from `resp.body.length()`, i.e. strlen
-- `:269` — the body is appended to a `StringBuilder`
-
-So fixing only `read_file` would still emit a truncated `Content-Length` and a
-truncated body. Serving binary assets needs a byte-length-carrying body type
-(`@bytes` `Buffer`, or a `String` that stores an explicit length) threaded through
-`Response` and the writer.
-
-**A working read path already exists** and is the basis for any fix:
-`IO.file_size` + `IO.read_binary` (`src/lib/io.sf:255-263`, runtime
-`:1103-1134`) return the correct 13 for the fixture above. Note they currently
-emit `[codegen] Warning: calling undefined function '__io_file_size'` /
-`'__io_read_binary'` — the functions exist in `runtime.sf` and link fine, but
-they are missing from the codegen known-function tables in
-`src/compiler/codegen/utils_body.sf:5-6`, so every call warns.
-
-**Relationship to the log.** This is the same underlying defect as Bug 2 in
-`docs/design/playground-bug-log.md`, which was only ever *worked around* inside the
-playground's compile endpoint and never filed in the tracker. This is a second,
-independent instance of it, so it is filed here as the general defect.
-
-**Note on the playground handoff**: the completing agent's report listed
-`/app.wasm` among "All 6 routes correct". That claim does not hold — the route
-returns 200 with an empty body.
-
-**Status: still open as a stdlib defect; routed around in the playground.** The
-underlying defect is unchanged — `static_files` still cannot serve a wasm module,
-and `Response.body` is still String-typed — but the playground no longer depends
-on it. It serves the UI module base64-encoded from its own endpoint
-(`GET /api/app_wasm`, `playground/src/main.sf`), which the loader decodes with
-`atob` before instantiating; base64's alphabet is pure ASCII, so it survives a
-Saffron string intact. This is the same dodge the compile endpoint already used
-for user modules, now factored into `Compile.encode_file_base64`. Verified
-byte-identical: the 47555-byte module round-trips through the endpoint and the
-frontend loads and runs. Costs a 33% larger transfer once per page load.
-
-That does not fix the general case — any Saffron program serving a binary asset
-still hits this — so the byte-length-carrying body type described above is still
-the work that needs doing.
-
-**FIXED** (`e6b0735`). `IO.Bytes` is that body type: an explicit (pointer, length)
-pair, so length is carried rather than recomputed by scanning for a NUL, plus
-`read_file_bytes` / `write_file_bytes`. `Response` carries an optional
-`_body_bytes` which takes precedence for `Content-Length`, and `_write_response`
-writes the body straight from its pointer via `sf_tcp_write`/`sf_tls_write`
-instead of through a `String`. `static_files` reads byte-exactly. Fixing the read
-alone would not have been enough — the response path was `String`-typed end to
-end, so `Content-Length` was a strlen and the payload went through a
-`StringBuilder`.
-
-Built on `_b_*` C stdio externs rather than the runtime's `__io_file_size` /
-`__io_read_binary`, because those two are absent from codegen's known-function
-table: calling them from inside a module gets them module-prefix-mangled to
-`@io___io_file_size` and they fail to link.
-
-Those externs declare `FILE*` as `i64`, not `void*`, deliberately. **A
-`void*`-returning extern has its result pointer-tagged, so `fp == 0` compares
-`TAG_PTR|0` against `TAG_INT|0` and is never true** — a failed `fopen` would take
-the success branch and read through a NULL `FILE*`. `IO.open` has exactly this
-latent defect and does not throw on a missing file; that is unfixed and worth its
-own entry.
-
-Tests: `test/pass/binary_file_bytes.sf`, `test/pass/http_binary_response.sf`.
-Still uncovered: the TLS byte-write path is implemented but untested, and
-Stream/SSE remains String-only.
 
 ### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
 
@@ -1153,6 +1051,120 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 66. FIXED — binary files could not be read or served: `IO.read_file` truncated at the first NUL, so `static_files` served any wasm module as 0 bytes
+
+Found while verifying the playground before committing it. `GET /app.wasm` returns
+`200` with `Content-Length: 0` even though `playground/static/app.wasm` is 19569
+bytes on disk. The playground frontend therefore cannot load in a browser at all.
+
+**Reproduction** — no server needed:
+
+```saffron
+import "io" as IO
+
+// 13 bytes on disk, starting with the wasm magic \0asm
+var leading: String = IO.read_file("/tmp/nul_test.bin")
+IO.println(leading.length())   // 0
+
+// "abc\0def", 7 bytes on disk
+var mid: String = IO.read_file("/tmp/nul_mid.bin")
+IO.println(mid.length())       // 3
+```
+
+Create the fixtures with `printf '\0asm\x01\x00\x00\x00hello' > /tmp/nul_test.bin`
+and `printf 'abc\0def' > /tmp/nul_mid.bin`.
+
+**Cause.** `__io_read_file` (`src/runtime/runtime.sf:1096-1098`) is *not* the
+problem — it `rt_fread`s the full size and returns the whole buffer. The loss is
+in the representation: a Saffron `String` is a NUL-terminated C string, so
+`length()` is a `strlen` that stops at the first embedded NUL. Every byte after it
+is still in memory but unreachable. A wasm module's magic number is `\0asm`, so the
+very first byte terminates the string and the read yields `""`.
+
+**This is wider than the read.** The `@http/server` response path is String-typed
+end to end, so a binary body is unrepresentable even given a correct read:
+
+- `src/lib/http/server.sf:655` — `static_files` reads with
+  `var content: String = IO.read_file(full_path)`
+- `:168` — `Response.body` is declared `String`
+- `:251-252` — `Content-Length` is emitted from `resp.body.length()`, i.e. strlen
+- `:269` — the body is appended to a `StringBuilder`
+
+So fixing only `read_file` would still emit a truncated `Content-Length` and a
+truncated body. Serving binary assets needs a byte-length-carrying body type
+(`@bytes` `Buffer`, or a `String` that stores an explicit length) threaded through
+`Response` and the writer.
+
+**A working read path already exists** and is the basis for any fix:
+`IO.file_size` + `IO.read_binary` (`src/lib/io.sf:255-263`, runtime
+`:1103-1134`) return the correct 13 for the fixture above. Note they currently
+emit `[codegen] Warning: calling undefined function '__io_file_size'` /
+`'__io_read_binary'` — the functions exist in `runtime.sf` and link fine, but
+they are missing from the codegen known-function tables in
+`src/compiler/codegen/utils_body.sf:5-6`, so every call warns.
+
+**Relationship to the log.** This is the same underlying defect as Bug 2 in
+`docs/design/playground-bug-log.md`, which was only ever *worked around* inside the
+playground's compile endpoint and never filed in the tracker. This is a second,
+independent instance of it, so it is filed here as the general defect.
+
+**Note on the playground handoff**: the completing agent's report listed
+`/app.wasm` among "All 6 routes correct". That claim does not hold — the route
+returns 200 with an empty body.
+
+The playground routed around this before the general fix landed: it serves the UI
+module base64-encoded from its own endpoint
+(`GET /api/app_wasm`, `playground/src/main.sf`), which the loader decodes with
+`atob` before instantiating; base64's alphabet is pure ASCII, so it survives a
+Saffron string intact. This is the same dodge the compile endpoint already used
+for user modules, now factored into `Compile.encode_file_base64`. Verified
+byte-identical: the 47555-byte module round-trips through the endpoint and the
+frontend loads and runs. Costs a 33% larger transfer once per page load.
+
+That does not fix the general case — any Saffron program serving a binary asset
+still hits this — so the byte-length-carrying body type described above is still
+the work that needs doing.
+
+**FIXED** (`e6b0735`). `IO.Bytes` is that body type: an explicit (pointer, length)
+pair, so length is carried rather than recomputed by scanning for a NUL, plus
+`read_file_bytes` / `write_file_bytes`. `Response` carries an optional
+`_body_bytes` which takes precedence for `Content-Length`, and `_write_response`
+writes the body straight from its pointer via `sf_tcp_write`/`sf_tls_write`
+instead of through a `String`. `static_files` reads byte-exactly. Fixing the read
+alone would not have been enough — the response path was `String`-typed end to
+end, so `Content-Length` was a strlen and the payload went through a
+`StringBuilder`.
+
+Built on `_b_*` C stdio externs rather than the runtime's `__io_file_size` /
+`__io_read_binary`, because those two are absent from codegen's known-function
+table: calling them from inside a module gets them module-prefix-mangled to
+`@io___io_file_size` and they fail to link.
+
+Those externs declare `FILE*` as `i64`, not `void*`, deliberately. **A
+`void*`-returning extern has its result pointer-tagged, so `fp == 0` compares
+`TAG_PTR|0` against `TAG_INT|0` and is never true** — a failed `fopen` would take
+the success branch and read through a NULL `FILE*`. `IO.open` has exactly this
+latent defect and does not throw on a missing file; that is unfixed and worth its
+own entry.
+
+Tests: `test/pass/binary_file_bytes.sf`, `test/pass/http_binary_response.sf`.
+Still uncovered: the TLS byte-write path is implemented but untested, and
+Stream/SSE remains String-only.
+
+Re-verified 2026-08-03 on `0745e3b`, independently of the fixing commit.
+`read_file` still returns 0/3 for the leading-NUL and interior-NUL fixtures while
+`read_file_bytes` returns the true 13/7. `__io_file_size` and `__io_read_binary`
+now resolve with no codegen warning (registered at
+`src/compiler/codegen/utils_body.sf:5-6`, `output_body.sf:701-702`,
+`codegen.sf:692/1250/1938`). End-to-end, a live `static_files` server returns
+`playground/static/app.wasm` (47555 bytes, leading NUL) as `Content-Length:
+47555` with a `cmp`-identical body — the original `Content-Length: 0` symptom is
+gone. Both tests pass; suite failure set unchanged at the 24-name baseline.
+
+Correction to the closing note above: `IO.open` **does** now throw on a missing
+file (`src/lib/io.sf:359-365` tests `fp == 0` against an `i64`-declared `_fopen`),
+so the latent NULL-`FILE*` defect it describes no longer needs its own entry.
 
 ### 6. FIXED — `break`/`continue` outside a loop is now a checker error
 
