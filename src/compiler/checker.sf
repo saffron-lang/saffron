@@ -251,6 +251,30 @@ class NullChecker {
     // ones, so register_class_identity can tell a local declaration from a rival.
     var registering_local: Bool
 
+    // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
+    //
+    // Which class members are private, keyed "<class key>#<member name>". The
+    // class name is part of the key on purpose: two classes can declare the same
+    // member name with different visibility — one `private fun bump`, one public
+    // — and a table keyed by member name alone would reject the public one. Both
+    // the qualified key (prefix + name) and the bare key are written, mirroring
+    // env.class_fields, so a lookup through qualified_class_key finds the entry
+    // whichever way the receiver's type was spelled.
+    //
+    // Class-private here means Kotlin's rule: the class BODY, not the file. A
+    // same-module free function reading a private field is rejected. That
+    // asymmetry with module-level `private` is deliberate (§6a) and is why the
+    // stdlib's 24 leading-underscore fields must stay unannotated until they can
+    // be marked `internal`.
+    var private_members: Map<String, String>
+    // Every member name that is private on *some* class. This is the gate on the
+    // unresolvable-receiver warning (§3), and it is what keeps that warning from
+    // being useless noise: an `Any`-typed receiver is pervasive and honest, so
+    // warning about every member access through one would bury the signal. A
+    // warning is only worth printing when the name being read is private
+    // somewhere — i.e. when there is genuinely a check that could not be made.
+    var private_member_names: Map<String, Bool>
+
     fun init() {
         this.env = TypeEnv()
         this.errors = []
@@ -271,6 +295,8 @@ class NullChecker {
         this.ambiguous_classes = []
         this.local_classes = []
         this.registering_local = false
+        this.private_members = {}
+        this.private_member_names = {}
     }
 
     fun error(msg: String) {
@@ -958,6 +984,7 @@ class NullChecker {
                 // modules declaring the same class stay distinguishable
                 // (register_class_identity; the `Response` collision).
                 this.register_class_identity(name, this.params_list_to_string(fields))
+                this.register_private_members(name, fields, methods)
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
                 if (parents.length() > 0) {
@@ -1217,6 +1244,154 @@ class NullChecker {
         return base
     }
 
+    // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
+
+    /// Record every `private` field and method of a class, and reject the one
+    /// combination that cannot mean anything.
+    fun register_private_members(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        var qualified: String = this.current_prefix + name
+        var fi: Float = 0
+        while (fi < fields.length()) {
+            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
+            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
+            if (f_vis == "private") {
+                this.mark_private_member(name, qualified, f_name)
+            }
+            fi = fi + 1
+        }
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var m_name: String = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, m_vis) => mn
+                _ => ""
+            }
+            var m_vis: String = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, mv) => mv
+                _ => "public"
+            }
+            var m_body: List<AST.Stmt> = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, mv) => mb
+                _ => []
+            }
+            if (m_name.length() > 0 and m_vis == "private") {
+                // A private *abstract* method is a contradiction, not a
+                // restriction. The distinction is the one class_abstract_methods
+                // already draws: bodyless means "a requirement on subclasses".
+                // An implementor in another module must be able to name the
+                // method to implement it, and check_conformance would then demand
+                // an implementation that implementor is forbidden to write — so
+                // the declaration makes the type unimplementable. A private
+                // *default* method (one with a body) is a perfectly good private
+                // helper and is allowed.
+                if (m_body.length() == 0) {
+                    this.error("'" + name + "." + m_name + "' is declared private and has no body; a private abstract method cannot be implemented")
+                }
+                this.mark_private_member(name, qualified, m_name)
+            }
+            mi = mi + 1
+        }
+    }
+
+    /// Write one private-member entry under both the bare and qualified keys.
+    fun mark_private_member(bare: String, qualified: String, member: String) {
+        this.private_members.set(bare + "#" + member, "private")
+        this.private_members.set(qualified + "#" + member, "private")
+        this.private_member_names.set(member, true)
+    }
+
+    /// Is `member` private as declared directly on the class `class_name` names?
+    fun is_private_member(class_name: String, member: String): Bool {
+        var key: String = this.qualified_class_key(class_name) + "#" + member
+        if (this.private_members.has(key)) return true
+        // The bare key as a fallback, for a receiver type that resolved to a
+        // class the current module did not declare and did not import under a
+        // prefix the lookup above could reconstruct.
+        return this.private_members.has(this.generic_base(class_name) + "#" + member)
+    }
+
+    /// Which class in `class_name`'s ancestry declares `member` private, or "".
+    ///
+    /// The ancestry has to be searched, not just the receiver's own class: a
+    /// member is inherited by name, so `this.secret` inside a subclass of the
+    /// class that declared `secret` private reads a private member without ever
+    /// naming the declaring class. Kotlin rejects exactly that — its `private`
+    /// does not extend to subclasses; `protected` is the modifier that does, and
+    /// it is Phase 5b. Checking only the receiver's own class would let any
+    /// `class Child extends Base {}` launder every private field Base has.
+    ///
+    /// Breadth-first with a visited set, matching inherited_method_names, so a
+    /// diamond visits a shared ancestor once and a cyclic `extends` terminates
+    /// rather than hanging the checker.
+    fun private_declaring_class(class_name: String, member: String): String {
+        var base: String = this.generic_base(class_name)
+        if (this.is_private_member(base, member)) { return base }
+        var visited: List<String> = [base]
+        var work: List<String> = []
+        if (this.class_parents.has(base)) {
+            var seed: List<String> = this.class_parents.get(base)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.is_private_member(cur, member)) { return cur }
+                if (this.class_parents.has(cur)) {
+                    var ups: List<String> = this.class_parents.get(cur)
+                    var ui: Float = 0
+                    while (ui < ups.length()) {
+                        if (!this.list_has_string(visited, ups[ui])) { work.push(ups[ui]) }
+                        ui = ui + 1
+                    }
+                }
+            }
+        }
+        return ""
+    }
+
+    /// May code at the current position read or call `member` on `obj_type`?
+    ///
+    /// Class-private means the class BODY (Kotlin's rule for members, §6a), so
+    /// the single question is whether the code being checked is inside the class
+    /// that declared the member. `this.x`, a sibling instance of the same class,
+    /// and one method calling another all satisfy that; a free function in the
+    /// same file does not, which is the deliberate asymmetry with module-level
+    /// `private`.
+    fun check_member_visibility(obj_type: String, member: String, what: String) {
+        var base: String = this.generic_base(obj_type)
+        // An unresolved receiver: allow the access and say that it was not
+        // checked (§3). Neither silent answer is honest — silently allowing
+        // spells unknown as "public", silently denying spells it as "private" —
+        // and denying has direct precedent for how badly it goes: BUGS #56
+        // records that erroring on this same fallback "broke pass/math and
+        // test_reflect". A missed denial is a missed lint; a false denial rejects
+        // correct programs.
+        //
+        // Gated on the member name being private *somewhere*, because `Any`-typed
+        // receivers are pervasive and honest: warning on every member access
+        // through one would bury the signal in noise and teach readers to ignore
+        // the category.
+        if (base.length() == 0 or base == "Any" or !this.env.class_fields.has(this.qualified_class_key(base))) {
+            if (this.private_member_names.has(member)) {
+                this.warn("cannot determine the class of the receiver; visibility of '" + member + "' not checked")
+            }
+            return nil
+        }
+        var owner: String = this.private_declaring_class(base, member)
+        if (owner.length() == 0) { return nil }
+        // Inside the declaring class body — the whole extent of class-private.
+        if (this.current_class.length() > 0
+            and this.generic_base(this.current_class) == owner) { return nil }
+        var where: String = " from outside the class"
+        if (this.current_class.length() > 0) {
+            where = " from class '" + this.current_class + "'"
+        }
+        this.error("private " + what + " '" + owner + "." + member + "' is not accessible" + where)
+    }
 
     fun check_spawn_captures(expr: AST.Expr) {
         var spawn_method: String = match (expr) {
@@ -1787,6 +1962,14 @@ class NullChecker {
         // this.field → look up field type from current class
         if (obj_type == this.current_class or obj_type == "This") {
             if (this.env.class_fields.has(this.current_class)) {
+                // `this.x` is checked too, and it is not a redundant check: a
+                // subclass reads an inherited member by name without ever naming
+                // the class that declared it private, so `this.secret` inside
+                // `class Child extends Base` is the case that needs catching.
+                // Access from within the declaring class is what
+                // check_member_visibility permits, so the ordinary use is
+                // unaffected.
+                this.check_member_visibility(this.current_class, field, "field")
                 return this.get_class_field_type(this.current_class, field)
             }
         }
@@ -1795,6 +1978,11 @@ class NullChecker {
         // declared type: `var v: T` on a `Box<String>` is a String (BUGS #95).
         var ma_base: String = this.generic_base(obj_type)
         if (this.env.class_fields.has(ma_base)) {
+            // A class receiver whose type resolved: this is the one path where a
+            // field's visibility can actually be decided. The `this.field` branch
+            // above returns before reaching here, which is correct — reading your
+            // own class's private field is exactly what private permits.
+            this.check_member_visibility(obj_type, field, "field")
             return this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type)
         }
         // Known module members
@@ -1815,6 +2003,11 @@ class NullChecker {
                 return obj_name
             }
         }
+        // The fallback: no class resolved, so no visibility decision is possible.
+        // check_member_visibility takes the soft-fail branch and warns only if
+        // this member name is private on some class. This is also the working
+        // route for `Math.PI`, which is why it must not become an error (§3).
+        this.check_member_visibility(obj_type, field, "field")
         return field
     }
 
@@ -2358,6 +2551,13 @@ class NullChecker {
             // not dropped, though — they are exactly what resolves the method's
             // type parameters below (BUGS #95).
             var full_name: String = this.generic_base(obj_type) + "__" + method
+            // The receiver's class is known here, so a private method call can be
+            // decided. Placed inside this branch rather than at the top of the
+            // function on purpose: the builtin-type arms above return before
+            // reaching here, so `m.get(k)` and `list.length()` never consult the
+            // visibility tables and cannot be perturbed by a user class that
+            // happens to declare a private method of the same name.
+            this.check_member_visibility(obj_type, method, "method")
             // Check generic constraints for class methods
             if (this.is_generic_func(full_name)) {
                 this.check_generic_constraints(full_name, args)

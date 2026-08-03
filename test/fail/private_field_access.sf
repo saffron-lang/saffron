@@ -1,0 +1,27 @@
+// A private field read from outside the declaring class must be rejected.
+//
+// The receiver is an annotated local, deliberately. Per §3 of
+// docs/design/access-modifiers.md, an unresolvable receiver takes the soft-fail
+// path — the access is allowed and a warning is emitted — so a fail test whose
+// receiver the checker cannot type would compile cleanly and thereby fail the
+// suite while testing nothing. `var s: Slot = Slot()` gives a statically known
+// class, which is what makes the denial reachable.
+//
+// Note the asymmetry this test pins down: `read_it` is a free function in the
+// SAME file as Slot and is still rejected. Class-private means the class body,
+// not the file — Kotlin's rule for members. That is why the stdlib's
+// leading-underscore fields read by same-file free functions must stay
+// unannotated until `internal` lands (Phase 5).
+class Slot {
+    private var count: Int
+    fun init() { this.count = 0 }
+    fun bump() { this.count = this.count + 1 }
+}
+
+fun read_it(): Int {
+    var s: Slot = Slot()
+    s.bump()
+    return s.count
+}
+
+IO.println(read_it())
