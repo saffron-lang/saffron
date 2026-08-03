@@ -1,0 +1,15 @@
+// BUGS #118: a nonexistent member of an imported module must be REJECTED.
+//
+// Before the fix this compiled with exit 0 and then emitted invalid LLVM IR:
+// having failed to resolve the member, codegen fell through to the generic
+// receiver path and evaluated the bare alias `Math` as a local, emitting
+//   %t1 = load i64, i64* %Math
+// from an SSA name that was never defined. The user saw "the compiler emitted
+// invalid LLVM IR / this is a compiler bug, not an error in your program" for
+// what is a plain typo.
+//
+// The compiler must now say:
+//   [codegen] Error: no member 'NOPE' in module 'Math'
+import "@math" as Math
+
+IO.println(Math.NOPE)

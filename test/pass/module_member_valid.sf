@@ -1,0 +1,34 @@
+// BUGS #118 companion: the half that can break shipped code.
+//
+// The fix makes an unresolvable module member fatal. Everything that legitimately
+// resolves through a module alias must keep working — these are the spellings a
+// probe compiler was used to enumerate before the miss was made fatal.
+import "@test" as Test
+import "@math" as Math
+import "@iter" as Iter
+
+// A module GLOBAL read through its alias (module_globals hit).
+Test.assert(Math.pi > 3.14, "module global constant resolves")
+Test.assert(Math.pi < 3.15, "module global constant has the right value")
+Test.assert(Math.tau > 6.28, "a second module global resolves")
+
+// A module FUNCTION called through its alias (known_functions hit).
+Test.assert_eq(Math.abs(-5), 5, "module function call resolves")
+Test.assert_eq(Math.max(3, 7), 7, "a second module function call resolves")
+
+// A module FUNCTION used as a first-class value, not called — this is the
+// path that goes through the same block as the failing lookup.
+var absf = Math.abs
+Test.assert_eq(absf(-9), 9, "module function as a value resolves")
+
+var minf = Math.min
+Test.assert_eq(minf(4, 2), 2, "a second module function as a value resolves")
+
+// A different module, to show it is not specific to @math.
+Test.assert_eq(Iter.sum([1, 2, 3]), 6, "another module's function resolves")
+
+// The same module's function as a value, from a second module.
+var sumf = Iter.sum
+Test.assert_eq(sumf([4, 5]), 9, "another module's function as a value resolves")
+
+Test.summary()
