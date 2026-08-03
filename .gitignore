@@ -13,6 +13,32 @@ build/guard.sf
 build/guard.ll
 build/guard_lib/
 
+# stage4_test/ predates stage4/ above and nothing references it any more.
+build/stage4_test/
+
+# bootstrap.sh's final smoke test: it compiles test/hello_bootstrap.sf and runs
+# the result on every run, so both are outputs rather than inputs.
+build/hello_bootstrap
+build/hello_bootstrap.ll
+
+# One-off compiler copies. Neither is referenced anywhere; gen2 lives at
+# build/stage2/saffronc and gen3 at build/saffronc, and those two ARE checked in
+# — build/ as a whole must NOT be ignored. bootstrap.sh links gen3 from the
+# checked-in build/stage3/*.ll when gen2 cannot compile current source, so
+# stage2/ and stage3/ are a recovery path, not artifacts.
+build/saffronc2
+build/saffronc_promoted
+
+# Scratch binaries and demo output that accumulated in the build root.
+build/test_array_pattern
+build/test_array_pattern.ll
+build/app.ll
+build/app.wasm
+build/pantry
+build/pantry.dSYM/
+build/wasm_demo/
+build/wasm_counter/
+
 # Sub-agent scratch space. The worktrees are nested git repos, so a plain
 # `git add -A` stages them as gitlinks — a clone would then carry dangling
 # submodule pointers to paths that only ever existed on one machine.
