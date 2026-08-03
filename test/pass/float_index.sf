@@ -1,0 +1,84 @@
+// Indexing with a Float-typed value must convert, not reinterpret.
+//
+// `emit_untag_int` lowered to `__val_untag_int`, which masks the low 48 bits of
+// a NaN-boxed value and sign-extends. That is only correct for a TAG_INT value.
+// Handed a *float*-tagged value it reinterpreted the double's bit pattern:
+// 2.0 is 0x4000000000000000, whose low 48 bits are all zero, so `chars[f]` with
+// `var f: Float = 2.0` silently read element 0. Every small float has zero low
+// bits, so a whole family of hand-written counted loops using the older `Float`
+// spelling read element 0 forever, with no warning and no error.
+//
+// The failure mode — every element reads as the first — looks exactly like a
+// loop-variable capture bug, which is why it misdirected debugging twice: it
+// presented as "StringBuilder.append repeats its first argument" in
+// turmeric/tools/build.sf (the bundler rewrote every index.html into N copies of
+// its first line) and as a stdlib indexing bug elsewhere.
+//
+// Genuine doubles now route through __val_untag_float (which already sitofp's an
+// int-tagged operand) and fptosi, so they are converted. Values carrying TAG_PTR
+// or TAG_SPEC, and raw untagged values whose high bits are clear, keep the exact
+// old masking path — only a real double behaves differently.
+//
+// The cases that must KEEP working are the point of this test as much as the fix.
+
+import "@test" as Test
+
+var chars = ["a", "b", "c", "d"]
+
+// --- the bug: a Float-annotated index ---
+var f: Float = 2.0
+Test.assert_eq(chars[f], "c", "Float index reads the right element, not element 0")
+
+var f0: Float = 0.0
+Test.assert_eq(chars[f0], "a", "Float index 0.0 reads element 0 (for the right reason)")
+
+var f3: Float = 3.0
+Test.assert_eq(chars[f3], "d", "Float index reaches the last element")
+
+// A fractional index truncates toward zero, matching .floor() on a positive
+// value — the documented workaround now happens implicitly.
+var frac: Float = 2.9
+Test.assert_eq(chars[frac], "c", "fractional Float index truncates toward zero")
+
+// --- cases that must keep working ---
+Test.assert_eq(chars[1], "b", "literal index still correct")
+Test.assert_eq(chars[1 + 1], "c", "arithmetic in an index still correct")
+
+var i: Int = 2
+Test.assert_eq(chars[i], "c", "Int-annotated index still correct")
+
+var inferred = 3
+Test.assert_eq(chars[inferred], "d", "inferred index still correct")
+
+Test.assert_eq(chars[-1], "d", "negative literal index still wraps to the end")
+
+var neg: Int = -2
+Test.assert_eq(chars[neg], "c", "negative Int index still wraps")
+
+var negf: Float = -1.0
+Test.assert_eq(chars[negf], "d", "negative Float index wraps like an Int")
+
+// --- the same untag path serves string indexing ---
+Test.assert_eq("wxyz"[2], "y", "literal String index still correct")
+var si: Int = 1
+Test.assert_eq("wxyz"[si], "x", "Int String index still correct")
+var sf: Float = 3.0
+Test.assert_eq("wxyz"[sf], "z", "Float String index converts too")
+
+// --- and int-consuming methods, which share emit_untag_int ---
+Test.assert_eq("hello".slice(1, 3), "el", "String.slice unaffected")
+Test.assert_eq([1, 2, 3, 4].slice(1, 3).to_string(), "[2, 3]", "List.slice unaffected")
+Test.assert_eq("ha".repeat(3), "hahaha", "String.repeat unaffected")
+
+// Large magnitudes must survive the tag classification in both directions:
+// a genuine Int keeps the masking path, so nothing is truncated.
+var big: Int = 100000
+Test.assert_eq(big.to_string(), "100000", "large positive Int round-trips")
+var negbig: Int = -100000
+Test.assert_eq(negbig.to_string(), "-100000", "large negative Int round-trips")
+
+// A Float in a plainly numeric (non-index) position is untouched by all this.
+var fv: Float = 2.5
+Test.assert_eq((fv + 1.0).to_string(), "3.5", "Float arithmetic still uses the float path")
+
+Test.summary()

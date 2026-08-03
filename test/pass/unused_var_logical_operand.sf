@@ -1,0 +1,196 @@
+// BUGS #133 — "unused variable" must not fire for a variable whose only
+// appearance is inside an `and`/`or` OPERAND, and must still fire for one that
+// is genuinely never touched.
+//
+// infer_type's `Logical(left, op, right)` arm returned BoolType without ever
+// visiting either operand, so both subtrees were invisible to the used-variable
+// bookkeeping. `if (e > 0 and e < 5)` warned for `e`.
+//
+// This is the third instance of one class of defect, and the pattern is worth
+// naming because it predicts where the fourth will be: #121 (the callee of a
+// Call), #126 (a lambda's body) and #133 (a logical operand) are all arms that
+// knew their own result type and therefore never asked what was underneath them.
+// `and`/`or` is the easiest of the three to get wrong, because unlike Binary the
+// operand types genuinely do not contribute to the result — Saffron's `and`/`or`
+// yield a Bool rather than one of their operands — so returning BoolType without
+// recursing looks complete rather than truncated.
+//
+// Both halves are asserted, because the fix's whole risk is that it becomes a
+// blanket suppression: the walk must make the operands *visible*, not make the
+// warning go away.
+//
+// WHY THIS SHELLS OUT TO THE COMPILER — same reason as
+// test/pass/unused_var_lambda_capture.sf and unused_var_callee_position.sf,
+// which this file is modelled on: tools/run_tests.sh's filter_noise() strips
+// every `[checker] Warning` line out of a test's captured output, so a warning
+// printed while compiling THIS file is invisible to the runner by construction.
+// A "no warning" test written that way would pass no matter what. The in-process
+// route (`import "@check"`) is still blocked by BUGS #127's parser defect.
+
+import "@test" as Test
+import "@os" as OS
+
+fun compiler_path(): String { return "build/saffronc" }
+
+// Compile `src` and return the compiler's combined stdout+stderr.
+//
+// The output path must NOT contain ".sf": saffronc selects its input by
+// contains(".sf") on the last matching argument, so `out.sf.ll` would silently
+// become the input, the real input would never be read, and every case here
+// would report "no warning" and pass vacuously (BUGS #119).
+fun diagnostics_for(src: String, tag: String): String {
+    var src_path: String = "/tmp/saffron_b133_" + tag + ".sf"
+    var out_path: String = "/tmp/saffron_b133_" + tag + "_out.ll"
+    IO.write_file(src_path, src)
+    return OS.exec(compiler_path() + " " + src_path + " " + out_path + " 2>&1")
+}
+
+fun warns_unused(src: String, var_name: String, tag: String): Bool {
+    var out: String = diagnostics_for(src, tag)
+    return out.contains("unused variable '" + var_name + "'")
+}
+
+// A guard on the harness itself. If the compiler path were wrong, or the input
+// were never read (BUGS #119), every warns_unused() below would answer false —
+// which would make the must-not-warn cases pass for the wrong reason.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var never_touched: Int = 5\n  return 1\n}\n",
+    "never_touched", "harness"), "HARNESS: a variable never mentioned still warns")
+
+// --- The false positive (must NOT warn) ---------------------------------------
+
+// The headline repro from BUGS #133: `e` appears only inside the two operands.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var e: Int = 1\n  if (e > 0 and e < 5) { return 2 }\n  return 1\n}\n",
+    "e", "both"), "a variable used only in both and-operands is used")
+
+// Each side alone, because one arm recursing and the other not is exactly the
+// half-fix this is most likely to receive: the operands are two separate
+// recursive calls, and dropping either one is a one-line mistake.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var l: Int = 1\n  if (l == 1 and true) { return 2 }\n  return 1\n}\n",
+    "l", "left"), "a variable used only in the LEFT and-operand is used")
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var r: Int = 1\n  if (true and r == 1) { return 2 }\n  return 1\n}\n",
+    "r", "right"), "a variable used only in the RIGHT and-operand is used")
+
+// `or` as well as `and`. These are separate operator strings on the same AST
+// node, so a fix keyed on `op == "and"` — which is how apply_narrowing is
+// legitimately written a few hundred lines above — would leave `or` broken.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var o: Int = 1\n  if (o == 1 or false) { return 2 }\n  return 1\n}\n",
+    "o", "or"), "a variable used only in an or-operand is used")
+
+// Nested logicals: the use is two levels down, so the walk has to recurse rather
+// than look one operand deep.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var d: Int = 1\n  if (true and (false or d == 1)) { return 2 }\n  return 1\n}\n",
+    "d", "nested"), "a variable used in a nested logical is used")
+
+// Outside an `if` condition entirely. The un-walked arm was in infer_type, not
+// in the if-statement path, so the defect was never specific to conditions —
+// asserting only the `if` shape would under-specify the fix.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var a: Int = 1\n  var b: Bool = a == 1 and true\n  if (b) { return 2 }\n  return 1\n}\n",
+    "a", "assign"), "a variable in a logical assigned to a var is used")
+// The interpolation case is assembled by concatenation rather than written as a
+// literal: a `${...}` spelled inside this file's own string would be interpolated
+// HERE, by the compiler building this test, and `s` names nothing in this scope —
+// which is a compile error in the test rather than a probe of the compiler under
+// test. `interp_dollar()` keeps the `$` out of the literal.
+fun interp_dollar(): String { return "$" }
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var s: Int = 1\n  IO.println(\"" + interp_dollar() + "{s == 1 and true}\")\n  return 1\n}\n",
+    "s", "interp"), "a variable in a logical inside interpolation is used")
+Test.assert(!warns_unused(
+    "fun take(f: Bool): Int { return 1 }\nfun run(): Int {\n  var g: Int = 1\n  return take(g == 1 or false)\n}\n",
+    "g", "callarg"), "a variable in a logical passed as an argument is used")
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var w: Int = 1\n  while (w == 1 and false) { return 2 }\n  return 1\n}\n",
+    "w", "while"), "a variable in a while-condition logical is used")
+
+// A whole EXPRESSION under the operand, not just a bare variable. The walk has
+// to reach the variable through the arithmetic, which is what distinguishes a
+// real recursive walk from a special case that only recognises `Variable` and
+// `Binary(Variable, op, Literal)`.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var x: Int = 1\n  if (x + 1 == 2 and true) { return 2 }\n  return 1\n}\n",
+    "x", "arith"), "a variable under arithmetic in an operand is used")
+
+// Controls that were ALREADY correct before the fix, kept so a regression in the
+// surrounding arms is caught here rather than somewhere less specific. `!` goes
+// through Unary and a nested `==` through Binary, both of which already recursed.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var n: Int = 1\n  if (!(n == 1)) { return 2 }\n  return 1\n}\n",
+    "n", "not"), "CONTROL: a variable under `!` is used")
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var q: Int = 1\n  if ((q == 1) == true) { return 2 }\n  return 1\n}\n",
+    "q", "eqeq"), "CONTROL: a variable under a nested == is used")
+
+// --- Genuine unused variables (must STILL warn) -------------------------------
+// What would break if walking the operands suppressed the warning wholesale.
+
+// A genuinely-unused local sitting right beside a real logical use, so "the
+// logical marked something used" cannot be mistaken for "the enclosing scope
+// stopped being checked at all".
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var used: Int = 1\n  var spare: Int = 2\n  if (used == 1 and true) { return 2 }\n  return 1\n}\n",
+    "spare", "spare"), "an unused local beside a real logical use still warns")
+
+// Two locals where only ONE appears in the logical. The other must still warn,
+// which pins down that the walk marks the variables it actually reaches rather
+// than everything in scope at the time it runs.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var seen: Int = 1\n  var unseen: Int = 2\n  if (seen == 1 or seen == 3) { return 2 }\n  return 1\n}\n",
+    "unseen", "onlyone"), "a local absent from the logical still warns")
+
+// A local mentioned nowhere at all, in a function that DOES contain a logical.
+// If the walk ever marked used-ness by scope rather than by reached expression,
+// the mere presence of a logical would suppress every warning in the function.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var untouched: Int = 9\n  if (true and false) { return 2 }\n  return 1\n}\n",
+    "untouched", "nologicaluse"), "a logical with no variables suppresses nothing")
+
+// --- Narrowing across the operand -------------------------------------------
+// The walk cannot infer the right operand in the UNNARROWED environment. Doing
+// so does not merely miss a diagnostic, it invents one: the first version of the
+// #133 fix walked the right operand plainly and made the compiler reject its own
+// source, because `x != nil and x.length() > 0` is the guard spelling this
+// codebase recommends (`is` is broken on unions, BUGS #69) and the plain walk saw
+// `x` as `String|Nil` on the right. Short-circuiting is what licenses the
+// narrowing: `and` only evaluates the right operand when the left was true.
+
+fun errors_for(src: String, tag: String): String {
+    var out: String = diagnostics_for(src, tag)
+    return out
+}
+fun rejects(src: String, tag: String): Bool {
+    return errors_for(src, tag).contains("ERROR")
+}
+
+// The recommended guard must type check. This is the shape that broke the build.
+Test.assert(!rejects(
+    "fun run(): Int {\n  var m: Map<String, String> = {}\n  var v: String|Nil = m.get(\"k\")\n  if (v != nil and v.length() > 0) { return 2 }\n  return 1\n}\n",
+    "narrow_and"), "`x != nil and x.length()` type checks")
+
+// `or` needs the INVERSE narrowing, and for the same reason: it only evaluates
+// the right operand when the left was FALSE. A fix that narrowed only for `and`
+// would leave this rejected.
+Test.assert(!rejects(
+    "fun run(): Int {\n  var m: Map<String, String> = {}\n  var v: String|Nil = m.get(\"k\")\n  if (v == nil or v.length() > 0) { return 2 }\n  return 1\n}\n",
+    "narrow_or"), "`x == nil or x.length()` type checks")
+
+// ...but the narrowing must not ESCAPE the logical. It is pushed in a scope of
+// its own precisely so an unguarded use outside the operand is still an error;
+// otherwise the fix would trade a false warning for unsound nil handling.
+Test.assert(rejects(
+    "fun run(): Int {\n  var m: Map<String, String> = {}\n  var v: String|Nil = m.get(\"k\")\n  if (v != nil and true) { return 2 }\n  return v.length()\n}\n",
+    "no_escape"), "narrowing does not escape the logical expression")
+
+// The dual: an unguarded call in the right operand is STILL an error. Without
+// this, "narrows correctly" is indistinguishable from "stopped checking there".
+Test.assert(rejects(
+    "fun run(): Int {\n  var m: Map<String, String> = {}\n  var v: String|Nil = m.get(\"k\")\n  if (true and v.length() > 0) { return 2 }\n  return 1\n}\n",
+    "unguarded_right"), "an unguarded nullable call in the right operand still errors")
+
+Test.summary()

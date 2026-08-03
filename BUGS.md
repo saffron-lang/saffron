@@ -2,8 +2,8 @@
 
 ## Open
 
-**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
-#129, #130, #131, #132, #133. Next free number is **#134**.
+**15 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+#129, #130, #131, #132. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -1157,6 +1157,180 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 134. FIXED — a method call on a concrete builtin receiver dispatched to an unrelated user class
+
+**Severity: high — a silent wrong answer, and a segfault in the field-touching
+variant.** A call to a method name the receiver's real type does not have, but
+which *some* unrelated user class declared, resolved to that class's method
+instead of being rejected.
+
+```saffron
+class Widget { fun init() {} fun frobnicate(): Int { return 42 } }
+fun main() {
+    var s: String = "ab"
+    IO.println(s.frobnicate())   // printed 42 — String has no frobnicate()
+}
+main()
+```
+
+`String` has no `frobnicate`, `Widget` was never even constructed, yet the call
+printed `42`. With a field-touching body the unrelated class's `this` became a
+`String` pointer read at a class field offset — `Segmentation fault: 11`.
+
+**Not String-specific.** The same `Widget`/`frobnicate` shape over five receiver
+types (String, Int, `List<Int>`, Bool, Float) all printed `42`, so it was not
+"String is under-checked" — a call on *any* concrete builtin receiver, when
+nothing legitimately matched, fell through to whatever user class declared that
+name. Distinct from #37 (no branch matches → call silently dropped): there the
+*wrong* branch matched. Same dispatch-permissiveness family as #37/#38/#91.
+
+The cause: `find_class_for_method(method)` is a heuristic for a receiver whose
+type codegen could not resolve, and three sites in `gen_method_call` invoked it
+without first checking the receiver's static type. A `String` receiver resolved
+to `""`, `is_user_class` stayed false, and the heuristic found `Widget`. Fixed by
+`recv_is_concrete_builtin(obj_type)` — true for a primitive, container or
+StringBuilder, false for `Any` (which keeps the heuristic and its own
+annotate-the-receiver diagnostic) and for user classes — gating all three
+`find_class_for_method` sites. A concrete builtin with no matching builtin arm
+now reaches the terminal fall-through, which already reported "type 'X' has no
+method 'm'". The genuine builtin methods (`length`, `to_upper`, `abs`, `floor`,
+…) are dispatched by the arms above and are unaffected.
+
+`test/fail/builtin_receiver_misdispatch.sf` (must be rejected) and the legitimate
+builtin methods verified still working. Note the guard is keyed on the *static*
+type: a receiver whose type is genuinely `Any` still rides the heuristic, so the
+"annotate the value" story for #37 is intact.
+
+### 135. FIXED — a method inherited from a grandparent but not redeclared on the leaf had no dispatch symbol
+
+**Severity: high — rejected valid programs at codegen.** A three-level chain where
+the middle class overrode a method and the leaf did not redeclare it failed to
+compile *when the call went through a base-typed receiver* (the case that forces
+runtime dispatch):
+
+```saffron
+class Base { fun init() {} fun label(): String { return "base" }
+             fun show(): String { return this.label() } }
+class Mid extends Base { fun init() {} fun label(): String { return "mid" } }
+class Leaf extends Mid { fun init() {} }
+var x: Base = Leaf()
+x.label()   // was: [codegen] Error: no symbol for method 'label' on class 'Leaf'
+```
+
+`var x: Leaf = Leaf(); x.label()` compiled and printed `mid` — the failure needed
+the base-typed variable, which makes codegen emit a runtime dispatch arm per
+concrete descendant. In `gen_virtual_dispatch` each arm switches on the
+descendant's runtime tag but derived the *called symbol* from the descendant's
+own name (`sc`), so for `Leaf` it asked `resolve_method_symbol` for `Leaf__label`
+— a forwarder never emitted, because `Leaf` inherits `label` from `Mid` without
+redeclaring it. The arm already computed `sc_owner` (`effective_method_owner(sc,
+method)` = `Mid`, the class that actually declares the method); the fix derives
+the symbol's bare name from `sc_owner` while still switching on `sc`'s tag. When
+the descendant does redeclare, `sc_owner == sc` and behaviour is unchanged.
+
+`test/pass/grandchild_dispatch.sf`, 7 assertions: leaf through a base slot,
+through an inherited `show()`, a redeclaring `Mid` (the always-worked arm), the
+base itself, a `List<Base>`, and a four-level chain where the resolved owner is
+two hops up (a one-level walk would still miss it).
+
+### 136. FIXED — a semicolon inside a block EXPRESSION was a parse error
+
+```saffron
+var r = { var q = 5; q }   // Error: expected a literal, name or '(' here
+```
+
+The parser desugars a block expression `{ stmts...; value }` via a loop at
+`parser.sf:930` that, unlike every other statement loop in the file, never
+drained the `;` separator before calling `parse_stmt`, so the bare `;` was handed
+to `parse_stmt`. `{ 1; 2 }`, `{ 7; }` and `{ ; 7 }` all failed the same way. The
+multi-line form worked only because newlines are not tokens — which is exactly
+what hid it, since a multi-statement block is naturally written across lines, and
+semicolons work fine in a `fun` body (`parse_block_stmts` at `parser.sf:3213`
+already had the skip).
+
+Surfaced by the abb4fbf branch evaluation, which bisected the *visible* error to
+`3138807` (the #76 checker-recursion fix): that commit added the
+`_ => { this.parse_error(...) }` arm to the primary-expression match and so
+turned this pre-existing silent-garbage path into a hard error. The missing `;`
+skip itself is older. Distinct from #129 (a `this`-initial statement swallowing
+an infix operator — no `this` here) and #128.
+
+Fixed by mirroring `parse_block_stmts`: drain `;` at the top of the loop and
+re-check `}`/eof after the drain so a trailing `;` closes the block (yielding nil)
+rather than demanding another statement. Regression test
+`test/pass/block_expr_semicolon.sf`, 6 assertions covering single/multiple/
+leading/trailing semicolons, two values, and the still-working multi-line form.
+
+### 133. FIXED — a variable used only inside an `and`/`or` operand was reported unused
+
+```saffron
+fun f() {
+    var e: Int = 1
+    if (e > 0 and e < 5) { IO.println("ok") }   // Warning: unused variable 'e'
+}
+```
+
+`infer_type`'s `Logical(left, op, right)` arm (`checker.sf:2632`) returned
+`AST.Type.BoolType` without visiting either operand, so both subtrees were
+invisible to the used-variable bookkeeping. Fixed by walking them; the arm still
+returns `BoolType` unconditionally, because it is a walk and not new inference.
+
+Reproduced against the untouched checked-in gen2, so it predates the current
+round of work and is not a regression from it. Cosmetic — a false diagnostic, no
+wrong code emitted.
+
+**The axis was measured, not guessed.** Eight shapes were compiled and the
+warnings counted one at a time:
+
+| shape | warns |
+|---|---|
+| `if (x == 1 and true)` | yes |
+| `if (true and x == 1)` | yes |
+| `if (x == 1 or true)` | yes |
+| `var b: Bool = x == 1 and true` | yes |
+| `IO.println("${x == 1 and true}")` | yes |
+| `if (x + 1 == 2 and true)` | yes |
+| `if (!(x == 1))` | **no** |
+| `if ((x == 1) == true)` | **no** |
+
+So it was never specific to `if` conditions, and `!` (Unary) and a nested `==`
+(Binary) were already correct — both of those arms recurse. That table is what
+located the single arm; reading the file would have offered `apply_narrowing`'s
+two `Logical` arms as equally plausible culprits, and they are not the bug.
+
+**This is the third instance of one defect class, and naming it predicts the
+fourth.** #121 (the callee of a `Call`), #126 (a lambda's body) and #133 (a
+logical operand) are all `infer_type` arms that knew their own result type and
+therefore never asked what was underneath them. `Logical` is the easiest of the
+three to write wrongly, because unlike `Binary` the operand types genuinely *do
+not* contribute to the result — Saffron's `and`/`or` yield a `Bool` rather than
+one of their operands — so returning `BoolType` without recursing looks complete
+rather than truncated. **The audit this suggests:** any `infer_type` arm whose
+body is a bare type constructor with no `infer_type` call is a candidate. At the
+time of writing `GetField(obj, field) => AST.Type.AnyType` and
+`ListLit(elements) => AST.Type.GenericType("List", [AnyType])` both have that
+shape.
+
+Regression test: `test/pass/unused_var_logical_operand.sf`, 16 assertions,
+modelled on `unused_var_lambda_capture.sf` (#126) and
+`unused_var_callee_position.sf` (#121) — it shells out to `build/saffronc` and
+greps the diagnostics, because `run_tests.sh`'s `filter_noise()` strips every
+`[checker] Warning` line from a test's captured output, so an in-file "no
+warning" test would pass no matter what. Measured 6/16 before the fix and 16/16
+after. It asserts both halves: left operand and right operand separately (two
+recursive calls, so dropping either is a one-line half-fix), `or` as well as
+`and` (a fix keyed on `op == "and"` — which is how `apply_narrowing` is
+legitimately written a few hundred lines above — would leave `or` broken), a use
+reached *through* arithmetic, and three must-still-warn cases so the walk cannot
+become a blanket suppression.
+
+One wrinkle worth recording because it cost a cycle: the interpolation case
+cannot be written as a string literal. A `${...}` inside this test's own source
+is interpolated by the compiler *building the test*, where `s` names nothing, so
+the literal has to be assembled by concatenation around a helper returning `"$"`.
+
+---
 
 ### 116. FIXED — enum payload variants compared by address, so two equal values were unequal
 

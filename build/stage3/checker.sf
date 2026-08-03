@@ -2629,7 +2629,44 @@ class NullChecker {
             Unary(op, right) => this.infer_type(right)
             Call(callee, args) => this.parse_type_node(this.infer_call(callee, args))
             Assign(name, value) => this.parse_type_node(this.check_assign(name, value))
-            Logical(left, op, right) => AST.Type.BoolType
+            // Both operands are code, so walk them. Returning BoolType without
+            // visiting `left` and `right` meant a variable used ONLY inside an
+            // `and`/`or` operand was never marked used and drew a false "unused
+            // variable" (BUGS #133) — `if (e > 0 and e < 5)` warned for `e`. Same
+            // un-walked-subtree class as #121 and #126, at a third site: what
+            // these three share is an arm that knew its own result type and so
+            // never asked what was underneath it.
+            //
+            // The type is still unconditionally BoolType: this is a walk, not new
+            // inference. `and`/`or` in Saffron yield a Bool rather than one of
+            // their operands, so the operand types genuinely do not contribute —
+            // which is exactly what made the missing walk easy to write.
+            // The right operand is inferred UNDER the left's narrowing, which is
+            // what short-circuiting licenses: `and` only evaluates the right when
+            // the left was true, so `x != nil and x.length() > 0` — the guard
+            // spelling this codebase recommends, since `is` is broken on unions
+            // (BUGS #69) — must see `x` as non-nil on the right. `or` gets the
+            // INVERSE narrowing for the same reason: it only evaluates the right
+            // when the left was false, so `x == nil or x.length() > 0` narrows too.
+            //
+            // Walking the right operand in the unnarrowed environment is not a
+            // half-measure, it is a new false error: the first version of this fix
+            // did exactly that and made the compiler reject its own source at
+            // codegen/stmts_body.sf. The scope is pushed and popped so the
+            // narrowing cannot escape into the enclosing expression — `(a != nil
+            // and b) or a.f` must still reject `a.f`.
+            Logical(left, op, right) => {
+                this.infer_type(left)
+                this.env.push_scope()
+                if (op == "and") {
+                    this.apply_narrowing(left)
+                } else {
+                    this.apply_inverse_narrowing(left)
+                }
+                this.infer_type(right)
+                this.env.pop_scope()
+                AST.Type.BoolType
+            }
             MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
