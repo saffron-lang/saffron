@@ -1,0 +1,99 @@
+// A nested map literal must not overwrite its parent.
+//
+// The parser desugars a map literal into a BlockExpr holding a VarDecl of a
+// temporary plus one `.set()` per entry, and that temporary is always named
+// `__map` (at both duplicated desugaring sites). Allocas are hoisted per
+// *function*, not per block, so a literal nested inside another literal declared
+// a second `__map` that aliased the first: the inner map's construction wrote
+// into the outer map's slot, the outer entries were discarded, and the variable
+// ended up bound to the inner map. `{"outer": {"inner": 1}}` reported the key
+// "inner". No diagnostic — the program just held the wrong value.
+//
+// Codegen now recognises that desugared shape and emits it in pure SSA, with the
+// map handle in a fresh `%tN` and no named storage at all, so nesting cannot
+// alias at any depth. A user block that merely happens to declare a variable
+// called `__map` is deliberately NOT rewritten.
+
+import "@test" as Test
+
+// --- the bug ---
+var m = {"outer": {"inner": 1}, "other": 2}
+Test.assert_eq(m.keys().to_string(), "[outer, other]", "outer keys survive a nested literal")
+Test.assert_eq(m.keys().length(), 2, "outer map has exactly its own two keys")
+Test.assert(m.has("outer"), "the nested-value key is present")
+Test.assert(!m.has("inner"), "the inner map's key did not leak into the parent")
+
+// --- three-level nesting ---
+//
+// The inner maps are annotated on the way down deliberately. Reading a nested
+// map out through an *inferred* variable (`var lvl2 = deep["a"]`) is broken
+// independently of this fix — the value type of a Map<String, Map<...>> is not
+// recovered, so the receiver reaches codegen as Any and the untyped `keys()`
+// dispatch misreads it. That is a separate pre-existing defect (it segfaults on
+// a baseline build; with this fix it degrades to a clean IndexError instead).
+// Annotating keeps this test about #41: whether the outer literal's own entries
+// survive.
+var deep = {"a": {"b": {"c": 1}}, "z": 9}
+Test.assert_eq(deep.keys().to_string(), "[a, z]", "level 1 keys intact with 3 levels")
+Test.assert_eq(deep.keys().length(), 2, "level 1 has exactly its own keys")
+Test.assert(deep.has("a"), "level 1 nested key present")
+Test.assert(!deep.has("b"), "level 2 key did not leak up to level 1")
+Test.assert(!deep.has("c"), "level 3 key did not leak up to level 1")
+
+var lvl2: Map<String, Int> = {"b": 7}
+Test.assert_eq(lvl2.keys().to_string(), "[b]", "an annotated inner map keeps its key")
+
+// --- sibling nested maps: each needs its own storage ---
+// Two nested literals side by side each needed their own storage; under the bug
+// they shared one slot with each other and with the parent.
+var sib = {"x": {"p": 1}, "y": {"q": 2}, "w": 3}
+Test.assert_eq(sib.keys().to_string(), "[x, y, w]", "all sibling keys present")
+Test.assert_eq(sib.keys().length(), 3, "parent has exactly its own three keys")
+Test.assert(!sib.has("p"), "first nested map's key did not leak into the parent")
+Test.assert(!sib.has("q"), "second nested map's key did not leak into the parent")
+Test.assert_eq(sib.get("w"), 3, "a plain value alongside nested ones is correct")
+
+// Reading siblings back through a list literal keeps the element type concrete,
+// which avoids the unrelated Any-receiver defect noted above.
+var pair = [{"p": 1}, {"q": 2}]
+Test.assert_eq(pair[0].keys().to_string(), "[p]", "first sibling keeps its own entry")
+Test.assert_eq(pair[1].keys().to_string(), "[q]", "second sibling is not clobbered by the first")
+Test.assert_eq(pair[0].keys().length(), 1, "first sibling has exactly one entry")
+Test.assert_eq(pair[1].keys().length(), 1, "second sibling has exactly one entry")
+
+// --- flat literals and type inference must be unchanged ---
+var flat = {"a": 1, "b": 2}
+Test.assert_eq(flat.keys().to_string(), "[a, b]", "flat literal unaffected")
+Test.assert_eq(flat.get("b"), 2, "flat literal values unaffected")
+
+var typed: Map<String, Int> = {"k": 1, "j": 2}
+Test.assert_eq(typed["k"], 1, "annotated Map<String,Int> still indexes correctly")
+
+var empty: Map<String, Int> = {}
+Test.assert_eq(empty.keys().length(), 0, "empty literal still builds an empty map")
+
+// Numeric keys go through the same path; the key tag must stay intact.
+var by_id = {1: "one", 2: "two"}
+Test.assert_eq(by_id.get(1), "one", "Int-keyed literal still works")
+
+// A nested literal inside a *list* literal, and a map nested in a map value
+// reached via a method call, both exercise the recursion.
+var in_list = [{"a": 1}, {"b": 2}]
+Test.assert_eq(in_list[0].keys().to_string(), "[a]", "map literal inside a list keeps its keys")
+Test.assert_eq(in_list[1].keys().to_string(), "[b]", "second map in a list is independent")
+
+// --- the guard: a real user block naming __map is left alone ---
+//
+// Written multi-line deliberately. The single-line form
+// `var plain = { var __map = 5; __map + 1 }` does not parse: the block
+// expression's statement loop (parser.sf:921) is the one such loop that never
+// skips a `;`, so parse_stmt is handed the semicolon and reports "expected a
+// literal, name or '(' here". That is a separate, unfiled parser defect and
+// nothing to do with #41 — keep this assertion about the guard.
+var plain = {
+    var __map = 5
+    __map + 1
+}
+Test.assert_eq(plain, 6, "an ordinary block using the name __map is not rewritten")
+
+Test.summary()
