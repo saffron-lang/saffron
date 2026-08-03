@@ -1,0 +1,147 @@
+// BUGS #116 — `==` on an enum must mean the SAME thing whether or not the
+// variant carries a payload.
+//
+// A payload variant is built by `gen_enum_construct` (expr_body.sf:3222) as a
+// bare `__sf_malloc` array `[tag, f0, f1, ...]`, and `gen_binary`'s equality
+// path (expr_body.sf:940) ends at a raw `icmp eq i64` for two operands of static
+// type `EnumType`. So `==` compares the two *addresses*:
+//
+//   Option.Some(42) == Option.Some(42)   // false — two distinct mallocs
+//   Option.Some(42) == Option.Some(43)   // false — right answer, wrong reason
+//
+// Note the second line. It is why a test that only checks UNEQUAL values passes
+// while equality is completely broken, and why the assertions below are written
+// as properties rather than as a list of expected booleans.
+//
+// The wart this pins down is that `==` currently means two different things
+// depending on the variant's shape: value equality for a fieldless enum (whose
+// representation is the bare immediate `tag << 56`, with no allocation and hence
+// no identity to accidentally compare), and identity for a payload variant. One
+// spelling, two semantics, chosen by a detail of the enum's declaration that the
+// call site cannot see.
+//
+// WHAT THIS TEST ASSERTS AND WHY IT IS SHAPED THIS WAY
+//
+// Each block states an invariant that must hold under ANY defensible definition
+// of enum equality, and that address comparison violates. It deliberately avoids
+// freezing answers that a future design decision could legitimately change
+// (BUGS #107 discipline):
+//
+//   1. REFLEXIVITY THROUGH RECONSTRUCTION — building the same variant with the
+//      same payload twice gives two values that are equal. This is the headline
+//      failure. Plain `x == x` on a single variable does NOT test it: address
+//      comparison answers that one correctly, so it is a control, not a probe.
+//   2. AGREEMENT WITH THE FIELDLESS CASE — `Color.Red == Color.Red` is already
+//      true. Whatever `==` means, it must not flip when a sibling variant in the
+//      same enum gains a field.
+//   3. TAG SENSITIVITY — two DIFFERENT variants of the same enum are unequal,
+//      and stay unequal. Structural equality must compare the tag first, or
+//      `None == Some(0)` could start answering true once payload comparison is
+//      added.
+//   4. PAYLOAD SENSITIVITY — same variant, different payload, is unequal. This
+//      is the one that already passes; it is here so a fix cannot achieve
+//      equality by making everything equal.
+//   5. INDEPENDENCE FROM ALLOCATION ORDER — the same two values built in the
+//      opposite order compare the same way. Under address comparison the
+//      *inequality* results are luck of the allocator, exactly as in
+//      test/pass/cmp_container_not_by_address.sf.
+//
+// WHAT IT DOES NOT COVER: this is value equality only. Reference identity for
+// mutable CLASS instances is a separate question and is not touched here — see
+// test/pass/cmp_container_not_by_address.sf, which pins ordering, not equality.
+import "@test" as Test
+
+enum Option {
+    Some(value: Int),
+    None
+}
+
+enum Shape {
+    Circle(r: Int),
+    Rect(w: Int, h: Int),
+    Empty
+}
+
+// Fieldless enum: the control. Its representation is `tag << 56`, so it has
+// always compared by value.
+enum Color {
+    Red,
+    Green
+}
+
+fun main() {
+    // --- 2. The control: the fieldless case that already works. If this ever
+    // breaks, the fix went too far and broke the case that was right.
+    Test.assert(Color.Red == Color.Red, "fieldless variant equals itself")
+    Test.assert(!(Color.Red == Color.Green), "distinct fieldless variants differ")
+
+    // --- Reflexivity on a single value. Address comparison passes this too, so
+    // it proves nothing on its own — it is here to catch a fix that manages to
+    // make a value unequal to itself.
+    var s: Option = Option.Some(42)
+    Test.assert(s == s, "a payload value equals itself")
+
+    // --- 1. THE HEADLINE. Two separately constructed, structurally identical
+    // payload values. This is what BUGS #116 reports as false.
+    var a: Option = Option.Some(42)
+    var b: Option = Option.Some(42)
+    Test.assert(a == b, "two Some(42) built separately are equal")
+    Test.assert(!(a != b), "and != agrees with ==")
+
+    // Symmetry: equality cannot depend on operand order.
+    Test.assert(b == a, "equality is symmetric")
+
+    // The same, without the intermediate variables, so a fix that only works
+    // through a load from a variable slot is caught.
+    Test.assert(Option.Some(7) == Option.Some(7), "inline Some(7) values are equal")
+
+    // A fieldless variant of an enum that DOES have payload variants. This one
+    // is a distinct case in codegen: it is heap-allocated as a one-slot array
+    // `[tag]` rather than being an immediate, so it compared by address too.
+    Test.assert(Option.None == Option.None, "None equals None")
+    var n1: Option = Option.None
+    var n2: Option = Option.None
+    Test.assert(n1 == n2, "two separately built None values are equal")
+
+    // --- 3. TAG SENSITIVITY. Different variants of the same enum.
+    Test.assert(!(a == Option.None), "Some(42) does not equal None")
+    Test.assert(a != Option.None, "and != says so")
+    Test.assert(!(Option.None == Option.Some(0)),
+        "None does not equal Some(0) even though both are 'empty-ish'")
+
+    // --- 4. PAYLOAD SENSITIVITY. Same variant, different payload.
+    var c: Option = Option.Some(43)
+    Test.assert(!(a == c), "Some(42) does not equal Some(43)")
+    Test.assert(a != c, "and != says so")
+
+    // --- Multi-field variants: every field must participate, not just the first.
+    Test.assert(Shape.Rect(2, 3) == Shape.Rect(2, 3), "Rect(2,3) equals Rect(2,3)")
+    Test.assert(!(Shape.Rect(2, 3) == Shape.Rect(2, 4)),
+        "a difference in the LAST field is detected")
+    Test.assert(!(Shape.Rect(2, 3) == Shape.Rect(9, 3)),
+        "a difference in the FIRST field is detected")
+
+    // Different variants with different arities in the same enum.
+    Test.assert(!(Shape.Circle(2) == Shape.Rect(2, 3)),
+        "Circle(2) does not equal Rect(2,3)")
+    Test.assert(!(Shape.Circle(2) == Shape.Empty), "Circle(2) does not equal Empty")
+    Test.assert(Shape.Empty == Shape.Empty, "Empty equals Empty")
+    Test.assert(Shape.Circle(5) == Shape.Circle(5), "Circle(5) equals Circle(5)")
+
+    // --- 5. INDEPENDENCE FROM ALLOCATION ORDER. Same pair of values, built in
+    // the reverse order. Under address comparison the answers here are decided
+    // by where the allocator happened to put each object.
+    var y: Option = Option.Some(43)
+    var x: Option = Option.Some(42)
+    Test.assert_eq(x == y, a == c, "equality does not depend on allocation order")
+    Test.assert_eq(y == x, c == a, "nor with the operands the other way round")
+
+    // Determinism: the same comparison twice agrees with itself.
+    var first: Bool = a == b
+    Test.assert_eq(a == b, first, "equality is deterministic")
+    Test.assert_eq(a == b, first, "and again")
+
+    Test.summary()
+}
+
+main()
