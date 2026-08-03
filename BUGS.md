@@ -3,7 +3,10 @@
 ## Open
 
 **11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139, #143. Next free number is **#144**.
+#139, #143. Next free number is **#145**.
+
+#144 was filed and fixed in the same sitting (the unused-variable warning firing
+on compiler-mandated match-arm bindings) and is under `## Resolved`.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -674,6 +677,57 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 144. FIXED — the unused-variable warning was 98% noise, because it fired on match-arm bindings the language forces you to write
+
+**Severity: medium.** Not a miscompile — warnings are non-blocking
+(`error_report`, `checker.sf`; `has_errors` reads only `errors`). The damage was
+to every log: a bootstrap emitted **1458** `unused variable` lines while gen3
+compiled the compiler's own source, and the 38-odd real findings among them were
+unfindable. A diagnostic nobody can read is a diagnostic that does not exist.
+
+The warning was *accurate* about "never read" and wrong about "defect".
+`check_pattern_arity` **requires** every payload field of a variant to be named:
+shortening a pattern is a hard error (`match arm A binds 1 field(s) but A
+declares 3`). So a four-field variant must spell all four bindings, and the
+checker then warned about the three you did not read. `src/compiler/ast.sf` is
+built out of exactly that idiom — `match (s) { Span(line, col, offset, len) =>
+line }`, three warnings per accessor — and `checker.sf`'s own `TypeAlias(ta_n,
+ta_t, ta_vis) => {}` was three warnings from an *empty* arm. Match-arm bindings
+were registered with plain `define_var`, into the same unused-tracked scope as an
+ordinary `var`, so nothing distinguished "the author declared this and ignored
+it" from "the grammar made the author write this".
+
+Attribution was measured, not estimated. On `build/stage3/ast.sf`: 19 warnings,
+19 statically-unused single-line pattern bindings, **identical name multiset**
+(`col`×4, `offset`×4, `len`×4, `line`×3, …) — an exact match, not a correlation.
+Across the five stage3 modules: 1763 warnings, 1725 attributable to pattern
+bindings (97.8%), 38 residual. Four sampled residuals were all true positives
+(`module_doc` and `alias` in `parser.sf`, assigned then never re-read;
+`parent_tag`, a never-used parameter).
+
+**Fix:** `Scope` gains a `pattern_bound: Map<String, Bool>` set, populated by a
+new `define_pattern_var` used at the two match-arm binding sites (payload
+bindings and `NamedWildcard`), and `check_unused_in_scope` skips those names.
+
+The exemption is by **binding kind**, deliberately, rather than by skipping the
+arm scope wholesale — which would have been a one-line deletion. `BlockExpr`
+pushes no scope of its own, so a `var` declared inside a match-arm *body* lands
+in the arm's scope; dropping the scope's check would have silently stopped
+reporting those. Verified after the fix: an unread arm binding is silent, while
+`var arm_dead` inside an arm body, an unused `catch` binding, an unused function
+parameter and a dead function-scope `var` are all still reported.
+
+Measured on the same workload (gen3 compiling the compiler's source, Stage 2 of
+the bootstrap): **1458 → 118 warnings, −92%.** Bootstrap green through Stage 2,
+no gen2 promotion needed — the change uses only `Map<String, Bool>` and
+`.set`/`.has`, both already in this file.
+
+Two incidental findings, not fixed here. `_` and a `_`-prefix already silence the
+warning, and several `_` bindings per pattern parse and check correctly. And
+`check_let_pattern` (`checker.sf`) is **dead code — zero callers**: the
+`LetPattern` arm only infers the value, so `let`-destructuring bindings are never
+registered for unused-tracking and never arity-checked either.
 
 ### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
 
