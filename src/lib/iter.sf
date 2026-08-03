@@ -1,4 +1,22 @@
 //! Iterator utilities — higher-order functions over any Iterable<T>.
+//!
+//! These all iterate with `for (x in iterable)`, which handles both builtin
+//! collections (List / String / Map) and user types implementing the iterator
+//! protocol (`.iter()` -> `.has_next()` / `.next()`).
+
+/// Materialize any iterable into a list.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.to_list("abc")  // ["a", "b", "c"]
+/// ```
+fun to_list<T>(iterable: Iterable<T>): List<T> {
+    var result: List<T> = []
+    for (item in iterable) {
+        result.push(item)
+    }
+    return result
+}
 
 /// Apply a function to each element and return a new list of results.
 ///
@@ -9,9 +27,8 @@
 /// ```
 fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     var result: List<R> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        result.push(func(iter.next()))
+    for (item in iterable) {
+        result.push(func(item))
     }
     return result
 }
@@ -25,9 +42,7 @@ fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
 /// ```
 fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var item = iter.next()
+    for (item in iterable) {
         if (func(item)) {
             result.push(item)
         }
@@ -44,9 +59,8 @@ fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
 /// ```
 fun reduce<T, R>(iterable: Iterable<T>, func: (R, T) => R, initial: R): R {
     var acc: R = initial
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        acc = func(acc, iter.next())
+    for (item in iterable) {
+        acc = func(acc, item)
     }
     return acc
 }
@@ -68,9 +82,8 @@ fun sum(iterable: Iterable<Number>): Number {
 /// Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
 /// ```
 fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (func(iter.next())) { return true }
+    for (item in iterable) {
+        if (func(item)) { return true }
     }
     return false
 }
@@ -82,9 +95,8 @@ fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
 /// Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0)  // true
 /// ```
 fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (!func(iter.next())) { return false }
+    for (item in iterable) {
+        if (!func(item)) { return false }
     }
     return true
 }
@@ -96,9 +108,8 @@ fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
 /// Iter.each(["a", "b", "c"], IO.println)
 /// ```
 fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        func(iter.next())
+    for (item in iterable) {
+        func(item)
     }
 }
 
@@ -111,9 +122,8 @@ fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
 /// ```
 fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
     var n = 0
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (func(iter.next())) { n = n + 1 }
+    for (item in iterable) {
+        if (func(item)) { n = n + 1 }
     }
     return n
 }
@@ -126,9 +136,7 @@ fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
 /// // 2
 /// ```
 fun find<T>(iterable: Iterable<T>, func: (T) => Bool): T {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var item = iter.next()
+    for (item in iterable) {
         if (func(item)) { return item }
     }
     return nil
@@ -143,12 +151,10 @@ fun find<T>(iterable: Iterable<T>, func: (T) => Bool): T {
 /// ```
 fun flat_map<T, R>(iterable: Iterable<T>, func: (T) => Iterable<R>): List<R> {
     var result: List<R> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var items = func(iter.next())
-        var inner = items.iter()
-        while (inner.next?()) {
-            result.push(inner.next())
+    for (item in iterable) {
+        var inner = func(item)
+        for (sub in inner) {
+            result.push(sub)
         }
     }
     return result
@@ -161,12 +167,19 @@ fun flat_map<T, R>(iterable: Iterable<T>, func: (T) => Iterable<R>): List<R> {
 /// Iter.zip([1, 2, 3], ["a", "b", "c"])
 /// // [[1, "a"], [2, "b"], [3, "c"]]
 /// ```
+// Both sides are materialized first: advancing two iterators in lockstep needs
+// `has_next()` on each before either `next()`, which the single-pass for-in
+// desugaring can't express directly.
 fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
+    var list_a: List<A> = to_list(a)
+    var list_b: List<B> = to_list(b)
+    var len = list_a.length()
+    if (list_b.length() < len) { len = list_b.length() }
     var result: List<List<Any>> = []
-    var iter_a = a.iter()
-    var iter_b = b.iter()
-    while (iter_a.next?() and iter_b.next?()) {
-        result.push([iter_a.next(), iter_b.next()])
+    var i = 0
+    while (i < len) {
+        result.push([list_a[i], list_b[i]])
+        i = i + 1
     }
     return result
 }
@@ -180,10 +193,9 @@ fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
 /// ```
 fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
     var result: List<List<Any>> = []
-    var iter = iterable.iter()
     var i = 0
-    while (iter.next?()) {
-        result.push([i, iter.next()])
+    for (item in iterable) {
+        result.push([i, item])
         i = i + 1
     }
     return result
@@ -197,10 +209,10 @@ fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
 /// ```
 fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
     var i = 0
-    while (i < n and iter.next?()) {
-        result.push(iter.next())
+    for (item in iterable) {
+        if (i >= n) { break }
+        result.push(item)
         i = i + 1
     }
     return result
@@ -214,10 +226,8 @@ fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
 /// ```
 fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
     var i = 0
-    while (iter.next?()) {
-        var item = iter.next()
+    for (item in iterable) {
         if (i >= n) { result.push(item) }
         i = i + 1
     }

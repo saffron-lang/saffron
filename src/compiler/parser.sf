@@ -10,6 +10,7 @@ class Parser {
     var error_count: Float
     var source: String
     var html_depth: Float
+    var for_counter: Float
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -18,6 +19,7 @@ class Parser {
         this.error_count = 0
         this.source = ""
         this.html_depth = 0
+        this.for_counter = 0
     }
 
     fun current(): Lexer.Token {
@@ -2095,69 +2097,221 @@ class Parser {
     }
 
     fun parse_for_in(item_name: String): AST.Stmt {
-        // Desugar: for (item in list) { body }
-        // Into: { var __list = list; var __i = 0; while (__i < __list.length()) { var item = __list[__i]; body; __i = __i + 1 } }
         var iter_expr: AST.Expr = this.parse_expr()
         this.consume(")")
         var body: List<AST.Stmt> = this.parse_block_stmts()
+        return this.desugar_for_in(item_name, iter_expr, body)
+    }
 
-        var list_var: String = "__for_list"
-        var idx_var: String = "__for_i"
+    // Desugars `for (item in coll) { body }` so it supports BOTH index-based
+    // builtin collections (List / String / Map) and user-defined types that
+    // implement the iterator protocol (`.iter()` -> `.has_next()` / `.next()`).
+    //
+    // Emitted shape (temporaries gensym'd, so nesting is safe):
+    //
+    //   {
+    //     var src = coll                    // keeps coll's concrete static type
+    //     var box: List<Any> = [src]        // type-erasing box
+    //     var any: Any = box[0]             // erased view, used for `is` tests
+    //     var items: List<Any> = []         // flattened elements (builtin path)
+    //     var indexed: Bool = false
+    //     if (any is List)   { items = box[0]; indexed = true }
+    //     if (any is String) { <push each char via char_at>; indexed = true }
+    //     if (any is Map)    { <push [k, v] pairs via keys()/get()>; indexed = true }
+    //     var it = src.iter()               // protocol iterator (user types)
+    //     var cell: List<Any> = [0]         // one-slot cell carrying the element
+    //     var i = 0
+    //     while (true) {
+    //       if (indexed) {
+    //         if (i >= items.length()) break
+    //         cell[0] = items[i]
+    //         i = i + 1
+    //       } else {
+    //         if (!it.has_next()) break
+    //         cell[0] = it.next()
+    //       }
+    //       var item = cell[0]
+    //       body
+    //     }
+    //   }
+    //
+    // Why this shape:
+    //  * The erasing box is REQUIRED: codegen type-checks every branch, including
+    //    statically unreachable ones. Testing `coll is List` directly on a
+    //    `Countdown` still makes codegen reject `coll.length()` ("has no method
+    //    'length'"). Reading the value back out of a `List<Any>` erases the static
+    //    type, so both arms compile regardless of the collection's real type.
+    //  * `.iter()` is called on `src` (not the erased view) so user classes keep a
+    //    concrete receiver and dispatch to their real method — there is no dynamic
+    //    dispatch on `Any` in this backend.
+    //  * The one-slot `cell` carries the element out of the two arms so the user
+    //    body is emitted exactly ONCE (no duplication, no exponential nesting).
+    //    `var item = cell[0]` is left un-annotated on purpose: an explicit `: Any`
+    //    defeats inference and breaks `==` on the loop variable.
+    //  * The dispatch flag is resolved before the loop, so the per-iteration cost
+    //    is one bool test, and `break` / `continue` in the body still bind to this
+    //    `while`.
+    fun desugar_for_in(item_name: String, iter_expr: AST.Expr, body: List<AST.Stmt>): AST.Stmt {
+        var uid: String = this.for_uid()
+        var src_var: String = "__for_src" + uid
+        var box_var: String = "__for_box" + uid
+        var any_var: String = "__for_any" + uid
+        var items_var: String = "__for_items" + uid
+        var flag_var: String = "__for_indexed" + uid
+        var it_var: String = "__for_it" + uid
+        var cell_var: String = "__for_cell" + uid
+        var idx_var: String = "__for_i" + uid
 
-        // var __for_list = iter_expr
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
-        // var __for_i = 0
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
-        // __for_i < __for_list.length()
-        var cond: AST.Expr = AST.Expr.Binary(
-            AST.Expr.Variable(idx_var),
-            "<",
-            AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", [])
-        )
-        // var item = __for_list[__for_i]
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any",
-            AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
-        // __for_i = __for_i + 1
-        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
-            AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
-
-        // Build while body: item decl + increment + user body
-        // (increment before body so that `continue` doesn't skip it)
-        var while_body: List<AST.Stmt> = []
-        while_body.push(item_init)
-        while_body.push(increment)
-        var bi: Float = 0
-        while (bi < body.length()) {
-            while_body.push(body[bi])
-            bi = bi + 1
-        }
-
-        // Build block: list init + idx init + while
         var stmts: List<AST.Stmt> = []
-        stmts.push(init_list)
-        stmts.push(init_idx)
-        stmts.push(AST.Stmt.While(cond, while_body))
+
+        // var src = coll
+        stmts.push(AST.Stmt.VarDecl(src_var, "", iter_expr, ""))
+        // var box: List<Any> = [src]
+        var box_elems: List<AST.Expr> = []
+        box_elems.push(AST.Expr.Variable(src_var))
+        stmts.push(AST.Stmt.VarDecl(box_var, "List<Any>", AST.Expr.ListLit(box_elems), ""))
+        // var any: Any = box[0]
+        stmts.push(AST.Stmt.VarDecl(any_var, "Any",
+            AST.Expr.IndexGet(AST.Expr.Variable(box_var), AST.Expr.IntLit(0)), ""))
+        // var items: List<Any> = []
+        stmts.push(AST.Stmt.VarDecl(items_var, "List<Any>", AST.Expr.ListLit([]), ""))
+        // var indexed: Bool = false
+        stmts.push(AST.Stmt.VarDecl(flag_var, "Bool", AST.Expr.BoolLit(false), ""))
+
+        // if (any is List) { items = box[0]; indexed = true }
+        var list_arm: List<AST.Stmt> = []
+        list_arm.push(AST.Stmt.ExprStmt(AST.Expr.Assign(items_var,
+            AST.Expr.IndexGet(AST.Expr.Variable(box_var), AST.Expr.IntLit(0)))))
+        list_arm.push(AST.Stmt.ExprStmt(AST.Expr.Assign(flag_var, AST.Expr.BoolLit(true))))
+        stmts.push(AST.Stmt.If(
+            AST.Expr.IsCheck(AST.Expr.Variable(any_var), "List"), list_arm, []))
+
+        // if (any is String) { flatten to chars }
+        stmts.push(AST.Stmt.If(
+            AST.Expr.IsCheck(AST.Expr.Variable(any_var), "String"),
+            this.for_in_string_arm(uid, box_var, items_var, flag_var), []))
+
+        // if (any is Map) { flatten to [key, value] pairs }
+        stmts.push(AST.Stmt.If(
+            AST.Expr.IsCheck(AST.Expr.Variable(any_var), "Map"),
+            this.for_in_map_arm(uid, box_var, items_var, flag_var), []))
+
+        // var it = src.iter()
+        stmts.push(AST.Stmt.VarDecl(it_var, "",
+            AST.Expr.MethodCall(AST.Expr.Variable(src_var), "iter", []), ""))
+        // var cell: List<Any> = [0]
+        var cell_elems: List<AST.Expr> = []
+        cell_elems.push(AST.Expr.IntLit(0))
+        stmts.push(AST.Stmt.VarDecl(cell_var, "List<Any>", AST.Expr.ListLit(cell_elems), ""))
+        // var i = 0
+        stmts.push(AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), ""))
+
+        // indexed arm: bounds-check, load element, advance
+        var idx_arm: List<AST.Stmt> = []
+        var idx_break: List<AST.Stmt> = []
+        idx_break.push(AST.Stmt.Break)
+        idx_arm.push(AST.Stmt.If(
+            AST.Expr.Binary(AST.Expr.Variable(idx_var), ">=",
+                AST.Expr.MethodCall(AST.Expr.Variable(items_var), "length", [])),
+            idx_break, []))
+        idx_arm.push(AST.Stmt.ExprStmt(AST.Expr.IndexSet(
+            AST.Expr.Variable(cell_var), AST.Expr.IntLit(0),
+            AST.Expr.IndexGet(AST.Expr.Variable(items_var), AST.Expr.Variable(idx_var)))))
+        idx_arm.push(AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
+            AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1)))))
+
+        // protocol arm: has_next / next
+        var proto_arm: List<AST.Stmt> = []
+        var proto_break: List<AST.Stmt> = []
+        proto_break.push(AST.Stmt.Break)
+        proto_arm.push(AST.Stmt.If(
+            AST.Expr.Unary("!",
+                AST.Expr.MethodCall(AST.Expr.Variable(it_var), "has_next", [])),
+            proto_break, []))
+        proto_arm.push(AST.Stmt.ExprStmt(AST.Expr.IndexSet(
+            AST.Expr.Variable(cell_var), AST.Expr.IntLit(0),
+            AST.Expr.MethodCall(AST.Expr.Variable(it_var), "next", []))))
+
+        // while (true) { <dispatch>; var item = cell[0]; body }
+        var while_body: List<AST.Stmt> = []
+        while_body.push(AST.Stmt.If(AST.Expr.Variable(flag_var), idx_arm, proto_arm))
+        while_body.push(AST.Stmt.VarDecl(item_name, "",
+            AST.Expr.IndexGet(AST.Expr.Variable(cell_var), AST.Expr.IntLit(0)), ""))
+        var bi: Float = 0
+        while (bi < body.length()) { while_body.push(body[bi]); bi = bi + 1 }
+
+        stmts.push(AST.Stmt.While(AST.Expr.BoolLit(true), while_body))
         return AST.Stmt.Block(stmts)
     }
 
-    fun desugar_for_in(item_name: String, iter_expr: AST.Expr, body: List<AST.Stmt>): AST.Stmt {
-        var list_var: String = "__for_list"
-        var idx_var: String = "__for_i"
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
-        var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
-        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
-        var while_body: List<AST.Stmt> = []
-        while_body.push(item_init)
-        while_body.push(increment)
-        var bi: Float = 0
-        while (bi < body.length()) { while_body.push(body[bi]); bi = bi + 1 }
-        var stmts: List<AST.Stmt> = []
-        stmts.push(init_list)
-        stmts.push(init_idx)
-        stmts.push(AST.Stmt.While(cond, while_body))
-        return AST.Stmt.Block(stmts)
+    // var s: String = box[0]; var i = 0
+    // while (i < s.length()) { items.push(s.char_at(i)); i = i + 1 }
+    // indexed = true
+    fun for_in_string_arm(uid: String, box_var: String, items_var: String, flag_var: String): List<AST.Stmt> {
+        var s_var: String = "__for_str" + uid
+        var i_var: String = "__for_si" + uid
+        var arm: List<AST.Stmt> = []
+        arm.push(AST.Stmt.VarDecl(s_var, "String",
+            AST.Expr.IndexGet(AST.Expr.Variable(box_var), AST.Expr.IntLit(0)), ""))
+        arm.push(AST.Stmt.VarDecl(i_var, "Int", AST.Expr.IntLit(0), ""))
+        var push_args: List<AST.Expr> = []
+        push_args.push(AST.Expr.MethodCall(AST.Expr.Variable(s_var), "char_at",
+            [AST.Expr.Variable(i_var)]))
+        var loop: List<AST.Stmt> = []
+        loop.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(
+            AST.Expr.Variable(items_var), "push", push_args)))
+        loop.push(AST.Stmt.ExprStmt(AST.Expr.Assign(i_var,
+            AST.Expr.Binary(AST.Expr.Variable(i_var), "+", AST.Expr.IntLit(1)))))
+        arm.push(AST.Stmt.While(
+            AST.Expr.Binary(AST.Expr.Variable(i_var), "<",
+                AST.Expr.MethodCall(AST.Expr.Variable(s_var), "length", [])),
+            loop))
+        arm.push(AST.Stmt.ExprStmt(AST.Expr.Assign(flag_var, AST.Expr.BoolLit(true))))
+        return arm
+    }
+
+    // var m: Map = box[0]; var ks = m.keys(); var i = 0
+    // while (i < ks.length()) { var k = ks[i]; items.push([k, m.get(k)]); i = i + 1 }
+    // indexed = true
+    // Uses `m.get(k)` rather than `m[k]`: index-get on an erased map miscompiles
+    // (reads a garbage index and throws IndexError).
+    fun for_in_map_arm(uid: String, box_var: String, items_var: String, flag_var: String): List<AST.Stmt> {
+        var m_var: String = "__for_map" + uid
+        var keys_var: String = "__for_keys" + uid
+        var i_var: String = "__for_mi" + uid
+        var k_var: String = "__for_key" + uid
+        var arm: List<AST.Stmt> = []
+        arm.push(AST.Stmt.VarDecl(m_var, "Map",
+            AST.Expr.IndexGet(AST.Expr.Variable(box_var), AST.Expr.IntLit(0)), ""))
+        arm.push(AST.Stmt.VarDecl(keys_var, "",
+            AST.Expr.MethodCall(AST.Expr.Variable(m_var), "keys", []), ""))
+        arm.push(AST.Stmt.VarDecl(i_var, "Int", AST.Expr.IntLit(0), ""))
+        var loop: List<AST.Stmt> = []
+        loop.push(AST.Stmt.VarDecl(k_var, "",
+            AST.Expr.IndexGet(AST.Expr.Variable(keys_var), AST.Expr.Variable(i_var)), ""))
+        var get_args: List<AST.Expr> = []
+        get_args.push(AST.Expr.Variable(k_var))
+        var pair: List<AST.Expr> = []
+        pair.push(AST.Expr.Variable(k_var))
+        pair.push(AST.Expr.MethodCall(AST.Expr.Variable(m_var), "get", get_args))
+        var push_args: List<AST.Expr> = []
+        push_args.push(AST.Expr.ListLit(pair))
+        loop.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(
+            AST.Expr.Variable(items_var), "push", push_args)))
+        loop.push(AST.Stmt.ExprStmt(AST.Expr.Assign(i_var,
+            AST.Expr.Binary(AST.Expr.Variable(i_var), "+", AST.Expr.IntLit(1)))))
+        arm.push(AST.Stmt.While(
+            AST.Expr.Binary(AST.Expr.Variable(i_var), "<",
+                AST.Expr.MethodCall(AST.Expr.Variable(keys_var), "length", [])),
+            loop))
+        arm.push(AST.Stmt.ExprStmt(AST.Expr.Assign(flag_var, AST.Expr.BoolLit(true))))
+        return arm
+    }
+
+    // Unique suffix per for-in, so nested loops don't share temporaries.
+    fun for_uid(): String {
+        this.for_counter = this.for_counter + 1
+        return "_" + this.for_counter.floor().to_string()
     }
 
     fun parse_try(): AST.Stmt {
