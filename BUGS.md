@@ -2,8 +2,8 @@
 
 ## Open
 
-**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #123,
-#128, #129, #130, #131, #132. Next free number is **#133**.
+**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+#129, #130, #131, #132, #133. Next free number is **#134**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -587,60 +587,6 @@ reference; broken paths only negatively.
 
 ---
 
-### 116. Enum payload variants compare by address, so two equal values are unequal
-
-```saffron
-enum Color { Red, Green }               // no payload variant anywhere
-enum Option { Some(value: Int), None }  // has one
-
-Color.Red == Color.Red              // true  — both are the immediate `tag << 56`
-Option.Some(42) == Option.Some(42)  // false — two distinct __sf_malloc's
-Option.Some(42) == Option.Some(43)  // false — correct, but for the wrong reason
-Option.None == Option.None          // false — and None carries no payload at all
-```
-
-Verified at HEAD. Two things about the shape of this before you write a repro:
-
-- **The third line answers correctly by accident.** A test that only checks
-  *unequal* values passes while equality is entirely broken.
-- **`x == x` on one variable answers true**, because both operands load the same
-  address. A repro must construct the value **twice**.
-
-**The axis is the enum *declaration*, not the variant.** `Option.None` compares
-by address even though it has no fields: once any variant of the enum carries a
-payload, `gen_enum_construct` heap-allocates *every* variant, so a fieldless one
-becomes a one-slot `[tag]` array (`expr_body.sf:3233`) instead of the immediate.
-So adding a field to one variant silently changes `==` for every *other* variant
-of the same enum. `Color.Red == Color.Red` is true only because `Color` declares
-no payload variant anywhere.
-
-**This is codegen-only; there is nothing to fix in the runtime.** Confirmed by
-reading the emitted IR: the sole `__any_eq` in it is the `declare` line — no call
-is ever made. Two operands of static type `EnumType` end at a bare
-`icmp eq i64` on two `ptrtoint`s (`expr_body.sf:958`). The prerequisite chain is
-therefore:
-
-1. `gen_enum_construct` (`expr_body.sf:3243`) must allocate via `__gc_alloc` with
-   a tag — today it uses headerless `__sf_malloc`, so `__rt_gc_tag_of`
-   (`runtime.sf:664`) cannot even identify the value as an enum.
-2. Codegen must route enum `==` to a helper instead of emitting `icmp`. Arity
-   lives only in codegen's `enum_variant_fields`, so the helper needs it passed
-   in or recorded in the header.
-
-Same root as #115's enum half (the missing GC header). A header alone is not
-sufficient — the comparison still has to become a call.
-
-Worth stating plainly because it is a language-semantics wart, not just a bug:
-`==` on an enum currently means **different things** depending on whether its
-declaration contains a payload variant — value equality if not, identity if so.
-
-Regression test: `test/pass/enum_payload_value_equality.sf`, red on purpose
-(9 failing assertions), listed in `run_tests.sh`'s `KNOWN_FAIL`. It asserts
-invariants rather than expected booleans, so it cannot be satisfied by making
-everything equal.
-
----
-
 ### 117. An unannotated list literal of class instances loses its element type
 
 ```saffron
@@ -1211,6 +1157,113 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 116. FIXED — enum payload variants compared by address, so two equal values were unequal
+
+```saffron
+enum Color { Red, Green }               // no payload variant anywhere
+enum Option { Some(value: Int), None }  // has one
+
+Color.Red == Color.Red              // true  — both are the immediate `tag << 56`
+Option.Some(42) == Option.Some(42)  // false — two distinct __sf_malloc's
+Option.Some(42) == Option.Some(43)  // false — correct, but for the wrong reason
+Option.None == Option.None          // false — and None carries no payload at all
+```
+
+Two things about the shape of this, worth keeping because they are what made the
+bug survive so long:
+
+- **The third line answered correctly by accident.** A test that only checks
+  *unequal* values passes while equality is entirely broken. That is why the
+  regression test asserts invariants rather than a list of expected booleans.
+- **`x == x` on one variable answered true**, because both operands load the same
+  address. A repro must construct the value **twice**.
+
+**The axis was the enum *declaration*, not the variant.** `Option.None` compared
+by address even though it has no fields: once any variant of the enum carries a
+payload, `gen_enum_construct` heap-allocates *every* variant, so a fieldless one
+becomes a one-slot `[tag]` array instead of the immediate. Adding a field to one
+variant therefore silently changed `==` for every *other* variant of the same
+enum. `Color.Red == Color.Red` was true only because `Color` declares no payload
+variant anywhere. Stated plainly, this was a language-semantics wart and not just
+a bug: `==` on an enum meant **different things** depending on whether the
+declaration contained a payload variant — value equality if not, identity if so —
+chosen by a detail of the declaration the comparison site cannot see.
+
+**Which site was live, and how that was established.** The entry above originally
+blamed `expr_body.sf:958`. That was right, but only because it was checked: there
+are *two* plausible arms, the `==`/`!=` block and a general comparison block ~300
+lines below it, and reading them does not tell you which one an enum `==` reaches.
+Marker strings settled it — `; MARKER-SITE-A-EQ-BLOCK` and
+`; MARKER-SITE-B-CMP-BLOCK` were inserted, the compiler rebootstrapped, and the
+emitted IR read back: for a file with three enum `==` comparisons, A appeared 3/3
+times and B never. **This is the third entry in a row (#118, #122, #116) where
+the readable-looking arm was a candidate and only a marker sweep plus a
+rebootstrap could say which fires.** Reasoning from the source is not evidence
+here.
+
+**The fix: a generated per-enum `__enum_eq_<Name>`.** The prerequisite chain this
+entry previously laid out — give `gen_enum_construct` a GC header so
+`__rt_gc_tag_of` can identify the value, then route `==` to a runtime helper — was
+**not implementable as specified**, and finding out why is the useful part. The
+heap array is a *bare* pointer: no NaN-box tag, no GC header, and variant arity
+and field types exist **only** in codegen's `enum_variant_fields`. A runtime
+helper has nothing to read. But everything it would need is known *statically* at
+the comparison site, so the comparison became a generated function instead:
+
+- Emitted once per enum per module, registered in `defined_funcs` **before** its
+  body is built, which is what makes a recursive enum
+  (`enum Tree { Leaf, Node(l: Tree, r: Tree) }`) emit a self-call rather than
+  expand forever.
+- Body shape: bitwise-identical fast path → a guard that both operands really are
+  bare heap pointers (top 16 bits zero; anything else, e.g. a value arriving
+  through `Any`, answers with the bitwise result rather than dereferencing tag
+  bits) → null checks → **tag equality, then payload**, in that order, so a
+  fieldless variant cannot let `None == Some(0)` answer true → a switch to a
+  per-variant arm comparing that variant's fields in declaration order,
+  short-circuiting to unequal, so a difference in the *first* field and in the
+  *last* are both detected.
+- A fieldless variant's arm is "the tags matched", which is what makes
+  `Option.None == Option.None` true.
+- `!=` is the negation of the same call, so the two operators cannot drift apart.
+- Per-field lowering is chosen by the field's **declared** type — which is the
+  whole reason this belongs in codegen, since the slot itself is an opaque i64
+  that says nothing about which comparison is right. String → `__string_eq`;
+  Float/Number → `fcmp oeq` on doubles, so `-0.0 == 0.0` as elsewhere in the
+  language; a nested heap-encoded enum → recursion, so equality is deep over the
+  whole enum tree; Int/Bool/Nil and reference types (class, List, Map, Set) → bit
+  equality, the latter deliberately, because value equality for a mutable
+  reference is a separate design question enum equality should not decide alone;
+  an unresolvable type (an `Any` field, or a generic parameter `T` that names
+  nothing at IR level) → `__any_eq`, the same delegation #104 made for ordering.
+- The body is emitted into a scratch `StringBuilder` and parked in `globals`, the
+  same save/restore a nested lambda uses. That is not incidental: routing through
+  the normal pointer and untag helpers is what makes wasm32's i32 pointers work
+  here for free, and the save/restore has to nest because the recursive case
+  re-enters the emitter mid-body.
+- Identity mode is guarded separately: it has no tags to interpret, and it links
+  against `base.ll`, which **has no `__any_eq` at all** — so the fallback simply
+  is not available there and every non-String field is compared as its bits.
+
+`declared_field_type` was added rather than reusing `get_variant_field_type`
+because the latter collapses its answer onto the handful of names codegen lowers
+with, and equality needs to tell a nested enum from a class — exactly the
+distinction that collapse discards.
+
+The general lesson: **when a fix's stated prerequisites turn out to be
+unbuildable, that is information about where the knowledge actually lives, not a
+reason to build them anyway.** The type information had never left codegen; the
+chain assumed it should be pushed into the runtime, and the shorter fix was to
+generate the comparison where the knowledge already was.
+
+Regression tests: `test/pass/enum_payload_value_equality.sf` (25 assertions, was
+16/25, now 25/25) and `test/pass/enum_eq_payload_kinds.sf` (33 assertions, added
+with the fix, covering String / Float / nested-enum / reference / `Any` payload
+kinds). The `KNOWN_FAIL` entry was removed in the same commit as the fix, so an
+`xpass` cannot go unnoticed. No gen2 promotion needed — the fix changes what the
+compiler *emits*, not what it can parse.
+
+---
 
 ### 119. FIXED — an output path containing `.sf` was taken as the input, so the real input was never read
 
