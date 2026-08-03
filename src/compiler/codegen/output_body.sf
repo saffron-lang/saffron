@@ -636,11 +636,11 @@
 
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
-            FunDecl(n, p, r, b, d, f_vis) => true
-            EnumDecl(n, v, d, e_vis) => true
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => true
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => true
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => true
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => true
             ExprStmt(e) => this.is_nil_expr(e)
-            VarDecl(n, t, i, d, v_vis) => d.starts_with("@import:")
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => d.starts_with("@import:")
             Return(v) => false
             If(c, t, e) => false
             While(c, b) => false
@@ -784,7 +784,7 @@
         while (pri < program.length()) {
             var pr_stmt: AST.Stmt = program[pri]
             match (pr_stmt) {
-                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis) => {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis, __ns, __fs) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
                         if (!this.str_in_list(this.known_functions,pr_emit)) {
@@ -810,7 +810,7 @@
                         }
                     }
                 }
-                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc, c_vis) => {
+                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc, c_vis, __ns, __fs, __intro) => {
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
@@ -884,7 +884,7 @@
                     }
                     this.class_own_methods.set(pr_type_name, pr_own)
                 }
-                EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis) => {
+                EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis, __ns, __fs) => {
                     // Register enum variant constructor names AND variant tags
                     // so that match expressions work regardless of declaration order
                     var pr_vnames: List<String> = []
@@ -904,7 +904,7 @@
                     }
                     this.enum_defs.set(pr_ename, pr_vnames)
                 }
-                VarDecl(n, t, init, d, v_vis) => {}
+                VarDecl(n, t, init, d, v_vis, __ns, __fs) => {}
                 ExprStmt(e) => {}
                 Return(v) => {}
                 If(c, t, e) => {}

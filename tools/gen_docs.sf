@@ -115,7 +115,7 @@ fun render_function(stmt: AST.Stmt): String {
 
     // Extract signature from the FunDecl fields
     match (stmt) {
-        FunDecl(fn_name, params, ret_type, body, docstring, f_vis) => {
+        FunDecl(fn_name, params, ret_type, body, docstring, f_vis, __ns, __fs) => {
             var sig = "fun ${fn_name}(${params})"
             if (!(ret_type == "")) {
                 sig = sig + ": ${ret_type}"
@@ -151,7 +151,7 @@ fun render_class(stmt: AST.Stmt): String {
 
     // Render class methods
     match (stmt) {
-        ClassDecl(cls_name, type_params, parents, fields, methods, docstring, c_vis) => {
+        ClassDecl(cls_name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => {
             if (!(fields == "")) {
                 out.push("**Fields:** ${fields}")
                 out.push("")
@@ -181,13 +181,13 @@ fun render_enum(stmt: AST.Stmt): String {
     }
 
     match (stmt) {
-        EnumDecl(enum_name, variants, docstring, e_vis) => {
+        EnumDecl(enum_name, variants, docstring, e_vis, __ns, __fs) => {
             if (variants.length() > 0) {
                 out.push("**Variants:**")
                 out.push("")
                 for (variant in variants) {
                     match (variant) {
-                        Variant(vname, fields) => {
+                        Variant(vname, fields, __ns) => {
                             if (fields == "") {
                                 out.push("- `${vname}`")
                             } else {
@@ -214,7 +214,7 @@ fun render_var(stmt: AST.Stmt): String {
     out.push("")
 
     match (stmt) {
-        VarDecl(vname, type_ann, initializer, docstring, v_vis) => {
+        VarDecl(vname, type_ann, initializer, docstring, v_vis, __ns, __fs) => {
             if (!(type_ann == "")) {
                 out.push("```saffron")
                 out.push("var ${vname}: ${type_ann}")

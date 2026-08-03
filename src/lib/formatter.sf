@@ -47,11 +47,11 @@ fun escape_string(s: String): String {
 
 fun is_top_level_decl(stmt: AST.Stmt): Bool {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, doc, f_vis) => true
-        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => true
-        EnumDecl(name, variants, doc, e_vis) => true
+        FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => true
+        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => true
+        EnumDecl(name, variants, doc, e_vis, __ns, __fs) => true
         ExprStmt(expr) => false
-        VarDecl(name, type_ann, init, doc, v_vis) => false
+        VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => false
         Return(value) => false
         If(cond, then_b, else_b) => false
         While(cond, body) => false
@@ -177,10 +177,10 @@ fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt
         var expr_str: String = match (single) {
             Return(value) => " => " + format_expr(value)
             ExprStmt(expr) => " => " + format_expr(expr)
-            VarDecl(n, t, i, d, v_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            FunDecl(n, p, r, b, d, f_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            EnumDecl(n, v, d, e_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            ClassDecl(n, tps, ps, f, m, d, c_vis) => " {\n    " + format_stmt(single, 1) + "}"
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => " {\n    " + format_stmt(single, 1) + "}"
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => " {\n    " + format_stmt(single, 1) + "}"
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => " {\n    " + format_stmt(single, 1) + "}"
+            ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => " {\n    " + format_stmt(single, 1) + "}"
             If(c, t, e) => " {\n    " + format_stmt(single, 1) + "}"
             While(c, b) => " {\n    " + format_stmt(single, 1) + "}"
             Block(s) => " {\n    " + format_stmt(single, 1) + "}"
@@ -216,9 +216,9 @@ fun format_params(params: List<AST.Param>): String {
     while (i < params.length()) {
         if (i > 0) { sb.append(", ") }
         var p: AST.Param = params[i]
-        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-        var ptype: String = match (p) { Param(n, t, d, p_vis) => t }
-        var pdefault: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
+        var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+        var ptype: String = match (p) { Param(n, t, d, p_vis, __ns) => t }
+        var pdefault: AST.Expr = match (p) { Param(n, t, d, p_vis, __ns) => d }
         sb.append(pname)
         if (ptype.length() > 0 and ptype != "Any") {
             sb.append(": ")
@@ -241,7 +241,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
     var pad: String = make_indent(indent)
     return match (stmt) {
         ExprStmt(expr) => pad + format_expr(expr) + "\n"
-        VarDecl(name, type_ann, init, doc, v_vis) => {
+        VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
             var sb: StringBuilder = StringBuilder()
             sb.append(pad)
             sb.append("var ")
@@ -258,7 +258,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append("\n")
             sb.to_string()
         }
-        FunDecl(name, params, ret_type, body, doc, f_vis) => {
+        FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
             var sb: StringBuilder = StringBuilder()
             // Docstring
             if (doc.length() > 0 and !doc.starts_with("@")) {
@@ -283,7 +283,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append("}\n")
             sb.to_string()
         }
-        EnumDecl(name, variants, doc, e_vis) => {
+        EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
             var sb: StringBuilder = StringBuilder()
             if (doc.length() > 0 and !doc.starts_with("@")) {
                 sb.append(pad)
@@ -298,8 +298,8 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             var i: Float = 0
             while (i < variants.length()) {
                 var v: AST.Variant = variants[i]
-                var vname: String = match (v) { Variant(n, f) => n }
-                var vfields: String = match (v) { Variant(n, f) => f }
+                var vname: String = match (v) { Variant(n, f, __ns) => n }
+                var vfields: String = match (v) { Variant(n, f, __ns) => f }
                 sb.append(make_indent(indent + 1))
                 sb.append(vname)
                 if (vfields.length() > 0) {
@@ -317,7 +317,7 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             sb.append("}\n")
             sb.to_string()
         }
-        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
             var sb: StringBuilder = StringBuilder()
             if (doc.length() > 0 and !doc.starts_with("@")) {
                 sb.append(pad)
@@ -345,8 +345,8 @@ fun format_stmt(stmt: AST.Stmt, indent: Float): String {
             var fi: Float = 0
             while (fi < fields.length()) {
                 var f: AST.Param = fields[fi]
-                var fname: String = match (f) { Param(n, t, d, p_vis) => n }
-                var ftype: String = match (f) { Param(n, t, d, p_vis) => t }
+                var fname: String = match (f) { Param(n, t, d, p_vis, __ns) => n }
+                var ftype: String = match (f) { Param(n, t, d, p_vis, __ns) => t }
                 sb.append(make_indent(indent + 1))
                 sb.append("var ")
                 sb.append(fname)

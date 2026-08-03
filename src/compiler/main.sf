@@ -470,16 +470,16 @@ fun resolve_import_or_die(base_path: String, import_path: String, stdlib_dir: St
 
 fun get_stmt_doc(stmt: AST.Stmt): String {
     return match (stmt) {
-        VarDecl(n, t, init, d, v_vis) => d
-        FunDecl(n, p, r, b, d, f_vis) => d
+        VarDecl(n, t, init, d, v_vis, __ns, __fs) => d
+        FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => d
         _ => ""
     }
 }
 
 fun get_stmt_name(stmt: AST.Stmt): String {
     return match (stmt) {
-        VarDecl(n, t, init, d, v_vis) => n
-        FunDecl(n, p, r, b, d, f_vis) => n
+        VarDecl(n, t, init, d, v_vis, __ns, __fs) => n
+        FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => n
         _ => ""
     }
 }

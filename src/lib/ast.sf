@@ -20,6 +20,55 @@ var MatchArm = Internal.MatchArm
 var Variant = Internal.Variant
 var Type = Internal.Type
 var Param = Internal.Param
+// Declaration nodes carry source regions, so a consumer of `@ast` needs the
+// Span type and its accessors to read them. Matching on `Span(...)` directly
+// works, but going through the accessors means a future field on Span does not
+// break every caller.
+var Span = Internal.Span
+
+/// The source region of a declaration's *name* — the go-to-definition and rename
+/// target. `span_none()` for a node the parser synthesized rather than read;
+/// guard with `span_is_real` before trusting it.
+fun stmt_name_span(stmt: Any): Any {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => __ns
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => __ns
+        EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => __ns
+        VarDecl(name, type_ann, initializer, docstring, v_vis, __ns, __fs) => __ns
+        _ => Internal.span_none()
+    }
+}
+
+/// The source region of the whole declaration, first token through last — the
+/// foldable extent.
+fun stmt_full_span(stmt: Any): Any {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => __fs
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => __fs
+        EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => __fs
+        VarDecl(name, type_ann, initializer, docstring, v_vis, __ns, __fs) => __fs
+        _ => Internal.span_none()
+    }
+}
+
+/// The keyword that introduced a ClassDecl: "class", "interface" or "actor".
+/// All three parse through the same node, so this is the only way to tell them
+/// apart — `""` for a statement that is not a ClassDecl.
+fun class_introducer(stmt: Any): String {
+    return match (stmt) {
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => __intro
+        _ => ""
+    }
+}
+
+fun span_none(): Any { return Internal.span_none() }
+fun span_is_real(s: Any): Bool { return Internal.span_is_real(s) }
+fun span_line(s: Any): Float { return Internal.span_line(s) }
+fun span_col(s: Any): Float { return Internal.span_col(s) }
+fun span_offset(s: Any): Float { return Internal.span_offset(s) }
+fun span_len(s: Any): Float { return Internal.span_len(s) }
+fun span_merge(a: Any, b: Any): Any { return Internal.span_merge(a, b) }
+fun span_to_string(s: Any): String { return Internal.span_to_string(s) }
 
 // =============================================================================
 // AST Traversal
@@ -38,10 +87,10 @@ fun walk_stmts(stmts: List<Any>, visitor: Any) {
 /// Recursively visit child statements within a statement.
 fun walk_children(stmt: Any, visitor: Any) {
     match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => {
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => {
             walk_stmts(body, visitor)
         }
-        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => {
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => {
             walk_stmts(methods, visitor)
         }
         If(condition, then_branch, else_branch) => {
@@ -73,7 +122,7 @@ fun find_functions(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            FunDecl(name, params, ret_type, body, docstring, f_vis) => {
+            FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -89,7 +138,7 @@ fun find_classes(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -105,7 +154,7 @@ fun find_enums(stmts: List<Any>): List<Any> {
     var i: Float = 0
     while (i < stmts.length()) {
         match (stmts[i]) {
-            EnumDecl(name, variants, docstring, e_vis) => {
+            EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => {
                 results.push(stmts[i])
             }
             _ => {}
@@ -118,10 +167,10 @@ fun find_enums(stmts: List<Any>): List<Any> {
 /// Get the name of a declaration statement.
 fun stmt_name(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => name
-        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => name
-        EnumDecl(name, variants, docstring, e_vis) => name
-        VarDecl(name, type_ann, initializer, docstring, v_vis) => name
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => name
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => name
+        EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => name
+        VarDecl(name, type_ann, initializer, docstring, v_vis, __ns, __fs) => name
         _ => ""
     }
 }
@@ -129,10 +178,10 @@ fun stmt_name(stmt: Any): String {
 /// Get the docstring of a declaration statement.
 fun stmt_doc(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => docstring
-        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => docstring
-        EnumDecl(name, variants, docstring, e_vis) => docstring
-        VarDecl(name, type_ann, initializer, docstring, v_vis) => docstring
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => docstring
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => docstring
+        EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => docstring
+        VarDecl(name, type_ann, initializer, docstring, v_vis, __ns, __fs) => docstring
         _ => ""
     }
 }
@@ -140,7 +189,7 @@ fun stmt_doc(stmt: Any): String {
 /// Get the return type of a function declaration.
 fun fun_ret_type(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => ret_type
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => ret_type
         _ => ""
     }
 }
@@ -148,7 +197,7 @@ fun fun_ret_type(stmt: Any): String {
 /// Get the params of a function declaration.
 fun fun_params(stmt: Any): List<Any> {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => params
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => params
         _ => []
     }
 }
@@ -156,7 +205,7 @@ fun fun_params(stmt: Any): List<Any> {
 /// Get the body of a function declaration.
 fun fun_body(stmt: Any): List<Any> {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => body
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => body
         _ => []
     }
 }
@@ -164,7 +213,7 @@ fun fun_body(stmt: Any): List<Any> {
 /// Check if a statement is a function declaration.
 fun is_fun(stmt: Any): Bool {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring, f_vis) => true
+        FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => true
         _ => false
     }
 }
@@ -172,7 +221,7 @@ fun is_fun(stmt: Any): Bool {
 /// Check if a statement is a class declaration.
 fun is_class(stmt: Any): Bool {
     return match (stmt) {
-        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis) => true
+        ClassDecl(name, type_params, parents, fields, methods, docstring, c_vis, __ns, __fs, __intro) => true
         _ => false
     }
 }
@@ -180,7 +229,7 @@ fun is_class(stmt: Any): Bool {
 /// Check if a statement is an enum declaration.
 fun is_enum(stmt: Any): Bool {
     return match (stmt) {
-        EnumDecl(name, variants, docstring, e_vis) => true
+        EnumDecl(name, variants, docstring, e_vis, __ns, __fs) => true
         _ => false
     }
 }
