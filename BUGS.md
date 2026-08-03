@@ -2,12 +2,26 @@
 
 ## Open
 
-The block of bugs numbered 50–57 came out of building the playground; the full
-narrative log for that work, including the ones that were fixed along the way and
-the workarounds each one forced, is at `docs/design/playground-bug-log.md`. Every
-entry below was re-verified against `build/saffronc` on 2026-07-30 before being
-filed here — the log also contains entries that no longer reproduce, which are
-noted there rather than carried forward.
+**14 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
+#118, #119, #121. Next free number is **#122**.
+
+Everything with a resolution lives under `## Resolved` below, full narrative
+intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
+title says FIXED belongs in `## Resolved`** — if you find one here, move it. That
+drift is why this heading is worth keeping honest: for a while `## Open` held 81
+entries of which only 14 were actually open, so the count could not be read off
+the file at all.
+
+Two titles here are deliberately hedged rather than resolved. #107 says LARGELY
+CLOSED because the assertion backfill is incomplete, and #12 was moved to
+`## Resolved` as OBSOLETE rather than FIXED — it no longer reproduces, but its
+repro targeted the dead C VM, so nothing was fixed for it.
+
+The block numbered 50–57 came out of building the playground; the full narrative
+log for that work, including the ones fixed along the way and the workarounds
+each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
+`## Resolved` now. The log also contains entries that no longer reproduce, noted
+there rather than carried forward.
 
 ### 110. wasm32 never auto-invokes `fun main()`, so a main-only program silently prints nothing
 
@@ -41,6 +55,692 @@ Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
 and none of them are value-layer bugs. Worth fixing before the remaining
 value-layer drift, since it currently makes wasm32 output unobservable for those
 seven programs.
+
+### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
+
+**Severity: high — this is the reason the other entries survived.**
+
+| | count |
+|---|---|
+| assertions **and** `.expected` | 0 |
+| assertions only | 77 |
+| `.expected` only | 33 |
+| **neither — passes on ANY output** | **64** |
+
+The 64 are graded solely on "exit 0 and no `Runtime Error:` on stderr". They
+print, and nothing checks what. Includes all 11 `mini_*` tests,
+`test/pass/enums.sf`, `test/pass/generics.sf`, `test/pass/closures.sf`,
+`test/pass/interfaces.sf`, `test/pass/operators.sf`, `test/json.sf`,
+`test/inheritance.sf`.
+
+Not hypothetical: `test/pass/enums.sf` and `test/pass/generics.sf` print
+subnormal doubles today (#105) and both pass. `run_tests.sh` already notes that
+`test_async.sf` "was green for the entire life of BUGS #38 while emitting 2 of
+its ~12 expected lines and garbage for the rest" — the mechanism was known, the
+scale was not.
+
+`tools/differential.sh --record` writes `.expected` from the reference run and
+refuses when configurations disagree.
+
+---
+
+**LARGELY CLOSED (2026-08-02).** The blind set was re-derived independently rather
+than trusting the "64" above, which predated several merges. At the time of the
+work: **184 positive files — 0 with both mechanisms, 86 assertions-only, 55
+`.expected`-only, 43 blind.**
+
+After the pass: **23 still blind, and 21 of those already FAIL in the baseline**
+(build-fail / timeout / segfault / runtime-error). A test that produces no output
+cannot enshrine a wrong one, so those 21 are not the hazard this entry is about.
+Only **2 are green-and-blind**, both deliberately.
+
+Coverage added across 27 files, via three mechanisms: 21 `.expected`, 2 empty
+`.expected` (which pin the two import helpers to printing *nothing*), 4 `.exit`
+(a **new** mechanism), 5 files given assertions, and 1 carrying both. Every
+recorded output was read against the source before acceptance, then cross-checked
+through the oracle: **36 AGREE, 0 MISMATCH** across native-O2 / native-O0 /
+wasm32.
+
+**What was deliberately NOT recorded is the more important half.**
+`test/pass/enums.sf` and `test/pass/generics.sf` print `0` and `7.29112e-304` from
+`IO.println(Color.Red)` — that is #105. Recording it would have frozen a bug as
+intended behaviour and made this entry worse, so each instead got 10 assertions
+via *interpolation* (which inserts `.to_string()` and is correct), leaving every
+`IO.println` untouched so the garbage stays visible.
+
+`gc_coro_root_{depth,order,overpop}.sf` were also left unfrozen, and this one was
+*proven* rather than argued: adding the three locals needed to capture shadow-stack
+depths moved the reported value 18 → 24. The depth is frame-layout dependent, so
+freezing it would flag unrelated codegen as a regression. Their *invariants* are
+asserted instead — depths equal across rounds, each frame above its spawner.
+
+**Three harness defects found and fixed, all of which were this entry's own
+mechanism one layer up:**
+
+1. **The oracle compared stdout only.** It set `RUN_EC` per config and never used
+   it. The four `mini_*` tests print nothing, so all four "AGREEd" by matching two
+   empty files — a wasm32 run returning 0 where native returned 55 was a unanimous
+   pass. It now compares exit status too, verified by injecting `RUN_EC=7`.
+2. **`output-mismatch` was missing from `run_tests.sh`'s category breakdown**, so a
+   `.expected` regression counted in the total but vanished from the summary.
+3. **The two grading mechanisms compose**, contrary to what "0 files with both"
+   suggested: the assertion gate returns early *only on failure*, so passing
+   assertions fall through to the diff. The 0 was an accident, not policy;
+   `interfaces.sf` is now the first file carrying both.
+
+Also: `test/gc_deep_test.sf` was stable over **25 consecutive runs**, so the
+"nondeterministic" label it carries elsewhere in this file is doubtful and should
+not be used to dismiss a failure there.
+
+**Merge hazard worth recording here, because it makes a fix look like it did not
+work:** `tools/saffron` links the **checked-in** `build/stage3/runtime.ll`
+(`tools/saffron:16`), not `src/runtime/runtime.sf`. So a merge that brings a
+`runtime.sf` fix without regenerating that artifact leaves the fix **inert** —
+`test/pass/subnormal_not_a_pointer.sf` still segfaulted (exit 139) on a tree that
+already contained its fix in source. Regenerating `build/stage3/runtime.ll` made
+all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
+before its tests mean anything, and a green test run against a stale artifact is
+evidence of nothing.
+
+
+### 75. A value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under
+
+**Reproduction** (wasm32; `t.sf`):
+
+```saffron
+@extern("void js_note(i64)")
+fun _note(id: Float)
+
+var _next_id: Float = 0
+var _cb: Map<Float, String> = {}
+
+fun reg(payload: String): Float {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _cb.set(id, payload)
+    return id
+}
+
+fun kick() { _note(reg("HELLO")) }
+
+// Exported to JS (the `__on_` prefix is what tools/saffron:392 exports).
+fun __on_back(id: Float) {
+    if (_cb.has(id)) { IO.println("FOUND " + _cb.get(id)) }
+    else { IO.println("MISSING") }
+}
+
+kick()
+```
+
+Build with `tools/saffron build t.sf --target wasm32 -o t.wasm`, then from JS call
+`_start()` (which invokes `js_note` and hands you the id) and pass that exact id
+straight back to `__on_back`:
+
+```
+js_note got id = 1n
+MISSING
+```
+
+The id makes a round trip and stops being findable. Handing the *bit pattern of
+1.0* back instead prints `FOUND HELLO`, which localizes it exactly:
+
+```js
+const bb = new ArrayBuffer(8); new Float64Array(bb)[0] = 1.0;
+inst.exports.__on_back(new BigInt64Array(bb)[0]);   // FOUND HELLO
+```
+
+So the two representations of "1" involved are:
+
+| Path | Value seen by `__map_key_cmp` |
+|---|---|
+| stored by `reg()` | `0x3FF0000000000000` — the f64 bit pattern of 1.0 |
+| arriving from JS | `0x0000000000000001` — a bare machine integer |
+
+An exported wasm function's `i64` parameter is whatever JS passed; nothing on the
+boundary re-tags it into the NaN-boxed form the module uses internally. And
+`__map_key_cmp` (`src/runtime/runtime.sf:287`) compares non-string keys by exact
+bit pattern — correctly, for its own purposes — so the lookup misses. Note
+`__val_untag_float` (`src/runtime/wasm_base_32.ll:763`) would convert `1` to `1.0`
+happily; it is simply never called, because a `Map` key is compared as an opaque
+i64 and never untagged at all.
+
+**Why it is nastier than a plain type-mismatch:** every symptom is silent. There
+is no diagnostic at compile time, no trap at runtime, and `has()` returning false
+is a legitimate result, so the callback is *dropped* rather than failing. In the
+playground this meant the Run button POSTed correctly, the service replied
+correctly, and then nothing happened at all — no error in the console, no status
+change. The pattern it breaks (hand JS an opaque id, get it back later) is the
+only way to do asynchronous work across the wasm boundary, so any callback
+registry written the obvious way is affected.
+
+Also note `Bool.to_string()` on wasm32 prints `"false"` for `true` — a separate,
+unfiled printing bug (the branch `if (t)` is taken correctly). It matters here
+because it made an early `IO.println(_cb.has(id).to_string())` read as a Map
+failure in cases where the Map was fine, and it will mislead anyone debugging this
+by printing booleans.
+
+**Workaround (in use):** index a `List` instead of keying a `Map`. An index only
+has to compare numerically, which survives the representation change:
+
+```saffron
+var _callbacks: List<(String) => Nil> = []
+fun _register(cb: (String) => Nil): Float {
+    _callbacks.push(cb)
+    return _callbacks.length() - 1
+}
+fun _resolve(id: Float, payload: String) {
+    if (id >= 0 and id < _callbacks.length()) {
+        var cb: (String) => Nil = _callbacks[id]
+        cb(payload)
+    }
+}
+```
+
+Applied at `playground/frontend/src/api.sf`. This is also why Turmeric's own
+`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based —
+it works, but the reason was not written down, so the Map version looks fine
+until you try it.
+
+The real fix is to normalise incoming values at the export boundary: codegen knows
+each exported function's declared parameter types, so a `Float` parameter on an
+exported function should be re-tagged (`__val_tag_float` on the integer, or a
+tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
+Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
+boundary.
+
+### 66. Binary files cannot be read or served — `IO.read_file` truncates at the first NUL, so `static_files` serves any wasm module as 0 bytes
+
+Found while verifying the playground before committing it. `GET /app.wasm` returns
+`200` with `Content-Length: 0` even though `playground/static/app.wasm` is 19569
+bytes on disk. The playground frontend therefore cannot load in a browser at all.
+
+**Reproduction** — no server needed:
+
+```saffron
+import "io" as IO
+
+// 13 bytes on disk, starting with the wasm magic \0asm
+var leading: String = IO.read_file("/tmp/nul_test.bin")
+IO.println(leading.length())   // 0
+
+// "abc\0def", 7 bytes on disk
+var mid: String = IO.read_file("/tmp/nul_mid.bin")
+IO.println(mid.length())       // 3
+```
+
+Create the fixtures with `printf '\0asm\x01\x00\x00\x00hello' > /tmp/nul_test.bin`
+and `printf 'abc\0def' > /tmp/nul_mid.bin`.
+
+**Cause.** `__io_read_file` (`src/runtime/runtime.sf:1096-1098`) is *not* the
+problem — it `rt_fread`s the full size and returns the whole buffer. The loss is
+in the representation: a Saffron `String` is a NUL-terminated C string, so
+`length()` is a `strlen` that stops at the first embedded NUL. Every byte after it
+is still in memory but unreachable. A wasm module's magic number is `\0asm`, so the
+very first byte terminates the string and the read yields `""`.
+
+**This is wider than the read.** The `@http/server` response path is String-typed
+end to end, so a binary body is unrepresentable even given a correct read:
+
+- `src/lib/http/server.sf:655` — `static_files` reads with
+  `var content: String = IO.read_file(full_path)`
+- `:168` — `Response.body` is declared `String`
+- `:251-252` — `Content-Length` is emitted from `resp.body.length()`, i.e. strlen
+- `:269` — the body is appended to a `StringBuilder`
+
+So fixing only `read_file` would still emit a truncated `Content-Length` and a
+truncated body. Serving binary assets needs a byte-length-carrying body type
+(`@bytes` `Buffer`, or a `String` that stores an explicit length) threaded through
+`Response` and the writer.
+
+**A working read path already exists** and is the basis for any fix:
+`IO.file_size` + `IO.read_binary` (`src/lib/io.sf:255-263`, runtime
+`:1103-1134`) return the correct 13 for the fixture above. Note they currently
+emit `[codegen] Warning: calling undefined function '__io_file_size'` /
+`'__io_read_binary'` — the functions exist in `runtime.sf` and link fine, but
+they are missing from the codegen known-function tables in
+`src/compiler/codegen/utils_body.sf:5-6`, so every call warns.
+
+**Relationship to the log.** This is the same underlying defect as Bug 2 in
+`docs/design/playground-bug-log.md`, which was only ever *worked around* inside the
+playground's compile endpoint and never filed in the tracker. This is a second,
+independent instance of it, so it is filed here as the general defect.
+
+**Note on the playground handoff**: the completing agent's report listed
+`/app.wasm` among "All 6 routes correct". That claim does not hold — the route
+returns 200 with an empty body.
+
+**Status: still open as a stdlib defect; routed around in the playground.** The
+underlying defect is unchanged — `static_files` still cannot serve a wasm module,
+and `Response.body` is still String-typed — but the playground no longer depends
+on it. It serves the UI module base64-encoded from its own endpoint
+(`GET /api/app_wasm`, `playground/src/main.sf`), which the loader decodes with
+`atob` before instantiating; base64's alphabet is pure ASCII, so it survives a
+Saffron string intact. This is the same dodge the compile endpoint already used
+for user modules, now factored into `Compile.encode_file_base64`. Verified
+byte-identical: the 47555-byte module round-trips through the endpoint and the
+frontend loads and runs. Costs a 33% larger transfer once per page load.
+
+That does not fix the general case — any Saffron program serving a binary asset
+still hits this — so the byte-length-carrying body type described above is still
+the work that needs doing.
+
+**FIXED** (`e6b0735`). `IO.Bytes` is that body type: an explicit (pointer, length)
+pair, so length is carried rather than recomputed by scanning for a NUL, plus
+`read_file_bytes` / `write_file_bytes`. `Response` carries an optional
+`_body_bytes` which takes precedence for `Content-Length`, and `_write_response`
+writes the body straight from its pointer via `sf_tcp_write`/`sf_tls_write`
+instead of through a `String`. `static_files` reads byte-exactly. Fixing the read
+alone would not have been enough — the response path was `String`-typed end to
+end, so `Content-Length` was a strlen and the payload went through a
+`StringBuilder`.
+
+Built on `_b_*` C stdio externs rather than the runtime's `__io_file_size` /
+`__io_read_binary`, because those two are absent from codegen's known-function
+table: calling them from inside a module gets them module-prefix-mangled to
+`@io___io_file_size` and they fail to link.
+
+Those externs declare `FILE*` as `i64`, not `void*`, deliberately. **A
+`void*`-returning extern has its result pointer-tagged, so `fp == 0` compares
+`TAG_PTR|0` against `TAG_INT|0` and is never true** — a failed `fopen` would take
+the success branch and read through a NULL `FILE*`. `IO.open` has exactly this
+latent defect and does not throw on a missing file; that is unfixed and worth its
+own entry.
+
+Tests: `test/pass/binary_file_bytes.sf`, `test/pass/http_binary_response.sf`.
+Still uncovered: the TLS byte-write path is implemented but untested, and
+Stream/SSE remains String-only.
+
+### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
+
+`try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
+`IndexError`, `DivisionError` and `NullError` all route through
+`__runtime_error_fatal` (`src/runtime/runtime.sf:713`), which writes to fd 2 and
+calls `rt_exit(1)`. No `catch` or `finally` block runs.
+
+Repro — the exact example `CLAUDE.md` used to carry:
+
+```saffron
+fun main() {
+    try {
+        var list = [1, 2, 3]
+        IO.println(list[99])
+    } catch (e) {
+        IO.println("caught: ${e}")
+    }
+    IO.println("still alive")
+}
+main()
+```
+
+Actual: prints `Runtime Error: IndexError: index 99 out of bounds (length 3)`,
+exits 1. Neither `caught:` nor `still alive` is reached. Division by zero behaves
+identically. An explicit `throw` in the same shape is caught and returns 0, which
+is what made the wrong claim plausible for so long.
+
+The fatal call sites are `runtime.sf:777` (`__index_error`), `:815`
+(`__division_error`) and `:857` (`__null_pointer_error`).
+
+Nil misuse mostly never gets this far: the checker rejects calling a method on a
+nullable value at compile time.
+
+**Docs fixed** (2026-07-30): `CLAUDE.md`, `docs/src/tutorial/error-handling.md`,
+`docs/learnxinyminutes/learnsaffron.sf` and its `index.html` all claimed runtime
+errors were catchable and showed output that never occurs. They now document the
+fatal behaviour and show a guard-before-indexing pattern instead.
+
+**Still open**: whether the *behaviour* should change. Making these catchable is
+not a small fix — the error path itself allocates (`__runtime_error` calls
+`rt_malloc`), and `setjmp`/`longjmp` are no-ops on both wasm bases
+(`wasm_base_32.ll:592-597`, `wasm_base.ll:503-508`), so `try`/`catch` cannot work
+on wasm at all. Decide whether fatal-by-design is the intended semantics before
+investing there.
+
+### 49. `Number` is one surface name for two representations
+
+`str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
+
+```saffron
+fun area(r: Number): Number { return 3.0 * r * r }
+IO.println(area(2.0).to_string())   // prints 0, should be 12
+```
+
+The declared type is relabelled `Int` at the boundary, so the caller's
+`.to_string()` untags a double as an integer and prints `0` (or garbage like
+`37357358909038`). Enum payloads had the same defect from the other end, and that
+half **is** fixed — see #45 and #43.
+
+Mapping `"Number"` to `FloatType` instead is the honest reading of the surface
+syntax and fixes the case above, but it is a worse lie in the other direction:
+stdlib code writes `Number` for values it then uses as list indices and integer
+counters. `src/lib/toml.sf:23`'s `fun peek_at(offset: Number)` is the clearest
+case — as a double, that offset breaks indexing. Measured both ways
+(2026-07-30):
+
+| mapping | `pantry_config` | `test_sorted_set` | `area(): Number` |
+|---|---|---|---|
+| `Number` → `Int` | 29/29 | 33/33 | `0` (wrong) |
+| `Number` → `Float` | 8 failed | `IndexError` | `12` (right) |
+
+Neither mapping is right, because `Number` itself is the defect: one surface name
+for two representations, so no single lattice entry can be correct for both uses.
+This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type")
+showing up as a genuine fork in the road rather than a one-line fix.
+
+**Real fix:** retire `Number` in favour of explicit `Int` and `Float` — the
+intended direction for the language. That means auditing every `Number` in
+`src/lib/*.sf` and deciding per site which one is meant (`peek_at(offset: Int)`,
+`number(key: String): Float`, etc.), then removing the surface spelling. Until
+then `Int` is the mapping that keeps the stdlib working, and it stays, with the
+trade-off documented at the mapping site.
+
+**Correction note.** An earlier version of this file recorded `Number` → `Float`
+as fixed and claimed the regression above did not exist ("`pantry_config` passes
+29/29 with the Float mapping"). That measurement was taken against a `saffronc`
+that did not yet contain the change, and was wrong; the regression is real and
+reproduces. The mapping was reverted to `Int`.
+
+**Progress (2026-07-30).** The retirement is underway; the mapping is unchanged
+but its blast radius is shrinking:
+
+- `src/lib/*.sf`: all 134 `Number` annotations converted. Bulk → `Int`
+  (indices, counters, ports, handles, lengths, byte values, char codes);
+  `scheduler.sleep_times` → `List<Float>`; `reflect.number_to_string`,
+  `toml.number`/`number_or` → `Any` (genuinely int-OR-float pass-throughs that
+  do no arithmetic). `toml.sf`'s `peek_at(offset: Number)` — the example cited
+  above — is now `offset: Int`.
+
+  **Correction (2026-08-01): "no `Number` annotation remains in `src/lib`" was
+  false when written.** Fourteen live annotations were left in
+  `src/lib/http/client.sf` and `src/lib/http/server.sf` — `var status`,
+  `max_redirects`, `redirect_count`, `port`, `body_start`, `_parse_hex(): Number`,
+  `_index_of_from(start: Number): Number`, `_is_redirect(status: Number)`, and
+  five `var i`/`var k` loop counters. All are indices, counts or HTTP status
+  codes, so all fourteen became `Int`. The five remaining hits in
+  `src/lib/llvm/test_codegen.sf` are inside comments and are left alone. `src/lib`
+  is now genuinely free of `Number` annotations.
+- `test/*.sf`: all 152 annotations → `Int` across 49 files. The 9 `is Number`
+  checks are kept deliberately: they cover the feature while it still exists.
+- `checker.sf` no longer collapses `Float` into `IntType` when parsing type
+  strings, so `Int` and `Float` are finally distinct in the checker. This alone
+  turned two `test/fail/` cases from "compiled cleanly" (itself a failure) into
+  correct rejections, taking the suite from 90/47 to 92/45.
+- A latent runtime bug surfaced and was fixed on the way: `__val_is_float`
+  called every raw untagged heap pointer a float, so rewriting `is Number` to
+  `is Int or is Float` made `JSON.to_string({...})` serialize a Map as an
+  integer. `is Number` had masked it by only ever checking the int tag — which
+  also means **`is Number` returns false for every float**, so all seven stdlib
+  `is Number` guards were already silently wrong. See the Fixed section.
+
+**Remaining:** user-facing docs, then removing the surface spelling from the
+lexer/parser/checker/codegen — which is a breaking change for user programs and
+wants its own decision.
+
+### 2. Forward references in nested closures
+
+**Reproduction:**
+```saffron
+fun test() {
+    fun a() { return b() }
+    fun b() { return 42 }
+    IO.print(a())
+}
+test()
+```
+
+**Expected:** Works (b is defined before a is called).
+**Actual:** `Runtime error` — b is undefined when a's closure is compiled.
+
+**Impact:** Can't write mutually recursive helper functions inside a parent scope.
+**Note:** Design choice — compile-time local resolution. Same as Lua/Python.
+
+### 6. No `break`/`continue` type checking
+
+The compiler has break/continue infrastructure (breakJumps, continueJumps arrays) but the type checker doesn't handle NODE_BREAK/NODE_CONTINUE. Runtime works; type checker just ignores them.
+
+### 115. A class instance reaching a formatter prints its raw bit pattern
+
+**Severity: high.** Silent wrong answer. The class-shaped sibling of #105, with a
+*different* mechanism, so #105's fix does not reach it.
+
+```saffron
+class Pt { var x: Number
+           fun init(x: Number) { this.x = x }
+           fun to_string(): String { return "Pt(${this.x})" } }
+var p: Pt = Pt(3)
+IO.println(p)          // 5.21502e-310   — WRONG, and this is TOP LEVEL
+IO.println("${p}")     // Pt(3)          — correct
+var ps: List<Pt> = [Pt(1), Pt(2)]
+IO.println("${ps}")    // [5.21502e-310, 5.21502e-310]
+```
+
+Verified directly at HEAD, not merely reported: `IO.println(p)` prints
+`5.21502e-310` while `"${p}"` prints `Pt(3)`.
+
+#105 was cured by `methods_body.sf:1543` inserting `<Enum>__to_string()` when the
+argument's **static** type is a known enum (`enum_defs.has(type)`). That is
+static-type-driven, so it covers exactly what the checker can see through and
+nothing else — no list element, and **no class arm at all**.
+
+**The runtime cannot fix this alone, and the class case is what proves the
+prerequisite is insufficient.** A class instance *does* carry a GC header
+(`__gc_alloc(size, class_tag)`, tags allocated from 10) and `__val_class_tag`
+reads it safely — so unlike a fieldless enum, the value **is** identifiable. It
+still prints as bits. What is missing is the mapping from tag to that class's
+`to_string()`, which only codegen holds (`class_type_ids`, `class_own_methods`).
+So "give payload enums a GC header" is necessary but *not* sufficient for the
+enum half either.
+
+Proposed fix: emit a tag-switch `__val_to_string(i64)` in
+`emit_class_hierarchy_helpers()` (`stmts_body.sf:1740`), beside the
+`__class_parent_tag` / `__class_is_a` switches it already generates from exactly
+these tables, and call it from `__any_to_string` (`base_nanbox.ll:1355`) before
+the `do_float` fallthrough. Payload enums join by allocating via `__gc_alloc` in
+`gen_enum_construct` (`expr_body.sf:3101`) instead of `__sf_malloc`, with tags
+from the same allocator as `next_class_type_id` (`codegen.sf:198`) to avoid
+collision. `__val_to_string` must return a raw `char*` like its siblings — no
+tag/untag step, which is what would re-create #102's segfault.
+
+**Fieldless enums cannot join this scheme.** `tag << 56` is a bare immediate with
+no allocation and no identity; there is nothing to key on. A bit-pattern heuristic
+was deliberately not written, because a wrong guess is worse than visible garbage.
+
+Two caveats to accept explicitly if this is implemented: `__any_to_string` is
+**absent from `wasm_base.ll`** (0 definitions; the other three bases have it), so
+**wasm64 silently loses the behaviour**; and the emit site is gated
+`if (!this.identity_mode)`, so **bootstrap can never validate it** — the
+identity-mode blind spot again.
+
+Regression test `test/oracle_println_class_not_bits.sf` is **6/8, failing on
+purpose**. The garbage is an address reinterpreted as a subnormal, so it varies
+per run and per `-O` level; recording it would make the eventual fix look like a
+regression (#107 discipline). Working paths are asserted positively as the
+reference; broken paths only negatively.
+
+---
+
+### 116. Enum payload variants compare by address, so two equal values are unequal
+
+```saffron
+Color.Red == Color.Red              // true  — both are the immediate 0
+Shape.Circle(2) == Shape.Circle(2)  // false — two distinct __sf_malloc's
+Shape.Circle(2) == Shape.Circle(3)  // false — correct, but for the wrong reason
+```
+
+Verified at HEAD. Note the third line: it answers correctly *by accident*, so a
+test that only checks unequal values passes while equality is broken.
+
+Same root as #115's enum half — a payload variant is a headerless `__sf_malloc`
+array. Giving it a GC header is a prerequisite for structural equality but not
+sufficient: `__any_eq` also needs an enum arm that compares payloads field by
+field.
+
+Worth stating plainly because it is a language-semantics wart, not just a bug:
+`==` on an enum currently means **different things** depending on whether the
+variant carries fields — value equality for fieldless, identity for payload.
+
+---
+
+### 117. An unannotated list literal of class instances loses its element type
+
+```saffron
+var ann: List<Pt> = [Pt(1), Pt(2)]
+IO.println(ann[0].to_string())   // Pt(1)          — correct
+var un = [Pt(1), Pt(2)]
+IO.println(un[0].to_string())    // 5.21502e-310   — WRONG
+```
+
+Verified at HEAD: the same expression answers correctly with an annotation and
+returns the raw pointer without one. **Minor severity only because the annotation
+is a workaround** — the wrong answer is silent.
+
+Distinct from #115: this is the untyped-receiver dispatch hazard (a call on a
+value whose type inference failed is dropped or misdispatched rather than
+diagnosed), and it is *why* `test/oracle_println_class_not_bits.sf` annotates its
+lists. It also means #115's "only nested elements are wrong" framing holds for
+**annotated** collections only.
+
+---
+
+### 118. A nonexistent member of an imported module compiles cleanly and emits invalid IR
+
+**Severity: high.** Not a wrong answer — a compiler crash *reported as a compiler
+bug*, blaming itself for a plain typo in the user's program.
+
+```saffron
+import "@math" as Math
+IO.println(Math.NOPE)     // compiler exits 0; the IR is then rejected
+IO.println(Math.pi)       // 3.14159 — a real member is fine
+```
+
+```
+saffron: the compiler emitted invalid LLVM IR for test/pass/math.sf
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:1288:24: error: use of undefined value '%Math'
+    %t1 = load i64, i64* %Math
+```
+
+The last line is the whole story: having failed to resolve the *member*, codegen
+falls back to evaluating the **namespace itself** as if it were a local variable,
+and emits a load from an SSA name that was never defined. The message is actively
+misleading — it tells the user their correct compiler is broken when in fact their
+program has a typo, so the diagnostic points at the wrong party.
+
+Mechanism, and it is the recurring pattern again (**eighth instance**, after #22,
+#40, #78, #37, #103, #113, #114): a resolver with no way to say *not found*.
+`expr_body.sf:311` handles a module-prefixed member by trying two lookups —
+`known_functions` for `Module.fun`, then `module_globals` for `Module.global`. When
+both miss it does not report absence; it simply falls out of the block, and control
+reaches the generic receiver path at `expr_body.sf:332`, which evaluates `object`
+— the bare alias `Math`. The undefined-variable check that would have caught that
+(`expr_body.sf:91`) explicitly exempts `module_prefixes.has(name)`, and rightly so
+for a *valid* member access, so nothing else stops it.
+
+The fix belongs in the `module_prefixes` block: after both lookups miss, report
+`no member 'NOPE' in module 'Math'` and set `has_errors`, rather than falling
+through to a path that can only produce a load from a namespace. The alias is known
+to be a module at that point, so "not found" is expressible there and nowhere
+downstream.
+
+Found while checking a claim that `test/pass/math.sf` was merely a stale test
+calling `Math.PI` when `src/lib/math.sf:21` defines lowercase `pi`. The test *is*
+wrong, but that is not why it fails: any nonexistent member reproduces this, so
+renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
+remains red pending the diagnostic; fixing the test alone would be papering over
+the real defect.
+
+---
+
+### 119. An output path containing `.sf` is taken as the input, so the real input is never read
+
+**Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
+file appear to accept it, which corrupts measurement rather than just output.
+
+```
+saffronc real.sf decoy.sf     # exit 0 — compiles decoy.sf; real.sf never read
+saffronc real.sf out.sf.ll    # exit 0 — writes out.sf.ll.ll
+```
+
+Verified at HEAD, both cases: after `saffronc /tmp/real.sf /tmp/decoy.sf`, the
+emitted IR contains `DECOY` once and `REAL_INPUT` **zero** times, with exit 0.
+
+`main.sf:1075` picks the input by scanning for `arg.contains(".sf")` and keeping the
+**last** match:
+
+```saffron
+if (arg.contains(".sf") and arg != "--stdlib") {
+    last_sf_idx = i
+}
+```
+
+Two independent defects in one line. `contains` rather than `ends_with` matches
+`.sf` anywhere in the string, so `out.sf.ll` qualifies; and taking the *last* match
+means when both args qualify the **output** wins. Note the rest of `main.sf`
+already knows better — lines 693, 714, 742 and 968 all use `ends_with(".sf")`. Only
+the argument parser sniffs.
+
+The fix is `ends_with(".sf")` plus treating the input as *positional* (first
+non-flag argument) rather than sniffing for it at all. Sniffing cannot distinguish
+an input from an output that merely resembles one; position can.
+
+**Why this matters beyond the obvious.** The failure is silent and exit code 0, so
+any batch sweep whose output filenames embed `.sf` measures nothing while appearing
+to measure everything. This was found by an agent whose first two arity sweeps
+wrote to `$OUT/<name>.sf.ll` and reported zero diagnostics across the corpus —
+including on a file it had just watched the compiler reject. The result looked like
+strong evidence of no regression and was evidence of nothing.
+
+The shipped pipeline is **not** affected, which is why this survived: `tools/saffron`
+writes `$TMPDIR/output.ll` (`tools/saffron:320,441`) and `tools/run_tests.sh` writes
+`neg_<name>.ll`, neither containing `.sf`. So the test suites and every failure-set
+comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
+
+---
+
+### 121. A variable used only in callee position is falsely reported as an unused variable
+
+**Severity: low** — warning-only, no codegen consequence. Filed because it is a
+*false* diagnostic, and a warning that fires on correct code is how people learn to
+ignore warnings.
+
+```saffron
+fun run(): Int {
+    var fs: List<Fun> = [fun (x: Int): Int => x]
+    return fs[0](7)            // fs IS used, right here
+}
+```
+
+```
+[checker] Warning: unused variable 'fs'
+```
+
+`infer_call` (`checker.sf:2161`) pattern-matches the callee only to extract a *name
+string* for the return-type lookup, and never calls `infer_expr` on it. Since
+`mark_used` is reachable only from the `Variable`/`Ref` arms of `infer_type`
+(`checker.sf:1701,1705`), a variable appearing **only** in callee position is never
+marked used.
+
+The axis is "appears only as a callee", **not** "has a function type" — which is
+what makes this its own bug rather than part of #120. Two observations pin that
+down: a `List<Fun>` variable, which is not a function type at all, warns when its
+only appearance is `fs[0](7)`; and the same variable used as a plain value
+(`var alias: Fun = h`) is correctly marked used.
+
+One wrinkle worth recording so a future reproduction attempt does not conclude the
+bug is absent: at **top level** the same `List<Fun>` spelling does *not* warn — only
+inside a function body. So a repro must put the variable in a `fun`.
+
+Found while fixing #120, and deliberately not fixed alongside it: the correction
+(calling `infer_expr(callee)`, or `mark_used` on the extracted name) touches a
+use-marking path shared by every call site in the compiler, so it wants its own
+change with its own test rather than riding along on an unrelated codegen fix.
+
+---
+## Resolved
+
+Full narratives for bugs that are closed. Kept in the file rather than deleted
+because several of these entries are the only written record of *why* a
+subsystem is shaped the way it is, and of the measurement mistakes that let the
+bug survive.
 
 ### 109. FIXED — `is String` / `is List` / `is Map` were unconditionally false on wasm32
 
@@ -355,93 +1055,6 @@ inside an arm *body*, the stronger rebinding check. A block-bodied arm currently
 types as `Nil|String` and the checker rejects returning it as `String` — a
 separate limitation. Sequential matches cover the same slot-sharing question
 meanwhile.
-
-
-### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
-
-**Severity: high — this is the reason the other entries survived.**
-
-| | count |
-|---|---|
-| assertions **and** `.expected` | 0 |
-| assertions only | 77 |
-| `.expected` only | 33 |
-| **neither — passes on ANY output** | **64** |
-
-The 64 are graded solely on "exit 0 and no `Runtime Error:` on stderr". They
-print, and nothing checks what. Includes all 11 `mini_*` tests,
-`test/pass/enums.sf`, `test/pass/generics.sf`, `test/pass/closures.sf`,
-`test/pass/interfaces.sf`, `test/pass/operators.sf`, `test/json.sf`,
-`test/inheritance.sf`.
-
-Not hypothetical: `test/pass/enums.sf` and `test/pass/generics.sf` print
-subnormal doubles today (#105) and both pass. `run_tests.sh` already notes that
-`test_async.sf` "was green for the entire life of BUGS #38 while emitting 2 of
-its ~12 expected lines and garbage for the rest" — the mechanism was known, the
-scale was not.
-
-`tools/differential.sh --record` writes `.expected` from the reference run and
-refuses when configurations disagree.
-
----
-
-**LARGELY CLOSED (2026-08-02).** The blind set was re-derived independently rather
-than trusting the "64" above, which predated several merges. At the time of the
-work: **184 positive files — 0 with both mechanisms, 86 assertions-only, 55
-`.expected`-only, 43 blind.**
-
-After the pass: **23 still blind, and 21 of those already FAIL in the baseline**
-(build-fail / timeout / segfault / runtime-error). A test that produces no output
-cannot enshrine a wrong one, so those 21 are not the hazard this entry is about.
-Only **2 are green-and-blind**, both deliberately.
-
-Coverage added across 27 files, via three mechanisms: 21 `.expected`, 2 empty
-`.expected` (which pin the two import helpers to printing *nothing*), 4 `.exit`
-(a **new** mechanism), 5 files given assertions, and 1 carrying both. Every
-recorded output was read against the source before acceptance, then cross-checked
-through the oracle: **36 AGREE, 0 MISMATCH** across native-O2 / native-O0 /
-wasm32.
-
-**What was deliberately NOT recorded is the more important half.**
-`test/pass/enums.sf` and `test/pass/generics.sf` print `0` and `7.29112e-304` from
-`IO.println(Color.Red)` — that is #105. Recording it would have frozen a bug as
-intended behaviour and made this entry worse, so each instead got 10 assertions
-via *interpolation* (which inserts `.to_string()` and is correct), leaving every
-`IO.println` untouched so the garbage stays visible.
-
-`gc_coro_root_{depth,order,overpop}.sf` were also left unfrozen, and this one was
-*proven* rather than argued: adding the three locals needed to capture shadow-stack
-depths moved the reported value 18 → 24. The depth is frame-layout dependent, so
-freezing it would flag unrelated codegen as a regression. Their *invariants* are
-asserted instead — depths equal across rounds, each frame above its spawner.
-
-**Three harness defects found and fixed, all of which were this entry's own
-mechanism one layer up:**
-
-1. **The oracle compared stdout only.** It set `RUN_EC` per config and never used
-   it. The four `mini_*` tests print nothing, so all four "AGREEd" by matching two
-   empty files — a wasm32 run returning 0 where native returned 55 was a unanimous
-   pass. It now compares exit status too, verified by injecting `RUN_EC=7`.
-2. **`output-mismatch` was missing from `run_tests.sh`'s category breakdown**, so a
-   `.expected` regression counted in the total but vanished from the summary.
-3. **The two grading mechanisms compose**, contrary to what "0 files with both"
-   suggested: the assertion gate returns early *only on failure*, so passing
-   assertions fall through to the diff. The 0 was an accident, not policy;
-   `interfaces.sf` is now the first file carrying both.
-
-Also: `test/gc_deep_test.sf` was stable over **25 consecutive runs**, so the
-"nondeterministic" label it carries elsewhere in this file is doubtful and should
-not be used to dismiss a failure there.
-
-**Merge hazard worth recording here, because it makes a fix look like it did not
-work:** `tools/saffron` links the **checked-in** `build/stage3/runtime.ll`
-(`tools/saffron:16`), not `src/runtime/runtime.sf`. So a merge that brings a
-`runtime.sf` fix without regenerating that artifact leaves the fix **inert** —
-`test/pass/subnormal_not_a_pointer.sf` still segfaulted (exit 139) on a tree that
-already contained its fix in source. Regenerating `build/stage3/runtime.ll` made
-all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
-before its tests mean anything, and a green test run against a stale artifact is
-evidence of nothing.
 
 
 ### 108. FIXED — enum `to_string()` printed heap addresses for List, Map and nested-enum payloads
@@ -2282,111 +2895,6 @@ Now that the checker runs inside methods, the compiler's own source is checked
 for the first time. Treat a fresh diagnostic in compiler source as real: there
 is no longer a "the checker doesn't look here" explanation available.
 
-### 75. A value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under
-
-**Reproduction** (wasm32; `t.sf`):
-
-```saffron
-@extern("void js_note(i64)")
-fun _note(id: Float)
-
-var _next_id: Float = 0
-var _cb: Map<Float, String> = {}
-
-fun reg(payload: String): Float {
-    _next_id = _next_id + 1
-    var id: Float = _next_id
-    _cb.set(id, payload)
-    return id
-}
-
-fun kick() { _note(reg("HELLO")) }
-
-// Exported to JS (the `__on_` prefix is what tools/saffron:392 exports).
-fun __on_back(id: Float) {
-    if (_cb.has(id)) { IO.println("FOUND " + _cb.get(id)) }
-    else { IO.println("MISSING") }
-}
-
-kick()
-```
-
-Build with `tools/saffron build t.sf --target wasm32 -o t.wasm`, then from JS call
-`_start()` (which invokes `js_note` and hands you the id) and pass that exact id
-straight back to `__on_back`:
-
-```
-js_note got id = 1n
-MISSING
-```
-
-The id makes a round trip and stops being findable. Handing the *bit pattern of
-1.0* back instead prints `FOUND HELLO`, which localizes it exactly:
-
-```js
-const bb = new ArrayBuffer(8); new Float64Array(bb)[0] = 1.0;
-inst.exports.__on_back(new BigInt64Array(bb)[0]);   // FOUND HELLO
-```
-
-So the two representations of "1" involved are:
-
-| Path | Value seen by `__map_key_cmp` |
-|---|---|
-| stored by `reg()` | `0x3FF0000000000000` — the f64 bit pattern of 1.0 |
-| arriving from JS | `0x0000000000000001` — a bare machine integer |
-
-An exported wasm function's `i64` parameter is whatever JS passed; nothing on the
-boundary re-tags it into the NaN-boxed form the module uses internally. And
-`__map_key_cmp` (`src/runtime/runtime.sf:287`) compares non-string keys by exact
-bit pattern — correctly, for its own purposes — so the lookup misses. Note
-`__val_untag_float` (`src/runtime/wasm_base_32.ll:763`) would convert `1` to `1.0`
-happily; it is simply never called, because a `Map` key is compared as an opaque
-i64 and never untagged at all.
-
-**Why it is nastier than a plain type-mismatch:** every symptom is silent. There
-is no diagnostic at compile time, no trap at runtime, and `has()` returning false
-is a legitimate result, so the callback is *dropped* rather than failing. In the
-playground this meant the Run button POSTed correctly, the service replied
-correctly, and then nothing happened at all — no error in the console, no status
-change. The pattern it breaks (hand JS an opaque id, get it back later) is the
-only way to do asynchronous work across the wasm boundary, so any callback
-registry written the obvious way is affected.
-
-Also note `Bool.to_string()` on wasm32 prints `"false"` for `true` — a separate,
-unfiled printing bug (the branch `if (t)` is taken correctly). It matters here
-because it made an early `IO.println(_cb.has(id).to_string())` read as a Map
-failure in cases where the Map was fine, and it will mislead anyone debugging this
-by printing booleans.
-
-**Workaround (in use):** index a `List` instead of keying a `Map`. An index only
-has to compare numerically, which survives the representation change:
-
-```saffron
-var _callbacks: List<(String) => Nil> = []
-fun _register(cb: (String) => Nil): Float {
-    _callbacks.push(cb)
-    return _callbacks.length() - 1
-}
-fun _resolve(id: Float, payload: String) {
-    if (id >= 0 and id < _callbacks.length()) {
-        var cb: (String) => Nil = _callbacks[id]
-        cb(payload)
-    }
-}
-```
-
-Applied at `playground/frontend/src/api.sf`. This is also why Turmeric's own
-`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based —
-it works, but the reason was not written down, so the Map version looks fine
-until you try it.
-
-The real fix is to normalise incoming values at the export boundary: codegen knows
-each exported function's declared parameter types, so a `Float` parameter on an
-exported function should be re-tagged (`__val_tag_float` on the integer, or a
-tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
-Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
-boundary.
-
 ### 74. FIXED — builtin-namespace calls (`GC.*`) passed NaN-boxed arguments straight into `@extern` functions, and the matching getter re-masked the corruption so it read back correct
 
 Found while wiring `GC.set_max_memory()` for the `--max-memory` work. It is not
@@ -2903,153 +3411,6 @@ fails 5 of them).
 unions") is listed under Fixed, and that fix was real — it addressed the checker
 reading `Expr.type` instead of `Expr.self.type`. This is a separate defect in
 codegen rather than the checker, hence a new entry rather than a reopen.
-
-### 66. Binary files cannot be read or served — `IO.read_file` truncates at the first NUL, so `static_files` serves any wasm module as 0 bytes
-
-Found while verifying the playground before committing it. `GET /app.wasm` returns
-`200` with `Content-Length: 0` even though `playground/static/app.wasm` is 19569
-bytes on disk. The playground frontend therefore cannot load in a browser at all.
-
-**Reproduction** — no server needed:
-
-```saffron
-import "io" as IO
-
-// 13 bytes on disk, starting with the wasm magic \0asm
-var leading: String = IO.read_file("/tmp/nul_test.bin")
-IO.println(leading.length())   // 0
-
-// "abc\0def", 7 bytes on disk
-var mid: String = IO.read_file("/tmp/nul_mid.bin")
-IO.println(mid.length())       // 3
-```
-
-Create the fixtures with `printf '\0asm\x01\x00\x00\x00hello' > /tmp/nul_test.bin`
-and `printf 'abc\0def' > /tmp/nul_mid.bin`.
-
-**Cause.** `__io_read_file` (`src/runtime/runtime.sf:1096-1098`) is *not* the
-problem — it `rt_fread`s the full size and returns the whole buffer. The loss is
-in the representation: a Saffron `String` is a NUL-terminated C string, so
-`length()` is a `strlen` that stops at the first embedded NUL. Every byte after it
-is still in memory but unreachable. A wasm module's magic number is `\0asm`, so the
-very first byte terminates the string and the read yields `""`.
-
-**This is wider than the read.** The `@http/server` response path is String-typed
-end to end, so a binary body is unrepresentable even given a correct read:
-
-- `src/lib/http/server.sf:655` — `static_files` reads with
-  `var content: String = IO.read_file(full_path)`
-- `:168` — `Response.body` is declared `String`
-- `:251-252` — `Content-Length` is emitted from `resp.body.length()`, i.e. strlen
-- `:269` — the body is appended to a `StringBuilder`
-
-So fixing only `read_file` would still emit a truncated `Content-Length` and a
-truncated body. Serving binary assets needs a byte-length-carrying body type
-(`@bytes` `Buffer`, or a `String` that stores an explicit length) threaded through
-`Response` and the writer.
-
-**A working read path already exists** and is the basis for any fix:
-`IO.file_size` + `IO.read_binary` (`src/lib/io.sf:255-263`, runtime
-`:1103-1134`) return the correct 13 for the fixture above. Note they currently
-emit `[codegen] Warning: calling undefined function '__io_file_size'` /
-`'__io_read_binary'` — the functions exist in `runtime.sf` and link fine, but
-they are missing from the codegen known-function tables in
-`src/compiler/codegen/utils_body.sf:5-6`, so every call warns.
-
-**Relationship to the log.** This is the same underlying defect as Bug 2 in
-`docs/design/playground-bug-log.md`, which was only ever *worked around* inside the
-playground's compile endpoint and never filed in the tracker. This is a second,
-independent instance of it, so it is filed here as the general defect.
-
-**Note on the playground handoff**: the completing agent's report listed
-`/app.wasm` among "All 6 routes correct". That claim does not hold — the route
-returns 200 with an empty body.
-
-**Status: still open as a stdlib defect; routed around in the playground.** The
-underlying defect is unchanged — `static_files` still cannot serve a wasm module,
-and `Response.body` is still String-typed — but the playground no longer depends
-on it. It serves the UI module base64-encoded from its own endpoint
-(`GET /api/app_wasm`, `playground/src/main.sf`), which the loader decodes with
-`atob` before instantiating; base64's alphabet is pure ASCII, so it survives a
-Saffron string intact. This is the same dodge the compile endpoint already used
-for user modules, now factored into `Compile.encode_file_base64`. Verified
-byte-identical: the 47555-byte module round-trips through the endpoint and the
-frontend loads and runs. Costs a 33% larger transfer once per page load.
-
-That does not fix the general case — any Saffron program serving a binary asset
-still hits this — so the byte-length-carrying body type described above is still
-the work that needs doing.
-
-**FIXED** (`e6b0735`). `IO.Bytes` is that body type: an explicit (pointer, length)
-pair, so length is carried rather than recomputed by scanning for a NUL, plus
-`read_file_bytes` / `write_file_bytes`. `Response` carries an optional
-`_body_bytes` which takes precedence for `Content-Length`, and `_write_response`
-writes the body straight from its pointer via `sf_tcp_write`/`sf_tls_write`
-instead of through a `String`. `static_files` reads byte-exactly. Fixing the read
-alone would not have been enough — the response path was `String`-typed end to
-end, so `Content-Length` was a strlen and the payload went through a
-`StringBuilder`.
-
-Built on `_b_*` C stdio externs rather than the runtime's `__io_file_size` /
-`__io_read_binary`, because those two are absent from codegen's known-function
-table: calling them from inside a module gets them module-prefix-mangled to
-`@io___io_file_size` and they fail to link.
-
-Those externs declare `FILE*` as `i64`, not `void*`, deliberately. **A
-`void*`-returning extern has its result pointer-tagged, so `fp == 0` compares
-`TAG_PTR|0` against `TAG_INT|0` and is never true** — a failed `fopen` would take
-the success branch and read through a NULL `FILE*`. `IO.open` has exactly this
-latent defect and does not throw on a missing file; that is unfixed and worth its
-own entry.
-
-Tests: `test/pass/binary_file_bytes.sf`, `test/pass/http_binary_response.sf`.
-Still uncovered: the TLS byte-write path is implemented but untested, and
-Stream/SSE remains String-only.
-
-### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
-
-`try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
-`IndexError`, `DivisionError` and `NullError` all route through
-`__runtime_error_fatal` (`src/runtime/runtime.sf:713`), which writes to fd 2 and
-calls `rt_exit(1)`. No `catch` or `finally` block runs.
-
-Repro — the exact example `CLAUDE.md` used to carry:
-
-```saffron
-fun main() {
-    try {
-        var list = [1, 2, 3]
-        IO.println(list[99])
-    } catch (e) {
-        IO.println("caught: ${e}")
-    }
-    IO.println("still alive")
-}
-main()
-```
-
-Actual: prints `Runtime Error: IndexError: index 99 out of bounds (length 3)`,
-exits 1. Neither `caught:` nor `still alive` is reached. Division by zero behaves
-identically. An explicit `throw` in the same shape is caught and returns 0, which
-is what made the wrong claim plausible for so long.
-
-The fatal call sites are `runtime.sf:777` (`__index_error`), `:815`
-(`__division_error`) and `:857` (`__null_pointer_error`).
-
-Nil misuse mostly never gets this far: the checker rejects calling a method on a
-nullable value at compile time.
-
-**Docs fixed** (2026-07-30): `CLAUDE.md`, `docs/src/tutorial/error-handling.md`,
-`docs/learnxinyminutes/learnsaffron.sf` and its `index.html` all claimed runtime
-errors were catchable and showed output that never occurs. They now document the
-fatal behaviour and show a guard-before-indexing pattern instead.
-
-**Still open**: whether the *behaviour* should change. Making these catchable is
-not a small fix — the error path itself allocates (`__runtime_error` calls
-`rt_malloc`), and `setjmp`/`longjmp` are no-ops on both wasm bases
-(`wasm_base_32.ll:592-597`, `wasm_base.ll:503-508`), so `try`/`catch` cannot work
-on wasm at all. Decide whether fatal-by-design is the intended semantics before
-investing there.
 
 ### 64. FIXED — a request body over ~35 KB silently killed the server; `@http/server` read only 8192 bytes and never checked for a short read
 
@@ -4087,86 +4448,6 @@ symlinks or interior `..` segments, so `a/../b` and `b` are still two paths. Tha
 is deliberate: `OS` has no realpath binding, and the failure this entry describes
 comes from the relative-vs-absolute spelling that the driver itself produces.
 
-### 49. `Number` is one surface name for two representations
-
-`str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
-
-```saffron
-fun area(r: Number): Number { return 3.0 * r * r }
-IO.println(area(2.0).to_string())   // prints 0, should be 12
-```
-
-The declared type is relabelled `Int` at the boundary, so the caller's
-`.to_string()` untags a double as an integer and prints `0` (or garbage like
-`37357358909038`). Enum payloads had the same defect from the other end, and that
-half **is** fixed — see #45 and #43.
-
-Mapping `"Number"` to `FloatType` instead is the honest reading of the surface
-syntax and fixes the case above, but it is a worse lie in the other direction:
-stdlib code writes `Number` for values it then uses as list indices and integer
-counters. `src/lib/toml.sf:23`'s `fun peek_at(offset: Number)` is the clearest
-case — as a double, that offset breaks indexing. Measured both ways
-(2026-07-30):
-
-| mapping | `pantry_config` | `test_sorted_set` | `area(): Number` |
-|---|---|---|---|
-| `Number` → `Int` | 29/29 | 33/33 | `0` (wrong) |
-| `Number` → `Float` | 8 failed | `IndexError` | `12` (right) |
-
-Neither mapping is right, because `Number` itself is the defect: one surface name
-for two representations, so no single lattice entry can be correct for both uses.
-This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type")
-showing up as a genuine fork in the road rather than a one-line fix.
-
-**Real fix:** retire `Number` in favour of explicit `Int` and `Float` — the
-intended direction for the language. That means auditing every `Number` in
-`src/lib/*.sf` and deciding per site which one is meant (`peek_at(offset: Int)`,
-`number(key: String): Float`, etc.), then removing the surface spelling. Until
-then `Int` is the mapping that keeps the stdlib working, and it stays, with the
-trade-off documented at the mapping site.
-
-**Correction note.** An earlier version of this file recorded `Number` → `Float`
-as fixed and claimed the regression above did not exist ("`pantry_config` passes
-29/29 with the Float mapping"). That measurement was taken against a `saffronc`
-that did not yet contain the change, and was wrong; the regression is real and
-reproduces. The mapping was reverted to `Int`.
-
-**Progress (2026-07-30).** The retirement is underway; the mapping is unchanged
-but its blast radius is shrinking:
-
-- `src/lib/*.sf`: all 134 `Number` annotations converted. Bulk → `Int`
-  (indices, counters, ports, handles, lengths, byte values, char codes);
-  `scheduler.sleep_times` → `List<Float>`; `reflect.number_to_string`,
-  `toml.number`/`number_or` → `Any` (genuinely int-OR-float pass-throughs that
-  do no arithmetic). `toml.sf`'s `peek_at(offset: Number)` — the example cited
-  above — is now `offset: Int`.
-
-  **Correction (2026-08-01): "no `Number` annotation remains in `src/lib`" was
-  false when written.** Fourteen live annotations were left in
-  `src/lib/http/client.sf` and `src/lib/http/server.sf` — `var status`,
-  `max_redirects`, `redirect_count`, `port`, `body_start`, `_parse_hex(): Number`,
-  `_index_of_from(start: Number): Number`, `_is_redirect(status: Number)`, and
-  five `var i`/`var k` loop counters. All are indices, counts or HTTP status
-  codes, so all fourteen became `Int`. The five remaining hits in
-  `src/lib/llvm/test_codegen.sf` are inside comments and are left alone. `src/lib`
-  is now genuinely free of `Number` annotations.
-- `test/*.sf`: all 152 annotations → `Int` across 49 files. The 9 `is Number`
-  checks are kept deliberately: they cover the feature while it still exists.
-- `checker.sf` no longer collapses `Float` into `IntType` when parsing type
-  strings, so `Int` and `Float` are finally distinct in the checker. This alone
-  turned two `test/fail/` cases from "compiled cleanly" (itself a failure) into
-  correct rejections, taking the suite from 90/47 to 92/45.
-- A latent runtime bug surfaced and was fixed on the way: `__val_is_float`
-  called every raw untagged heap pointer a float, so rewriting `is Number` to
-  `is Int or is Float` made `JSON.to_string({...})` serialize a Map as an
-  integer. `is Number` had masked it by only ever checking the int tag — which
-  also means **`is Number` returns false for every float**, so all seven stdlib
-  `is Number` guards were already silently wrong. See the Fixed section.
-
-**Remaining:** user-facing docs, then removing the surface spelling from the
-lexer/parser/checker/codegen — which is a breaking change for user programs and
-wants its own decision.
-
 ### 41. FIXED — a nested map literal overwrote its parent (silent wrong answer)
 
 Fixed by giving each desugared map literal a unique temporary. The parser has a
@@ -4262,28 +4543,6 @@ keys are the same string — so it only ever matched a global belonging to a
   `shuffle()` spun forever.
 
 Both fallbacks are removed; only the prefixed key is consulted.
-
-### 2. Forward references in nested closures
-
-**Reproduction:**
-```saffron
-fun test() {
-    fun a() { return b() }
-    fun b() { return 42 }
-    IO.print(a())
-}
-test()
-```
-
-**Expected:** Works (b is defined before a is called).
-**Actual:** `Runtime error` — b is undefined when a's closure is compiled.
-
-**Impact:** Can't write mutually recursive helper functions inside a parent scope.
-**Note:** Design choice — compile-time local resolution. Same as Lua/Python.
-
-### 6. No `break`/`continue` type checking
-
-The compiler has break/continue infrastructure (breakJumps, continueJumps arrays) but the type checker doesn't handle NODE_BREAK/NODE_CONTINUE. Runtime works; type checker just ignores them.
 
 ### 12. OBSOLETE — type checker segfaults on Any-typed closures in imported modules (repro targets the dead C VM)
 
@@ -5134,205 +5393,6 @@ produce byte-identical output before and after, and separately checked 1-, 2- an
 
 ---
 
-### 115. A class instance reaching a formatter prints its raw bit pattern
-
-**Severity: high.** Silent wrong answer. The class-shaped sibling of #105, with a
-*different* mechanism, so #105's fix does not reach it.
-
-```saffron
-class Pt { var x: Number
-           fun init(x: Number) { this.x = x }
-           fun to_string(): String { return "Pt(${this.x})" } }
-var p: Pt = Pt(3)
-IO.println(p)          // 5.21502e-310   — WRONG, and this is TOP LEVEL
-IO.println("${p}")     // Pt(3)          — correct
-var ps: List<Pt> = [Pt(1), Pt(2)]
-IO.println("${ps}")    // [5.21502e-310, 5.21502e-310]
-```
-
-Verified directly at HEAD, not merely reported: `IO.println(p)` prints
-`5.21502e-310` while `"${p}"` prints `Pt(3)`.
-
-#105 was cured by `methods_body.sf:1543` inserting `<Enum>__to_string()` when the
-argument's **static** type is a known enum (`enum_defs.has(type)`). That is
-static-type-driven, so it covers exactly what the checker can see through and
-nothing else — no list element, and **no class arm at all**.
-
-**The runtime cannot fix this alone, and the class case is what proves the
-prerequisite is insufficient.** A class instance *does* carry a GC header
-(`__gc_alloc(size, class_tag)`, tags allocated from 10) and `__val_class_tag`
-reads it safely — so unlike a fieldless enum, the value **is** identifiable. It
-still prints as bits. What is missing is the mapping from tag to that class's
-`to_string()`, which only codegen holds (`class_type_ids`, `class_own_methods`).
-So "give payload enums a GC header" is necessary but *not* sufficient for the
-enum half either.
-
-Proposed fix: emit a tag-switch `__val_to_string(i64)` in
-`emit_class_hierarchy_helpers()` (`stmts_body.sf:1740`), beside the
-`__class_parent_tag` / `__class_is_a` switches it already generates from exactly
-these tables, and call it from `__any_to_string` (`base_nanbox.ll:1355`) before
-the `do_float` fallthrough. Payload enums join by allocating via `__gc_alloc` in
-`gen_enum_construct` (`expr_body.sf:3101`) instead of `__sf_malloc`, with tags
-from the same allocator as `next_class_type_id` (`codegen.sf:198`) to avoid
-collision. `__val_to_string` must return a raw `char*` like its siblings — no
-tag/untag step, which is what would re-create #102's segfault.
-
-**Fieldless enums cannot join this scheme.** `tag << 56` is a bare immediate with
-no allocation and no identity; there is nothing to key on. A bit-pattern heuristic
-was deliberately not written, because a wrong guess is worse than visible garbage.
-
-Two caveats to accept explicitly if this is implemented: `__any_to_string` is
-**absent from `wasm_base.ll`** (0 definitions; the other three bases have it), so
-**wasm64 silently loses the behaviour**; and the emit site is gated
-`if (!this.identity_mode)`, so **bootstrap can never validate it** — the
-identity-mode blind spot again.
-
-Regression test `test/oracle_println_class_not_bits.sf` is **6/8, failing on
-purpose**. The garbage is an address reinterpreted as a subnormal, so it varies
-per run and per `-O` level; recording it would make the eventual fix look like a
-regression (#107 discipline). Working paths are asserted positively as the
-reference; broken paths only negatively.
-
----
-
-### 116. Enum payload variants compare by address, so two equal values are unequal
-
-```saffron
-Color.Red == Color.Red              // true  — both are the immediate 0
-Shape.Circle(2) == Shape.Circle(2)  // false — two distinct __sf_malloc's
-Shape.Circle(2) == Shape.Circle(3)  // false — correct, but for the wrong reason
-```
-
-Verified at HEAD. Note the third line: it answers correctly *by accident*, so a
-test that only checks unequal values passes while equality is broken.
-
-Same root as #115's enum half — a payload variant is a headerless `__sf_malloc`
-array. Giving it a GC header is a prerequisite for structural equality but not
-sufficient: `__any_eq` also needs an enum arm that compares payloads field by
-field.
-
-Worth stating plainly because it is a language-semantics wart, not just a bug:
-`==` on an enum currently means **different things** depending on whether the
-variant carries fields — value equality for fieldless, identity for payload.
-
----
-
-### 117. An unannotated list literal of class instances loses its element type
-
-```saffron
-var ann: List<Pt> = [Pt(1), Pt(2)]
-IO.println(ann[0].to_string())   // Pt(1)          — correct
-var un = [Pt(1), Pt(2)]
-IO.println(un[0].to_string())    // 5.21502e-310   — WRONG
-```
-
-Verified at HEAD: the same expression answers correctly with an annotation and
-returns the raw pointer without one. **Minor severity only because the annotation
-is a workaround** — the wrong answer is silent.
-
-Distinct from #115: this is the untyped-receiver dispatch hazard (a call on a
-value whose type inference failed is dropped or misdispatched rather than
-diagnosed), and it is *why* `test/oracle_println_class_not_bits.sf` annotates its
-lists. It also means #115's "only nested elements are wrong" framing holds for
-**annotated** collections only.
-
----
-
-### 118. A nonexistent member of an imported module compiles cleanly and emits invalid IR
-
-**Severity: high.** Not a wrong answer — a compiler crash *reported as a compiler
-bug*, blaming itself for a plain typo in the user's program.
-
-```saffron
-import "@math" as Math
-IO.println(Math.NOPE)     // compiler exits 0; the IR is then rejected
-IO.println(Math.pi)       // 3.14159 — a real member is fine
-```
-
-```
-saffron: the compiler emitted invalid LLVM IR for test/pass/math.sf
-saffron: this is a compiler bug, not an error in your program.
-  opt: output.ll:1288:24: error: use of undefined value '%Math'
-    %t1 = load i64, i64* %Math
-```
-
-The last line is the whole story: having failed to resolve the *member*, codegen
-falls back to evaluating the **namespace itself** as if it were a local variable,
-and emits a load from an SSA name that was never defined. The message is actively
-misleading — it tells the user their correct compiler is broken when in fact their
-program has a typo, so the diagnostic points at the wrong party.
-
-Mechanism, and it is the recurring pattern again (**eighth instance**, after #22,
-#40, #78, #37, #103, #113, #114): a resolver with no way to say *not found*.
-`expr_body.sf:311` handles a module-prefixed member by trying two lookups —
-`known_functions` for `Module.fun`, then `module_globals` for `Module.global`. When
-both miss it does not report absence; it simply falls out of the block, and control
-reaches the generic receiver path at `expr_body.sf:332`, which evaluates `object`
-— the bare alias `Math`. The undefined-variable check that would have caught that
-(`expr_body.sf:91`) explicitly exempts `module_prefixes.has(name)`, and rightly so
-for a *valid* member access, so nothing else stops it.
-
-The fix belongs in the `module_prefixes` block: after both lookups miss, report
-`no member 'NOPE' in module 'Math'` and set `has_errors`, rather than falling
-through to a path that can only produce a load from a namespace. The alias is known
-to be a module at that point, so "not found" is expressible there and nowhere
-downstream.
-
-Found while checking a claim that `test/pass/math.sf` was merely a stale test
-calling `Math.PI` when `src/lib/math.sf:21` defines lowercase `pi`. The test *is*
-wrong, but that is not why it fails: any nonexistent member reproduces this, so
-renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
-remains red pending the diagnostic; fixing the test alone would be papering over
-the real defect.
-
----
-
-### 119. An output path containing `.sf` is taken as the input, so the real input is never read
-
-**Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
-file appear to accept it, which corrupts measurement rather than just output.
-
-```
-saffronc real.sf decoy.sf     # exit 0 — compiles decoy.sf; real.sf never read
-saffronc real.sf out.sf.ll    # exit 0 — writes out.sf.ll.ll
-```
-
-Verified at HEAD, both cases: after `saffronc /tmp/real.sf /tmp/decoy.sf`, the
-emitted IR contains `DECOY` once and `REAL_INPUT` **zero** times, with exit 0.
-
-`main.sf:1075` picks the input by scanning for `arg.contains(".sf")` and keeping the
-**last** match:
-
-```saffron
-if (arg.contains(".sf") and arg != "--stdlib") {
-    last_sf_idx = i
-}
-```
-
-Two independent defects in one line. `contains` rather than `ends_with` matches
-`.sf` anywhere in the string, so `out.sf.ll` qualifies; and taking the *last* match
-means when both args qualify the **output** wins. Note the rest of `main.sf`
-already knows better — lines 693, 714, 742 and 968 all use `ends_with(".sf")`. Only
-the argument parser sniffs.
-
-The fix is `ends_with(".sf")` plus treating the input as *positional* (first
-non-flag argument) rather than sniffing for it at all. Sniffing cannot distinguish
-an input from an output that merely resembles one; position can.
-
-**Why this matters beyond the obvious.** The failure is silent and exit code 0, so
-any batch sweep whose output filenames embed `.sf` measures nothing while appearing
-to measure everything. This was found by an agent whose first two arity sweeps
-wrote to `$OUT/<name>.sf.ll` and reported zero diagnostics across the corpus —
-including on a file it had just watched the compiler reject. The result looked like
-strong evidence of no regression and was evidence of nothing.
-
-The shipped pipeline is **not** affected, which is why this survived: `tools/saffron`
-writes `$TMPDIR/output.ll` (`tools/saffron:320,441`) and `tools/run_tests.sh` writes
-`neg_<name>.ll`, neither containing `.sf`. So the test suites and every failure-set
-comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
-
----
-
 ### 120. FIXED — calling a `Fun`-typed field through `this` emitted a call to a nonexistent method symbol
 
 A class field holding a closure could not be called as `this.field(args)`. The
@@ -5413,45 +5473,6 @@ dispatch statically, and `@heap` driven through its actual import.
 
 ---
 
-### 121. A variable used only in callee position is falsely reported as an unused variable
-
-**Severity: low** — warning-only, no codegen consequence. Filed because it is a
-*false* diagnostic, and a warning that fires on correct code is how people learn to
-ignore warnings.
-
-```saffron
-fun run(): Int {
-    var fs: List<Fun> = [fun (x: Int): Int => x]
-    return fs[0](7)            // fs IS used, right here
-}
-```
-
-```
-[checker] Warning: unused variable 'fs'
-```
-
-`infer_call` (`checker.sf:2161`) pattern-matches the callee only to extract a *name
-string* for the return-type lookup, and never calls `infer_expr` on it. Since
-`mark_used` is reachable only from the `Variable`/`Ref` arms of `infer_type`
-(`checker.sf:1701,1705`), a variable appearing **only** in callee position is never
-marked used.
-
-The axis is "appears only as a callee", **not** "has a function type" — which is
-what makes this its own bug rather than part of #120. Two observations pin that
-down: a `List<Fun>` variable, which is not a function type at all, warns when its
-only appearance is `fs[0](7)`; and the same variable used as a plain value
-(`var alias: Fun = h`) is correctly marked used.
-
-One wrinkle worth recording so a future reproduction attempt does not conclude the
-bug is absent: at **top level** the same `List<Fun>` spelling does *not* warn — only
-inside a function body. So a repro must put the variable in a `fun`.
-
-Found while fixing #120, and deliberately not fixed alongside it: the correction
-(calling `infer_expr(callee)`, or `mark_used` on the extracted name) touches a
-use-marking path shared by every call site in the compiler, so it wants its own
-change with its own test rather than riding along on an unrelated codegen fix.
-
----
 
 ## Fixed
 

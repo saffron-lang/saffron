@@ -503,6 +503,22 @@ Both halves are compiled, so a sweep over AST node shapes must cover
 
 ## Known Issues
 
-See `BUGS.md` for the full list. Remaining critical bugs:
-- **#2**: Forward references in nested closures (design limitation)
-- **#6**: No `break`/`continue` (infrastructure exists but not yet connected to type checker)
+`BUGS.md` is the list. Its `## Open` heading carries the current count and the
+open numbers; trust that over any summary here, including this one. Do not read
+the count by measuring the section — `## Resolved` keeps closed entries in the
+file for their narratives, so the file is long by design.
+
+The two long-standing design limitations:
+- **#2**: forward references in nested closures — compile-time local resolution,
+  same as Lua/Python
+- **#6**: no `break`/`continue` type checking — the runtime nodes exist, the
+  checker ignores them
+
+Two more worth knowing before you trust a measurement or a clean compile:
+- **#118**: a nonexistent member of an imported module compiles cleanly and emits
+  invalid IR, so a typo'd `Module.thing` is not an error
+- **#119**: `saffronc` picks its input by looking for `.sf` in the *last* matching
+  argument, so an output path containing `.sf` is taken as the input and the real
+  input is never read — silently, with exit 0. Any ad-hoc sweep whose output names
+  embed `.sf` measures nothing. `tools/saffron` and `tools/run_tests.sh` are
+  unaffected; they write `output.ll` and `neg_<name>.ll`.
