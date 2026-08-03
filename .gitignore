@@ -13,6 +13,12 @@ build/guard.sf
 build/guard.ll
 build/guard_lib/
 
+# Sub-agent scratch space. The worktrees are nested git repos, so a plain
+# `git add -A` stages them as gitlinks — a clone would then carry dangling
+# submodule pointers to paths that only ever existed on one machine.
+.claude/worktrees/
+.claude/salvage/
+
 # Python bytecode from tools/*.py
 __pycache__/
 *.pyc

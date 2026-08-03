@@ -1101,47 +1101,31 @@ endif91:
   ret i64 %t12
 }
 
-define i64 @__rt_is_gc_non_string(i64 %raw.arg) {
+define i64 @__rt_is_gc_non_string(i64 %v.arg) {
 entry:
-  %raw = alloca i64
-  %magic = alloca i64
-  store i64 %raw.arg, i64* %raw
-  %t1 = load i64, i64* %raw
-  %t2 = add i64 0, 0
-  %t3 = icmp eq i64 %t1, %t2
-  %t4 = zext i1 %t3 to i64
-  %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then95, label %else96
+  %v = alloca i64
+  %tag = alloca i64
+  store i64 %v.arg, i64* %v
+  %t1 = load i64, i64* %v
+  %t2 = call i64 @__rt_gc_tag_of(i64 %t1)
+  store i64 %t2, i64* %tag
+  %t3 = load i64, i64* %tag
+  %t4 = add i64 0, 0
+  %t5 = icmp eq i64 %t3, %t4
+  %t6 = zext i1 %t5 to i64
+  %t7 = trunc i64 %t6 to i1
+  br i1 %t7, label %then95, label %else96
 then95:
-  %t6 = add i64 0, 0
-  ret i64 %t6
+  %t8 = add i64 0, 0
+  ret i64 %t8
 else96:
   br label %endif94
 endif94:
-  %t7 = load i64, i64* %raw
-  %t8 = add i64 0, 8
-  %t9 = sub i64 %t7, %t8
-  %t10 = inttoptr i64 %t9 to i64*
-  %t11 = load i64, i64* %t10
-  store i64 %t11, i64* %magic
-  %t12 = load i64, i64* %magic
-  %t13 = add i64 0, 6557403441622859503
-  %t14 = icmp ne i64 %t12, %t13
-  %t15 = zext i1 %t14 to i64
-  %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then98, label %else99
-then98:
-  %t17 = add i64 0, 0
-  ret i64 %t17
-else99:
-  br label %endif97
-endif97:
-  %t18 = load i64, i64* %raw
-  %t19 = call i64 @__gc_get_type_tag(i64 %t18)
-  %t20 = add i64 0, 1
-  %t21 = icmp ne i64 %t19, %t20
-  %t22 = zext i1 %t21 to i64
-  ret i64 %t22
+  %t9 = load i64, i64* %tag
+  %t10 = add i64 0, 1
+  %t11 = icmp ne i64 %t9, %t10
+  %t12 = zext i1 %t11 to i64
+  ret i64 %t12
 }
 
 define i64 @__val_cmp(i64 %a.arg, i64 %b.arg) {
@@ -1162,99 +1146,99 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then101, label %else102
-then101:
+  br i1 %t5, label %then98, label %else99
+then98:
   %t6 = add i64 0, 0
   ret i64 %t6
-else102:
+else99:
+  br label %endif97
+endif97:
+  %t7 = load i64, i64* %a
+  %t8 = call i64 @__rt_is_gc_non_string(i64 %t7)
+  %t9 = trunc i64 %t8 to i1
+  br label %logic.entry101
+logic.entry101:
+  br i1 %t9, label %end103, label %rhs102
+rhs102:
+  %t10 = load i64, i64* %b
+  %t11 = call i64 @__rt_is_gc_non_string(i64 %t10)
+  %t12 = trunc i64 %t11 to i1
+  br label %rhs.exit104
+rhs.exit104:
+  br label %end103
+end103:
+  %t13 = phi i1 [%t9, %logic.entry101], [%t12, %rhs.exit104]
+  %t14 = zext i1 %t13 to i64
+  %t15 = trunc i64 %t14 to i1
+  br i1 %t15, label %then105, label %else106
+then105:
+  %t16 = add i64 0, 0
+  ret i64 %t16
+else106:
   br label %endif100
 endif100:
-  %t7 = load i64, i64* %a
-  %t8 = add i64 0, 48
-  %t9 = ashr i64 %t7, %t8
-  store i64 %t9, i64* %ua
-  %t10 = load i64, i64* %b
-  %t11 = add i64 0, 48
-  %t12 = ashr i64 %t10, %t11
-  store i64 %t12, i64* %ub
-  %t13 = load i64, i64* %ua
-  %t14 = add i64 0, 32760
-  %t15 = icmp eq i64 %t13, %t14
-  %t16 = zext i1 %t15 to i64
-  %t17 = trunc i64 %t16 to i1
-  br label %logic.entry104
-logic.entry104:
-  br i1 %t17, label %rhs105, label %end106
-rhs105:
-  %t18 = load i64, i64* %ub
-  %t19 = add i64 0, 32760
-  %t20 = icmp eq i64 %t18, %t19
-  %t21 = zext i1 %t20 to i64
-  %t22 = trunc i64 %t21 to i1
-  br label %rhs.exit107
-rhs.exit107:
-  br label %end106
-end106:
-  %t23 = phi i1 [%t17, %logic.entry104], [%t22, %rhs.exit107]
-  %t24 = zext i1 %t23 to i64
-  %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then108, label %else109
-then108:
-  %t26 = load i64, i64* %a
-  %t27 = call i8* @__val_untag_ptr(i64 %t26)
-  %t28 = ptrtoint i8* %t27 to i64
-  store i64 %t28, i64* %ra
-  %t29 = load i64, i64* %b
-  %t30 = call i8* @__val_untag_ptr(i64 %t29)
-  %t31 = ptrtoint i8* %t30 to i64
-  store i64 %t31, i64* %rb
-  %t32 = load i64, i64* %ra
-  %t33 = call i64 @__rt_is_gc_non_string(i64 %t32)
-  %t34 = trunc i64 %t33 to i1
-  br label %logic.entry111
-logic.entry111:
-  br i1 %t34, label %end113, label %rhs112
-rhs112:
-  %t35 = load i64, i64* %rb
-  %t36 = call i64 @__rt_is_gc_non_string(i64 %t35)
-  %t37 = trunc i64 %t36 to i1
-  br label %rhs.exit114
-rhs.exit114:
-  br label %end113
-end113:
-  %t38 = phi i1 [%t34, %logic.entry111], [%t37, %rhs.exit114]
-  %t39 = zext i1 %t38 to i64
-  %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %then115, label %else116
-then115:
-  %t41 = add i64 0, 0
-  ret i64 %t41
-else116:
-  br label %endif110
-endif110:
+  %t17 = load i64, i64* %a
+  %t18 = add i64 0, 48
+  %t19 = ashr i64 %t17, %t18
+  store i64 %t19, i64* %ua
+  %t20 = load i64, i64* %b
+  %t21 = add i64 0, 48
+  %t22 = ashr i64 %t20, %t21
+  store i64 %t22, i64* %ub
+  %t23 = load i64, i64* %ua
+  %t24 = add i64 0, 32760
+  %t25 = icmp eq i64 %t23, %t24
+  %t26 = zext i1 %t25 to i64
+  %t27 = trunc i64 %t26 to i1
+  br label %logic.entry108
+logic.entry108:
+  br i1 %t27, label %rhs109, label %end110
+rhs109:
+  %t28 = load i64, i64* %ub
+  %t29 = add i64 0, 32760
+  %t30 = icmp eq i64 %t28, %t29
+  %t31 = zext i1 %t30 to i64
+  %t32 = trunc i64 %t31 to i1
+  br label %rhs.exit111
+rhs.exit111:
+  br label %end110
+end110:
+  %t33 = phi i1 [%t27, %logic.entry108], [%t32, %rhs.exit111]
+  %t34 = zext i1 %t33 to i64
+  %t35 = trunc i64 %t34 to i1
+  br i1 %t35, label %then112, label %else113
+then112:
+  %t36 = load i64, i64* %a
+  %t37 = call i8* @__val_untag_ptr(i64 %t36)
+  %t38 = ptrtoint i8* %t37 to i64
+  store i64 %t38, i64* %ra
+  %t39 = load i64, i64* %b
+  %t40 = call i8* @__val_untag_ptr(i64 %t39)
+  %t41 = ptrtoint i8* %t40 to i64
+  store i64 %t41, i64* %rb
   %t42 = load i64, i64* %ra
   %t43 = add i64 0, 0
   %t44 = icmp ne i64 %t42, %t43
   %t45 = zext i1 %t44 to i64
   %t46 = trunc i64 %t45 to i1
-  br label %logic.entry118
-logic.entry118:
-  br i1 %t46, label %rhs119, label %end120
-rhs119:
+  br label %logic.entry115
+logic.entry115:
+  br i1 %t46, label %rhs116, label %end117
+rhs116:
   %t47 = load i64, i64* %rb
   %t48 = add i64 0, 0
   %t49 = icmp ne i64 %t47, %t48
   %t50 = zext i1 %t49 to i64
   %t51 = trunc i64 %t50 to i1
-  br label %rhs.exit121
-rhs.exit121:
-  br label %end120
-end120:
-  %t52 = phi i1 [%t46, %logic.entry118], [%t51, %rhs.exit121]
+  br label %rhs.exit118
+rhs.exit118:
+  br label %end117
+end117:
+  %t52 = phi i1 [%t46, %logic.entry115], [%t51, %rhs.exit118]
   %t53 = zext i1 %t52 to i64
   %t54 = trunc i64 %t53 to i1
-  br i1 %t54, label %then122, label %else123
-then122:
+  br i1 %t54, label %then119, label %else120
+then119:
   %t55 = load i64, i64* %ra
   %t56 = inttoptr i64 %t55 to i8*
   %t57 = load i64, i64* %rb
@@ -1267,37 +1251,37 @@ then122:
   %t64 = icmp slt i64 %t61, %t62
   %t63 = zext i1 %t64 to i64
   %t65 = trunc i64 %t63 to i1
-  br i1 %t65, label %then125, label %else126
-then125:
+  br i1 %t65, label %then122, label %else123
+then122:
   %t66 = add i64 0, 0
   %t67 = add i64 0, 1
   %t68 = sub i64 %t66, %t67
   ret i64 %t68
-else126:
-  br label %endif124
-endif124:
+else123:
+  br label %endif121
+endif121:
   %t69 = load i64, i64* %c
   %t70 = add i64 0, 0
   %t72 = icmp sgt i64 %t69, %t70
   %t71 = zext i1 %t72 to i64
   %t73 = trunc i64 %t71 to i1
-  br i1 %t73, label %then128, label %else129
-then128:
+  br i1 %t73, label %then125, label %else126
+then125:
   %t74 = add i64 0, 1
   ret i64 %t74
-else129:
-  br label %endif127
-endif127:
+else126:
+  br label %endif124
+endif124:
   %t75 = add i64 0, 0
   ret i64 %t75
-else123:
-  br label %endif117
-endif117:
+else120:
+  br label %endif114
+endif114:
   %t76 = add i64 0, 0
   ret i64 %t76
-else109:
-  br label %endif103
-endif103:
+else113:
+  br label %endif107
+endif107:
   %t77 = load i64, i64* %a
   %t78 = call double @__val_untag_float(i64 %t77)
   %t79 = bitcast double %t78 to i64
@@ -1313,27 +1297,27 @@ endif103:
   %t88 = icmp slt i64 %t85, %t86
   %t87 = zext i1 %t88 to i64
   %t89 = trunc i64 %t87 to i1
-  br i1 %t89, label %then131, label %else132
-then131:
+  br i1 %t89, label %then128, label %else129
+then128:
   %t90 = add i64 0, 0
   %t91 = add i64 0, 1
   %t92 = sub i64 %t90, %t91
   ret i64 %t92
-else132:
-  br label %endif130
-endif130:
+else129:
+  br label %endif127
+endif127:
   %t93 = load i64, i64* %ka
   %t94 = load i64, i64* %kb
   %t96 = icmp sgt i64 %t93, %t94
   %t95 = zext i1 %t96 to i64
   %t97 = trunc i64 %t95 to i1
-  br i1 %t97, label %then134, label %else135
-then134:
+  br i1 %t97, label %then131, label %else132
+then131:
   %t98 = add i64 0, 1
   ret i64 %t98
-else135:
-  br label %endif133
-endif133:
+else132:
+  br label %endif130
+endif130:
   %t99 = add i64 0, 0
   ret i64 %t99
 }
@@ -1351,13 +1335,13 @@ entry:
   %t6 = icmp slt i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then137, label %else138
-then137:
+  br i1 %t7, label %then134, label %else135
+then134:
   %t8 = add i64 0, 1
   ret i64 %t8
-else138:
-  br label %endif136
-endif136:
+else135:
+  br label %endif133
+endif133:
   %t9 = add i64 0, 0
   ret i64 %t9
 }
@@ -1375,13 +1359,13 @@ entry:
   %t6 = icmp sle i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then140, label %else141
-then140:
+  br i1 %t7, label %then137, label %else138
+then137:
   %t8 = add i64 0, 1
   ret i64 %t8
-else141:
-  br label %endif139
-endif139:
+else138:
+  br label %endif136
+endif136:
   %t9 = add i64 0, 0
   ret i64 %t9
 }
@@ -1399,13 +1383,13 @@ entry:
   %t6 = icmp sgt i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then143, label %else144
-then143:
+  br i1 %t7, label %then140, label %else141
+then140:
   %t8 = add i64 0, 1
   ret i64 %t8
-else144:
-  br label %endif142
-endif142:
+else141:
+  br label %endif139
+endif139:
   %t9 = add i64 0, 0
   ret i64 %t9
 }
@@ -1423,13 +1407,13 @@ entry:
   %t6 = icmp sge i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then146, label %else147
-then146:
+  br i1 %t7, label %then143, label %else144
+then143:
   %t8 = add i64 0, 1
   ret i64 %t8
-else147:
-  br label %endif145
-endif145:
+else144:
+  br label %endif142
+endif142:
   %t9 = add i64 0, 0
   ret i64 %t9
 }
@@ -1444,13 +1428,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then149, label %else150
-then149:
+  br i1 %t5, label %then146, label %else147
+then146:
   %t6 = add i64 0, 0
   ret i64 %t6
-else150:
-  br label %endif148
-endif148:
+else147:
+  br label %endif145
+endif145:
   %t7 = load i64, i64* %v
   %t8 = add i64 0, 48
   %t9 = ashr i64 %t7, %t8
@@ -1460,43 +1444,43 @@ endif148:
   %t12 = icmp eq i64 %t10, %t11
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br i1 %t14, label %then152, label %else153
-then152:
+  br i1 %t14, label %then149, label %else150
+then149:
   %t15 = load i64, i64* %v
   %t16 = call i8* @__val_untag_ptr(i64 %t15)
   %t17 = ptrtoint i8* %t16 to i64
   ret i64 %t17
-else153:
-  br label %endif151
-endif151:
+else150:
+  br label %endif148
+endif148:
   %t18 = load i64, i64* %upper
   %t19 = add i64 0, 0
   %t20 = icmp eq i64 %t18, %t19
   %t21 = zext i1 %t20 to i64
   %t22 = trunc i64 %t21 to i1
-  br label %logic.entry155
-logic.entry155:
-  br i1 %t22, label %rhs156, label %end157
-rhs156:
+  br label %logic.entry152
+logic.entry152:
+  br i1 %t22, label %rhs153, label %end154
+rhs153:
   %t23 = load i64, i64* %v
   %t24 = add i64 0, 65536
   %t26 = icmp sgt i64 %t23, %t24
   %t25 = zext i1 %t26 to i64
   %t27 = trunc i64 %t25 to i1
-  br label %rhs.exit158
-rhs.exit158:
-  br label %end157
-end157:
-  %t28 = phi i1 [%t22, %logic.entry155], [%t27, %rhs.exit158]
+  br label %rhs.exit155
+rhs.exit155:
+  br label %end154
+end154:
+  %t28 = phi i1 [%t22, %logic.entry152], [%t27, %rhs.exit155]
   %t29 = zext i1 %t28 to i64
   %t30 = trunc i64 %t29 to i1
-  br i1 %t30, label %then159, label %else160
-then159:
+  br i1 %t30, label %then156, label %else157
+then156:
   %t31 = load i64, i64* %v
   ret i64 %t31
-else160:
-  br label %endif154
-endif154:
+else157:
+  br label %endif151
+endif151:
   %t32 = add i64 0, 0
   ret i64 %t32
 }
@@ -1514,13 +1498,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then162, label %else163
-then162:
+  br i1 %t5, label %then159, label %else160
+then159:
   %t6 = add i64 0, 0
   ret i64 %t6
-else163:
-  br label %endif161
-endif161:
+else160:
+  br label %endif158
+endif158:
   %t7 = load i64, i64* %a
   %t8 = call i64 @__map_key_str(i64 %t7)
   store i64 %t8, i64* %ra
@@ -1529,13 +1513,13 @@ endif161:
   %t11 = icmp eq i64 %t9, %t10
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then165, label %else166
-then165:
+  br i1 %t13, label %then162, label %else163
+then162:
   %t14 = add i64 0, 1
   ret i64 %t14
-else166:
-  br label %endif164
-endif164:
+else163:
+  br label %endif161
+endif161:
   %t15 = load i64, i64* %b
   %t16 = call i64 @__map_key_str(i64 %t15)
   store i64 %t16, i64* %rb
@@ -1544,13 +1528,13 @@ endif164:
   %t19 = icmp eq i64 %t17, %t18
   %t20 = zext i1 %t19 to i64
   %t21 = trunc i64 %t20 to i1
-  br i1 %t21, label %then168, label %else169
-then168:
+  br i1 %t21, label %then165, label %else166
+then165:
   %t22 = add i64 0, 1
   ret i64 %t22
-else169:
-  br label %endif167
-endif167:
+else166:
+  br label %endif164
+endif164:
   %t23 = load i64, i64* %ra
   %t24 = inttoptr i64 %t23 to i8*
   %t25 = load i64, i64* %rb
@@ -1570,13 +1554,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then171, label %else172
-then171:
+  br i1 %t5, label %then168, label %else169
+then168:
   %t6 = load i64, i64* %v
   ret i64 %t6
-else172:
-  br label %endif170
-endif170:
+else169:
+  br label %endif167
+endif167:
   %t7 = load i64, i64* %v
   %t8 = add i64 0, 48
   %t9 = ashr i64 %t7, %t8
@@ -1586,14 +1570,14 @@ endif170:
   %t12 = icmp eq i64 %t10, %t11
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br i1 %t14, label %then174, label %else175
-then174:
+  br i1 %t14, label %then171, label %else172
+then171:
   %t15 = load i64, i64* %v
   %t16 = call i64 @__rt_tag_ptr(i64 %t15)
   ret i64 %t16
-else175:
-  br label %endif173
-endif173:
+else172:
+  br label %endif170
+endif170:
   %t17 = load i64, i64* %v
   ret i64 %t17
 }
@@ -1620,29 +1604,29 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br label %logic.entry177
-logic.entry177:
-  br i1 %t11, label %end179, label %rhs178
-rhs178:
+  br label %logic.entry174
+logic.entry174:
+  br i1 %t11, label %end176, label %rhs175
+rhs175:
   %t12 = load i64, i64* %n
   %t13 = add i64 0, 0
   %t14 = icmp eq i64 %t12, %t13
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br label %rhs.exit180
-rhs.exit180:
-  br label %end179
-end179:
-  %t17 = phi i1 [%t11, %logic.entry177], [%t16, %rhs.exit180]
+  br label %rhs.exit177
+rhs.exit177:
+  br label %end176
+end176:
+  %t17 = phi i1 [%t11, %logic.entry174], [%t16, %rhs.exit177]
   %t18 = zext i1 %t17 to i64
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then181, label %else182
-then181:
+  br i1 %t19, label %then178, label %else179
+then178:
   %t20 = add i64 0, 0
   ret i64 %t20
-else182:
-  br label %endif176
-endif176:
+else179:
+  br label %endif173
+endif173:
   %t21 = load i64, i64* %h
   %t22 = inttoptr i64 %t21 to i8*
   %t23 = load i64, i64* %n
@@ -1655,13 +1639,13 @@ endif176:
   %t29 = icmp eq i64 %t27, %t28
   %t30 = zext i1 %t29 to i64
   %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then184, label %else185
-then184:
+  br i1 %t31, label %then181, label %else182
+then181:
   %t32 = add i64 0, 0
   ret i64 %t32
-else185:
-  br label %endif183
-endif183:
+else182:
+  br label %endif180
+endif180:
   %t33 = add i64 0, 1
   ret i64 %t33
 }
@@ -1683,13 +1667,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then187, label %else188
-then187:
+  br i1 %t5, label %then184, label %else185
+then184:
   %t6 = add i64 0, 0
   ret i64 %t6
-else188:
-  br label %endif186
-endif186:
+else185:
+  br label %endif183
+endif183:
   %t7 = load i64, i64* %val
   %t8 = call i8* @__val_untag_ptr(i64 %t7)
   %t9 = ptrtoint i8* %t8 to i64
@@ -1706,15 +1690,15 @@ endif186:
   store i64 %t17, i64* %data
   %t18 = add i64 0, 0
   store i64 %t18, i64* %i
-  br label %while.cond189
-while.cond189:
+  br label %while.cond186
+while.cond186:
   %t19 = load i64, i64* %i
   %t20 = load i64, i64* %count
   %t22 = icmp slt i64 %t19, %t20
   %t21 = zext i1 %t22 to i64
   %t23 = trunc i64 %t21 to i1
-  br i1 %t23, label %while.body190, label %while.end191
-while.body190:
+  br i1 %t23, label %while.body187, label %while.end188
+while.body187:
   %t24 = load i64, i64* %data
   %t25 = load i64, i64* %i
   %t26 = add i64 0, 8
@@ -1732,60 +1716,60 @@ while.body190:
   %t36 = icmp eq i64 %t34, %t35
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br label %logic.entry193
-logic.entry193:
-  br i1 %t38, label %rhs194, label %end195
-rhs194:
+  br label %logic.entry190
+logic.entry190:
+  br i1 %t38, label %rhs191, label %end192
+rhs191:
   %t39 = load i64, i64* %raw_elem
   %t40 = add i64 0, 0
   %t41 = icmp eq i64 %t39, %t40
   %t42 = zext i1 %t41 to i64
   %t43 = trunc i64 %t42 to i1
-  br label %rhs.exit196
-rhs.exit196:
-  br label %end195
-end195:
-  %t44 = phi i1 [%t38, %logic.entry193], [%t43, %rhs.exit196]
+  br label %rhs.exit193
+rhs.exit193:
+  br label %end192
+end192:
+  %t44 = phi i1 [%t38, %logic.entry190], [%t43, %rhs.exit193]
   %t45 = zext i1 %t44 to i64
   %t46 = trunc i64 %t45 to i1
-  br i1 %t46, label %then197, label %else198
-then197:
+  br i1 %t46, label %then194, label %else195
+then194:
   %t47 = add i64 0, 1
   ret i64 %t47
-else198:
-  br label %endif192
-endif192:
+else195:
+  br label %endif189
+endif189:
   %t48 = load i64, i64* %raw_val
   %t49 = add i64 0, 0
   %t50 = icmp eq i64 %t48, %t49
   %t51 = zext i1 %t50 to i64
   %t52 = trunc i64 %t51 to i1
-  br label %logic.entry200
-logic.entry200:
-  br i1 %t52, label %end202, label %rhs201
-rhs201:
+  br label %logic.entry197
+logic.entry197:
+  br i1 %t52, label %end199, label %rhs198
+rhs198:
   %t53 = load i64, i64* %raw_elem
   %t54 = add i64 0, 0
   %t55 = icmp eq i64 %t53, %t54
   %t56 = zext i1 %t55 to i64
   %t57 = trunc i64 %t56 to i1
-  br label %rhs.exit203
-rhs.exit203:
-  br label %end202
-end202:
-  %t58 = phi i1 [%t52, %logic.entry200], [%t57, %rhs.exit203]
+  br label %rhs.exit200
+rhs.exit200:
+  br label %end199
+end199:
+  %t58 = phi i1 [%t52, %logic.entry197], [%t57, %rhs.exit200]
   %t59 = zext i1 %t58 to i64
   %t60 = trunc i64 %t59 to i1
-  br i1 %t60, label %then204, label %else205
-then204:
+  br i1 %t60, label %then201, label %else202
+then201:
   %t61 = load i64, i64* %i
   %t62 = add i64 0, 1
   %t63 = add i64 %t61, %t62
   store i64 %t63, i64* %i
-  br label %while.cond189
-else205:
-  br label %endif199
-endif199:
+  br label %while.cond186
+else202:
+  br label %endif196
+endif196:
   %t64 = load i64, i64* %raw_val
   %t65 = inttoptr i64 %t64 to i8*
   %t66 = load i64, i64* %raw_elem
@@ -1796,19 +1780,19 @@ endif199:
   %t71 = icmp eq i64 %t69, %t70
   %t72 = zext i1 %t71 to i64
   %t73 = trunc i64 %t72 to i1
-  br i1 %t73, label %then207, label %else208
-then207:
+  br i1 %t73, label %then204, label %else205
+then204:
   %t74 = add i64 0, 1
   ret i64 %t74
-else208:
-  br label %endif206
-endif206:
+else205:
+  br label %endif203
+endif203:
   %t75 = load i64, i64* %i
   %t76 = add i64 0, 1
   %t77 = add i64 %t75, %t76
   store i64 %t77, i64* %i
-  br label %while.cond189
-while.end191:
+  br label %while.cond186
+while.end188:
   %t78 = add i64 0, 0
   ret i64 %t78
 }
@@ -1875,13 +1859,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then210, label %else211
-then210:
+  br i1 %t5, label %then207, label %else208
+then207:
   %t6 = call i64 @__null_pointer_error()
-  br label %endif209
-else211:
-  br label %endif209
-endif209:
+  br label %endif206
+else208:
+  br label %endif206
+endif206:
   %t7 = load i64, i64* %map
   %t8 = inttoptr i64 %t7 to i64*
   %t9 = load i64, i64* %t8
@@ -1906,15 +1890,15 @@ endif209:
   store i64 %t24, i64* %vals
   %t25 = add i64 0, 0
   store i64 %t25, i64* %i
-  br label %while.cond212
-while.cond212:
+  br label %while.cond209
+while.cond209:
   %t26 = load i64, i64* %i
   %t27 = load i64, i64* %count
   %t29 = icmp slt i64 %t26, %t27
   %t28 = zext i1 %t29 to i64
   %t30 = trunc i64 %t28 to i1
-  br i1 %t30, label %while.body213, label %while.end214
-while.body213:
+  br i1 %t30, label %while.body210, label %while.end211
+while.body210:
   %t31 = load i64, i64* %keys
   %t32 = load i64, i64* %i
   %t33 = add i64 0, 8
@@ -1930,8 +1914,8 @@ while.body213:
   %t42 = icmp eq i64 %t40, %t41
   %t43 = zext i1 %t42 to i64
   %t44 = trunc i64 %t43 to i1
-  br i1 %t44, label %then216, label %else217
-then216:
+  br i1 %t44, label %then213, label %else214
+then213:
   %t45 = load i64, i64* %vals
   %t46 = load i64, i64* %i
   %t47 = add i64 0, 8
@@ -1941,22 +1925,22 @@ then216:
   %t51 = inttoptr i64 %t49 to i64*
   store i64 %t50, i64* %t51
   ret i64 0
-else217:
-  br label %endif215
-endif215:
+else214:
+  br label %endif212
+endif212:
   %t52 = load i64, i64* %i
   %t53 = add i64 0, 1
   %t54 = add i64 %t52, %t53
   store i64 %t54, i64* %i
-  br label %while.cond212
-while.end214:
+  br label %while.cond209
+while.end211:
   %t55 = load i64, i64* %count
   %t56 = load i64, i64* %cap
   %t58 = icmp sge i64 %t55, %t56
   %t57 = zext i1 %t58 to i64
   %t59 = trunc i64 %t57 to i1
-  br i1 %t59, label %then219, label %else220
-then219:
+  br i1 %t59, label %then216, label %else217
+then216:
   %t60 = load i64, i64* %cap
   %t61 = add i64 0, 2
   %t62 = mul i64 %t60, %t61
@@ -1980,24 +1964,24 @@ then219:
   %t76 = icmp ne i64 %t74, %t75
   %t77 = zext i1 %t76 to i64
   %t78 = trunc i64 %t77 to i1
-  br label %logic.entry222
-logic.entry222:
-  br i1 %t78, label %rhs223, label %end224
-rhs223:
+  br label %logic.entry219
+logic.entry219:
+  br i1 %t78, label %rhs220, label %end221
+rhs220:
   %t79 = load i64, i64* %new_vals
   %t80 = add i64 0, 0
   %t81 = icmp ne i64 %t79, %t80
   %t82 = zext i1 %t81 to i64
   %t83 = trunc i64 %t82 to i1
-  br label %rhs.exit225
-rhs.exit225:
-  br label %end224
-end224:
-  %t84 = phi i1 [%t78, %logic.entry222], [%t83, %rhs.exit225]
+  br label %rhs.exit222
+rhs.exit222:
+  br label %end221
+end221:
+  %t84 = phi i1 [%t78, %logic.entry219], [%t83, %rhs.exit222]
   %t85 = zext i1 %t84 to i64
   %t86 = trunc i64 %t85 to i1
-  br i1 %t86, label %then226, label %else227
-then226:
+  br i1 %t86, label %then223, label %else224
+then223:
   %t87 = load i64, i64* %map
   %t88 = add i64 0, 8
   %t89 = add i64 %t87, %t88
@@ -2016,14 +2000,14 @@ then226:
   %t100 = load i64, i64* %new_vals
   %t101 = inttoptr i64 %t99 to i64*
   store i64 %t100, i64* %t101
-  br label %endif221
-else227:
-  br label %endif221
-endif221:
   br label %endif218
-else220:
+else224:
   br label %endif218
 endif218:
+  br label %endif215
+else217:
+  br label %endif215
+endif215:
   %t102 = load i64, i64* %map
   %t103 = add i64 0, 16
   %t104 = add i64 %t102, %t103
@@ -2077,13 +2061,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then229, label %else230
-then229:
+  br i1 %t5, label %then226, label %else227
+then226:
   %t6 = call i64 @__rt_nil()
   ret i64 %t6
-else230:
-  br label %endif228
-endif228:
+else227:
+  br label %endif225
+endif225:
   %t7 = load i64, i64* %map
   %t8 = inttoptr i64 %t7 to i64*
   %t9 = load i64, i64* %t8
@@ -2102,15 +2086,15 @@ endif228:
   store i64 %t19, i64* %vals
   %t20 = add i64 0, 0
   store i64 %t20, i64* %i
-  br label %while.cond231
-while.cond231:
+  br label %while.cond228
+while.cond228:
   %t21 = load i64, i64* %i
   %t22 = load i64, i64* %count
   %t24 = icmp slt i64 %t21, %t22
   %t23 = zext i1 %t24 to i64
   %t25 = trunc i64 %t23 to i1
-  br i1 %t25, label %while.body232, label %while.end233
-while.body232:
+  br i1 %t25, label %while.body229, label %while.end230
+while.body229:
   %t26 = load i64, i64* %keys
   %t27 = load i64, i64* %i
   %t28 = add i64 0, 8
@@ -2126,8 +2110,8 @@ while.body232:
   %t37 = icmp eq i64 %t35, %t36
   %t38 = zext i1 %t37 to i64
   %t39 = trunc i64 %t38 to i1
-  br i1 %t39, label %then235, label %else236
-then235:
+  br i1 %t39, label %then232, label %else233
+then232:
   %t40 = load i64, i64* %vals
   %t41 = load i64, i64* %i
   %t42 = add i64 0, 8
@@ -2136,15 +2120,15 @@ then235:
   %t45 = inttoptr i64 %t44 to i64*
   %t46 = load i64, i64* %t45
   ret i64 %t46
-else236:
-  br label %endif234
-endif234:
+else233:
+  br label %endif231
+endif231:
   %t47 = load i64, i64* %i
   %t48 = add i64 0, 1
   %t49 = add i64 %t47, %t48
   store i64 %t49, i64* %i
-  br label %while.cond231
-while.end233:
+  br label %while.cond228
+while.end230:
   %t50 = call i64 @__rt_nil()
   ret i64 %t50
 }
@@ -2164,13 +2148,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then238, label %else239
-then238:
+  br i1 %t5, label %then235, label %else236
+then235:
   %t6 = add i64 0, 0
   ret i64 %t6
-else239:
-  br label %endif237
-endif237:
+else236:
+  br label %endif234
+endif234:
   %t7 = load i64, i64* %map
   %t8 = inttoptr i64 %t7 to i64*
   %t9 = load i64, i64* %t8
@@ -2183,15 +2167,15 @@ endif237:
   store i64 %t14, i64* %keys
   %t15 = add i64 0, 0
   store i64 %t15, i64* %i
-  br label %while.cond240
-while.cond240:
+  br label %while.cond237
+while.cond237:
   %t16 = load i64, i64* %i
   %t17 = load i64, i64* %count
   %t19 = icmp slt i64 %t16, %t17
   %t18 = zext i1 %t19 to i64
   %t20 = trunc i64 %t18 to i1
-  br i1 %t20, label %while.body241, label %while.end242
-while.body241:
+  br i1 %t20, label %while.body238, label %while.end239
+while.body238:
   %t21 = load i64, i64* %keys
   %t22 = load i64, i64* %i
   %t23 = add i64 0, 8
@@ -2207,19 +2191,19 @@ while.body241:
   %t32 = icmp eq i64 %t30, %t31
   %t33 = zext i1 %t32 to i64
   %t34 = trunc i64 %t33 to i1
-  br i1 %t34, label %then244, label %else245
-then244:
+  br i1 %t34, label %then241, label %else242
+then241:
   %t35 = add i64 0, 1
   ret i64 %t35
-else245:
-  br label %endif243
-endif243:
+else242:
+  br label %endif240
+endif240:
   %t36 = load i64, i64* %i
   %t37 = add i64 0, 1
   %t38 = add i64 %t36, %t37
   store i64 %t38, i64* %i
-  br label %while.cond240
-while.end242:
+  br label %while.cond237
+while.end239:
   %t39 = add i64 0, 0
   ret i64 %t39
 }
@@ -2237,13 +2221,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then247, label %else248
-then247:
+  br i1 %t5, label %then244, label %else245
+then244:
   %t6 = call i64 @__list_new()
   ret i64 %t6
-else248:
-  br label %endif246
-endif246:
+else245:
+  br label %endif243
+endif243:
   %t7 = load i64, i64* %map
   %t8 = inttoptr i64 %t7 to i64*
   %t9 = load i64, i64* %t8
@@ -2258,15 +2242,15 @@ endif246:
   store i64 %t15, i64* %list
   %t16 = add i64 0, 0
   store i64 %t16, i64* %i
-  br label %while.cond249
-while.cond249:
+  br label %while.cond246
+while.cond246:
   %t17 = load i64, i64* %i
   %t18 = load i64, i64* %count
   %t20 = icmp slt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %while.body250, label %while.end251
-while.body250:
+  br i1 %t21, label %while.body247, label %while.end248
+while.body247:
   %t22 = load i64, i64* %list
   %t23 = load i64, i64* %kp
   %t24 = load i64, i64* %i
@@ -2281,8 +2265,8 @@ while.body250:
   %t33 = add i64 0, 1
   %t34 = add i64 %t32, %t33
   store i64 %t34, i64* %i
-  br label %while.cond249
-while.end251:
+  br label %while.cond246
+while.end248:
   %t35 = load i64, i64* %list
   ret i64 %t35
 }
@@ -2300,13 +2284,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then253, label %else254
-then253:
+  br i1 %t5, label %then250, label %else251
+then250:
   %t6 = call i64 @__list_new()
   ret i64 %t6
-else254:
-  br label %endif252
-endif252:
+else251:
+  br label %endif249
+endif249:
   %t7 = load i64, i64* %map
   %t8 = inttoptr i64 %t7 to i64*
   %t9 = load i64, i64* %t8
@@ -2321,15 +2305,15 @@ endif252:
   store i64 %t15, i64* %list
   %t16 = add i64 0, 0
   store i64 %t16, i64* %i
-  br label %while.cond255
-while.cond255:
+  br label %while.cond252
+while.cond252:
   %t17 = load i64, i64* %i
   %t18 = load i64, i64* %count
   %t20 = icmp slt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %while.body256, label %while.end257
-while.body256:
+  br i1 %t21, label %while.body253, label %while.end254
+while.body253:
   %t22 = load i64, i64* %list
   %t23 = load i64, i64* %vp
   %t24 = load i64, i64* %i
@@ -2343,8 +2327,8 @@ while.body256:
   %t32 = add i64 0, 1
   %t33 = add i64 %t31, %t32
   store i64 %t33, i64* %i
-  br label %while.cond255
-while.end257:
+  br label %while.cond252
+while.end254:
   %t34 = load i64, i64* %list
   ret i64 %t34
 }
@@ -2404,7 +2388,7 @@ entry:
   ret i64 %t39
 }
 
-define i64 @__rt_as_list_ptr(i64 %v.arg) {
+define i64 @__rt_gc_tag_of(i64 %v.arg) {
 entry:
   %v = alloca i64
   %upper = alloca i64
@@ -2416,13 +2400,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then259, label %else260
-then259:
+  br i1 %t5, label %then256, label %else257
+then256:
   %t6 = add i64 0, 0
   ret i64 %t6
-else260:
-  br label %endif258
-endif258:
+else257:
+  br label %endif255
+endif255:
   %t7 = load i64, i64* %v
   %t8 = add i64 0, 48
   %t9 = ashr i64 %t7, %t8
@@ -2434,204 +2418,149 @@ endif258:
   %t13 = icmp eq i64 %t11, %t12
   %t14 = zext i1 %t13 to i64
   %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then262, label %else263
-then262:
+  br i1 %t15, label %then259, label %else260
+then259:
   %t16 = load i64, i64* %v
   %t17 = call i8* @__val_untag_ptr(i64 %t16)
   %t18 = ptrtoint i8* %t17 to i64
   store i64 %t18, i64* %raw
-  br label %endif261
-else263:
+  br label %endif258
+else260:
   %t19 = load i64, i64* %upper
   %t20 = add i64 0, 0
   %t21 = icmp eq i64 %t19, %t20
   %t22 = zext i1 %t21 to i64
   %t23 = trunc i64 %t22 to i1
-  br label %logic.entry264
-logic.entry264:
-  br i1 %t23, label %rhs265, label %end266
-rhs265:
+  br i1 %t23, label %then261, label %else262
+then261:
   %t24 = load i64, i64* %v
-  %t25 = add i64 0, 65536
-  %t27 = icmp sgt i64 %t24, %t25
-  %t26 = zext i1 %t27 to i64
-  %t28 = trunc i64 %t26 to i1
-  br label %rhs.exit267
-rhs.exit267:
-  br label %end266
-end266:
-  %t29 = phi i1 [%t23, %logic.entry264], [%t28, %rhs.exit267]
-  %t30 = zext i1 %t29 to i64
-  %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then268, label %else269
-then268:
-  %t32 = load i64, i64* %v
-  store i64 %t32, i64* %raw
-  br label %endif261
-else269:
-  %t33 = add i64 0, 0
-  ret i64 %t33
-endif261:
-  %t34 = load i64, i64* %raw
+  store i64 %t24, i64* %raw
+  br label %endif258
+else262:
+  %t25 = add i64 0, 0
+  ret i64 %t25
+endif258:
+  %t26 = load i64, i64* %raw
+  %t27 = add i64 0, 0
+  %t28 = icmp eq i64 %t26, %t27
+  %t29 = zext i1 %t28 to i64
+  %t30 = trunc i64 %t29 to i1
+  br i1 %t30, label %then264, label %else265
+then264:
+  %t31 = add i64 0, 0
+  ret i64 %t31
+else265:
+  br label %endif263
+endif263:
+  %t32 = load i64, i64* %raw
+  %t33 = add i64 0, 7
+  %t34 = and i64 %t32, %t33
   %t35 = add i64 0, 0
-  %t36 = icmp eq i64 %t34, %t35
+  %t36 = icmp ne i64 %t34, %t35
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then271, label %else272
-then271:
+  br i1 %t38, label %then267, label %else268
+then267:
   %t39 = add i64 0, 0
   ret i64 %t39
-else272:
-  br label %endif270
-endif270:
+else268:
+  br label %endif266
+endif266:
   %t40 = load i64, i64* %raw
-  %t41 = add i64 0, 8
-  %t42 = sub i64 %t40, %t41
-  %t43 = inttoptr i64 %t42 to i64*
-  %t44 = load i64, i64* %t43
-  store i64 %t44, i64* %magic
-  %t45 = load i64, i64* %magic
-  %t46 = add i64 0, 6557403441622859503
-  %t47 = icmp ne i64 %t45, %t46
-  %t48 = zext i1 %t47 to i64
-  %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then274, label %else275
-then274:
-  %t50 = add i64 0, 0
-  ret i64 %t50
-else275:
-  br label %endif273
-endif273:
-  %t51 = load i64, i64* %raw
-  %t52 = call i64 @__gc_get_type_tag(i64 %t51)
-  %t53 = add i64 0, 2
-  %t54 = icmp ne i64 %t52, %t53
-  %t55 = zext i1 %t54 to i64
-  %t56 = trunc i64 %t55 to i1
-  br i1 %t56, label %then277, label %else278
-then277:
-  %t57 = add i64 0, 0
-  ret i64 %t57
-else278:
-  br label %endif276
-endif276:
-  %t58 = load i64, i64* %raw
+  %t41 = add i64 0, 4294967296
+  %t43 = icmp slt i64 %t40, %t41
+  %t42 = zext i1 %t43 to i64
+  %t44 = trunc i64 %t42 to i1
+  br i1 %t44, label %then270, label %else271
+then270:
+  %t45 = add i64 0, 0
+  ret i64 %t45
+else271:
+  br label %endif269
+endif269:
+  %t46 = load i64, i64* %raw
+  %t47 = add i64 0, 8
+  %t48 = sub i64 %t46, %t47
+  %t49 = inttoptr i64 %t48 to i64*
+  %t50 = load i64, i64* %t49
+  store i64 %t50, i64* %magic
+  %t51 = load i64, i64* %magic
+  %t52 = add i64 0, 6557403441622859503
+  %t53 = icmp ne i64 %t51, %t52
+  %t54 = zext i1 %t53 to i64
+  %t55 = trunc i64 %t54 to i1
+  br i1 %t55, label %then273, label %else274
+then273:
+  %t56 = add i64 0, 0
+  ret i64 %t56
+else274:
+  br label %endif272
+endif272:
+  %t57 = load i64, i64* %raw
+  %t58 = call i64 @__gc_get_type_tag(i64 %t57)
   ret i64 %t58
+}
+
+define i64 @__rt_as_gc_ptr(i64 %v.arg, i64 %want.arg) {
+entry:
+  %v = alloca i64
+  %want = alloca i64
+  %upper = alloca i64
+  store i64 %v.arg, i64* %v
+  store i64 %want.arg, i64* %want
+  %t1 = load i64, i64* %v
+  %t2 = call i64 @__rt_gc_tag_of(i64 %t1)
+  %t3 = load i64, i64* %want
+  %t4 = icmp ne i64 %t2, %t3
+  %t5 = zext i1 %t4 to i64
+  %t6 = trunc i64 %t5 to i1
+  br i1 %t6, label %then276, label %else277
+then276:
+  %t7 = add i64 0, 0
+  ret i64 %t7
+else277:
+  br label %endif275
+endif275:
+  %t8 = load i64, i64* %v
+  %t9 = add i64 0, 48
+  %t10 = ashr i64 %t8, %t9
+  store i64 %t10, i64* %upper
+  %t11 = load i64, i64* %upper
+  %t12 = add i64 0, 32760
+  %t13 = icmp eq i64 %t11, %t12
+  %t14 = zext i1 %t13 to i64
+  %t15 = trunc i64 %t14 to i1
+  br i1 %t15, label %then279, label %else280
+then279:
+  %t16 = load i64, i64* %v
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = ptrtoint i8* %t17 to i64
+  ret i64 %t18
+else280:
+  br label %endif278
+endif278:
+  %t19 = load i64, i64* %v
+  ret i64 %t19
+}
+
+define i64 @__rt_as_list_ptr(i64 %v.arg) {
+entry:
+  %v = alloca i64
+  store i64 %v.arg, i64* %v
+  %t1 = load i64, i64* %v
+  %t2 = add i64 0, 2
+  %t3 = call i64 @__rt_as_gc_ptr(i64 %t1, i64 %t2)
+  ret i64 %t3
 }
 
 define i64 @__rt_as_string_ptr(i64 %v.arg) {
 entry:
   %v = alloca i64
-  %upper = alloca i64
-  %raw = alloca i64
-  %magic = alloca i64
   store i64 %v.arg, i64* %v
   %t1 = load i64, i64* %v
-  %t2 = add i64 0, 0
-  %t3 = icmp eq i64 %t1, %t2
-  %t4 = zext i1 %t3 to i64
-  %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then280, label %else281
-then280:
-  %t6 = add i64 0, 0
-  ret i64 %t6
-else281:
-  br label %endif279
-endif279:
-  %t7 = load i64, i64* %v
-  %t8 = add i64 0, 48
-  %t9 = ashr i64 %t7, %t8
-  store i64 %t9, i64* %upper
-  %t10 = add i64 0, 0
-  store i64 %t10, i64* %raw
-  %t11 = load i64, i64* %upper
-  %t12 = add i64 0, 32760
-  %t13 = icmp eq i64 %t11, %t12
-  %t14 = zext i1 %t13 to i64
-  %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then283, label %else284
-then283:
-  %t16 = load i64, i64* %v
-  %t17 = call i8* @__val_untag_ptr(i64 %t16)
-  %t18 = ptrtoint i8* %t17 to i64
-  store i64 %t18, i64* %raw
-  br label %endif282
-else284:
-  %t19 = load i64, i64* %upper
-  %t20 = add i64 0, 0
-  %t21 = icmp eq i64 %t19, %t20
-  %t22 = zext i1 %t21 to i64
-  %t23 = trunc i64 %t22 to i1
-  br label %logic.entry285
-logic.entry285:
-  br i1 %t23, label %rhs286, label %end287
-rhs286:
-  %t24 = load i64, i64* %v
-  %t25 = add i64 0, 65536
-  %t27 = icmp sgt i64 %t24, %t25
-  %t26 = zext i1 %t27 to i64
-  %t28 = trunc i64 %t26 to i1
-  br label %rhs.exit288
-rhs.exit288:
-  br label %end287
-end287:
-  %t29 = phi i1 [%t23, %logic.entry285], [%t28, %rhs.exit288]
-  %t30 = zext i1 %t29 to i64
-  %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then289, label %else290
-then289:
-  %t32 = load i64, i64* %v
-  store i64 %t32, i64* %raw
-  br label %endif282
-else290:
-  %t33 = add i64 0, 0
-  ret i64 %t33
-endif282:
-  %t34 = load i64, i64* %raw
-  %t35 = add i64 0, 0
-  %t36 = icmp eq i64 %t34, %t35
-  %t37 = zext i1 %t36 to i64
-  %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then292, label %else293
-then292:
-  %t39 = add i64 0, 0
-  ret i64 %t39
-else293:
-  br label %endif291
-endif291:
-  %t40 = load i64, i64* %raw
-  %t41 = add i64 0, 8
-  %t42 = sub i64 %t40, %t41
-  %t43 = inttoptr i64 %t42 to i64*
-  %t44 = load i64, i64* %t43
-  store i64 %t44, i64* %magic
-  %t45 = load i64, i64* %magic
-  %t46 = add i64 0, 6557403441622859503
-  %t47 = icmp ne i64 %t45, %t46
-  %t48 = zext i1 %t47 to i64
-  %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then295, label %else296
-then295:
-  %t50 = add i64 0, 0
-  ret i64 %t50
-else296:
-  br label %endif294
-endif294:
-  %t51 = load i64, i64* %raw
-  %t52 = call i64 @__gc_get_type_tag(i64 %t51)
-  %t53 = add i64 0, 1
-  %t54 = icmp ne i64 %t52, %t53
-  %t55 = zext i1 %t54 to i64
-  %t56 = trunc i64 %t55 to i1
-  br i1 %t56, label %then298, label %else299
-then298:
-  %t57 = add i64 0, 0
-  ret i64 %t57
-else299:
-  br label %endif297
-endif297:
-  %t58 = load i64, i64* %raw
-  ret i64 %t58
+  %t2 = add i64 0, 1
+  %t3 = call i64 @__rt_as_gc_ptr(i64 %t1, i64 %t2)
+  ret i64 %t3
 }
 
 define i64 @__rt_elem_to_string(i64 %elem.arg) {
@@ -2649,14 +2578,14 @@ entry:
   %t5 = icmp ne i64 %t3, %t4
   %t6 = zext i1 %t5 to i64
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %then301, label %else302
-then301:
+  br i1 %t7, label %then282, label %else283
+then282:
   %t8 = load i64, i64* %as_list
   %t9 = call i64 @__list_to_string(i64 %t8)
   ret i64 %t9
-else302:
-  br label %endif300
-endif300:
+else283:
+  br label %endif281
+endif281:
   %t10 = load i64, i64* %elem
   %t11 = call i64 @__rt_as_map_ptr(i64 %t10)
   store i64 %t11, i64* %as_map
@@ -2665,14 +2594,14 @@ endif300:
   %t14 = icmp ne i64 %t12, %t13
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then304, label %else305
-then304:
+  br i1 %t16, label %then285, label %else286
+then285:
   %t17 = load i64, i64* %as_map
   %t18 = call i64 @__map_to_string(i64 %t17)
   ret i64 %t18
-else305:
-  br label %endif303
-endif303:
+else286:
+  br label %endif284
+endif284:
   %t19 = load i64, i64* %elem
   %t20 = call i64 @__rt_as_string_ptr(i64 %t19)
   store i64 %t20, i64* %as_str
@@ -2681,13 +2610,13 @@ endif303:
   %t23 = icmp ne i64 %t21, %t22
   %t24 = zext i1 %t23 to i64
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then307, label %else308
-then307:
+  br i1 %t25, label %then288, label %else289
+then288:
   %t26 = load i64, i64* %as_str
   ret i64 %t26
-else308:
-  br label %endif306
-endif306:
+else289:
+  br label %endif287
+endif287:
   %t27 = load i64, i64* %elem
   %t28 = call i64 @__any_to_string(i64 %t27)
   ret i64 %t28
@@ -2716,8 +2645,8 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then310, label %else311
-then310:
+  br i1 %t5, label %then291, label %else292
+then291:
   %t6 = add i64 0, 3
   %t7 = add i64 0, 1
   %t8 = call i64 @__gc_alloc(i64 %t6, i64 %t7)
@@ -2743,9 +2672,9 @@ then310:
   store i8 %t23, i8* %t24
   %t25 = load i64, i64* %nil_s
   ret i64 %t25
-else311:
-  br label %endif309
-endif309:
+else292:
+  br label %endif290
+endif290:
   %t26 = load i64, i64* %list
   %t27 = inttoptr i64 %t26 to i64*
   %t28 = load i64, i64* %t27
@@ -2852,32 +2781,32 @@ endif309:
   %t109 = call i64 @__join_append(i64 %t104, i64 %t105, i64 %t106, i64 %t107, i64 %t108)
   %t110 = add i64 0, 0
   store i64 %t110, i64* %i
-  br label %while.cond312
-while.cond312:
+  br label %while.cond293
+while.cond293:
   %t111 = load i64, i64* %i
   %t112 = load i64, i64* %count
   %t114 = icmp slt i64 %t111, %t112
   %t113 = zext i1 %t114 to i64
   %t115 = trunc i64 %t113 to i1
-  br i1 %t115, label %while.body313, label %while.end314
-while.body313:
+  br i1 %t115, label %while.body294, label %while.end295
+while.body294:
   %t116 = load i64, i64* %i
   %t117 = add i64 0, 0
   %t119 = icmp sgt i64 %t116, %t117
   %t118 = zext i1 %t119 to i64
   %t120 = trunc i64 %t118 to i1
-  br i1 %t120, label %then316, label %else317
-then316:
+  br i1 %t120, label %then297, label %else298
+then297:
   %t121 = load i64, i64* %buf_p
   %t122 = load i64, i64* %len_p
   %t123 = load i64, i64* %cap_p
   %t124 = load i64, i64* %sep_b
   %t125 = add i64 0, 2
   %t126 = call i64 @__join_append(i64 %t121, i64 %t122, i64 %t123, i64 %t124, i64 %t125)
-  br label %endif315
-else317:
-  br label %endif315
-endif315:
+  br label %endif296
+else298:
+  br label %endif296
+endif296:
   %t127 = load i64, i64* %data
   %t128 = load i64, i64* %i
   %t129 = add i64 0, 8
@@ -2894,8 +2823,8 @@ endif315:
   %t138 = icmp ne i64 %t136, %t137
   %t139 = zext i1 %t138 to i64
   %t140 = trunc i64 %t139 to i1
-  br i1 %t140, label %then319, label %else320
-then319:
+  br i1 %t140, label %then300, label %else301
+then300:
   %t141 = load i64, i64* %buf_p
   %t142 = load i64, i64* %len_p
   %t143 = load i64, i64* %cap_p
@@ -2904,16 +2833,16 @@ then319:
   %t146 = inttoptr i64 %t145 to i8*
   %t147 = call i64 @strlen(i8* %t146)
   %t148 = call i64 @__join_append(i64 %t141, i64 %t142, i64 %t143, i64 %t144, i64 %t147)
-  br label %endif318
-else320:
-  br label %endif318
-endif318:
+  br label %endif299
+else301:
+  br label %endif299
+endif299:
   %t149 = load i64, i64* %i
   %t150 = add i64 0, 1
   %t151 = add i64 %t149, %t150
   store i64 %t151, i64* %i
-  br label %while.cond312
-while.end314:
+  br label %while.cond293
+while.end295:
   %t152 = load i64, i64* %buf_p
   %t153 = load i64, i64* %len_p
   %t154 = load i64, i64* %cap_p
@@ -2949,116 +2878,11 @@ while.end314:
 define i64 @__rt_as_map_ptr(i64 %v.arg) {
 entry:
   %v = alloca i64
-  %upper = alloca i64
-  %raw = alloca i64
-  %magic = alloca i64
   store i64 %v.arg, i64* %v
   %t1 = load i64, i64* %v
-  %t2 = add i64 0, 0
-  %t3 = icmp eq i64 %t1, %t2
-  %t4 = zext i1 %t3 to i64
-  %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then322, label %else323
-then322:
-  %t6 = add i64 0, 0
-  ret i64 %t6
-else323:
-  br label %endif321
-endif321:
-  %t7 = load i64, i64* %v
-  %t8 = add i64 0, 48
-  %t9 = ashr i64 %t7, %t8
-  store i64 %t9, i64* %upper
-  %t10 = add i64 0, 0
-  store i64 %t10, i64* %raw
-  %t11 = load i64, i64* %upper
-  %t12 = add i64 0, 32760
-  %t13 = icmp eq i64 %t11, %t12
-  %t14 = zext i1 %t13 to i64
-  %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then325, label %else326
-then325:
-  %t16 = load i64, i64* %v
-  %t17 = call i8* @__val_untag_ptr(i64 %t16)
-  %t18 = ptrtoint i8* %t17 to i64
-  store i64 %t18, i64* %raw
-  br label %endif324
-else326:
-  %t19 = load i64, i64* %upper
-  %t20 = add i64 0, 0
-  %t21 = icmp eq i64 %t19, %t20
-  %t22 = zext i1 %t21 to i64
-  %t23 = trunc i64 %t22 to i1
-  br label %logic.entry327
-logic.entry327:
-  br i1 %t23, label %rhs328, label %end329
-rhs328:
-  %t24 = load i64, i64* %v
-  %t25 = add i64 0, 65536
-  %t27 = icmp sgt i64 %t24, %t25
-  %t26 = zext i1 %t27 to i64
-  %t28 = trunc i64 %t26 to i1
-  br label %rhs.exit330
-rhs.exit330:
-  br label %end329
-end329:
-  %t29 = phi i1 [%t23, %logic.entry327], [%t28, %rhs.exit330]
-  %t30 = zext i1 %t29 to i64
-  %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then331, label %else332
-then331:
-  %t32 = load i64, i64* %v
-  store i64 %t32, i64* %raw
-  br label %endif324
-else332:
-  %t33 = add i64 0, 0
-  ret i64 %t33
-endif324:
-  %t34 = load i64, i64* %raw
-  %t35 = add i64 0, 0
-  %t36 = icmp eq i64 %t34, %t35
-  %t37 = zext i1 %t36 to i64
-  %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then334, label %else335
-then334:
-  %t39 = add i64 0, 0
-  ret i64 %t39
-else335:
-  br label %endif333
-endif333:
-  %t40 = load i64, i64* %raw
-  %t41 = add i64 0, 8
-  %t42 = sub i64 %t40, %t41
-  %t43 = inttoptr i64 %t42 to i64*
-  %t44 = load i64, i64* %t43
-  store i64 %t44, i64* %magic
-  %t45 = load i64, i64* %magic
-  %t46 = add i64 0, 6557403441622859503
-  %t47 = icmp ne i64 %t45, %t46
-  %t48 = zext i1 %t47 to i64
-  %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then337, label %else338
-then337:
-  %t50 = add i64 0, 0
-  ret i64 %t50
-else338:
-  br label %endif336
-endif336:
-  %t51 = load i64, i64* %raw
-  %t52 = call i64 @__gc_get_type_tag(i64 %t51)
-  %t53 = add i64 0, 3
-  %t54 = icmp ne i64 %t52, %t53
-  %t55 = zext i1 %t54 to i64
-  %t56 = trunc i64 %t55 to i1
-  br i1 %t56, label %then340, label %else341
-then340:
-  %t57 = add i64 0, 0
-  ret i64 %t57
-else341:
-  br label %endif339
-endif339:
-  %t58 = load i64, i64* %raw
-  ret i64 %t58
+  %t2 = add i64 0, 3
+  %t3 = call i64 @__rt_as_gc_ptr(i64 %t1, i64 %t2)
+  ret i64 %t3
 }
 
 define i64 @__any_iter_get(i64 %v.arg, i64 %index.arg) {
@@ -3071,9 +2895,7 @@ entry:
   %vals = alloca i64
   %pair = alloca i64
   %as_list = alloca i64
-  %upper = alloca i64
-  %raw = alloca i64
-  %magic = alloca i64
+  %gtag = alloca i64
   store i64 %v.arg, i64* %v
   store i64 %index.arg, i64* %index
   %t1 = load i64, i64* %v
@@ -3084,8 +2906,8 @@ entry:
   %t5 = icmp ne i64 %t3, %t4
   %t6 = zext i1 %t5 to i64
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %then343, label %else344
-then343:
+  br i1 %t7, label %then303, label %else304
+then303:
   %t8 = load i64, i64* %as_map
   %t9 = inttoptr i64 %t8 to i64*
   %t10 = load i64, i64* %t9
@@ -3095,32 +2917,32 @@ then343:
   %t14 = icmp slt i64 %t11, %t12
   %t13 = zext i1 %t14 to i64
   %t15 = trunc i64 %t13 to i1
-  br label %logic.entry346
-logic.entry346:
-  br i1 %t15, label %end348, label %rhs347
-rhs347:
+  br label %logic.entry306
+logic.entry306:
+  br i1 %t15, label %end308, label %rhs307
+rhs307:
   %t16 = load i64, i64* %index
   %t17 = load i64, i64* %count
   %t19 = icmp sge i64 %t16, %t17
   %t18 = zext i1 %t19 to i64
   %t20 = trunc i64 %t18 to i1
-  br label %rhs.exit349
-rhs.exit349:
-  br label %end348
-end348:
-  %t21 = phi i1 [%t15, %logic.entry346], [%t20, %rhs.exit349]
+  br label %rhs.exit309
+rhs.exit309:
+  br label %end308
+end308:
+  %t21 = phi i1 [%t15, %logic.entry306], [%t20, %rhs.exit309]
   %t22 = zext i1 %t21 to i64
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then350, label %else351
-then350:
+  br i1 %t23, label %then310, label %else311
+then310:
   %t24 = load i64, i64* %index
   %t25 = load i64, i64* %count
   %t26 = call i64 @__index_error(i64 %t24, i64 %t25)
   %t27 = call i64 @__rt_nil()
   ret i64 %t27
-else351:
-  br label %endif345
-endif345:
+else311:
+  br label %endif305
+endif305:
   %t28 = load i64, i64* %as_map
   %t29 = add i64 0, 16
   %t30 = add i64 %t28, %t29
@@ -3156,9 +2978,9 @@ endif345:
   %t57 = call i64 @__list_push(i64 %t49, i64 %t56)
   %t58 = load i64, i64* %pair
   ret i64 %t58
-else344:
-  br label %endif342
-endif342:
+else304:
+  br label %endif302
+endif302:
   %t59 = load i64, i64* %v
   %t60 = call i64 @__rt_as_list_ptr(i64 %t59)
   store i64 %t60, i64* %as_list
@@ -3167,114 +2989,51 @@ endif342:
   %t63 = icmp ne i64 %t61, %t62
   %t64 = zext i1 %t63 to i64
   %t65 = trunc i64 %t64 to i1
-  br i1 %t65, label %then353, label %else354
-then353:
+  br i1 %t65, label %then313, label %else314
+then313:
   %t66 = load i64, i64* %as_list
   %t67 = load i64, i64* %index
   %t68 = call i64 @__list_get(i64 %t66, i64 %t67)
   ret i64 %t68
-else354:
-  br label %endif352
-endif352:
+else314:
+  br label %endif312
+endif312:
   %t69 = load i64, i64* %v
-  %t70 = add i64 0, 48
-  %t71 = ashr i64 %t69, %t70
-  store i64 %t71, i64* %upper
+  %t70 = call i64 @__rt_gc_tag_of(i64 %t69)
+  store i64 %t70, i64* %gtag
+  %t71 = load i64, i64* %gtag
   %t72 = add i64 0, 0
-  store i64 %t72, i64* %raw
-  %t73 = load i64, i64* %upper
-  %t74 = add i64 0, 32760
-  %t75 = icmp eq i64 %t73, %t74
-  %t76 = zext i1 %t75 to i64
-  %t77 = trunc i64 %t76 to i1
-  br i1 %t77, label %then356, label %else357
-then356:
-  %t78 = load i64, i64* %v
-  %t79 = call i8* @__val_untag_ptr(i64 %t78)
-  %t80 = ptrtoint i8* %t79 to i64
-  store i64 %t80, i64* %raw
-  br label %endif355
-else357:
-  %t81 = load i64, i64* %upper
-  %t82 = add i64 0, 0
-  %t83 = icmp eq i64 %t81, %t82
-  %t84 = zext i1 %t83 to i64
-  %t85 = trunc i64 %t84 to i1
-  br label %logic.entry358
-logic.entry358:
-  br i1 %t85, label %rhs359, label %end360
-rhs359:
+  %t73 = icmp ne i64 %t71, %t72
+  %t74 = zext i1 %t73 to i64
+  %t75 = trunc i64 %t74 to i1
+  br label %logic.entry316
+logic.entry316:
+  br i1 %t75, label %rhs317, label %end318
+rhs317:
+  %t76 = load i64, i64* %gtag
+  %t77 = add i64 0, 1
+  %t78 = icmp ne i64 %t76, %t77
+  %t79 = zext i1 %t78 to i64
+  %t80 = trunc i64 %t79 to i1
+  br label %rhs.exit319
+rhs.exit319:
+  br label %end318
+end318:
+  %t81 = phi i1 [%t75, %logic.entry316], [%t80, %rhs.exit319]
+  %t82 = zext i1 %t81 to i64
+  %t83 = trunc i64 %t82 to i1
+  br i1 %t83, label %then320, label %else321
+then320:
+  %t84 = call i64 @__not_iterable_error()
+  %t85 = call i64 @__rt_nil()
+  ret i64 %t85
+else321:
+  br label %endif315
+endif315:
   %t86 = load i64, i64* %v
-  %t87 = add i64 0, 65536
-  %t89 = icmp sgt i64 %t86, %t87
-  %t88 = zext i1 %t89 to i64
-  %t90 = trunc i64 %t88 to i1
-  br label %rhs.exit361
-rhs.exit361:
-  br label %end360
-end360:
-  %t91 = phi i1 [%t85, %logic.entry358], [%t90, %rhs.exit361]
-  %t92 = zext i1 %t91 to i64
-  %t93 = trunc i64 %t92 to i1
-  br i1 %t93, label %then362, label %else363
-then362:
-  %t94 = load i64, i64* %v
-  store i64 %t94, i64* %raw
-  br label %endif355
-else363:
-  br label %endif355
-endif355:
-  %t95 = load i64, i64* %raw
-  %t96 = add i64 0, 0
-  %t97 = icmp ne i64 %t95, %t96
-  %t98 = zext i1 %t97 to i64
-  %t99 = trunc i64 %t98 to i1
-  br i1 %t99, label %then365, label %else366
-then365:
-  %t100 = load i64, i64* %raw
-  %t101 = add i64 0, 8
-  %t102 = sub i64 %t100, %t101
-  %t103 = inttoptr i64 %t102 to i64*
-  %t104 = load i64, i64* %t103
-  store i64 %t104, i64* %magic
-  %t105 = load i64, i64* %magic
-  %t106 = add i64 0, 6557403441622859503
-  %t107 = icmp eq i64 %t105, %t106
-  %t108 = zext i1 %t107 to i64
-  %t109 = trunc i64 %t108 to i1
-  br label %logic.entry368
-logic.entry368:
-  br i1 %t109, label %rhs369, label %end370
-rhs369:
-  %t110 = load i64, i64* %raw
-  %t111 = call i64 @__gc_get_type_tag(i64 %t110)
-  %t112 = add i64 0, 1
-  %t113 = icmp ne i64 %t111, %t112
-  %t114 = zext i1 %t113 to i64
-  %t115 = trunc i64 %t114 to i1
-  br label %rhs.exit371
-rhs.exit371:
-  br label %end370
-end370:
-  %t116 = phi i1 [%t109, %logic.entry368], [%t115, %rhs.exit371]
-  %t117 = zext i1 %t116 to i64
-  %t118 = trunc i64 %t117 to i1
-  br i1 %t118, label %then372, label %else373
-then372:
-  %t119 = call i64 @__not_iterable_error()
-  %t120 = call i64 @__rt_nil()
-  ret i64 %t120
-else373:
-  br label %endif367
-endif367:
-  br label %endif364
-else366:
-  br label %endif364
-endif364:
-  %t121 = load i64, i64* %v
-  %t122 = load i64, i64* %index
-  %t123 = call i64 @__str_get(i64 %t121, i64 %t122)
-  ret i64 %t123
+  %t87 = load i64, i64* %index
+  %t88 = call i64 @__str_get(i64 %t86, i64 %t87)
+  ret i64 %t88
 }
 
 define i64 @__not_iterable_error() {
@@ -3657,8 +3416,8 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then375, label %else376
-then375:
+  br i1 %t5, label %then323, label %else324
+then323:
   %t6 = add i64 0, 3
   %t7 = add i64 0, 1
   %t8 = call i64 @__gc_alloc(i64 %t6, i64 %t7)
@@ -3684,9 +3443,9 @@ then375:
   store i8 %t23, i8* %t24
   %t25 = load i64, i64* %nil_s
   ret i64 %t25
-else376:
-  br label %endif374
-endif374:
+else324:
+  br label %endif322
+endif322:
   %t26 = load i64, i64* %map
   %t27 = inttoptr i64 %t26 to i64*
   %t28 = load i64, i64* %t27
@@ -3822,32 +3581,32 @@ endif374:
   %t133 = call i64 @__join_append(i64 %t128, i64 %t129, i64 %t130, i64 %t131, i64 %t132)
   %t134 = add i64 0, 0
   store i64 %t134, i64* %i
-  br label %while.cond377
-while.cond377:
+  br label %while.cond325
+while.cond325:
   %t135 = load i64, i64* %i
   %t136 = load i64, i64* %count
   %t138 = icmp slt i64 %t135, %t136
   %t137 = zext i1 %t138 to i64
   %t139 = trunc i64 %t137 to i1
-  br i1 %t139, label %while.body378, label %while.end379
-while.body378:
+  br i1 %t139, label %while.body326, label %while.end327
+while.body326:
   %t140 = load i64, i64* %i
   %t141 = add i64 0, 0
   %t143 = icmp sgt i64 %t140, %t141
   %t142 = zext i1 %t143 to i64
   %t144 = trunc i64 %t142 to i1
-  br i1 %t144, label %then381, label %else382
-then381:
+  br i1 %t144, label %then329, label %else330
+then329:
   %t145 = load i64, i64* %buf_p
   %t146 = load i64, i64* %len_p
   %t147 = load i64, i64* %cap_p
   %t148 = load i64, i64* %sep_b
   %t149 = add i64 0, 2
   %t150 = call i64 @__join_append(i64 %t145, i64 %t146, i64 %t147, i64 %t148, i64 %t149)
-  br label %endif380
-else382:
-  br label %endif380
-endif380:
+  br label %endif328
+else330:
+  br label %endif328
+endif328:
   %t151 = load i64, i64* %keys
   %t152 = load i64, i64* %i
   %t153 = add i64 0, 8
@@ -3865,8 +3624,8 @@ endif380:
   %t163 = icmp ne i64 %t161, %t162
   %t164 = zext i1 %t163 to i64
   %t165 = trunc i64 %t164 to i1
-  br i1 %t165, label %then384, label %else385
-then384:
+  br i1 %t165, label %then332, label %else333
+then332:
   %t166 = load i64, i64* %buf_p
   %t167 = load i64, i64* %len_p
   %t168 = load i64, i64* %cap_p
@@ -3875,10 +3634,10 @@ then384:
   %t171 = inttoptr i64 %t170 to i8*
   %t172 = call i64 @strlen(i8* %t171)
   %t173 = call i64 @__join_append(i64 %t166, i64 %t167, i64 %t168, i64 %t169, i64 %t172)
-  br label %endif383
-else385:
-  br label %endif383
-endif383:
+  br label %endif331
+else333:
+  br label %endif331
+endif331:
   %t174 = load i64, i64* %buf_p
   %t175 = load i64, i64* %len_p
   %t176 = load i64, i64* %cap_p
@@ -3901,8 +3660,8 @@ endif383:
   %t191 = icmp ne i64 %t189, %t190
   %t192 = zext i1 %t191 to i64
   %t193 = trunc i64 %t192 to i1
-  br i1 %t193, label %then387, label %else388
-then387:
+  br i1 %t193, label %then335, label %else336
+then335:
   %t194 = load i64, i64* %buf_p
   %t195 = load i64, i64* %len_p
   %t196 = load i64, i64* %cap_p
@@ -3911,16 +3670,16 @@ then387:
   %t199 = inttoptr i64 %t198 to i8*
   %t200 = call i64 @strlen(i8* %t199)
   %t201 = call i64 @__join_append(i64 %t194, i64 %t195, i64 %t196, i64 %t197, i64 %t200)
-  br label %endif386
-else388:
-  br label %endif386
-endif386:
+  br label %endif334
+else336:
+  br label %endif334
+endif334:
   %t202 = load i64, i64* %i
   %t203 = add i64 0, 1
   %t204 = add i64 %t202, %t203
   store i64 %t204, i64* %i
-  br label %while.cond377
-while.end379:
+  br label %while.cond325
+while.end327:
   %t205 = load i64, i64* %buf_p
   %t206 = load i64, i64* %len_p
   %t207 = load i64, i64* %cap_p
@@ -5019,29 +4778,29 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br label %logic.entry390
-logic.entry390:
-  br i1 %t11, label %end392, label %rhs391
-rhs391:
+  br label %logic.entry338
+logic.entry338:
+  br i1 %t11, label %end340, label %rhs339
+rhs339:
   %t12 = load i64, i64* %rx
   %t13 = add i64 0, 0
   %t14 = icmp eq i64 %t12, %t13
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br label %rhs.exit393
-rhs.exit393:
-  br label %end392
-end392:
-  %t17 = phi i1 [%t11, %logic.entry390], [%t16, %rhs.exit393]
+  br label %rhs.exit341
+rhs.exit341:
+  br label %end340
+end340:
+  %t17 = phi i1 [%t11, %logic.entry338], [%t16, %rhs.exit341]
   %t18 = zext i1 %t17 to i64
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then394, label %else395
-then394:
+  br i1 %t19, label %then342, label %else343
+then342:
   %t20 = add i64 0, 0
   ret i64 %t20
-else395:
-  br label %endif389
-endif389:
+else343:
+  br label %endif337
+endif337:
   %t21 = load i64, i64* %rs
   %t22 = inttoptr i64 %t21 to i8*
   %t23 = call i64 @strlen(i8* %t22)
@@ -5055,13 +4814,13 @@ endif389:
   %t30 = icmp sgt i64 %t27, %t28
   %t29 = zext i1 %t30 to i64
   %t31 = trunc i64 %t29 to i1
-  br i1 %t31, label %then397, label %else398
-then397:
+  br i1 %t31, label %then345, label %else346
+then345:
   %t32 = add i64 0, 0
   ret i64 %t32
-else398:
-  br label %endif396
-endif396:
+else346:
+  br label %endif344
+endif344:
   %t33 = load i64, i64* %slen
   %t34 = load i64, i64* %plen
   %t35 = sub i64 %t33, %t34
@@ -5080,13 +4839,13 @@ endif396:
   %t46 = icmp eq i64 %t44, %t45
   %t47 = zext i1 %t46 to i64
   %t48 = trunc i64 %t47 to i1
-  br i1 %t48, label %then400, label %else401
-then400:
+  br i1 %t48, label %then348, label %else349
+then348:
   %t49 = add i64 0, 1
   ret i64 %t49
-else401:
-  br label %endif399
-endif399:
+else349:
+  br label %endif347
+endif347:
   %t50 = add i64 0, 0
   ret i64 %t50
 }
@@ -5144,29 +4903,29 @@ entry:
   %t29 = icmp eq i64 %t27, %t28
   %t30 = zext i1 %t29 to i64
   %t31 = trunc i64 %t30 to i1
-  br label %logic.entry403
-logic.entry403:
-  br i1 %t31, label %end405, label %rhs404
-rhs404:
+  br label %logic.entry351
+logic.entry351:
+  br i1 %t31, label %end353, label %rhs352
+rhs352:
   %t32 = load i64, i64* %rd
   %t33 = add i64 0, 0
   %t34 = icmp eq i64 %t32, %t33
   %t35 = zext i1 %t34 to i64
   %t36 = trunc i64 %t35 to i1
-  br label %rhs.exit406
-rhs.exit406:
-  br label %end405
-end405:
-  %t37 = phi i1 [%t31, %logic.entry403], [%t36, %rhs.exit406]
+  br label %rhs.exit354
+rhs.exit354:
+  br label %end353
+end353:
+  %t37 = phi i1 [%t31, %logic.entry351], [%t36, %rhs.exit354]
   %t38 = zext i1 %t37 to i64
   %t39 = trunc i64 %t38 to i1
-  br i1 %t39, label %then407, label %else408
-then407:
+  br i1 %t39, label %then355, label %else356
+then355:
   %t40 = load i64, i64* %list
   ret i64 %t40
-else408:
-  br label %endif402
-endif402:
+else356:
+  br label %endif350
+endif350:
   %t41 = load i64, i64* %ri
   %t42 = inttoptr i64 %t41 to i8*
   %t43 = call i64 @strlen(i8* %t42)
@@ -5189,8 +4948,8 @@ endif402:
   store i64 %t57, i64* %dlen
   %t58 = load i64, i64* %buf
   store i64 %t58, i64* %pos
-  br label %while.cond409
-while.cond409:
+  br label %while.cond357
+while.cond357:
   %t59 = load i64, i64* %pos
   %t60 = inttoptr i64 %t59 to i8*
   %t61 = call i64 @strlen(i8* %t60)
@@ -5198,8 +4957,8 @@ while.cond409:
   %t64 = icmp sgt i64 %t61, %t62
   %t63 = zext i1 %t64 to i64
   %t65 = trunc i64 %t63 to i1
-  br i1 %t65, label %while.body410, label %while.end411
-while.body410:
+  br i1 %t65, label %while.body358, label %while.end359
+while.body358:
   %t66 = load i64, i64* %pos
   %t67 = inttoptr i64 %t66 to i8*
   %t68 = load i64, i64* %rd
@@ -5212,8 +4971,8 @@ while.body410:
   %t74 = icmp eq i64 %t72, %t73
   %t75 = zext i1 %t74 to i64
   %t76 = trunc i64 %t75 to i1
-  br i1 %t76, label %then413, label %else414
-then413:
+  br i1 %t76, label %then361, label %else362
+then361:
   %t77 = load i64, i64* %pos
   %t78 = inttoptr i64 %t77 to i8*
   %t79 = call i64 @strlen(i8* %t78)
@@ -5237,9 +4996,9 @@ then413:
   call void @__sf_free(i8* %t95)
   %t96 = load i64, i64* %list
   ret i64 %t96
-else414:
-  br label %endif412
-endif412:
+else362:
+  br label %endif360
+endif360:
   %t97 = load i64, i64* %m
   %t98 = add i64 0, 0
   %t99 = trunc i64 %t98 to i8
@@ -5267,8 +5026,8 @@ endif412:
   %t119 = load i64, i64* %dlen
   %t120 = add i64 %t118, %t119
   store i64 %t120, i64* %pos
-  br label %while.cond409
-while.end411:
+  br label %while.cond357
+while.end359:
   %t121 = load i64, i64* %buf
   %t122 = inttoptr i64 %t121 to i8*
   call void @__sf_free(i8* %t122)
@@ -5319,8 +5078,8 @@ entry:
   %t18 = icmp sge i64 %t15, %t16
   %t17 = zext i1 %t18 to i64
   %t19 = trunc i64 %t17 to i1
-  br i1 %t19, label %then416, label %else417
-then416:
+  br i1 %t19, label %then364, label %else365
+then364:
   %t20 = load i64, i64* %needed
   %t21 = add i64 0, 2
   %t22 = mul i64 %t20, %t21
@@ -5336,8 +5095,8 @@ then416:
   %t30 = icmp ne i64 %t28, %t29
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then419, label %else420
-then419:
+  br i1 %t32, label %then367, label %else368
+then367:
   %t33 = load i64, i64* %cap_p
   %t34 = load i64, i64* %new_cap
   %t35 = inttoptr i64 %t33 to i64*
@@ -5346,14 +5105,14 @@ then419:
   %t37 = load i64, i64* %new_buf
   %t38 = inttoptr i64 %t36 to i64*
   store i64 %t37, i64* %t38
-  br label %endif418
-else420:
-  br label %endif418
-endif418:
-  br label %endif415
-else417:
-  br label %endif415
-endif415:
+  br label %endif366
+else368:
+  br label %endif366
+endif366:
+  br label %endif363
+else365:
+  br label %endif363
+endif363:
   %t39 = load i64, i64* %buf_p
   %t40 = inttoptr i64 %t39 to i64*
   %t41 = load i64, i64* %t40
@@ -5425,8 +5184,8 @@ entry:
   %t12 = icmp eq i64 %t10, %t11
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br i1 %t14, label %then422, label %else423
-then422:
+  br i1 %t14, label %then370, label %else371
+then370:
   %t15 = add i64 0, 1
   %t16 = add i64 0, 1
   %t17 = call i64 @__gc_alloc(i64 %t15, i64 %t16)
@@ -5439,41 +5198,41 @@ then422:
   %t22 = load i64, i64* %empty
   %t23 = call i64 @__rt_tag_ptr(i64 %t22)
   ret i64 %t23
-else423:
-  br label %endif421
-endif421:
+else371:
+  br label %endif369
+endif369:
   %t24 = load i64, i64* %ro
   %t25 = add i64 0, 0
   %t26 = icmp eq i64 %t24, %t25
   %t27 = zext i1 %t26 to i64
   %t28 = trunc i64 %t27 to i1
-  br label %logic.entry425
-logic.entry425:
-  br i1 %t28, label %end427, label %rhs426
-rhs426:
+  br label %logic.entry373
+logic.entry373:
+  br i1 %t28, label %end375, label %rhs374
+rhs374:
   %t29 = load i64, i64* %rr
   %t30 = add i64 0, 0
   %t31 = icmp eq i64 %t29, %t30
   %t32 = zext i1 %t31 to i64
   %t33 = trunc i64 %t32 to i1
-  br label %rhs.exit428
-rhs.exit428:
-  br label %end427
-end427:
-  %t34 = phi i1 [%t28, %logic.entry425], [%t33, %rhs.exit428]
+  br label %rhs.exit376
+rhs.exit376:
+  br label %end375
+end375:
+  %t34 = phi i1 [%t28, %logic.entry373], [%t33, %rhs.exit376]
   %t35 = zext i1 %t34 to i64
   %t36 = trunc i64 %t35 to i1
-  br i1 %t36, label %then429, label %else430
-then429:
+  br i1 %t36, label %then377, label %else378
+then377:
   %t37 = load i64, i64* %rs
   %t38 = inttoptr i64 %t37 to i8*
   %t39 = call i8* @strdup(i8* %t38)
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = call i64 @__rt_tag_ptr(i64 %t40)
   ret i64 %t41
-else430:
-  br label %endif424
-endif424:
+else378:
+  br label %endif372
+endif372:
   %t42 = load i64, i64* %rs
   %t43 = inttoptr i64 %t42 to i8*
   %t44 = call i64 @strlen(i8* %t43)
@@ -5527,8 +5286,8 @@ endif424:
   store i64 %t79, i64* %t80
   %t81 = load i64, i64* %rs
   store i64 %t81, i64* %src
-  br label %while.cond431
-while.cond431:
+  br label %while.cond379
+while.cond379:
   %t82 = load i64, i64* %src
   %t83 = inttoptr i64 %t82 to i8*
   %t84 = call i64 @strlen(i8* %t83)
@@ -5536,8 +5295,8 @@ while.cond431:
   %t87 = icmp sgt i64 %t84, %t85
   %t86 = zext i1 %t87 to i64
   %t88 = trunc i64 %t86 to i1
-  br i1 %t88, label %while.body432, label %while.end433
-while.body432:
+  br i1 %t88, label %while.body380, label %while.end381
+while.body380:
   %t89 = load i64, i64* %src
   %t90 = inttoptr i64 %t89 to i8*
   %t91 = load i64, i64* %ro
@@ -5550,8 +5309,8 @@ while.body432:
   %t97 = icmp eq i64 %t95, %t96
   %t98 = zext i1 %t97 to i64
   %t99 = trunc i64 %t98 to i1
-  br i1 %t99, label %then435, label %else436
-then435:
+  br i1 %t99, label %then383, label %else384
+then383:
   %t100 = load i64, i64* %buf_p
   %t101 = load i64, i64* %len_p
   %t102 = load i64, i64* %cap_p
@@ -5565,9 +5324,9 @@ then435:
   %t110 = load i64, i64* %t109
   %t111 = call i64 @__rt_tag_ptr(i64 %t110)
   ret i64 %t111
-else436:
-  br label %endif434
-endif434:
+else384:
+  br label %endif382
+endif382:
   %t112 = load i64, i64* %found
   %t113 = load i64, i64* %src
   %t114 = sub i64 %t112, %t113
@@ -5588,8 +5347,8 @@ endif434:
   %t128 = load i64, i64* %olen
   %t129 = add i64 %t127, %t128
   store i64 %t129, i64* %src
-  br label %while.cond431
-while.end433:
+  br label %while.cond379
+while.end381:
   %t130 = load i64, i64* %buf_p
   %t131 = inttoptr i64 %t130 to i64*
   %t132 = load i64, i64* %t131
@@ -5622,8 +5381,8 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then438, label %else439
-then438:
+  br i1 %t5, label %then386, label %else387
+then386:
   %t6 = add i64 0, 1
   %t7 = add i64 0, 1
   %t8 = call i64 @__gc_alloc(i64 %t6, i64 %t7)
@@ -5636,9 +5395,9 @@ then438:
   %t13 = load i64, i64* %empty
   %t14 = call i64 @__rt_tag_ptr(i64 %t13)
   ret i64 %t14
-else439:
-  br label %endif437
-endif437:
+else387:
+  br label %endif385
+endif385:
   %t15 = load i64, i64* %sep
   %t16 = call i8* @__val_untag_ptr(i64 %t15)
   %t17 = ptrtoint i8* %t16 to i64
@@ -5660,16 +5419,16 @@ endif437:
   %t29 = icmp ne i64 %t27, %t28
   %t30 = zext i1 %t29 to i64
   %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then441, label %else442
-then441:
+  br i1 %t31, label %then389, label %else390
+then389:
   %t32 = load i64, i64* %rs
   %t33 = inttoptr i64 %t32 to i8*
   %t34 = call i64 @strlen(i8* %t33)
   store i64 %t34, i64* %sep_len
-  br label %endif440
-else442:
-  br label %endif440
-endif440:
+  br label %endif388
+else390:
+  br label %endif388
+endif388:
   %t35 = add i64 0, 8
   %t36 = call i8* @__sf_malloc(i64 %t35)
   %t37 = ptrtoint i8* %t36 to i64
@@ -5705,32 +5464,32 @@ endif440:
   store i64 %t58, i64* %t59
   %t60 = add i64 0, 0
   store i64 %t60, i64* %i
-  br label %while.cond443
-while.cond443:
+  br label %while.cond391
+while.cond391:
   %t61 = load i64, i64* %i
   %t62 = load i64, i64* %count
   %t64 = icmp slt i64 %t61, %t62
   %t63 = zext i1 %t64 to i64
   %t65 = trunc i64 %t63 to i1
-  br i1 %t65, label %while.body444, label %while.end445
-while.body444:
+  br i1 %t65, label %while.body392, label %while.end393
+while.body392:
   %t66 = load i64, i64* %i
   %t67 = add i64 0, 0
   %t69 = icmp sgt i64 %t66, %t67
   %t68 = zext i1 %t69 to i64
   %t70 = trunc i64 %t68 to i1
-  br i1 %t70, label %then447, label %else448
-then447:
+  br i1 %t70, label %then395, label %else396
+then395:
   %t71 = load i64, i64* %buf_p
   %t72 = load i64, i64* %len_p
   %t73 = load i64, i64* %cap_p
   %t74 = load i64, i64* %rs
   %t75 = load i64, i64* %sep_len
   %t76 = call i64 @__join_append(i64 %t71, i64 %t72, i64 %t73, i64 %t74, i64 %t75)
-  br label %endif446
-else448:
-  br label %endif446
-endif446:
+  br label %endif394
+else396:
+  br label %endif394
+endif394:
   %t77 = load i64, i64* %data
   %t78 = load i64, i64* %i
   %t79 = add i64 0, 8
@@ -5748,24 +5507,24 @@ endif446:
   %t89 = icmp eq i64 %t87, %t88
   %t90 = zext i1 %t89 to i64
   %t91 = trunc i64 %t90 to i1
-  br label %logic.entry450
-logic.entry450:
-  br i1 %t91, label %end452, label %rhs451
-rhs451:
+  br label %logic.entry398
+logic.entry398:
+  br i1 %t91, label %end400, label %rhs399
+rhs399:
   %t92 = load i64, i64* %upper
   %t93 = add i64 0, 0
   %t94 = icmp eq i64 %t92, %t93
   %t95 = zext i1 %t94 to i64
   %t96 = trunc i64 %t95 to i1
-  br label %rhs.exit453
-rhs.exit453:
-  br label %end452
-end452:
-  %t97 = phi i1 [%t91, %logic.entry450], [%t96, %rhs.exit453]
+  br label %rhs.exit401
+rhs.exit401:
+  br label %end400
+end400:
+  %t97 = phi i1 [%t91, %logic.entry398], [%t96, %rhs.exit401]
   %t98 = zext i1 %t97 to i64
   %t99 = trunc i64 %t98 to i1
-  br i1 %t99, label %then454, label %else455
-then454:
+  br i1 %t99, label %then402, label %else403
+then402:
   %t100 = load i64, i64* %elem
   %t101 = call i8* @__val_untag_ptr(i64 %t100)
   %t102 = ptrtoint i8* %t101 to i64
@@ -5775,8 +5534,8 @@ then454:
   %t105 = icmp ne i64 %t103, %t104
   %t106 = zext i1 %t105 to i64
   %t107 = trunc i64 %t106 to i1
-  br i1 %t107, label %then457, label %else458
-then457:
+  br i1 %t107, label %then405, label %else406
+then405:
   %t108 = load i64, i64* %buf_p
   %t109 = load i64, i64* %len_p
   %t110 = load i64, i64* %cap_p
@@ -5785,12 +5544,12 @@ then457:
   %t113 = inttoptr i64 %t112 to i8*
   %t114 = call i64 @strlen(i8* %t113)
   %t115 = call i64 @__join_append(i64 %t108, i64 %t109, i64 %t110, i64 %t111, i64 %t114)
-  br label %endif456
-else458:
-  br label %endif456
-endif456:
-  br label %endif449
-else455:
+  br label %endif404
+else406:
+  br label %endif404
+endif404:
+  br label %endif397
+else403:
   %t116 = load i64, i64* %elem
   %t117 = call i64 @__rt_elem_to_string(i64 %t116)
   store i64 %t117, i64* %elem_str
@@ -5799,8 +5558,8 @@ else455:
   %t120 = icmp ne i64 %t118, %t119
   %t121 = zext i1 %t120 to i64
   %t122 = trunc i64 %t121 to i1
-  br i1 %t122, label %then460, label %else461
-then460:
+  br i1 %t122, label %then408, label %else409
+then408:
   %t123 = load i64, i64* %buf_p
   %t124 = load i64, i64* %len_p
   %t125 = load i64, i64* %cap_p
@@ -5809,18 +5568,18 @@ then460:
   %t128 = inttoptr i64 %t127 to i8*
   %t129 = call i64 @strlen(i8* %t128)
   %t130 = call i64 @__join_append(i64 %t123, i64 %t124, i64 %t125, i64 %t126, i64 %t129)
-  br label %endif459
-else461:
-  br label %endif459
-endif459:
-  br label %endif449
-endif449:
+  br label %endif407
+else409:
+  br label %endif407
+endif407:
+  br label %endif397
+endif397:
   %t131 = load i64, i64* %i
   %t132 = add i64 0, 1
   %t133 = add i64 %t131, %t132
   store i64 %t133, i64* %i
-  br label %while.cond443
-while.end445:
+  br label %while.cond391
+while.end393:
   %t134 = load i64, i64* %buf_p
   %t135 = inttoptr i64 %t134 to i64*
   %t136 = load i64, i64* %t135
@@ -5845,13 +5604,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then463, label %else464
-then463:
+  br i1 %t5, label %then411, label %else412
+then411:
   %t6 = add i64 0, 0
   ret i64 %t6
-else464:
-  br label %endif462
-endif462:
+else412:
+  br label %endif410
+endif410:
   %t7 = load i64, i64* %val
   %t8 = call i8* @__val_untag_ptr(i64 %t7)
   %t9 = ptrtoint i8* %t8 to i64
@@ -5868,15 +5627,15 @@ endif462:
   store i64 %t17, i64* %data
   %t18 = add i64 0, 0
   store i64 %t18, i64* %i
-  br label %while.cond465
-while.cond465:
+  br label %while.cond413
+while.cond413:
   %t19 = load i64, i64* %i
   %t20 = load i64, i64* %count
   %t22 = icmp slt i64 %t19, %t20
   %t21 = zext i1 %t22 to i64
   %t23 = trunc i64 %t21 to i1
-  br i1 %t23, label %while.body466, label %while.end467
-while.body466:
+  br i1 %t23, label %while.body414, label %while.end415
+while.body414:
   %t24 = load i64, i64* %data
   %t25 = load i64, i64* %i
   %t26 = add i64 0, 8
@@ -5894,60 +5653,60 @@ while.body466:
   %t36 = icmp eq i64 %t34, %t35
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br label %logic.entry469
-logic.entry469:
-  br i1 %t38, label %rhs470, label %end471
-rhs470:
+  br label %logic.entry417
+logic.entry417:
+  br i1 %t38, label %rhs418, label %end419
+rhs418:
   %t39 = load i64, i64* %re
   %t40 = add i64 0, 0
   %t41 = icmp eq i64 %t39, %t40
   %t42 = zext i1 %t41 to i64
   %t43 = trunc i64 %t42 to i1
-  br label %rhs.exit472
-rhs.exit472:
-  br label %end471
-end471:
-  %t44 = phi i1 [%t38, %logic.entry469], [%t43, %rhs.exit472]
+  br label %rhs.exit420
+rhs.exit420:
+  br label %end419
+end419:
+  %t44 = phi i1 [%t38, %logic.entry417], [%t43, %rhs.exit420]
   %t45 = zext i1 %t44 to i64
   %t46 = trunc i64 %t45 to i1
-  br i1 %t46, label %then473, label %else474
-then473:
+  br i1 %t46, label %then421, label %else422
+then421:
   %t47 = add i64 0, 1
   ret i64 %t47
-else474:
-  br label %endif468
-endif468:
+else422:
+  br label %endif416
+endif416:
   %t48 = load i64, i64* %rv
   %t49 = add i64 0, 0
   %t50 = icmp eq i64 %t48, %t49
   %t51 = zext i1 %t50 to i64
   %t52 = trunc i64 %t51 to i1
-  br label %logic.entry476
-logic.entry476:
-  br i1 %t52, label %end478, label %rhs477
-rhs477:
+  br label %logic.entry424
+logic.entry424:
+  br i1 %t52, label %end426, label %rhs425
+rhs425:
   %t53 = load i64, i64* %re
   %t54 = add i64 0, 0
   %t55 = icmp eq i64 %t53, %t54
   %t56 = zext i1 %t55 to i64
   %t57 = trunc i64 %t56 to i1
-  br label %rhs.exit479
-rhs.exit479:
-  br label %end478
-end478:
-  %t58 = phi i1 [%t52, %logic.entry476], [%t57, %rhs.exit479]
+  br label %rhs.exit427
+rhs.exit427:
+  br label %end426
+end426:
+  %t58 = phi i1 [%t52, %logic.entry424], [%t57, %rhs.exit427]
   %t59 = zext i1 %t58 to i64
   %t60 = trunc i64 %t59 to i1
-  br i1 %t60, label %then480, label %else481
-then480:
+  br i1 %t60, label %then428, label %else429
+then428:
   %t61 = load i64, i64* %i
   %t62 = add i64 0, 1
   %t63 = add i64 %t61, %t62
   store i64 %t63, i64* %i
-  br label %while.cond465
-else481:
-  br label %endif475
-endif475:
+  br label %while.cond413
+else429:
+  br label %endif423
+endif423:
   %t64 = load i64, i64* %rv
   %t65 = inttoptr i64 %t64 to i8*
   %t66 = load i64, i64* %re
@@ -5958,19 +5717,19 @@ endif475:
   %t71 = icmp eq i64 %t69, %t70
   %t72 = zext i1 %t71 to i64
   %t73 = trunc i64 %t72 to i1
-  br i1 %t73, label %then483, label %else484
-then483:
+  br i1 %t73, label %then431, label %else432
+then431:
   %t74 = add i64 0, 1
   ret i64 %t74
-else484:
-  br label %endif482
-endif482:
+else432:
+  br label %endif430
+endif430:
   %t75 = load i64, i64* %i
   %t76 = add i64 0, 1
   %t77 = add i64 %t75, %t76
   store i64 %t77, i64* %i
-  br label %while.cond465
-while.end467:
+  br label %while.cond413
+while.end415:
   %t78 = add i64 0, 0
   ret i64 %t78
 }
@@ -5994,13 +5753,13 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then486, label %else487
-then486:
+  br i1 %t8, label %then434, label %else435
+then434:
   %t9 = call i64 @__null_pointer_error()
-  br label %endif485
-else487:
-  br label %endif485
-endif485:
+  br label %endif433
+else435:
+  br label %endif433
+endif433:
   %t10 = load i64, i64* %rs
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = call i64 @strlen(i8* %t11)
@@ -6012,47 +5771,47 @@ endif485:
   %t17 = icmp slt i64 %t14, %t15
   %t16 = zext i1 %t17 to i64
   %t18 = trunc i64 %t16 to i1
-  br i1 %t18, label %then489, label %else490
-then489:
+  br i1 %t18, label %then437, label %else438
+then437:
   %t19 = load i64, i64* %count
   %t20 = load i64, i64* %actual_idx
   %t21 = add i64 %t19, %t20
   store i64 %t21, i64* %actual_idx
-  br label %endif488
-else490:
-  br label %endif488
-endif488:
+  br label %endif436
+else438:
+  br label %endif436
+endif436:
   %t22 = load i64, i64* %actual_idx
   %t23 = add i64 0, 0
   %t25 = icmp slt i64 %t22, %t23
   %t24 = zext i1 %t25 to i64
   %t26 = trunc i64 %t24 to i1
-  br label %logic.entry492
-logic.entry492:
-  br i1 %t26, label %end494, label %rhs493
-rhs493:
+  br label %logic.entry440
+logic.entry440:
+  br i1 %t26, label %end442, label %rhs441
+rhs441:
   %t27 = load i64, i64* %actual_idx
   %t28 = load i64, i64* %count
   %t30 = icmp sge i64 %t27, %t28
   %t29 = zext i1 %t30 to i64
   %t31 = trunc i64 %t29 to i1
-  br label %rhs.exit495
-rhs.exit495:
-  br label %end494
-end494:
-  %t32 = phi i1 [%t26, %logic.entry492], [%t31, %rhs.exit495]
+  br label %rhs.exit443
+rhs.exit443:
+  br label %end442
+end442:
+  %t32 = phi i1 [%t26, %logic.entry440], [%t31, %rhs.exit443]
   %t33 = zext i1 %t32 to i64
   %t34 = trunc i64 %t33 to i1
-  br i1 %t34, label %then496, label %else497
-then496:
+  br i1 %t34, label %then444, label %else445
+then444:
   %t35 = load i64, i64* %actual_idx
   %t36 = load i64, i64* %count
   %t37 = call i64 @__index_error(i64 %t35, i64 %t36)
   %t38 = add i64 0, 0
   ret i64 %t38
-else497:
-  br label %endif491
-endif491:
+else445:
+  br label %endif439
+endif439:
   %t39 = add i64 0, 2
   %t40 = call i8* @__sf_malloc(i64 %t39)
   %t41 = ptrtoint i8* %t40 to i64
@@ -6098,8 +5857,8 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then499, label %else500
-then499:
+  br i1 %t8, label %then447, label %else448
+then447:
   %t9 = add i64 0, 1
   %t10 = call i8* @__sf_malloc(i64 %t9)
   %t11 = ptrtoint i8* %t10 to i64
@@ -6112,9 +5871,9 @@ then499:
   %t16 = load i64, i64* %empty
   %t17 = call i64 @__rt_tag_ptr(i64 %t16)
   ret i64 %t17
-else500:
-  br label %endif498
-endif498:
+else448:
+  br label %endif446
+endif446:
   %t18 = add i64 0, 2
   %t19 = call i8* @__sf_malloc(i64 %t18)
   %t20 = ptrtoint i8* %t19 to i64
@@ -6146,8 +5905,8 @@ endif498:
   %t41 = icmp eq i64 %t39, %t40
   %t42 = zext i1 %t41 to i64
   %t43 = trunc i64 %t42 to i1
-  br i1 %t43, label %then502, label %else503
-then502:
+  br i1 %t43, label %then450, label %else451
+then450:
   %t44 = add i64 0, 1
   %t45 = call i8* @__sf_malloc(i64 %t44)
   %t46 = ptrtoint i8* %t45 to i64
@@ -6160,9 +5919,9 @@ then502:
   %t51 = load i64, i64* %empty
   %t52 = call i64 @__rt_tag_ptr(i64 %t51)
   ret i64 %t52
-else503:
-  br label %endif501
-endif501:
+else451:
+  br label %endif449
+endif449:
   %t53 = load i64, i64* %fp
   %t54 = inttoptr i64 %t53 to i8*
   %t55 = add i64 0, 0
@@ -6227,13 +5986,13 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then505, label %else506
-then505:
+  br i1 %t8, label %then453, label %else454
+then453:
   %t9 = add i64 0, 0
   ret i64 %t9
-else506:
-  br label %endif504
-endif504:
+else454:
+  br label %endif452
+endif452:
   %t10 = add i64 0, 3
   %t11 = call i8* @__sf_malloc(i64 %t10)
   %t12 = ptrtoint i8* %t11 to i64
@@ -6272,13 +6031,13 @@ endif504:
   %t39 = icmp eq i64 %t37, %t38
   %t40 = zext i1 %t39 to i64
   %t41 = trunc i64 %t40 to i1
-  br i1 %t41, label %then508, label %else509
-then508:
+  br i1 %t41, label %then456, label %else457
+then456:
   %t42 = add i64 0, 0
   ret i64 %t42
-else509:
-  br label %endif507
-endif507:
+else457:
+  br label %endif455
+endif455:
   %t43 = load i64, i64* %fp
   %t44 = inttoptr i64 %t43 to i8*
   %t45 = add i64 0, 0
@@ -6324,25 +6083,25 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then511, label %else512
-then511:
+  br i1 %t11, label %then459, label %else460
+then459:
   %t12 = add i64 0, 0
   ret i64 %t12
-else512:
-  br label %endif510
-endif510:
+else460:
+  br label %endif458
+endif458:
   %t13 = load i64, i64* %rb
   %t14 = add i64 0, 0
   %t15 = icmp eq i64 %t13, %t14
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then514, label %else515
-then514:
+  br i1 %t17, label %then462, label %else463
+then462:
   %t18 = add i64 0, 0
   ret i64 %t18
-else515:
-  br label %endif513
-endif513:
+else463:
+  br label %endif461
+endif461:
   %t19 = add i64 0, 3
   %t20 = call i8* @__sf_malloc(i64 %t19)
   %t21 = ptrtoint i8* %t20 to i64
@@ -6381,13 +6140,13 @@ endif513:
   %t48 = icmp eq i64 %t46, %t47
   %t49 = zext i1 %t48 to i64
   %t50 = trunc i64 %t49 to i1
-  br i1 %t50, label %then517, label %else518
-then517:
+  br i1 %t50, label %then465, label %else466
+then465:
   %t51 = add i64 0, 0
   ret i64 %t51
-else518:
-  br label %endif516
-endif516:
+else466:
+  br label %endif464
+endif464:
   %t52 = load i64, i64* %rb
   %t53 = inttoptr i64 %t52 to i8*
   %t54 = add i64 0, 1
@@ -6428,12 +6187,12 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then520, label %else521
-then520:
+  br i1 %t11, label %then468, label %else469
+then468:
   ret i64 0
-else521:
-  br label %endif519
-endif519:
+else469:
+  br label %endif467
+endif467:
   %t12 = add i64 0, 2
   %t13 = call i8* @__sf_malloc(i64 %t12)
   %t14 = ptrtoint i8* %t13 to i64
@@ -6465,27 +6224,27 @@ endif519:
   %t35 = icmp eq i64 %t33, %t34
   %t36 = zext i1 %t35 to i64
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then523, label %else524
-then523:
+  br i1 %t37, label %then471, label %else472
+then471:
   ret i64 0
-else524:
-  br label %endif522
-endif522:
+else472:
+  br label %endif470
+endif470:
   %t38 = load i64, i64* %rc
   %t39 = add i64 0, 0
   %t40 = icmp eq i64 %t38, %t39
   %t41 = zext i1 %t40 to i64
   %t42 = trunc i64 %t41 to i1
-  br i1 %t42, label %then526, label %else527
-then526:
+  br i1 %t42, label %then474, label %else475
+then474:
   %t43 = load i64, i64* %fp
   %t44 = inttoptr i64 %t43 to i8*
   %t45 = call i32 @fclose(i8* %t44)
   %t46 = sext i32 %t45 to i64
   ret i64 0
-else527:
-  br label %endif525
-endif525:
+else475:
+  br label %endif473
+endif473:
   %t47 = load i64, i64* %rc
   %t48 = inttoptr i64 %t47 to i8*
   %t49 = call i64 @strlen(i8* %t48)
@@ -6519,13 +6278,13 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then529, label %else530
-then529:
+  br i1 %t8, label %then477, label %else478
+then477:
   %t9 = add i64 0, 0
   ret i64 %t9
-else530:
-  br label %endif528
-endif528:
+else478:
+  br label %endif476
+endif476:
   %t10 = load i64, i64* %rp
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = add i64 0, 0
@@ -6538,13 +6297,13 @@ endif528:
   %t18 = icmp eq i64 %t16, %t17
   %t19 = zext i1 %t18 to i64
   %t20 = trunc i64 %t19 to i1
-  br i1 %t20, label %then532, label %else533
-then532:
+  br i1 %t20, label %then480, label %else481
+then480:
   %t21 = add i64 0, 1
   ret i64 %t21
-else533:
-  br label %endif531
-endif531:
+else481:
+  br label %endif479
+endif479:
   %t22 = add i64 0, 0
   ret i64 %t22
 }
@@ -6563,12 +6322,12 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then535, label %else536
-then535:
+  br i1 %t8, label %then483, label %else484
+then483:
   ret i64 0
-else536:
-  br label %endif534
-endif534:
+else484:
+  br label %endif482
+endif482:
   %t9 = load i64, i64* %rp
   %t10 = inttoptr i64 %t9 to i8*
   %t11 = add i64 0, 493
@@ -6602,12 +6361,12 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then538, label %else539
-then538:
+  br i1 %t11, label %then486, label %else487
+then486:
   ret i64 0
-else539:
-  br label %endif537
-endif537:
+else487:
+  br label %endif485
+endif485:
   %t12 = add i64 0, 2
   %t13 = call i8* @__sf_malloc(i64 %t12)
   %t14 = ptrtoint i8* %t13 to i64
@@ -6639,27 +6398,27 @@ endif537:
   %t35 = icmp eq i64 %t33, %t34
   %t36 = zext i1 %t35 to i64
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then541, label %else542
-then541:
+  br i1 %t37, label %then489, label %else490
+then489:
   ret i64 0
-else542:
-  br label %endif540
-endif540:
+else490:
+  br label %endif488
+endif488:
   %t38 = load i64, i64* %rc
   %t39 = add i64 0, 0
   %t40 = icmp eq i64 %t38, %t39
   %t41 = zext i1 %t40 to i64
   %t42 = trunc i64 %t41 to i1
-  br i1 %t42, label %then544, label %else545
-then544:
+  br i1 %t42, label %then492, label %else493
+then492:
   %t43 = load i64, i64* %fp
   %t44 = inttoptr i64 %t43 to i8*
   %t45 = call i32 @fclose(i8* %t44)
   %t46 = sext i32 %t45 to i64
   ret i64 0
-else545:
-  br label %endif543
-endif543:
+else493:
+  br label %endif491
+endif491:
   %t47 = load i64, i64* %rc
   %t48 = inttoptr i64 %t47 to i8*
   %t49 = call i64 @strlen(i8* %t48)
@@ -6703,13 +6462,13 @@ entry:
   %t7 = icmp eq i64 %t5, %t6
   %t8 = zext i1 %t7 to i64
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then547, label %else548
-then547:
+  br i1 %t9, label %then495, label %else496
+then495:
   %t10 = load i64, i64* %list
   ret i64 %t10
-else548:
-  br label %endif546
-endif546:
+else496:
+  br label %endif494
+endif494:
   %t11 = load i64, i64* %rp
   %t12 = inttoptr i64 %t11 to i8*
   %t13 = call i64 @strlen(i8* %t12)
@@ -6807,13 +6566,13 @@ endif546:
   %t90 = icmp eq i64 %t88, %t89
   %t91 = zext i1 %t90 to i64
   %t92 = trunc i64 %t91 to i1
-  br i1 %t92, label %then550, label %else551
-then550:
+  br i1 %t92, label %then498, label %else499
+then498:
   %t93 = load i64, i64* %list
   ret i64 %t93
-else551:
-  br label %endif549
-endif549:
+else499:
+  br label %endif497
+endif497:
   %t94 = add i64 0, 4096
   %t95 = call i8* @__sf_malloc(i64 %t94)
   %t96 = ptrtoint i8* %t95 to i64
@@ -6827,15 +6586,15 @@ endif549:
   %t103 = call i8* @fgets(i8* %t98, i32 %t100, i8* %t102)
   %t104 = ptrtoint i8* %t103 to i64
   store i64 %t104, i64* %line
-  br label %while.cond552
-while.cond552:
+  br label %while.cond500
+while.cond500:
   %t105 = load i64, i64* %line
   %t106 = add i64 0, 0
   %t107 = icmp ne i64 %t105, %t106
   %t108 = zext i1 %t107 to i64
   %t109 = trunc i64 %t108 to i1
-  br i1 %t109, label %while.body553, label %while.end554
-while.body553:
+  br i1 %t109, label %while.body501, label %while.end502
+while.body501:
   %t110 = load i64, i64* %buf
   %t111 = inttoptr i64 %t110 to i8*
   %t112 = call i64 @strlen(i8* %t111)
@@ -6845,8 +6604,8 @@ while.body553:
   %t116 = icmp sgt i64 %t113, %t114
   %t115 = zext i1 %t116 to i64
   %t117 = trunc i64 %t115 to i1
-  br i1 %t117, label %then556, label %else557
-then556:
+  br i1 %t117, label %then504, label %else505
+then504:
   %t118 = load i64, i64* %buf
   %t119 = load i64, i64* %len
   %t120 = add i64 %t118, %t119
@@ -6859,8 +6618,8 @@ then556:
   %t127 = icmp eq i64 %t125, %t126
   %t128 = zext i1 %t127 to i64
   %t129 = trunc i64 %t128 to i1
-  br i1 %t129, label %then559, label %else560
-then559:
+  br i1 %t129, label %then507, label %else508
+then507:
   %t130 = load i64, i64* %buf
   %t131 = load i64, i64* %len
   %t132 = add i64 %t130, %t131
@@ -6874,21 +6633,21 @@ then559:
   %t139 = add i64 0, 1
   %t140 = sub i64 %t138, %t139
   store i64 %t140, i64* %len
-  br label %endif558
-else560:
-  br label %endif558
-endif558:
-  br label %endif555
-else557:
-  br label %endif555
-endif555:
+  br label %endif506
+else508:
+  br label %endif506
+endif506:
+  br label %endif503
+else505:
+  br label %endif503
+endif503:
   %t141 = load i64, i64* %len
   %t142 = add i64 0, 0
   %t144 = icmp sgt i64 %t141, %t142
   %t143 = zext i1 %t144 to i64
   %t145 = trunc i64 %t143 to i1
-  br i1 %t145, label %then562, label %else563
-then562:
+  br i1 %t145, label %then510, label %else511
+then510:
   %t146 = load i64, i64* %buf
   %t147 = inttoptr i64 %t146 to i8*
   %t148 = call i8* @strdup(i8* %t147)
@@ -6898,10 +6657,10 @@ then562:
   %t151 = load i64, i64* %list
   %t152 = load i64, i64* %v_entry
   %t153 = call i64 @__list_push(i64 %t151, i64 %t152)
-  br label %endif561
-else563:
-  br label %endif561
-endif561:
+  br label %endif509
+else511:
+  br label %endif509
+endif509:
   %t154 = load i64, i64* %buf
   %t155 = inttoptr i64 %t154 to i8*
   %t156 = add i64 0, 4096
@@ -6911,8 +6670,8 @@ endif561:
   %t160 = call i8* @fgets(i8* %t155, i32 %t157, i8* %t159)
   %t161 = ptrtoint i8* %t160 to i64
   store i64 %t161, i64* %line
-  br label %while.cond552
-while.end554:
+  br label %while.cond500
+while.end502:
   %t162 = load i64, i64* %buf
   %t163 = inttoptr i64 %t162 to i8*
   call void @__sf_free(i8* %t163)
@@ -6941,8 +6700,8 @@ entry:
   %t6 = icmp sle i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then565, label %else566
-then565:
+  br i1 %t7, label %then513, label %else514
+then513:
   %t8 = add i64 0, 1
   %t9 = call i8* @__sf_malloc(i64 %t8)
   %t10 = ptrtoint i8* %t9 to i64
@@ -6955,9 +6714,9 @@ then565:
   %t15 = load i64, i64* %empty
   %t16 = call i64 @__rt_tag_ptr(i64 %t15)
   ret i64 %t16
-else566:
-  br label %endif564
-endif564:
+else514:
+  br label %endif512
+endif512:
   %t17 = load i64, i64* %rn
   %t18 = add i64 0, 1
   %t19 = add i64 %t17, %t18
@@ -6966,15 +6725,15 @@ endif564:
   store i64 %t21, i64* %buf
   %t22 = add i64 0, 0
   store i64 %t22, i64* %total
-  br label %while.cond567
-while.cond567:
+  br label %while.cond515
+while.cond515:
   %t23 = load i64, i64* %total
   %t24 = load i64, i64* %rn
   %t26 = icmp slt i64 %t23, %t24
   %t25 = zext i1 %t26 to i64
   %t27 = trunc i64 %t25 to i1
-  br i1 %t27, label %while.body568, label %while.end569
-while.body568:
+  br i1 %t27, label %while.body516, label %while.end517
+while.body516:
   %t28 = add i64 0, 0
   %t29 = trunc i64 %t28 to i32
   %t30 = load i64, i64* %buf
@@ -6991,18 +6750,18 @@ while.body568:
   %t41 = icmp sle i64 %t38, %t39
   %t40 = zext i1 %t41 to i64
   %t42 = trunc i64 %t40 to i1
-  br i1 %t42, label %then571, label %else572
-then571:
-  br label %while.end569
-else572:
-  br label %endif570
-endif570:
+  br i1 %t42, label %then519, label %else520
+then519:
+  br label %while.end517
+else520:
+  br label %endif518
+endif518:
   %t43 = load i64, i64* %total
   %t44 = load i64, i64* %got
   %t45 = add i64 %t43, %t44
   store i64 %t45, i64* %total
-  br label %while.cond567
-while.end569:
+  br label %while.cond515
+while.end517:
   %t46 = load i64, i64* %buf
   %t47 = load i64, i64* %total
   %t48 = add i64 %t46, %t47
@@ -7027,15 +6786,15 @@ entry:
   store i64 %t3, i64* %buf
   %t4 = add i64 0, 0
   store i64 %t4, i64* %len
-  br label %while.cond573
-while.cond573:
+  br label %while.cond521
+while.cond521:
   %t5 = load i64, i64* %len
   %t6 = add i64 0, 4095
   %t8 = icmp slt i64 %t5, %t6
   %t7 = zext i1 %t8 to i64
   %t9 = trunc i64 %t7 to i1
-  br i1 %t9, label %while.body574, label %while.end575
-while.body574:
+  br i1 %t9, label %while.body522, label %while.end523
+while.body522:
   %t10 = add i64 0, 0
   %t11 = trunc i64 %t10 to i32
   %t12 = load i64, i64* %buf
@@ -7050,12 +6809,12 @@ while.body574:
   %t21 = icmp sle i64 %t18, %t19
   %t20 = zext i1 %t21 to i64
   %t22 = trunc i64 %t20 to i1
-  br i1 %t22, label %then577, label %else578
-then577:
-  br label %while.end575
-else578:
-  br label %endif576
-endif576:
+  br i1 %t22, label %then525, label %else526
+then525:
+  br label %while.end523
+else526:
+  br label %endif524
+endif524:
   %t23 = load i64, i64* %buf
   %t24 = load i64, i64* %len
   %t25 = add i64 %t23, %t24
@@ -7068,18 +6827,18 @@ endif576:
   %t31 = icmp eq i64 %t29, %t30
   %t32 = zext i1 %t31 to i64
   %t33 = trunc i64 %t32 to i1
-  br i1 %t33, label %then580, label %else581
-then580:
-  br label %while.end575
-else581:
-  br label %endif579
-endif579:
+  br i1 %t33, label %then528, label %else529
+then528:
+  br label %while.end523
+else529:
+  br label %endif527
+endif527:
   %t34 = load i64, i64* %len
   %t35 = add i64 0, 1
   %t36 = add i64 %t34, %t35
   store i64 %t36, i64* %len
-  br label %while.cond573
-while.end575:
+  br label %while.cond521
+while.end523:
   %t37 = load i64, i64* %buf
   %t38 = load i64, i64* %len
   %t39 = add i64 %t37, %t38
@@ -7107,13 +6866,13 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then583, label %else584
-then583:
+  br i1 %t8, label %then531, label %else532
+then531:
   %t9 = add i64 0, 0
   ret i64 %t9
-else584:
-  br label %endif582
-endif582:
+else532:
+  br label %endif530
+endif530:
   %t10 = load i64, i64* %rp
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = call i8* @opendir(i8* %t11)
@@ -7124,13 +6883,13 @@ endif582:
   %t16 = icmp eq i64 %t14, %t15
   %t17 = zext i1 %t16 to i64
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %then586, label %else587
-then586:
+  br i1 %t18, label %then534, label %else535
+then534:
   %t19 = add i64 0, 0
   ret i64 %t19
-else587:
-  br label %endif585
-endif585:
+else535:
+  br label %endif533
+endif533:
   %t20 = load i64, i64* %dp
   %t21 = inttoptr i64 %t20 to i8*
   %t22 = call i32 @closedir(i8* %t21)
@@ -7161,25 +6920,25 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then589, label %else590
-then589:
+  br i1 %t11, label %then537, label %else538
+then537:
   %t12 = add i64 0, 0
   ret i64 %t12
-else590:
-  br label %endif588
-endif588:
+else538:
+  br label %endif536
+endif536:
   %t13 = load i64, i64* %rt2
   %t14 = add i64 0, 0
   %t15 = icmp eq i64 %t13, %t14
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then592, label %else593
-then592:
+  br i1 %t17, label %then540, label %else541
+then540:
   %t18 = add i64 0, 0
   ret i64 %t18
-else593:
-  br label %endif591
-endif591:
+else541:
+  br label %endif539
+endif539:
   %t19 = load i64, i64* %rf
   %t20 = inttoptr i64 %t19 to i8*
   %t21 = load i64, i64* %rt2
@@ -7192,13 +6951,13 @@ endif591:
   %t27 = icmp eq i64 %t25, %t26
   %t28 = zext i1 %t27 to i64
   %t29 = trunc i64 %t28 to i1
-  br i1 %t29, label %then595, label %else596
-then595:
+  br i1 %t29, label %then543, label %else544
+then543:
   %t30 = add i64 0, 1
   ret i64 %t30
-else596:
-  br label %endif594
-endif594:
+else544:
+  br label %endif542
+endif542:
   %t31 = add i64 0, 0
   ret i64 %t31
 }
@@ -7218,13 +6977,13 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then598, label %else599
-then598:
+  br i1 %t8, label %then546, label %else547
+then546:
   %t9 = add i64 0, 0
   ret i64 %t9
-else599:
-  br label %endif597
-endif597:
+else547:
+  br label %endif545
+endif545:
   %t10 = load i64, i64* %rp
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = call i32 @remove(i8* %t11)
@@ -7235,13 +6994,13 @@ endif597:
   %t16 = icmp eq i64 %t14, %t15
   %t17 = zext i1 %t16 to i64
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %then601, label %else602
-then601:
+  br i1 %t18, label %then549, label %else550
+then549:
   %t19 = add i64 0, 1
   ret i64 %t19
-else602:
-  br label %endif600
-endif600:
+else550:
+  br label %endif548
+endif548:
   %t20 = add i64 0, 0
   ret i64 %t20
 }
@@ -7268,25 +7027,25 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then604, label %else605
-then604:
+  br i1 %t11, label %then552, label %else553
+then552:
   %t12 = add i64 0, 0
   ret i64 %t12
-else605:
-  br label %endif603
-endif603:
+else553:
+  br label %endif551
+endif551:
   %t13 = load i64, i64* %rv
   %t14 = add i64 0, 0
   %t15 = icmp eq i64 %t13, %t14
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then607, label %else608
-then607:
+  br i1 %t17, label %then555, label %else556
+then555:
   %t18 = add i64 0, 0
   ret i64 %t18
-else608:
-  br label %endif606
-endif606:
+else556:
+  br label %endif554
+endif554:
   %t19 = load i64, i64* %rn
   %t20 = inttoptr i64 %t19 to i8*
   %t21 = load i64, i64* %rv
@@ -7301,13 +7060,13 @@ endif606:
   %t29 = icmp eq i64 %t27, %t28
   %t30 = zext i1 %t29 to i64
   %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then610, label %else611
-then610:
+  br i1 %t31, label %then558, label %else559
+then558:
   %t32 = add i64 0, 1
   ret i64 %t32
-else611:
-  br label %endif609
-endif609:
+else559:
+  br label %endif557
+endif557:
   %t33 = add i64 0, 0
   ret i64 %t33
 }
@@ -7367,8 +7126,8 @@ entry:
   %t40 = icmp eq i64 %t38, %t39
   %t41 = zext i1 %t40 to i64
   %t42 = trunc i64 %t41 to i1
-  br i1 %t42, label %then613, label %else614
-then613:
+  br i1 %t42, label %then561, label %else562
+then561:
   %t43 = add i64 0, 1
   %t44 = call i8* @__sf_malloc(i64 %t43)
   %t45 = ptrtoint i8* %t44 to i64
@@ -7381,9 +7140,9 @@ then613:
   %t50 = load i64, i64* %empty
   %t51 = call i64 @__rt_tag_ptr(i64 %t50)
   ret i64 %t51
-else614:
-  br label %endif612
-endif612:
+else562:
+  br label %endif560
+endif560:
   %t52 = load i64, i64* %val
   %t53 = inttoptr i64 %t52 to i8*
   %t54 = call i8* @strdup(i8* %t53)
@@ -7411,17 +7170,17 @@ entry:
   %t11 = icmp eq i64 %t9, %t10
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then616, label %else617
-then616:
+  br i1 %t13, label %then564, label %else565
+then564:
   %t14 = load i64, i64* %buf
   %t15 = add i64 0, 0
   %t16 = trunc i64 %t15 to i8
   %t17 = inttoptr i64 %t14 to i8*
   store i8 %t16, i8* %t17
-  br label %endif615
-else617:
-  br label %endif615
-endif615:
+  br label %endif563
+else565:
+  br label %endif563
+endif563:
   %t18 = load i64, i64* %buf
   %t19 = call i64 @__rt_tag_ptr(i64 %t18)
   ret i64 %t19
@@ -7531,8 +7290,8 @@ entry:
   %t10 = icmp eq i64 %t8, %t9
   %t11 = zext i1 %t10 to i64
   %t12 = trunc i64 %t11 to i1
-  br i1 %t12, label %then619, label %else620
-then619:
+  br i1 %t12, label %then567, label %else568
+then567:
   %t13 = add i64 0, 1
   %t14 = call i8* @__sf_malloc(i64 %t13)
   %t15 = ptrtoint i8* %t14 to i64
@@ -7545,9 +7304,9 @@ then619:
   %t20 = load i64, i64* %empty
   %t21 = call i64 @__rt_tag_ptr(i64 %t20)
   ret i64 %t21
-else620:
-  br label %endif618
-endif618:
+else568:
+  br label %endif566
+endif566:
   %t22 = load i64, i64* %val
   %t23 = inttoptr i64 %t22 to i8*
   %t24 = call i8* @strdup(i8* %t23)
@@ -7572,14 +7331,14 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then622, label %else623
-then622:
+  br i1 %t8, label %then570, label %else571
+then570:
   %t9 = add i64 0, 1
   %t10 = sub i64 0, %t9
   ret i64 %t10
-else623:
-  br label %endif621
-endif621:
+else571:
+  br label %endif569
+endif569:
   %t11 = load i64, i64* %rc
   %t12 = inttoptr i64 %t11 to i8*
   %t13 = call i32 @system(i8* %t12)
@@ -7590,21 +7349,21 @@ endif621:
   %t18 = icmp slt i64 %t15, %t16
   %t17 = zext i1 %t18 to i64
   %t19 = trunc i64 %t17 to i1
-  br i1 %t19, label %then625, label %else626
-then625:
+  br i1 %t19, label %then573, label %else574
+then573:
   %t20 = load i64, i64* %status
   ret i64 %t20
-else626:
-  br label %endif624
-endif624:
+else574:
+  br label %endif572
+endif572:
   %t21 = load i64, i64* %status
   %t22 = add i64 0, 128
   %t23 = icmp eq i64 %t22, 0
-  br i1 %t23, label %div_err627, label %div_ok628
-div_err627:
+  br i1 %t23, label %div_err575, label %div_ok576
+div_err575:
   call i64 @__division_error()
   unreachable
-div_ok628:
+div_ok576:
   %t24 = srem i64 %t21, %t22
   store i64 %t24, i64* %signal
   %t25 = load i64, i64* %signal
@@ -7612,23 +7371,23 @@ div_ok628:
   %t27 = icmp ne i64 %t25, %t26
   %t28 = zext i1 %t27 to i64
   %t29 = trunc i64 %t28 to i1
-  br i1 %t29, label %then630, label %else631
-then630:
+  br i1 %t29, label %then578, label %else579
+then578:
   %t30 = add i64 0, 128
   %t31 = load i64, i64* %signal
   %t32 = add i64 %t30, %t31
   ret i64 %t32
-else631:
-  br label %endif629
-endif629:
+else579:
+  br label %endif577
+endif577:
   %t33 = load i64, i64* %status
   %t34 = add i64 0, 256
   %t35 = icmp eq i64 %t34, 0
-  br i1 %t35, label %div_err632, label %div_ok633
-div_err632:
+  br i1 %t35, label %div_err580, label %div_ok581
+div_err580:
   call i64 @__division_error()
   unreachable
-div_ok633:
+div_ok581:
   %t36 = sdiv i64 %t33, %t34
   ret i64 %t36
 }
@@ -7657,8 +7416,8 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then635, label %else636
-then635:
+  br i1 %t8, label %then583, label %else584
+then583:
   %t9 = add i64 0, 1
   %t10 = call i8* @__sf_malloc(i64 %t9)
   %t11 = ptrtoint i8* %t10 to i64
@@ -7671,9 +7430,9 @@ then635:
   %t16 = load i64, i64* %empty
   %t17 = call i64 @__rt_tag_ptr(i64 %t16)
   ret i64 %t17
-else636:
-  br label %endif634
-endif634:
+else584:
+  br label %endif582
+endif582:
   %t18 = add i64 0, 2
   %t19 = call i8* @__sf_malloc(i64 %t18)
   %t20 = ptrtoint i8* %t19 to i64
@@ -7705,8 +7464,8 @@ endif634:
   %t41 = icmp eq i64 %t39, %t40
   %t42 = zext i1 %t41 to i64
   %t43 = trunc i64 %t42 to i1
-  br i1 %t43, label %then638, label %else639
-then638:
+  br i1 %t43, label %then586, label %else587
+then586:
   %t44 = add i64 0, 1
   %t45 = call i8* @__sf_malloc(i64 %t44)
   %t46 = ptrtoint i8* %t45 to i64
@@ -7719,9 +7478,9 @@ then638:
   %t51 = load i64, i64* %empty
   %t52 = call i64 @__rt_tag_ptr(i64 %t51)
   ret i64 %t52
-else639:
-  br label %endif637
-endif637:
+else587:
+  br label %endif585
+endif585:
   %t53 = add i64 0, 8
   %t54 = call i8* @__sf_malloc(i64 %t53)
   %t55 = ptrtoint i8* %t54 to i64
@@ -7768,15 +7527,15 @@ endif637:
   %t87 = call i8* @fgets(i8* %t82, i32 %t84, i8* %t86)
   %t88 = ptrtoint i8* %t87 to i64
   store i64 %t88, i64* %line
-  br label %while.cond640
-while.cond640:
+  br label %while.cond588
+while.cond588:
   %t89 = load i64, i64* %line
   %t90 = add i64 0, 0
   %t91 = icmp ne i64 %t89, %t90
   %t92 = zext i1 %t91 to i64
   %t93 = trunc i64 %t92 to i1
-  br i1 %t93, label %while.body641, label %while.end642
-while.body641:
+  br i1 %t93, label %while.body589, label %while.end590
+while.body589:
   %t94 = load i64, i64* %tmp
   %t95 = inttoptr i64 %t94 to i8*
   %t96 = call i64 @strlen(i8* %t95)
@@ -7796,8 +7555,8 @@ while.body641:
   %t109 = call i8* @fgets(i8* %t104, i32 %t106, i8* %t108)
   %t110 = ptrtoint i8* %t109 to i64
   store i64 %t110, i64* %line
-  br label %while.cond640
-while.end642:
+  br label %while.cond588
+while.end590:
   %t111 = load i64, i64* %tmp
   %t112 = inttoptr i64 %t111 to i8*
   call void @__sf_free(i8* %t112)
@@ -7830,15 +7589,15 @@ entry:
   store i64 %t5, i64* %list
   %t6 = add i64 0, 0
   store i64 %t6, i64* %i
-  br label %while.cond643
-while.cond643:
+  br label %while.cond591
+while.cond591:
   %t7 = load i64, i64* %i
   %t8 = load i64, i64* %argc
   %t10 = icmp slt i64 %t7, %t8
   %t9 = zext i1 %t10 to i64
   %t11 = trunc i64 %t9 to i1
-  br i1 %t11, label %while.body644, label %while.end645
-while.body644:
+  br i1 %t11, label %while.body592, label %while.end593
+while.body592:
   %t12 = load i64, i64* %argv
   %t13 = load i64, i64* %i
   %t14 = add i64 0, 8
@@ -7857,8 +7616,8 @@ while.body644:
   %t25 = add i64 0, 1
   %t26 = add i64 %t24, %t25
   store i64 %t26, i64* %i
-  br label %while.cond643
-while.end645:
+  br label %while.cond591
+while.end593:
   %t27 = load i64, i64* %list
   ret i64 %t27
 }
@@ -7933,8 +7692,8 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then647, label %else648
-then647:
+  br i1 %t8, label %then595, label %else596
+then595:
   %t9 = add i64 0, 1
   %t10 = add i64 0, 1
   %t11 = call i64 @__gc_alloc(i64 %t9, i64 %t10)
@@ -7947,9 +7706,9 @@ then647:
   %t16 = load i64, i64* %empty
   %t17 = call i64 @__rt_tag_ptr(i64 %t16)
   ret i64 %t17
-else648:
-  br label %endif646
-endif646:
+else596:
+  br label %endif594
+endif594:
   %t18 = load i64, i64* %rs
   %t19 = inttoptr i64 %t18 to i8*
   %t20 = call i64 @strlen(i8* %t19)
@@ -7958,15 +7717,15 @@ endif646:
   store i64 %t21, i64* %start
   %t22 = load i64, i64* %len
   store i64 %t22, i64* %v_end
-  br label %while.cond649
-while.cond649:
+  br label %while.cond597
+while.cond597:
   %t23 = load i64, i64* %start
   %t24 = load i64, i64* %v_end
   %t26 = icmp slt i64 %t23, %t24
   %t25 = zext i1 %t26 to i64
   %t27 = trunc i64 %t25 to i1
-  br i1 %t27, label %while.body650, label %while.end651
-while.body650:
+  br i1 %t27, label %while.body598, label %while.end599
+while.body598:
   %t28 = load i64, i64* %rs
   %t29 = load i64, i64* %start
   %t30 = add i64 %t28, %t29
@@ -7979,75 +7738,75 @@ while.body650:
   %t36 = icmp eq i64 %t34, %t35
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br label %logic.entry653
-logic.entry653:
-  br i1 %t38, label %end655, label %rhs654
-rhs654:
+  br label %logic.entry601
+logic.entry601:
+  br i1 %t38, label %end603, label %rhs602
+rhs602:
   %t39 = load i64, i64* %ch
   %t40 = add i64 0, 9
   %t41 = icmp eq i64 %t39, %t40
   %t42 = zext i1 %t41 to i64
   %t43 = trunc i64 %t42 to i1
-  br label %rhs.exit656
-rhs.exit656:
-  br label %end655
-end655:
-  %t44 = phi i1 [%t38, %logic.entry653], [%t43, %rhs.exit656]
+  br label %rhs.exit604
+rhs.exit604:
+  br label %end603
+end603:
+  %t44 = phi i1 [%t38, %logic.entry601], [%t43, %rhs.exit604]
   %t45 = zext i1 %t44 to i64
   %t46 = trunc i64 %t45 to i1
-  br label %logic.entry657
-logic.entry657:
-  br i1 %t46, label %end659, label %rhs658
-rhs658:
+  br label %logic.entry605
+logic.entry605:
+  br i1 %t46, label %end607, label %rhs606
+rhs606:
   %t47 = load i64, i64* %ch
   %t48 = add i64 0, 10
   %t49 = icmp eq i64 %t47, %t48
   %t50 = zext i1 %t49 to i64
   %t51 = trunc i64 %t50 to i1
-  br label %rhs.exit660
-rhs.exit660:
-  br label %end659
-end659:
-  %t52 = phi i1 [%t46, %logic.entry657], [%t51, %rhs.exit660]
+  br label %rhs.exit608
+rhs.exit608:
+  br label %end607
+end607:
+  %t52 = phi i1 [%t46, %logic.entry605], [%t51, %rhs.exit608]
   %t53 = zext i1 %t52 to i64
   %t54 = trunc i64 %t53 to i1
-  br label %logic.entry661
-logic.entry661:
-  br i1 %t54, label %end663, label %rhs662
-rhs662:
+  br label %logic.entry609
+logic.entry609:
+  br i1 %t54, label %end611, label %rhs610
+rhs610:
   %t55 = load i64, i64* %ch
   %t56 = add i64 0, 13
   %t57 = icmp eq i64 %t55, %t56
   %t58 = zext i1 %t57 to i64
   %t59 = trunc i64 %t58 to i1
-  br label %rhs.exit664
-rhs.exit664:
-  br label %end663
-end663:
-  %t60 = phi i1 [%t54, %logic.entry661], [%t59, %rhs.exit664]
+  br label %rhs.exit612
+rhs.exit612:
+  br label %end611
+end611:
+  %t60 = phi i1 [%t54, %logic.entry609], [%t59, %rhs.exit612]
   %t61 = zext i1 %t60 to i64
   %t62 = trunc i64 %t61 to i1
-  br i1 %t62, label %then665, label %else666
-then665:
+  br i1 %t62, label %then613, label %else614
+then613:
   %t63 = load i64, i64* %start
   %t64 = add i64 0, 1
   %t65 = add i64 %t63, %t64
   store i64 %t65, i64* %start
-  br label %endif652
-else666:
-  br label %while.end651
-endif652:
-  br label %while.cond649
-while.end651:
-  br label %while.cond667
-while.cond667:
+  br label %endif600
+else614:
+  br label %while.end599
+endif600:
+  br label %while.cond597
+while.end599:
+  br label %while.cond615
+while.cond615:
   %t66 = load i64, i64* %v_end
   %t67 = load i64, i64* %start
   %t69 = icmp sgt i64 %t66, %t67
   %t68 = zext i1 %t69 to i64
   %t70 = trunc i64 %t68 to i1
-  br i1 %t70, label %while.body668, label %while.end669
-while.body668:
+  br i1 %t70, label %while.body616, label %while.end617
+while.body616:
   %t71 = load i64, i64* %rs
   %t72 = load i64, i64* %v_end
   %t73 = add i64 %t71, %t72
@@ -8062,66 +7821,66 @@ while.body668:
   %t81 = icmp eq i64 %t79, %t80
   %t82 = zext i1 %t81 to i64
   %t83 = trunc i64 %t82 to i1
-  br label %logic.entry671
-logic.entry671:
-  br i1 %t83, label %end673, label %rhs672
-rhs672:
+  br label %logic.entry619
+logic.entry619:
+  br i1 %t83, label %end621, label %rhs620
+rhs620:
   %t84 = load i64, i64* %ch
   %t85 = add i64 0, 9
   %t86 = icmp eq i64 %t84, %t85
   %t87 = zext i1 %t86 to i64
   %t88 = trunc i64 %t87 to i1
-  br label %rhs.exit674
-rhs.exit674:
-  br label %end673
-end673:
-  %t89 = phi i1 [%t83, %logic.entry671], [%t88, %rhs.exit674]
+  br label %rhs.exit622
+rhs.exit622:
+  br label %end621
+end621:
+  %t89 = phi i1 [%t83, %logic.entry619], [%t88, %rhs.exit622]
   %t90 = zext i1 %t89 to i64
   %t91 = trunc i64 %t90 to i1
-  br label %logic.entry675
-logic.entry675:
-  br i1 %t91, label %end677, label %rhs676
-rhs676:
+  br label %logic.entry623
+logic.entry623:
+  br i1 %t91, label %end625, label %rhs624
+rhs624:
   %t92 = load i64, i64* %ch
   %t93 = add i64 0, 10
   %t94 = icmp eq i64 %t92, %t93
   %t95 = zext i1 %t94 to i64
   %t96 = trunc i64 %t95 to i1
-  br label %rhs.exit678
-rhs.exit678:
-  br label %end677
-end677:
-  %t97 = phi i1 [%t91, %logic.entry675], [%t96, %rhs.exit678]
+  br label %rhs.exit626
+rhs.exit626:
+  br label %end625
+end625:
+  %t97 = phi i1 [%t91, %logic.entry623], [%t96, %rhs.exit626]
   %t98 = zext i1 %t97 to i64
   %t99 = trunc i64 %t98 to i1
-  br label %logic.entry679
-logic.entry679:
-  br i1 %t99, label %end681, label %rhs680
-rhs680:
+  br label %logic.entry627
+logic.entry627:
+  br i1 %t99, label %end629, label %rhs628
+rhs628:
   %t100 = load i64, i64* %ch
   %t101 = add i64 0, 13
   %t102 = icmp eq i64 %t100, %t101
   %t103 = zext i1 %t102 to i64
   %t104 = trunc i64 %t103 to i1
-  br label %rhs.exit682
-rhs.exit682:
-  br label %end681
-end681:
-  %t105 = phi i1 [%t99, %logic.entry679], [%t104, %rhs.exit682]
+  br label %rhs.exit630
+rhs.exit630:
+  br label %end629
+end629:
+  %t105 = phi i1 [%t99, %logic.entry627], [%t104, %rhs.exit630]
   %t106 = zext i1 %t105 to i64
   %t107 = trunc i64 %t106 to i1
-  br i1 %t107, label %then683, label %else684
-then683:
+  br i1 %t107, label %then631, label %else632
+then631:
   %t108 = load i64, i64* %v_end
   %t109 = add i64 0, 1
   %t110 = sub i64 %t108, %t109
   store i64 %t110, i64* %v_end
-  br label %endif670
-else684:
-  br label %while.end669
-endif670:
-  br label %while.cond667
-while.end669:
+  br label %endif618
+else632:
+  br label %while.end617
+endif618:
+  br label %while.cond615
+while.end617:
   %t111 = load i64, i64* %v_end
   %t112 = load i64, i64* %start
   %t113 = sub i64 %t111, %t112
@@ -8175,31 +7934,31 @@ entry:
   %t9 = icmp eq i64 %t7, %t8
   %t10 = zext i1 %t9 to i64
   %t11 = trunc i64 %t10 to i1
-  br label %logic.entry686
-logic.entry686:
-  br i1 %t11, label %end688, label %rhs687
-rhs687:
+  br label %logic.entry634
+logic.entry634:
+  br i1 %t11, label %end636, label %rhs635
+rhs635:
   %t12 = load i64, i64* %rn
   %t13 = add i64 0, 0
   %t14 = icmp eq i64 %t12, %t13
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br label %rhs.exit689
-rhs.exit689:
-  br label %end688
-end688:
-  %t17 = phi i1 [%t11, %logic.entry686], [%t16, %rhs.exit689]
+  br label %rhs.exit637
+rhs.exit637:
+  br label %end636
+end636:
+  %t17 = phi i1 [%t11, %logic.entry634], [%t16, %rhs.exit637]
   %t18 = zext i1 %t17 to i64
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then690, label %else691
-then690:
+  br i1 %t19, label %then638, label %else639
+then638:
   %t20 = add i64 0, 0
   %t21 = add i64 0, 1
   %t22 = sub i64 %t20, %t21
   ret i64 %t22
-else691:
-  br label %endif685
-endif685:
+else639:
+  br label %endif633
+endif633:
   %t23 = load i64, i64* %rs
   %t24 = inttoptr i64 %t23 to i8*
   %t25 = load i64, i64* %rn
@@ -8212,15 +7971,15 @@ endif685:
   %t31 = icmp eq i64 %t29, %t30
   %t32 = zext i1 %t31 to i64
   %t33 = trunc i64 %t32 to i1
-  br i1 %t33, label %then693, label %else694
-then693:
+  br i1 %t33, label %then641, label %else642
+then641:
   %t34 = add i64 0, 0
   %t35 = add i64 0, 1
   %t36 = sub i64 %t34, %t35
   ret i64 %t36
-else694:
-  br label %endif692
-endif692:
+else642:
+  br label %endif640
+endif640:
   %t37 = load i64, i64* %found
   %t38 = load i64, i64* %rs
   %t39 = sub i64 %t37, %t38
@@ -8252,24 +8011,24 @@ entry:
   %t8 = icmp eq i64 %t6, %t7
   %t9 = zext i1 %t8 to i64
   %t10 = trunc i64 %t9 to i1
-  br label %logic.entry696
-logic.entry696:
-  br i1 %t10, label %end698, label %rhs697
-rhs697:
+  br label %logic.entry644
+logic.entry644:
+  br i1 %t10, label %end646, label %rhs645
+rhs645:
   %t11 = load i64, i64* %rc
   %t12 = add i64 0, 0
   %t14 = icmp sle i64 %t11, %t12
   %t13 = zext i1 %t14 to i64
   %t15 = trunc i64 %t13 to i1
-  br label %rhs.exit699
-rhs.exit699:
-  br label %end698
-end698:
-  %t16 = phi i1 [%t10, %logic.entry696], [%t15, %rhs.exit699]
+  br label %rhs.exit647
+rhs.exit647:
+  br label %end646
+end646:
+  %t16 = phi i1 [%t10, %logic.entry644], [%t15, %rhs.exit647]
   %t17 = zext i1 %t16 to i64
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %then700, label %else701
-then700:
+  br i1 %t18, label %then648, label %else649
+then648:
   %t19 = add i64 0, 1
   %t20 = add i64 0, 1
   %t21 = call i64 @__gc_alloc(i64 %t19, i64 %t20)
@@ -8282,9 +8041,9 @@ then700:
   %t26 = load i64, i64* %empty
   %t27 = call i64 @__rt_tag_ptr(i64 %t26)
   ret i64 %t27
-else701:
-  br label %endif695
-endif695:
+else649:
+  br label %endif643
+endif643:
   %t28 = load i64, i64* %rs
   %t29 = inttoptr i64 %t28 to i8*
   %t30 = call i64 @strlen(i8* %t29)
@@ -8306,15 +8065,15 @@ endif695:
   store i8 %t41, i8* %t42
   %t43 = add i64 0, 0
   store i64 %t43, i64* %i
-  br label %while.cond702
-while.cond702:
+  br label %while.cond650
+while.cond650:
   %t44 = load i64, i64* %i
   %t45 = load i64, i64* %rc
   %t47 = icmp slt i64 %t44, %t45
   %t46 = zext i1 %t47 to i64
   %t48 = trunc i64 %t46 to i1
-  br i1 %t48, label %while.body703, label %while.end704
-while.body703:
+  br i1 %t48, label %while.body651, label %while.end652
+while.body651:
   %t49 = load i64, i64* %buf
   %t50 = inttoptr i64 %t49 to i8*
   %t51 = load i64, i64* %rs
@@ -8325,8 +8084,8 @@ while.body703:
   %t56 = add i64 0, 1
   %t57 = add i64 %t55, %t56
   store i64 %t57, i64* %i
-  br label %while.cond702
-while.end704:
+  br label %while.cond650
+while.end652:
   %t58 = load i64, i64* %buf
   %t59 = call i64 @__rt_tag_ptr(i64 %t58)
   ret i64 %t59
@@ -8351,8 +8110,8 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then706, label %else707
-then706:
+  br i1 %t8, label %then654, label %else655
+then654:
   %t9 = add i64 0, 1
   %t10 = add i64 0, 1
   %t11 = call i64 @__gc_alloc(i64 %t9, i64 %t10)
@@ -8365,9 +8124,9 @@ then706:
   %t16 = load i64, i64* %empty
   %t17 = call i64 @__rt_tag_ptr(i64 %t16)
   ret i64 %t17
-else707:
-  br label %endif705
-endif705:
+else655:
+  br label %endif653
+endif653:
   %t18 = load i64, i64* %rs
   %t19 = inttoptr i64 %t18 to i8*
   %t20 = call i64 @strlen(i8* %t19)
@@ -8380,15 +8139,15 @@ endif705:
   store i64 %t25, i64* %buf
   %t26 = add i64 0, 0
   store i64 %t26, i64* %i
-  br label %while.cond708
-while.cond708:
+  br label %while.cond656
+while.cond656:
   %t27 = load i64, i64* %i
   %t28 = load i64, i64* %len
   %t30 = icmp slt i64 %t27, %t28
   %t29 = zext i1 %t30 to i64
   %t31 = trunc i64 %t29 to i1
-  br i1 %t31, label %while.body709, label %while.end710
-while.body709:
+  br i1 %t31, label %while.body657, label %while.end658
+while.body657:
   %t32 = load i64, i64* %rs
   %t33 = load i64, i64* %i
   %t34 = add i64 %t32, %t33
@@ -8401,24 +8160,24 @@ while.body709:
   %t41 = icmp sge i64 %t38, %t39
   %t40 = zext i1 %t41 to i64
   %t42 = trunc i64 %t40 to i1
-  br label %logic.entry712
-logic.entry712:
-  br i1 %t42, label %rhs713, label %end714
-rhs713:
+  br label %logic.entry660
+logic.entry660:
+  br i1 %t42, label %rhs661, label %end662
+rhs661:
   %t43 = load i64, i64* %ch
   %t44 = add i64 0, 122
   %t46 = icmp sle i64 %t43, %t44
   %t45 = zext i1 %t46 to i64
   %t47 = trunc i64 %t45 to i1
-  br label %rhs.exit715
-rhs.exit715:
-  br label %end714
-end714:
-  %t48 = phi i1 [%t42, %logic.entry712], [%t47, %rhs.exit715]
+  br label %rhs.exit663
+rhs.exit663:
+  br label %end662
+end662:
+  %t48 = phi i1 [%t42, %logic.entry660], [%t47, %rhs.exit663]
   %t49 = zext i1 %t48 to i64
   %t50 = trunc i64 %t49 to i1
-  br i1 %t50, label %then716, label %else717
-then716:
+  br i1 %t50, label %then664, label %else665
+then664:
   %t51 = load i64, i64* %buf
   %t52 = load i64, i64* %i
   %t53 = add i64 %t51, %t52
@@ -8428,8 +8187,8 @@ then716:
   %t57 = trunc i64 %t56 to i8
   %t58 = inttoptr i64 %t53 to i8*
   store i8 %t57, i8* %t58
-  br label %endif711
-else717:
+  br label %endif659
+else665:
   %t59 = load i64, i64* %buf
   %t60 = load i64, i64* %i
   %t61 = add i64 %t59, %t60
@@ -8437,14 +8196,14 @@ else717:
   %t63 = trunc i64 %t62 to i8
   %t64 = inttoptr i64 %t61 to i8*
   store i8 %t63, i8* %t64
-  br label %endif711
-endif711:
+  br label %endif659
+endif659:
   %t65 = load i64, i64* %i
   %t66 = add i64 0, 1
   %t67 = add i64 %t65, %t66
   store i64 %t67, i64* %i
-  br label %while.cond708
-while.end710:
+  br label %while.cond656
+while.end658:
   %t68 = load i64, i64* %buf
   %t69 = load i64, i64* %len
   %t70 = add i64 %t68, %t69
@@ -8476,8 +8235,8 @@ entry:
   %t6 = icmp eq i64 %t4, %t5
   %t7 = zext i1 %t6 to i64
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then719, label %else720
-then719:
+  br i1 %t8, label %then667, label %else668
+then667:
   %t9 = add i64 0, 1
   %t10 = add i64 0, 1
   %t11 = call i64 @__gc_alloc(i64 %t9, i64 %t10)
@@ -8490,9 +8249,9 @@ then719:
   %t16 = load i64, i64* %empty
   %t17 = call i64 @__rt_tag_ptr(i64 %t16)
   ret i64 %t17
-else720:
-  br label %endif718
-endif718:
+else668:
+  br label %endif666
+endif666:
   %t18 = load i64, i64* %rs
   %t19 = inttoptr i64 %t18 to i8*
   %t20 = call i64 @strlen(i8* %t19)
@@ -8505,15 +8264,15 @@ endif718:
   store i64 %t25, i64* %buf
   %t26 = add i64 0, 0
   store i64 %t26, i64* %i
-  br label %while.cond721
-while.cond721:
+  br label %while.cond669
+while.cond669:
   %t27 = load i64, i64* %i
   %t28 = load i64, i64* %len
   %t30 = icmp slt i64 %t27, %t28
   %t29 = zext i1 %t30 to i64
   %t31 = trunc i64 %t29 to i1
-  br i1 %t31, label %while.body722, label %while.end723
-while.body722:
+  br i1 %t31, label %while.body670, label %while.end671
+while.body670:
   %t32 = load i64, i64* %rs
   %t33 = load i64, i64* %i
   %t34 = add i64 %t32, %t33
@@ -8526,24 +8285,24 @@ while.body722:
   %t41 = icmp sge i64 %t38, %t39
   %t40 = zext i1 %t41 to i64
   %t42 = trunc i64 %t40 to i1
-  br label %logic.entry725
-logic.entry725:
-  br i1 %t42, label %rhs726, label %end727
-rhs726:
+  br label %logic.entry673
+logic.entry673:
+  br i1 %t42, label %rhs674, label %end675
+rhs674:
   %t43 = load i64, i64* %ch
   %t44 = add i64 0, 90
   %t46 = icmp sle i64 %t43, %t44
   %t45 = zext i1 %t46 to i64
   %t47 = trunc i64 %t45 to i1
-  br label %rhs.exit728
-rhs.exit728:
-  br label %end727
-end727:
-  %t48 = phi i1 [%t42, %logic.entry725], [%t47, %rhs.exit728]
+  br label %rhs.exit676
+rhs.exit676:
+  br label %end675
+end675:
+  %t48 = phi i1 [%t42, %logic.entry673], [%t47, %rhs.exit676]
   %t49 = zext i1 %t48 to i64
   %t50 = trunc i64 %t49 to i1
-  br i1 %t50, label %then729, label %else730
-then729:
+  br i1 %t50, label %then677, label %else678
+then677:
   %t51 = load i64, i64* %buf
   %t52 = load i64, i64* %i
   %t53 = add i64 %t51, %t52
@@ -8553,8 +8312,8 @@ then729:
   %t57 = trunc i64 %t56 to i8
   %t58 = inttoptr i64 %t53 to i8*
   store i8 %t57, i8* %t58
-  br label %endif724
-else730:
+  br label %endif672
+else678:
   %t59 = load i64, i64* %buf
   %t60 = load i64, i64* %i
   %t61 = add i64 %t59, %t60
@@ -8562,14 +8321,14 @@ else730:
   %t63 = trunc i64 %t62 to i8
   %t64 = inttoptr i64 %t61 to i8*
   store i8 %t63, i8* %t64
-  br label %endif724
-endif724:
+  br label %endif672
+endif672:
   %t65 = load i64, i64* %i
   %t66 = add i64 0, 1
   %t67 = add i64 %t65, %t66
   store i64 %t67, i64* %i
-  br label %while.cond721
-while.end723:
+  br label %while.cond669
+while.end671:
   %t68 = load i64, i64* %buf
   %t69 = load i64, i64* %len
   %t70 = add i64 %t68, %t69
@@ -8594,13 +8353,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then732, label %else733
-then732:
+  br i1 %t5, label %then680, label %else681
+then680:
   %t6 = call i64 @__list_new()
   ret i64 %t6
-else733:
-  br label %endif731
-endif731:
+else681:
+  br label %endif679
+endif679:
   %t7 = load i64, i64* %list
   %t8 = call i64 @__list_length(i64 %t7)
   store i64 %t8, i64* %len
@@ -8610,15 +8369,15 @@ endif731:
   %t11 = add i64 0, 1
   %t12 = sub i64 %t10, %t11
   store i64 %t12, i64* %i
-  br label %while.cond734
-while.cond734:
+  br label %while.cond682
+while.cond682:
   %t13 = load i64, i64* %i
   %t14 = add i64 0, 0
   %t16 = icmp sge i64 %t13, %t14
   %t15 = zext i1 %t16 to i64
   %t17 = trunc i64 %t15 to i1
-  br i1 %t17, label %while.body735, label %while.end736
-while.body735:
+  br i1 %t17, label %while.body683, label %while.end684
+while.body683:
   %t18 = load i64, i64* %new_list
   %t19 = load i64, i64* %list
   %t20 = load i64, i64* %i
@@ -8628,8 +8387,8 @@ while.body735:
   %t24 = add i64 0, 1
   %t25 = sub i64 %t23, %t24
   store i64 %t25, i64* %i
-  br label %while.cond734
-while.end736:
+  br label %while.cond682
+while.end684:
   %t26 = load i64, i64* %new_list
   ret i64 %t26
 }
@@ -8646,13 +8405,13 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then738, label %else739
-then738:
+  br i1 %t5, label %then686, label %else687
+then686:
   %t6 = call i64 @__list_new()
   ret i64 %t6
-else739:
-  br label %endif737
-endif737:
+else687:
+  br label %endif685
+endif685:
   %t7 = load i64, i64* %list
   %t8 = call i64 @__list_length(i64 %t7)
   store i64 %t8, i64* %len
@@ -8660,15 +8419,15 @@ endif737:
   store i64 %t9, i64* %new_list
   %t10 = add i64 0, 0
   store i64 %t10, i64* %i
-  br label %while.cond740
-while.cond740:
+  br label %while.cond688
+while.cond688:
   %t11 = load i64, i64* %i
   %t12 = load i64, i64* %len
   %t14 = icmp slt i64 %t11, %t12
   %t13 = zext i1 %t14 to i64
   %t15 = trunc i64 %t13 to i1
-  br i1 %t15, label %while.body741, label %while.end742
-while.body741:
+  br i1 %t15, label %while.body689, label %while.end690
+while.body689:
   %t16 = load i64, i64* %new_list
   %t17 = load i64, i64* %list
   %t18 = load i64, i64* %i
@@ -8678,8 +8437,8 @@ while.body741:
   %t22 = add i64 0, 1
   %t23 = add i64 %t21, %t22
   store i64 %t23, i64* %i
-  br label %while.cond740
-while.end742:
+  br label %while.cond688
+while.end690:
   %t24 = load i64, i64* %new_list
   ret i64 %t24
 }
@@ -8698,20 +8457,20 @@ entry:
   %t3 = icmp eq i64 %t1, %t2
   %t4 = zext i1 %t3 to i64
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then744, label %else745
-then744:
+  br i1 %t5, label %then692, label %else693
+then692:
   %t6 = call i64 @__list_new()
   ret i64 %t6
-else745:
-  br label %endif743
-endif743:
+else693:
+  br label %endif691
+endif691:
   %t7 = load i64, i64* %list
   %t8 = call i64 @__list_length(i64 %t7)
   store i64 %t8, i64* %len
   %t9 = add i64 0, 0
   store i64 %t9, i64* %outer
-  br label %while.cond746
-while.cond746:
+  br label %while.cond694
+while.cond694:
   %t10 = load i64, i64* %outer
   %t11 = load i64, i64* %len
   %t12 = add i64 0, 1
@@ -8719,12 +8478,12 @@ while.cond746:
   %t15 = icmp slt i64 %t10, %t13
   %t14 = zext i1 %t15 to i64
   %t16 = trunc i64 %t14 to i1
-  br i1 %t16, label %while.body747, label %while.end748
-while.body747:
+  br i1 %t16, label %while.body695, label %while.end696
+while.body695:
   %t17 = add i64 0, 0
   store i64 %t17, i64* %inner
-  br label %while.cond749
-while.cond749:
+  br label %while.cond697
+while.cond697:
   %t18 = load i64, i64* %inner
   %t19 = load i64, i64* %len
   %t20 = add i64 0, 1
@@ -8734,8 +8493,8 @@ while.cond749:
   %t25 = icmp slt i64 %t18, %t23
   %t24 = zext i1 %t25 to i64
   %t26 = trunc i64 %t24 to i1
-  br i1 %t26, label %while.body750, label %while.end751
-while.body750:
+  br i1 %t26, label %while.body698, label %while.end699
+while.body698:
   %t27 = load i64, i64* %list
   %t28 = load i64, i64* %inner
   %t29 = call i64 @__list_get(i64 %t27, i64 %t28)
@@ -8753,8 +8512,8 @@ while.body750:
   %t40 = icmp sgt i64 %t37, %t38
   %t39 = zext i1 %t40 to i64
   %t41 = trunc i64 %t39 to i1
-  br i1 %t41, label %then753, label %else754
-then753:
+  br i1 %t41, label %then701, label %else702
+then701:
   %t42 = load i64, i64* %list
   %t43 = load i64, i64* %inner
   %t44 = load i64, i64* %b
@@ -8765,22 +8524,22 @@ then753:
   %t49 = add i64 %t47, %t48
   %t50 = load i64, i64* %a
   %t51 = call i64 @__list_set(i64 %t46, i64 %t49, i64 %t50)
-  br label %endif752
-else754:
-  br label %endif752
-endif752:
+  br label %endif700
+else702:
+  br label %endif700
+endif700:
   %t52 = load i64, i64* %inner
   %t53 = add i64 0, 1
   %t54 = add i64 %t52, %t53
   store i64 %t54, i64* %inner
-  br label %while.cond749
-while.end751:
+  br label %while.cond697
+while.end699:
   %t55 = load i64, i64* %outer
   %t56 = add i64 0, 1
   %t57 = add i64 %t55, %t56
   store i64 %t57, i64* %outer
-  br label %while.cond746
-while.end748:
+  br label %while.cond694
+while.end696:
   %t58 = load i64, i64* %list
   ret i64 %t58
 }

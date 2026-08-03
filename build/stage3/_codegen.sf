@@ -1782,6 +1782,24 @@ class Codegen {
                             }
                             return mg_local
                         }
+                        // Neither a function nor a global under this module's
+                        // prefix. The alias is *known* to be a module here, so
+                        // "not found" is expressible — and this is the only place
+                        // it is. Falling through instead reached the generic
+                        // receiver path below, which evaluated the bare alias as
+                        // a local and emitted `load i64, i64* %Math` — invalid IR
+                        // blamed on the compiler for what is a typo in the user's
+                        // program (BUGS #118). Same family as #22/#40/#78/#37/
+                        // #103/#113/#114: a resolver with no way to say "not
+                        // found" guesses instead of reporting absence.
+                        //
+                        // This arm is currently unreachable — `gen_arg_value`'s
+                        // parallel copy of this block wins for every spelling
+                        // measured (336 files) — but it is kept correct so it
+                        // reports rather than guesses if it ever goes live.
+                        IO.println("[codegen] Error: no member '" + field + "' in module '" + obj_name + "'")
+                        this.has_errors = true
+                        return "0"
                     }
                 }
                 // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)
@@ -3293,6 +3311,40 @@ class Codegen {
                     }
                     return mg_local
                 }
+                // Neither a function nor a global under this module's prefix.
+                // `mn` is known to be a module alias here, so "not found" is
+                // expressible at this point and nowhere downstream — which is
+                // exactly why the diagnostic belongs here.
+                //
+                // Falling through instead reached the generic receiver fallback
+                // below, which evaluates the *object* — the bare alias `Math` —
+                // as if it were a local, emitting `load i64, i64* %Math` from an
+                // SSA name that was never defined. The compile exited 0 and the
+                // failure surfaced as "the compiler emitted invalid LLVM IR /
+                // this is a compiler bug, not an error in your program" for what
+                // is a plain typo in the user's source (BUGS #118).
+                //
+                // The undefined-variable check at the Variable arm above cannot
+                // catch it: that check deliberately exempts module_prefixes,
+                // because for a *valid* member access the bare alias really is
+                // not a variable. So this is the only honest place to report.
+                //
+                // Eighth instance of one family (#22, #40, #78, #37, #103, #113,
+                // #114): a resolver with no way to express "not found" guesses
+                // instead of reporting absence.
+                //
+                // Measured before making the miss fatal: a probe compiler logged
+                // every arrival here across 336 files (test/, test/pass/,
+                // test/fail/, src/lib/, src/compiler/, examples/, turmeric/,
+                // basil/, bazaar/, parsley/, pantry/). Exactly three arrivals,
+                // and `opt` rejects the IR for all three — no valid spelling
+                // depends on the fall-through. Enum variants, enum/class/actor
+                // constructors, @inline functions, named imports, forward
+                // references and locals shadowing an alias all resolve before
+                // reaching here and were each confirmed unaffected.
+                IO.println("[codegen] Error: no member '" + m_field + "' in module '" + mn + "'")
+                this.has_errors = true
+                return "0"
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
@@ -3808,14 +3860,52 @@ class Codegen {
             // (not imported via named imports), to avoid false positives from pipe |>
             var is_named_import: Bool = this.named_imports.has(callee_name)
             if (!is_named_import) {
-                if (this.called_function_arity.has(resolved_callee)) {
-                    var expected: Float = this.called_function_arity.get(resolved_callee)
-                    if (args.length() != expected and expected > 0 and !has_real_defs) {
+                // The arity comes from one of two maps, and only ONE of them is a
+                // trustworthy record of a *declared* arity.
+                //
+                //   func_param_count is written only where a declaration is
+                //   processed -- gen_fun_decl (both the plain and @inline arms),
+                //   gen_class_method, prescan_fun_decl, prescan_class_decl. A 0
+                //   there therefore means "this function is declared to take no
+                //   arguments", which is a real arity and must be checked.
+                //
+                //   called_function_arity is overloaded. Declarations write it for
+                //   class methods and inheritance forwarders, where the value is
+                //   always >= 1 because of the implicit `self`; but CALL SITES
+                //   also write args.length() into it (gen_method_call, the package
+                //   re-export arms) purely to size the `declare i64 @f(...)` lines
+                //   emit_module writes for undefined callees. A 0 in that map thus
+                //   cannot have come from a declaration -- it is a 0-argument call
+                //   site's leftover, or the key is simply absent.
+                //
+                // So `expected > 0` is a legitimate "we never recorded a real
+                // arity" guard for called_function_arity and pure damage for
+                // func_param_count. It used to be applied to both, which exempted
+                // every genuinely 0-arity function from arity checking altogether:
+                // `fun c() {}` then `c("too", "many")` compiled clean (BUGS #113).
+                // Consult the declaration-derived map first; where a key lives in
+                // both they agree, so the order only decides who answers.
+                //
+                // Measured, not assumed: a variant that drops `expected > 0` from
+                // BOTH arms and keeps the original order was built and run over the
+                // compiler's own source, the stdlib and the whole test corpus (285
+                // files). It produced byte-identical diagnostics to this version --
+                // no unrecorded-arity case is reachable today, so the exemption
+                // below is currently dead weight. It is kept because the call-site
+                // writers make 0 unfalsifiable in that map: the moment a
+                // gen_method_call path starts feeding this check, `expected > 0`
+                // is the only thing standing between a 0-arg call-site leftover
+                // and a fabricated "expects 0 arguments" on a function that takes
+                // three. Do NOT "simplify" it away without re-running that
+                // comparison.
+                if (this.func_param_count.has(resolved_callee)) {
+                    var expected: Float = this.func_param_count.get(resolved_callee)
+                    if (args.length() != expected and !has_real_defs) {
                         IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                         this.has_errors = true
                     }
-                } else if (this.func_param_count.has(resolved_callee)) {
-                    var expected: Float = this.func_param_count.get(resolved_callee)
+                } else if (this.called_function_arity.has(resolved_callee)) {
+                    var expected: Float = this.called_function_arity.get(resolved_callee)
                     if (args.length() != expected and expected > 0 and !has_real_defs) {
                         IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                         this.has_errors = true
@@ -12411,10 +12501,28 @@ class Codegen {
     fun gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
     // Check if 'method' is actually a function-type field (not a real method).
     // e.g. this.compute() where compute is `var compute: () => T`
-    // Function types can be: "Fun(Nil)", "(T) => R", "() => Nil", etc.
+    //
+    // Every spelling of a function type has to be listed here, because the three
+    // of them reach this point as three unrelated strings:
+    //
+    //   `(A, B) => R`   parses to FuncType, and func_type_string renders it
+    //                   "Fun(A,B):R"          → starts_with("Fun(")
+    //   `Fun<A, B, R>`  parses to GenericType("Fun", ...), and
+    //                   generic_type_string renders it "Fun<A,B,R>"
+    //   bare `Fun`      parses to ClassType("Fun") — NOT a FuncType — so
+    //                   type_to_string returns it via the ClassType(n) arm as
+    //                   the plain string "Fun", with no bracket of any kind
+    //
+    // Only the first was tested, so a `var f: Fun` field fell through to the
+    // ordinary method path below and emitted a call to the symbol `Ns__f`, which
+    // no definition exists for: the program failed to LINK rather than
+    // miscompiling. Copying the field to a local first worked around it because
+    // a local goes through gen_call's indirect path, which never consults a
+    // field type at all. Bare `Fun` is the spelling `src/lib/heap.sf` uses for
+    // its comparator, which is why that stdlib module could not link.
     if (has_self and this.class_fields.has(ns)) {
         var ft: String = this.get_field_type(ns, method)
-        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
+        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("Fun<") or ft == "Fun" or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
         if (is_fn_type) {
             // Check there's no actual method with this name
             var full_check: String = ns + "__" + method

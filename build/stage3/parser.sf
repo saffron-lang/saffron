@@ -667,11 +667,39 @@ class Parser {
 
         while (true) {
             if (this.match_kind_check(".")) {
+                // `..` is not an operator: Saffron has no range syntax. Report it
+                // here, at the first dot, rather than letting the shape fall
+                // through — it used to reach codegen as an IndexGet and segfault
+                // with no diagnostic from any stage (BUGS #112).
+                if (this.peek_is(".")) {
+                    this.parse_error("'..' is not an operator - Saffron has no range syntax; build a list or use a while/for loop")
+                    if (this.match_kind_check("eof")) { break }
+                    this.advance() // first '.'
+                    if (this.match_kind_check(".")) { this.advance() } // second '.'
+                    // Swallow the intended right-hand endpoint so the rest of the
+                    // statement does not produce a second, unrelated error.
+                    if (!this.match_kind_check("eof")) { this.parse_unary() }
+                    break
+                }
                 this.advance()
                 // Numeric dot access: tuple.0, tuple.1
                 if (this.match_kind_check("int")) {
                     var idx_kind: Lexer.TokenKind = this.current_kind()
                     var idx_val: Float = match (idx_kind) { TkInt(v) => v   _ => 0 }
+                    // A float literal is never a tuple, so `<float>.<int>` is
+                    // always a mis-scan, not a field access: `1.5.0` reaches here,
+                    // and so did `0..5` before the lexer stopped eating the first
+                    // dot as a decimal point (BUGS #112). Guarding the shape keeps
+                    // it from becoming __list_get on a double.
+                    var recv_is_float: String = match (expr) {
+                        FloatLit(v) => "yes"
+                        _ => "no"
+                    }
+                    if (recv_is_float == "yes") {
+                        this.parse_error("cannot use '.' field access on a float literal - a '.' right after a number is its decimal point")
+                        this.advance()
+                        continue
+                    }
                     this.advance()
                     expr = AST.Expr.IndexGet(expr, AST.Expr.IntLit(idx_val))
                     continue
