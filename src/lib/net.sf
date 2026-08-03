@@ -193,9 +193,9 @@ private fun _raw_close(handle: Int) {
 /// Wraps a socket file descriptor (and optional TLS handle) with read/write
 /// operations that yield to the async scheduler when they would block.
 class TcpConnection {
-    var _handle: Int
-    var _remote: String
-    var _is_tls: Bool
+    internal var _handle: Int
+    private var _remote: String
+    private var _is_tls: Bool
 
     fun init(handle: Int, remote: String, is_tls: Bool) {
         this._handle = handle
@@ -266,9 +266,9 @@ class TcpConnection {
 /// A TCP listener that accepts incoming connections.
 /// Binds to a host:port and yields to the scheduler while waiting for clients.
 class TcpListener {
-    var _fd: Int
-    var _host: String
-    var _port: Int
+    private var _fd: Int
+    private var _host: String
+    private var _port: Int
 
     fun init(fd: Int, host: String, port: Int) {
         this._fd = fd

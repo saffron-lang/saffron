@@ -29,8 +29,8 @@
 /// sm.keys()  // ["apple", "banana"]
 /// ```
 class SortedMap {
-    var _keys: List<String>
-    var _values: List<Any>
+    private var _keys: List<String>
+    private var _values: List<Any>
 
     fun init() {
         this._keys = []
@@ -39,7 +39,7 @@ class SortedMap {
 
     /// Binary search for the insertion index of key.
     /// Returns the index where key is or would be inserted.
-    fun _binary_search(key: String): Int {
+    private fun _binary_search(key: String): Int {
         var lo: Int = 0
         var hi: Int = this._keys.length()
         while (lo < hi) {

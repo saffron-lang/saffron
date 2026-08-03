@@ -3,7 +3,7 @@
 
 /// The Bool class — wraps a 1-bit truth value stored as i64.
 class Bool {
-    var _val: Int
+    private var _val: Int
 
     /// Return "true" or "false".
     fun to_string(): String {

@@ -49,7 +49,7 @@
 
 /// Wraps a raw pointer to null-terminated bytes.
 class CStr {
-    var _ptr: Int
+    private var _ptr: Int
 
     fun init(ptr: Int) {
         this._ptr = ptr

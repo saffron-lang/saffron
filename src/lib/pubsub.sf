@@ -23,9 +23,9 @@ import "@sync" as Sync
 /// Once the checker supports generic class resolution, recv() will
 /// return T and the type will be enforced at compile time.
 class Subscription<T> {
-    var _channel: Sync.Channel
-    var _topic: String
-    var _bus: Bus
+    internal var _channel: Sync.Channel
+    private var _topic: String
+    private var _bus: Bus
 
     fun init(channel: Sync.Channel, topic: String, bus: Bus) {
         this._channel = channel
@@ -62,7 +62,7 @@ class Subscription<T> {
 /// bus.publish("chat", 42)             // future: type error
 /// ```
 class Bus<T> {
-    var _topics: Map<String, List<Sync.Channel>>
+    private var _topics: Map<String, List<Sync.Channel>>
 
     fun init() {
         this._topics = {}
@@ -90,7 +90,7 @@ class Bus<T> {
         }
     }
 
-    fun _unsubscribe(topic: String, channel: Sync.Channel) {
+    internal fun _unsubscribe(topic: String, channel: Sync.Channel) {
         if (!this._topics.has(topic)) { return }
         var channels: List<Sync.Channel> = this._topics.get(topic)
         var new_channels: List<Sync.Channel> = []

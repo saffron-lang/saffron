@@ -24,7 +24,7 @@
 /// lock.release()
 /// ```
 class Mutex {
-    var _locked: Bool
+    private var _locked: Bool
 
     fun init() {
         this._locked = false
@@ -63,7 +63,7 @@ class Mutex {
 /// sem.release()   // increments permits, wakes a waiter
 /// ```
 class Semaphore {
-    var _permits: Int
+    private var _permits: Int
 
     fun init(permits: Int) {
         this._permits = permits
@@ -103,7 +103,7 @@ class Semaphore {
 /// wg.wait()  // suspends until counter reaches 0
 /// ```
 class WaitGroup {
-    var _counter: Int
+    private var _counter: Int
 
     fun init() {
         this._counter = 0
@@ -150,8 +150,8 @@ class WaitGroup {
 /// once.do(fun () => expensive_init())  // no-op, returns cached result
 /// ```
 class Once {
-    var _done: Bool
-    var _result: Any
+    private var _done: Bool
+    private var _result: Any
 
     fun init() {
         this._done = false
@@ -199,9 +199,9 @@ class Once {
 /// ch.close()
 /// ```
 class Channel<T> {
-    var _buffer: List<T>
-    var _capacity: Int
-    var _closed: Bool
+    private var _buffer: List<T>
+    private var _capacity: Int
+    private var _closed: Bool
 
     fun init(capacity: Int) {
         this._buffer = []
@@ -259,7 +259,7 @@ class Channel<T> {
     }
 
     // Dequeue the first element from the buffer (FIFO).
-    fun _dequeue(): T {
+    private fun _dequeue(): T {
         this._buffer.reverse()
         var value = this._buffer.pop()
         this._buffer.reverse()

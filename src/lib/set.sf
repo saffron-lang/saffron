@@ -11,7 +11,7 @@
 /// s.values()    // [1, 2, 3]
 /// ```
 class Set {
-    var _map: Map<Any, Bool>
+    private var _map: Map<Any, Bool>
 
     fun init() {
         this._map = Map()

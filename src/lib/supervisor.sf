@@ -26,8 +26,8 @@ class ChildSpec {
 }
 
 class Supervisor {
-    var _children: List<ChildSpec>
-    var _running: Bool
+    private var _children: List<ChildSpec>
+    private var _running: Bool
 
     fun init() {
         this._children = []
@@ -50,14 +50,14 @@ class Supervisor {
         Task.spawn(fun () => sup._monitor())
     }
 
-    fun _spawn(idx: Int) {
+    private fun _spawn(idx: Int) {
         var child: ChildSpec = this._children[idx]
         var factory = child.factory
         child.task = Task.spawn(fun () => factory())
         child.running = true
     }
 
-    fun _monitor() {
+    private fun _monitor() {
         while (this._running) {
             var i = 0
             while (i < this._children.length()) {

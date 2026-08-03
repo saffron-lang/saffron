@@ -2,8 +2,8 @@
 
 /// Iterator for traversing a Stack from top to bottom.
 class StackIter {
-    var _items: List<Any>
-    var _pos: Int
+    private var _items: List<Any>
+    private var _pos: Int
 
     fun init(items: List<Any>) {
         this._items = items
@@ -32,7 +32,7 @@ class StackIter {
 /// s.pop()    // 2
 /// ```
 class Stack {
-    var _data: List<Any>
+    private var _data: List<Any>
 
     fun init() {
         this._data = []

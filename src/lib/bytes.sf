@@ -75,8 +75,8 @@ private fun _char_to_byte(ch: String): Int {
 // --- Buffer class ---
 
 class Buffer {
-    var _data: List<Int>
-    var _length: Int
+    private var _data: List<Int>
+    private var _length: Int
 
     /// Create a zero-filled buffer of the given size.
     fun init(size: Int) {
@@ -546,8 +546,8 @@ fun concat_list(bufs: List<Buffer>): Buffer {
 /// Cursor-based sequential reader over a Buffer.
 /// Automatically advances the position after each read.
 class BufferReader {
-    var _buf: Buffer
-    var _pos: Int
+    private var _buf: Buffer
+    private var _pos: Int
 
     fun init(buf: Buffer) {
         this._buf = buf
@@ -696,8 +696,8 @@ fun reader(buf: Buffer): BufferReader {
 /// Growable cursor-based writer that produces a Buffer on finalization.
 /// Starts with an initial capacity and grows as needed.
 class BufferWriter {
-    var _data: List<Int>
-    var _pos: Int
+    private var _data: List<Int>
+    private var _pos: Int
 
     fun init(initial_capacity: Int) {
         this._data = []
@@ -721,7 +721,7 @@ class BufferWriter {
     }
 
     /// Ensure there are at least `n` more bytes available.
-    fun _ensure(n: Int) {
+    private fun _ensure(n: Int) {
         while (this._pos + n > this._data.length()) {
             this._data.push(0)
         }

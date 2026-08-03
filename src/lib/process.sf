@@ -101,9 +101,9 @@ class ProcessResult {
 /// A pipe endpoint for communicating with a child process.
 /// Wraps a native process handle + stream direction.
 class ProcessPipe {
-    var _handle: Int
-    var _stream: Int   // 0=stdin(write), 1=stdout(read), 2=stderr(read)
-    var _closed: Bool
+    private var _handle: Int
+    private var _stream: Int   // 0=stdin(write), 1=stdout(read), 2=stderr(read)
+    private var _closed: Bool
 
     fun init(handle: Int, stream: Int) {
         this._handle = handle
@@ -228,7 +228,7 @@ class ProcessPipe {
 /// A running child process with full pipe control.
 /// Create via Process.open() or Process.open_args().
 class Subprocess {
-    var _handle: Int
+    private var _handle: Int
     var pid: Int
     var stdin: ProcessPipe
     var stdout: ProcessPipe

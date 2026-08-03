@@ -90,7 +90,7 @@ private fun _pad4(n: Int): String {
 /// A DateTime instance representing a specific point in time (UTC).
 /// Fields: year, month (1-12), day (1-31), hour (0-23), minute (0-59), second (0-59).
 class DateTime {
-    var _ts: Int
+    private var _ts: Int
     var year: Int
     var month: Int
     var day: Int

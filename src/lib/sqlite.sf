@@ -142,8 +142,8 @@ private fun _ensure_sqlite3() {
 /// IO.println(row.columns())         // ["id", "name"]
 /// ```
 class Row {
-    var _columns: List<String>
-    var _values: List<String>
+    private var _columns: List<String>
+    private var _values: List<String>
 
     fun init(columns: List<String>, values: List<String>) {
         this._columns = columns
@@ -232,7 +232,7 @@ class Row {
 /// db.close()
 /// ```
 class Database {
-    var _path: String
+    private var _path: String
 
     fun init(path: String) {
         this._path = path

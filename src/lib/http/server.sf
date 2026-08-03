@@ -88,11 +88,11 @@ private fun _write_bytes_tls(handle: Int, ptr: Int, len: Int): Int {
 // =============================================================================
 
 class Stream {
-    var _conn: Net.TcpConnection
-    var _tls_conn: Any
-    var _headers_sent: Bool
-    var _extra_headers: List<String>
-    var _extra_values: List<String>
+    private var _conn: Net.TcpConnection
+    internal var _tls_conn: Any
+    private var _headers_sent: Bool
+    private var _extra_headers: List<String>
+    private var _extra_values: List<String>
 
     fun init(conn: Net.TcpConnection) {
         this._conn = conn
@@ -108,7 +108,7 @@ class Stream {
         return this
     }
 
-    fun _write_raw(data: String) {
+    private fun _write_raw(data: String) {
         if (this._tls_conn != nil) {
             this._tls_conn.write(data)
         } else {
@@ -116,7 +116,7 @@ class Stream {
         }
     }
 
-    fun _send_headers() {
+    private fun _send_headers() {
         if (this._headers_sent) { return }
         this._headers_sent = true
         var sb = StringBuilder()
@@ -168,8 +168,8 @@ class Request {
     var query: String
     var params: Map<String, String>
     var context: Map<String, String>
-    var _conn: Net.TcpConnection
-    var _tls_conn: Any
+    internal var _conn: Net.TcpConnection
+    internal var _tls_conn: Any
 
     fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
         this.method = method
@@ -219,17 +219,17 @@ class Request {
 class Response {
     var status: Int
     var status_text: String
-    var _headers: List<String>
-    var _header_values: List<String>
+    internal var _headers: List<String>
+    internal var _header_values: List<String>
     var body: String
-    var _is_stream: Bool
-    var _stream_fn: Fun
+    internal var _is_stream: Bool
+    internal var _stream_fn: Fun
     /// Byte-exact body, set instead of `body` for binary content. When non-nil
     /// this takes precedence: `Content-Length` comes from `_body_bytes.length()`
     /// and the payload is written straight from its pointer, so interior NUL
     /// bytes survive. `body` stays "" in that case, since a String simply cannot
     /// hold the content (see BUGS #66).
-    var _body_bytes: FileIO.Bytes
+    internal var _body_bytes: FileIO.Bytes
 
     fun init(status: Int, body: String) {
         this.status = status
@@ -460,9 +460,9 @@ class App {
     var host: String
     var port: Int
     var routes: List<Route>
-    var _middlewares: List<Fun>
-    var _after_middlewares: List<Fun>
-    var _tls_ctx: Any
+    private var _middlewares: List<Fun>
+    private var _after_middlewares: List<Fun>
+    private var _tls_ctx: Any
     /// Maximum accepted request size (headers + body) in bytes. A request that
     /// exceeds it is answered 413 rather than parsed truncated. Enforced while
     /// reading, which is the only place it can be enforced — an application-level
@@ -534,7 +534,7 @@ class App {
         }
     }
 
-    fun _handle(conn: Net.TcpConnection) {
+    private fun _handle(conn: Net.TcpConnection) {
         var tls_conn: Any = nil
 
         // If TLS is configured, perform the TLS handshake
@@ -641,7 +641,7 @@ class App {
     ///    application a half body.
     ///
     /// The size cap is enforced here, while reading, so it can actually fire.
-    fun _read_request(conn: Net.TcpConnection, tls_conn: Any): _RawRequest {
+    private fun _read_request(conn: Net.TcpConnection, tls_conn: Any): _RawRequest {
         var out: _RawRequest = _RawRequest()
         var chunk_size: Int = 65536
         var buf: String = ""
@@ -710,7 +710,7 @@ class App {
         return out
     }
 
-    fun _run_middlewares(req: Request): Response {
+    private fun _run_middlewares(req: Request): Response {
         var i: Int = 0
         while (i < this._middlewares.length()) {
             var mw: Fun = this._middlewares[i]
@@ -723,7 +723,7 @@ class App {
         return nil
     }
 
-    fun _run_after_middlewares(req: Request, resp: Response): Response {
+    private fun _run_after_middlewares(req: Request, resp: Response): Response {
         var i: Int = 0
         var current: Response = resp
         while (i < this._after_middlewares.length()) {
@@ -734,7 +734,7 @@ class App {
         return current
     }
 
-    fun _route(req: Request): Response {
+    private fun _route(req: Request): Response {
         // First pass: exact matches take priority
         var i: Int = 0
         while (i < this.routes.length()) {

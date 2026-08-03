@@ -350,7 +350,7 @@ class Logger {
         OS.exit(1)
     }
 
-    fun _log(level: Level, message: String, fields: Map<String, String>) {
+    private fun _log(level: Level, message: String, fields: Map<String, String>) {
         if (level_priority(level) < level_priority(this.min_level)) {
             return
         }

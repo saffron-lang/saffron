@@ -13,7 +13,7 @@
 /// ss.to_list()  // [1, 3, 5]
 /// ```
 class SortedSet {
-    var _items: List<Any>
+    internal var _items: List<Any>
 
     fun init() {
         this._items = []
@@ -22,7 +22,7 @@ class SortedSet {
     /// Binary search for the insertion index of value.
     /// Uses < operator for comparison.
     /// Returns the index where value is or would be inserted.
-    fun _bisect(value: Any): Int {
+    private fun _bisect(value: Any): Int {
         var lo: Int = 0
         var hi: Int = this._items.length()
         while (lo < hi) {
