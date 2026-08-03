@@ -1981,36 +1981,23 @@ class Parser {
             }
             return this_stmt
         }
-        // Check for index assignment: ident[expr] = value
-        if (this.match_kind_check("ident") and this.peek_is("[")) {
-            var idx_start: Float = this.pos
-            var idx_errs: Float = this.error_count
-            var obj_name: String = this.expect_ident()
-            this.advance() // consume [
-            var idx: AST.Expr = this.parse_expr()
-            this.consume("]")
-            if (this.match_kind("=")) {
-                var value: AST.Expr = this.parse_expr()
-                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
-                    AST.Expr.Variable(obj_name), idx, value))
-            }
-            // Not an assignment. Same terminal-return hazard as the `this`
-            // branch above: `lst[0] + 1` in statement position was the identical
-            // parse error, so the same rewind applies. This rewind is ALSO what
-            // fixes BUGS #138 (`xs[0].show()`): the postfix chain past the `]`
-            // is a continuation, so we rewind and let parse_expr_stmt run the
-            // whole `[ ] -> . -> call` chain through parse_call. BUGS #129
-            // recorded the defect as specific to `this`, measured through `var o
-            // = this  o.f + 1` — but that shape reaches the default parse_expr
-            // path below, not this branch, so the measurement bounded the wrong
-            // axis.
-            if (this.error_count == idx_errs and this.at_expr_continuation()) {
-                this.pos = idx_start
-                return this.parse_expr_stmt()
-            }
-            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
-            return AST.Stmt.ExprStmt(get_expr)
-        }
+        // A statement beginning `ident[` needs no special case. It used to have
+        // one — consume the name, `[`, the index, `]`, then check for `=` — and
+        // that branch is BUGS #138: it *returned* at the `]`, so the postfix
+        // chain past it (`xs[0].bump()`) was left in the token stream and
+        // re-parsed as a fresh statement starting at `.`.
+        //
+        // A rewind-on-continuation guard was tried here first (the shape used for
+        // `this` above) and is NOT sufficient: `at_expr_continuation` lists infix
+        // operators, so it catches `xs[0] + 1` but not `.`, `[` or `(`. Adding
+        // those three to it would work, and would still leave a branch whose only
+        // remaining job is duplicating what the general path does.
+        //
+        // parse_expr_stmt already handles every shape this branch existed for:
+        // parse_expr's postfix loop consumes `[ ] -> . -> call` to the end, and a
+        // trailing `=` reaches build_assign, whose "index" arm builds the same
+        // IndexSet this branch built by hand. So the fix is deletion, not
+        // another guard.
         return this.parse_expr_stmt()
     }
 
@@ -2168,9 +2155,18 @@ class Parser {
     /// the guard a following line's `is`-pattern match arm would drag the
     /// previous statement into itself.
     ///
-    /// `.`, `[` and `(` are deliberately absent: the chain loops in
-    /// parse_this_stmt already consume those, so seeing one here would mean the
-    /// chain ended for some other reason and rewinding would change nothing.
+    /// `.`, `[` and `(` are deliberately absent, and the reason is specific to
+    /// the one caller: parse_this_stmt's chain loops already consume those, so
+    /// seeing one here would mean the chain ended for some other reason and
+    /// rewinding would change nothing.
+    ///
+    /// That reasoning does NOT generalise. The `ident[`-initial branch had no
+    /// such loop — it returned at the `]` — so for it the postfix tokens were
+    /// exactly the continuations that mattered, and this predicate missed them
+    /// (BUGS #138: `xs[0].bump()` still failed with the rewind in place). That
+    /// branch is gone rather than patched. Before adding a second caller, check
+    /// whether it consumes postfix tokens itself; if it does not, this predicate
+    /// is the wrong tool.
     ///
     /// The compound-assignment and increment operators are included for the same
     /// reason as the infix ones: `this.f += 1` and `this.f++` need to reach
