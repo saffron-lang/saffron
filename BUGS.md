@@ -2,8 +2,17 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139. Next free number is **#144**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#139, #143. Next free number is **#146**.
+
+#144 was filed and fixed in the same sitting (the unused-variable warning firing
+on compiler-mandated match-arm bindings) and is under `## Resolved`.
+
+#145 is the alias/type-re-export fix (`var X = Module.SomeType`), also under
+`## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
+twice at merge — first to #143, then to #145 when origin/main's own #143
+(non-`Bool` condition) landed. The lesson below about reading the next-free
+number from `main` is exactly why.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -21,6 +30,11 @@ so the collision is the default outcome rather than an accident, and it is only
 visible at merge time — by which point the number is in commit messages, code
 comments and test names. If you are filing from a worktree, `git show
 main:BUGS.md | head -10` first.
+
+The condition-lowering bug below is **#143**, filed from ph5 after reading
+`main`'s then-next-free number, so it is the one worktree filing in this round
+that did not collide. Its commit message and the `BUGS #143` comments in
+`src/compiler/checker.sf` cite it correctly.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -53,6 +67,55 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
+
+**Severity: high.** Silent wrong branch, no diagnostic, and for pointers the
+answer is not even deterministic across runs.
+
+Every condition site funnels through `to_i1` (`codegen/stmts_body.sf:1293`),
+which emits
+
+```llvm
+%t3 = trunc i64 %val to i1
+br i1 %t3, label %then, label %else
+```
+
+`trunc … to i1` keeps **the low bit of the NaN-boxed i64**. That is correct for a
+real `Bool` purely by accident of the encoding — `__val_tag_bool` returns
+`0x7FFA000000000001` for true and `…0000` for false, so the low bit happens to be
+the truth value. For anything else it is arithmetic nonsense:
+
+```saffron
+if (1)    { }   // taken     — 1 is odd
+if (42)   { }   // NOT taken — 42 is even
+if (0)    { }   // not taken — coincidentally "right"
+if ("x")  { }   // depends on the low bit of the string's pointer
+if ([])   { }   // likewise
+```
+
+So `if (42)` and `if (43)` disagree, and `if (some_string)` can flip between
+runs as the allocator hands out a different address. `0` being falsey is not a
+truthiness rule anyone implemented — it is `0 & 1 == 0`.
+
+The root cause is upstream of codegen: the checker's `If` and `While` arms
+(`checker.sf:2306` and `:2321`) call `infer_expr(cond)` and **discard the
+result**. Nothing ever requires the condition to be `Bool`, so a `Int`, `String`
+or `List` condition type checks clean and reaches `to_i1`. The ternary and the
+`and`/`or` operands reach the same helper (5 call sites total).
+
+**Resolution: require `Bool`.** Saffron is statically typed and already refuses
+`Float`→`Int` and narrows unions; a language that rejects `var i: Int = 2.5`
+should not accept `if (2.5)`. Python/JS-style truthiness was considered and
+rejected — it would need a runtime `__val_truthy` call per condition on all four
+IR bases, and it converts a type error into a silent branch, which is the class
+of defect this entry is about. `if (v)` on a nullable was also considered as
+sugar for `v != nil` and rejected for now: it is the one genuinely useful case,
+but mixing "must be Bool" with "except when nullable" is the kind of exception
+that makes the rule unmemorable. Write the comparison.
+
+The fix is a diagnostic in the checker, not a change to `to_i1`: once the
+condition is provably `Bool`, `trunc` is correct and stays.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -622,7 +685,7 @@ because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
 
-### 143. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
+### 145. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
 
 **Severity: high.** Broke `@ast`, `@lexer` and `@lang` completely — any program
 that so much as imported one died — and the workaround it forced switched off
@@ -688,12 +751,64 @@ kept, since a reader of `src/lib/lexer.sf` should not have to know which
 bug, not an error in your program", and it was a two-word error in a library.
 A diagnostic that confidently assigns blame can still be pointing the wrong way.
 
-**Renumbered #142 → #143 at merge.** This entry was written on the
-ide-stage0-spans worktree as #142; the reconciliation note at the top of `## Open`
-had already recorded that ph5's List/Map `==` fix owns #142 and that this one was
-"still unmerged and still mis-numbered." It landed second, so it takes the next
-free number. Exactly the per-worktree collision that note warns about — read the
-next-free number from `main`, not from a worktree.
+**Renumbered #142 → #143 → #145 across two merges.** This entry was written on
+the ide-stage0-spans worktree as #142; ph5's List/Map `==` fix owned #142, so it
+moved to #143 at the first merge. Then origin/main's own #143 (non-`Bool`
+condition lowering) landed, colliding again, so it takes #145 — the next free
+number on `main` at the second merge. Twice bitten by the same per-worktree
+collision the note at the top of `## Open` warns about: read the next-free number
+from `main`, never from a worktree.
+
+### 144. FIXED — the unused-variable warning was 98% noise, because it fired on match-arm bindings the language forces you to write
+
+**Severity: medium.** Not a miscompile — warnings are non-blocking
+(`error_report`, `checker.sf`; `has_errors` reads only `errors`). The damage was
+to every log: a bootstrap emitted **1458** `unused variable` lines while gen3
+compiled the compiler's own source, and the 38-odd real findings among them were
+unfindable. A diagnostic nobody can read is a diagnostic that does not exist.
+
+The warning was *accurate* about "never read" and wrong about "defect".
+`check_pattern_arity` **requires** every payload field of a variant to be named:
+shortening a pattern is a hard error (`match arm A binds 1 field(s) but A
+declares 3`). So a four-field variant must spell all four bindings, and the
+checker then warned about the three you did not read. `src/compiler/ast.sf` is
+built out of exactly that idiom — `match (s) { Span(line, col, offset, len) =>
+line }`, three warnings per accessor — and `checker.sf`'s own `TypeAlias(ta_n,
+ta_t, ta_vis) => {}` was three warnings from an *empty* arm. Match-arm bindings
+were registered with plain `define_var`, into the same unused-tracked scope as an
+ordinary `var`, so nothing distinguished "the author declared this and ignored
+it" from "the grammar made the author write this".
+
+Attribution was measured, not estimated. On `build/stage3/ast.sf`: 19 warnings,
+19 statically-unused single-line pattern bindings, **identical name multiset**
+(`col`×4, `offset`×4, `len`×4, `line`×3, …) — an exact match, not a correlation.
+Across the five stage3 modules: 1763 warnings, 1725 attributable to pattern
+bindings (97.8%), 38 residual. Four sampled residuals were all true positives
+(`module_doc` and `alias` in `parser.sf`, assigned then never re-read;
+`parent_tag`, a never-used parameter).
+
+**Fix:** `Scope` gains a `pattern_bound: Map<String, Bool>` set, populated by a
+new `define_pattern_var` used at the two match-arm binding sites (payload
+bindings and `NamedWildcard`), and `check_unused_in_scope` skips those names.
+
+The exemption is by **binding kind**, deliberately, rather than by skipping the
+arm scope wholesale — which would have been a one-line deletion. `BlockExpr`
+pushes no scope of its own, so a `var` declared inside a match-arm *body* lands
+in the arm's scope; dropping the scope's check would have silently stopped
+reporting those. Verified after the fix: an unread arm binding is silent, while
+`var arm_dead` inside an arm body, an unused `catch` binding, an unused function
+parameter and a dead function-scope `var` are all still reported.
+
+Measured on the same workload (gen3 compiling the compiler's source, Stage 2 of
+the bootstrap): **1458 → 118 warnings, −92%.** Bootstrap green through Stage 2,
+no gen2 promotion needed — the change uses only `Map<String, Bool>` and
+`.set`/`.has`, both already in this file.
+
+Two incidental findings, not fixed here. `_` and a `_`-prefix already silence the
+warning, and several `_` bindings per pattern parse and check correctly. And
+`check_let_pattern` (`checker.sf`) is **dead code — zero callers**: the
+`LetPattern` arm only infers the value, so `let`-destructuring bindings are never
+registered for unused-tracking and never arity-checked either.
 
 ### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
 

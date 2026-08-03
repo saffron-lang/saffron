@@ -1,3 +1,46 @@
-data class Point { var x: Int; var y: Int }
+// Structural equality for value-like classes.
+//
+// This test was originally written against the dead C VM's `data class Point`
+// form, which made `==` compare instances field-by-field automatically.
+// `data class` does not exist in the self-hosted compiler (no token, no AST
+// node, no parse rule) — it was lexed as an identifier and the file died with
+// "[codegen] Error: undefined variable 'data'".
+//
+// Today the same semantics are spelled explicitly with the `eq` operator
+// overload, which is the supported mechanism. A class WITHOUT `eq` keeps
+// reference equality, which the second half of this file pins.
+
+class Point {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
+    fun eq(other: Point): Bool {
+        return this.x == other.x and this.y == other.y
+    }
+}
+
 IO.println(Point(1, 2) == Point(1, 2))  // true
 IO.println(Point(1, 2) == Point(3, 4))  // false
+
+// Nested: an `eq` that recurses into a field whose class also defines `eq`.
+class Line {
+    var a: Point
+    var b: Point
+    fun init(a: Point, b: Point) { this.a = a; this.b = b }
+    fun eq(other: Line): Bool {
+        return this.a == other.a and this.b == other.b
+    }
+}
+
+IO.println(Line(Point(1, 2), Point(3, 4)) == Line(Point(1, 2), Point(3, 4)))  // true
+IO.println(Line(Point(1, 2), Point(3, 4)) == Line(Point(1, 2), Point(9, 9)))  // false
+
+// No `eq` method => reference equality, NOT structural.
+class Opaque {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+var o = Opaque(7)
+IO.println(o == o)            // true  (same reference)
+IO.println(Opaque(7) == Opaque(7))  // false (distinct references)

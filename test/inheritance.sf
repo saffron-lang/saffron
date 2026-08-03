@@ -1,27 +1,67 @@
-var b = 6;
+// Inheritance: method override, `super.m(...)` reaching the parent
+// implementation, and virtual dispatch through a base-typed receiver.
+//
+// Kept deliberately free of two things that used to live here:
+//
+//   * a duplicated `var b` at top level (`var b = 6` then `var b = Doughnut()`).
+//     Duplicate top-level declarations are not a supported language feature —
+//     both spellings collapsed onto one `@__g_b` global. See task #30.
+//   * `IO.println(a.finish)` — reading a method without calling it. Saffron has
+//     no bound-method value, so that goes down the field-access path and emits
+//     `getelementptr %Cruller, ... i32 0, i32 0` against a fieldless struct,
+//     which fails LLVM verification. That was this file's actual `invalid-ir`
+//     cause, not the duplicate.
+//
+// test/imports.sf imports this file and constructs `Cruller`, so both class
+// names here are load-bearing.
 
 class Doughnut {
   fun finish(ingredient: String) {
     IO.println("Finish with " + ingredient);
   }
 
+  // Overridden below with a matching signature, so `cook` — inherited, never
+  // redeclared — is what proves the override is reached through `this`.
+  fun topping(): String {
+    return "sprinkles";
+  }
+
+  // `this.topping()` is the dispatch check. It deliberately does NOT go through
+  // `finish`: Cruller overrides `finish` with a *different arity* (zero args),
+  // and `this.finish(x)` on a Cruller reaches that zero-arg override and drops
+  // the argument — which would hide whether `topping` dispatched at all.
   fun cook() {
     IO.println("Dunk in the fryer.");
-    this.finish("sprinkles");
+    IO.println("Topping: " + this.topping());
   }
 }
 
-var b = Doughnut();
-b.finish("cheese");
+// Base class, called directly.
+var plain = Doughnut();
+plain.finish("cheese");
+plain.cook();
 
 class Cruller extends Doughnut {
+  // Overrides the parent, and reaches the parent through `super`.
   fun finish() {
-    // No sprinkles, always icing.
-    IO.println(super.finish);
+    IO.println("No sprinkles, always icing.");
     super.finish("icing");
+  }
+
+  // Same signature as the parent's, so inherited `cook` picks this one up.
+  fun topping(): String {
+    return "icing";
   }
 }
 
-var a = Cruller();
-a.finish();
-IO.println(a.finish);
+var fancy = Cruller();
+fancy.finish();
+
+// Virtual dispatch: `cook` is only defined on Doughnut, but the `this.topping()`
+// inside it must reach Cruller's override, not Doughnut's. Prints "icing".
+fancy.cook();
+
+// Same object in a base-typed slot — dispatch is on the runtime class, so this
+// prints "icing" too, not "sprinkles".
+var as_base: Doughnut = Cruller();
+as_base.cook();
