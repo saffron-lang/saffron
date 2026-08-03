@@ -1,4 +1,4 @@
-import "./qualified_type_helper.sf" as Lexer
+import "./support/qualified_type_helper.sf" as Lexer
 
 // This is the exact pattern from bug #15:
 // "Qualified type references (Module.Type) not supported in type annotations"

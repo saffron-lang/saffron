@@ -39,6 +39,16 @@ SAFFRONC="${SAFFRONC:-$ROOT/build/saffronc}"
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-60}
 RUN_TIMEOUT=${RUN_TIMEOUT:-10}
 
+# Fixture packages for the tests that exercise package-name imports
+# (`import "testpkg"`, not a relative path). tools/saffron reads
+# SAFFRON_LIB_PATH and turns each entry into a --lib-path, which is what makes
+# <dir>/<name>/pantry.toml resolvable. Without this, test_package_import fails
+# naming its import — see BUGS #40 part 2, where that failure was correctly
+# blamed on the harness passing no --lib-path rather than on the compiler.
+# It is a directory of its own, not test/ itself: putting every test file on a
+# lib path would make any test name shadow a package name.
+export SAFFRON_LIB_PATH="$ROOT/test/packages${SAFFRON_LIB_PATH:+:$SAFFRON_LIB_PATH}"
+
 TMPDIR=$(mktemp -d /tmp/saffron_tests_XXXXXX)
 trap 'rm -rf "$TMPDIR"' EXIT
 

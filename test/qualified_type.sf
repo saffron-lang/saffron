@@ -1,4 +1,4 @@
-import "./qualified_type_helper.sf" as Lexer
+import "./support/qualified_type_helper.sf" as Lexer
 
 // Test: qualified type in variable declaration
 var tok: Lexer.Token = Lexer.make_token("ID", "hello")
