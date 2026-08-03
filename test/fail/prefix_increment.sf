@@ -1,0 +1,25 @@
+// BUGS #128 guard: `++` and `--` are POSTFIX ONLY, and prefix use is rejected by
+// name rather than silently parsed.
+//
+// Adding the `++` / `--` tokens makes the lexer maximal-munch, so `++a` scans as
+// TkPlusPlus TkIdent — it can no longer be read as `+(+a)`. Something must decide
+// what that stream means, and the two bad answers are (a) accept it as a synonym
+// for postfix, which in statement position it genuinely is, or (b) fall through
+// to "expected a literal, name or '(' here", a diagnostic that points at the
+// operator and says nothing about why.
+//
+// It is rejected because prefix would be a second spelling for one behaviour.
+// Statement position discards the value, so `++a` and `a++` are identical there;
+// and where the value is wanted, the pre-increment value is `a + 1`, which reads
+// better than either. `--a` is worse still: in a language without C's operators
+// that text already means `-(-a)`, so accepting prefix `--` would make one
+// spelling mean two things depending on a lexer decision the reader cannot see.
+//
+// Postfix in every position, including as an expression, is covered by
+// test/pass/increment.sf.
+//
+// Expected: "'++' is postfix only in Saffron" and exit 1.
+
+var a: Int = 1
+++a
+IO.println(a)
