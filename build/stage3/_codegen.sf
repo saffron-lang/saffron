@@ -53,6 +53,12 @@ class Codegen {
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
     var module_prefixes: Map<String, String>
+    // File-scoped alias bindings, keyed `<declaring module prefix>|<alias>`.
+    // `module_prefixes` above is the flat whole-program union of every alias in
+    // every file, first-writer-wins; this map records who wrote each one, so an
+    // alias means what the file that declared it says it means. Read through
+    // has_module_alias / module_alias_prefix, never directly (BUGS #123).
+    var scoped_module_prefixes: Map<String, String>
     var func_prefix_map: Map<String, String>
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
@@ -165,6 +171,7 @@ class Codegen {
         this.called_functions = []
         this.called_function_arity = {}
         this.module_prefixes = {}
+        this.scoped_module_prefixes = {}
         this.func_prefix_map = {}
         this.func_defaults = {}
         this.func_param_count = {}
@@ -1796,8 +1803,8 @@ class Codegen {
                         }
                     }
                     // Module-prefixed function reference: e.g. Routes.list_packages used as value
-                    if (this.module_prefixes.has(obj_name)) {
-                        var mp_resolved: String = this.module_prefixes.get(obj_name) + field
+                    if (this.has_module_alias(obj_name)) {
+                        var mp_resolved: String = this.module_alias_prefix(obj_name) + field
                         if (this.str_in_list(this.known_functions, mp_resolved)) {
                             return this.gen_func_ref(mp_resolved)
                         }
@@ -3393,8 +3400,8 @@ class Codegen {
                 }
             }
             // Module-prefixed function reference: e.g. Routes.list_packages used as value
-            if (mn.length() > 0 and this.module_prefixes.has(mn)) {
-                var mp_resolved: String = this.module_prefixes.get(mn) + m_field
+            if (mn.length() > 0 and this.has_module_alias(mn)) {
+                var mp_resolved: String = this.module_alias_prefix(mn) + m_field
                 if (this.str_in_list(this.known_functions, mp_resolved)) {
                     return this.gen_func_ref(mp_resolved)
                 }
@@ -3809,8 +3816,8 @@ class Codegen {
                 resolved_callee = this.named_imports.get(resolved_callee)
             } else {
                 var dot_parts: List<String> = resolved_callee.split(".")
-                if (dot_parts.length() >= 2 and this.module_prefixes.has(dot_parts[0])) {
-                    resolved_callee = this.module_prefixes.get(dot_parts[0]) + dot_parts[1]
+                if (dot_parts.length() >= 2 and this.has_module_alias(dot_parts[0])) {
+                    resolved_callee = this.module_alias_prefix(dot_parts[0]) + dot_parts[1]
                 } else if (this.func_prefix_map.has(resolved_callee)) {
                     resolved_callee = this.func_prefix_map.get(resolved_callee)
                 }
@@ -5119,7 +5126,7 @@ class Codegen {
     fun report_missing_module_write(object: AST.Expr, field: String): Bool {
         var obj_name: String = this.get_variable_name(object)
         if (obj_name.length() == 0) { return false }
-        if (!this.module_prefixes.has(obj_name)) { return false }
+        if (!this.has_module_alias(obj_name)) { return false }
         // A local, parameter or global of the same name shadows the alias: the
         // write is a field store on that value, not a module write. Checked
         // before the member lookup because a shadowed alias has no members.
@@ -5137,7 +5144,7 @@ class Codegen {
         // (`Math.pi = 3.0`, `Flag.enabled = true` in test/cross_module_global.sf),
         // and this is exactly the lookup `gen_set_field` makes before its
         // fall-through.
-        var resolved: String = this.module_prefixes.get(obj_name) + field
+        var resolved: String = this.module_alias_prefix(obj_name) + field
         if (this.module_globals.has(resolved)) { return false }
         if (this.global_var_types.has(resolved)) { return false }
         // A member that EXISTS but is not a variable — a function, a class, an
@@ -9738,8 +9745,8 @@ class Codegen {
             MethodCall(o, m, a) => {
                 // Extract module-qualified call: Async.sleep → stdlib_async_sleep
                 var obj_name: String = this.get_variable_name(o)
-                if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-                    var prefix: String = this.module_prefixes.get(obj_name)
+                if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+                    var prefix: String = this.module_alias_prefix(obj_name)
                     calls.push(prefix + m)
                 }
                 calls.push(m)
@@ -9979,6 +9986,62 @@ class Codegen {
             __sil_i = __sil_i + 1
         }
         return false
+    }
+
+    // --- Import-alias resolution (BUGS #123) ---
+    //
+    // An import alias is file-local: `import "../compiler/lexer.sf" as Internal`
+    // binds `Internal` for the file that wrote that line and for no other file.
+    // `module_prefixes` cannot express that — it is one flat map keyed by alias
+    // name, filled by a whole-program walk with first-writer-wins — so when
+    // src/lib/ast.sf, src/lib/lexer.sf and src/lib/parser.sf each bound
+    // `Internal` to a *different* module, one binding won for all three and the
+    // other two silently resolved against the winner's prefix. `Internal.Token`
+    // inside lexer.sf looked up `compiler_ast_Token`, which does not exist, and
+    // the failure surfaced (post-#118) as "no member 'Token' in module
+    // 'Internal'" — a diagnostic blaming the file that was right.
+    //
+    // `scoped_module_prefixes` fixes the scoping rather than the instance: it is
+    // keyed `<declaring module prefix>|<alias>`, so each file keeps its own
+    // binding and `this.current_prefix` selects the right one. These two helpers
+    // are the only readers; every `module_prefixes.has(...)` /
+    // `module_prefixes.get(...)` pair on a *source-level alias* goes through them
+    // so the scoped answer and the fallback can never disagree at a call site.
+    //
+    // The flat map stays as the fallback, and that is deliberate. Aliases reach
+    // `module_prefixes` from several paths that do not record a declaring file —
+    // the hard-wired `IO`/`GC`/`Reflect` entries in
+    // generate_with_modules_flat_opts3, and the older non-flat entry points that
+    // never build a scoped map at all. For those the flat answer is the only
+    // answer, and it is the pre-#123 behaviour, so nothing that worked before
+    // stops working: the scoped map only ever *overrides* a name whose declaring
+    // file is known.
+    fun has_module_alias(name: String): Bool {
+        if (this.scoped_module_prefixes.has(this.alias_key(name))) { return true }
+        return this.module_prefixes.has(name)
+    }
+
+    // Both reads are guarded by the matching `has`, which is what narrows
+    // Map.get's `String|Nil` to `String` for the checker. The final `return ""`
+    // is unreachable for any caller that asked has_module_alias first — and
+    // every caller does — but an unguarded `.get` would not type check.
+    fun module_alias_prefix(name: String): String {
+        var scoped_key: String = this.alias_key(name)
+        if (this.scoped_module_prefixes.has(scoped_key)) {
+            return this.scoped_module_prefixes.get(scoped_key)
+        }
+        if (this.module_prefixes.has(name)) {
+            return this.module_prefixes.get(name)
+        }
+        return ""
+    }
+
+    // Must agree with main.sf's alias_scope_key, which writes these keys. A
+    // module prefix matches [A-Za-z0-9_]* and an alias is an identifier, so the
+    // bar cannot occur in either half; the entry file's prefix is empty, giving
+    // keys like |Lexer.
+    fun alias_key(name: String): String {
+        return this.current_prefix + "|" + name
     }
 
     fun is_known_name(name: String): Bool {
@@ -12313,8 +12376,8 @@ class Codegen {
         }
         if (callee_name.contains(".")) {
             var cp: List<String> = callee_name.split(".")
-            if (cp.length() >= 2 and this.module_prefixes.has(cp[0])) {
-                var resolved_name: String = this.module_prefixes.get(cp[0]) + cp[1]
+            if (cp.length() >= 2 and this.has_module_alias(cp[0])) {
+                var resolved_name: String = this.module_alias_prefix(cp[0]) + cp[1]
                 if (this.func_ret_types.has(resolved_name)) {
                     return this.type_to_string(this.func_ret_types.get(resolved_name))
                 }
@@ -13334,7 +13397,7 @@ class Codegen {
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
     }
-    if (this.module_prefixes.has(obj_name)) { return obj_name }
+    if (this.has_module_alias(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
         var vtype: String = this.get_var_type_str(obj_name)
@@ -13503,8 +13566,8 @@ class Codegen {
     // was properly imported (has a real prefix like "stdlib_os_").
     // Builtins with empty prefix (IO/OS/GC registered as "") fall through
     // to their hardcoded blocks below.
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-        var __mp: String = this.module_prefixes.get(obj_name)
+    if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+        var __mp: String = this.module_alias_prefix(obj_name)
         if (__mp.length() > 0) {
             var __mp_func: String = __mp + method
             // Method name remapping for GC functions that conflict with gc.ll globals.
@@ -13890,8 +13953,8 @@ class Codegen {
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+    if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+        var prefixed_name: String = this.module_alias_prefix(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
         if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
             return this.gen_intrinsic_call(prefixed_name, args)
@@ -14075,8 +14138,8 @@ class Codegen {
                             var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
                             var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
                             var mc_ns: String = this.get_variable_name(mc_obj_expr)
-                            if (mc_ns.length() > 0 and this.module_prefixes.has(mc_ns)) {
-                                var mc_full: String = this.module_prefixes.get(mc_ns) + mc_method_name
+                            if (mc_ns.length() > 0 and this.has_module_alias(mc_ns)) {
+                                var mc_full: String = this.module_alias_prefix(mc_ns) + mc_method_name
                                 if (this.func_ret_types.has(mc_full)) {
                                     task_result_type = this.type_to_string(this.func_ret_types.get(mc_full))
                                 }
@@ -15134,13 +15197,13 @@ class Codegen {
 
     // Check for imported module function calls (module alias or unknown name)
     // Also skip global variables (they should dispatch via class method resolution below)
-    if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
+    if (obj_name.length() > 0 and (this.has_module_alias(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
         var prefixed_name: String = method
         // Package namespace: check named_imports for "Alias.method" first
         if (this.named_imports.has(obj_name + "." + method)) {
             prefixed_name = this.named_imports.get(obj_name + "." + method)
-        } else if (this.module_prefixes.has(obj_name)) {
-            prefixed_name = this.module_prefixes.get(obj_name) + method
+        } else if (this.has_module_alias(obj_name)) {
+            prefixed_name = this.module_alias_prefix(obj_name) + method
         } else if (this.func_prefix_map.has(method)) {
             prefixed_name = this.func_prefix_map.get(method)
         } else {
@@ -15662,8 +15725,8 @@ class Codegen {
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
     // Check for module global write: ModuleAlias._field = value
     var sf_obj_name: String = this.get_variable_name(object)
-    if (sf_obj_name.length() > 0 and this.module_prefixes.has(sf_obj_name)) {
-        var sf_mp_resolved: String = this.module_prefixes.get(sf_obj_name) + field
+    if (sf_obj_name.length() > 0 and this.has_module_alias(sf_obj_name)) {
+        var sf_mp_resolved: String = this.module_alias_prefix(sf_obj_name) + field
         if (this.module_globals.has(sf_mp_resolved)) {
             var sf_val: String = this.gen_arg_value(value)
             this.emit_indent("store i64 " + sf_val + ", i64* @__g_" + this.sanitize_name(sf_mp_resolved))
@@ -17051,7 +17114,19 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
 }
 
 fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool): String {
+    // No scoped alias table: every alias resolves through the flat union, the
+    // pre-#123 behaviour. Kept for callers that do not build one.
+    var no_scopes: Map<String, String> = {}
+    return generate_with_modules_flat_opts4(program, all_stmts, boundaries, prefixes_joined, alias_map, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, no_scopes)
+}
+
+/// `scoped_aliases` is main.sf's file-scoped alias table, keyed
+/// `<declaring module prefix>|<alias>` (see alias_scope_key there). It is
+/// consulted before `alias_map` at every alias resolution site, which is what
+/// lets two files each bind `Internal` to their own module (BUGS #123).
+fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, scoped_aliases: Map<String, String>): String {
     var gen: Codegen = Codegen()
+    gen.scoped_module_prefixes = scoped_aliases
     gen.target = target
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib

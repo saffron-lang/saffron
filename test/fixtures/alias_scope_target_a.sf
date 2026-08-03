@@ -1,0 +1,20 @@
+// BUGS #123 fixture: the module alias_scope_alpha.sf binds as `Shared`.
+// Every member is deliberately named the same as target_b's counterpart, so a
+// misresolution links successfully and returns the WRONG value rather than
+// failing at link time. That is the shape #123 had in src/lib: a wrong answer,
+// not a missing symbol.
+var label: String = "target-a-global"
+
+fun who(): String {
+    return "target-a"
+}
+
+class Marker {
+    var tag: String
+    fun init(tag: String) {
+        this.tag = tag
+    }
+    fun describe(): String {
+        return "target-a:" + this.tag
+    }
+}
