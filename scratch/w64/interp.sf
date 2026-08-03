@@ -1,0 +1,4 @@
+fun main() {
+    var name = "world"
+    IO.println("hello ${name}")
+}
