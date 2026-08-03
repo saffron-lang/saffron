@@ -24,11 +24,22 @@ class Scope {
     var vars: Map<String, AST.Type>
     var narrowed: Map<String, AST.Type>
     var used: Map<String, Bool>
+    // Names bound by a match-arm payload pattern, which check_unused_in_scope
+    // exempts. They live in `vars` like any other binding — they must, so uses
+    // resolve and types are known — but they are not *declarations the author
+    // chose to make*: check_pattern_arity requires every payload field to be
+    // named, so `match (s) { Span(line, col, offset, len) => line }` has to
+    // spell all four and an unread one is compiler-mandated, not a defect.
+    // Tracking them as a separate set rather than skipping the arm scope
+    // wholesale keeps a `var` declared inside an arm body checked: BlockExpr
+    // pushes no scope of its own, so such a var lands in this same scope.
+    var pattern_bound: Map<String, Bool>
 
     fun init() {
         this.vars = {}
         this.narrowed = {}
         this.used = {}
+        this.pattern_bound = {}
     }
 }
 
@@ -69,6 +80,14 @@ class TypeEnv {
     fun define_var(name: String, typ: AST.Type) {
         var scope: Scope = this.current_scope()
         scope.vars.set(name, typ)
+    }
+
+    // Same as define_var, but marks the name as bound by a match-arm pattern so
+    // check_unused_in_scope skips it. See the comment on Scope.pattern_bound.
+    fun define_pattern_var(name: String, typ: AST.Type) {
+        var scope: Scope = this.current_scope()
+        scope.vars.set(name, typ)
+        scope.pattern_bound.set(name, true)
     }
 
     fun get_var_type(name: String): AST.Type {
@@ -423,13 +442,29 @@ class NullChecker {
         Diag.record_warn("checker", s, msg)
     }
 
+    // Warn about declarations in the innermost scope that nothing ever read.
+    //
+    // Match-arm payload bindings are exempt, and that exemption is 97.8% of this
+    // warning's former output — 1725 of 1763 lines emitted while checking the
+    // compiler's own source. check_pattern_arity REQUIRES every payload field to
+    // be named, so `match (s) { Span(line, col, offset, len) => line }` cannot be
+    // written any shorter and the three unread bindings are the language's doing,
+    // not the author's. `src/compiler/ast.sf` is built out of that idiom, and
+    // this file's own `TypeAlias(ta_n, ta_t, ta_vis) => {}` was three warnings
+    // from an empty arm. Same rationale already written down for lambda params in
+    // check_lambda_body: a compiler-mandated binding must not draw a warning.
+    //
+    // The exemption is by binding kind, not by skipping the arm scope, because
+    // BlockExpr pushes no scope — a `var` declared inside a match-arm body lands
+    // in the arm's scope, and dropping the whole scope's check would stop
+    // reporting those. `_` and a `_`-prefix still silence any binding.
     fun check_unused_in_scope() {
         var scope: Scope = this.env.scopes[this.env.scopes.length() - 1]
         var declared: List<String> = scope.vars.keys()
         var i: Float = 0
         while (i < declared.length()) {
             var name: String = declared[i]
-            if (!name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
+            if (!scope.pattern_bound.has(name) and !name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
                 this.warn("unused variable '" + name + "'")
             }
             i = i + 1
@@ -818,6 +853,43 @@ class NullChecker {
         if (s == "Bool") return true
         if (s == "String") return true
         return false
+    }
+
+    // Infer a condition and require it to be Bool (BUGS #143).
+    //
+    // Codegen lowers every condition through `to_i1`, which is
+    // `trunc i64 %v to i1` — the LOW BIT of the NaN-boxed value. That is right
+    // for a real Bool only because __val_tag_bool happens to put the truth
+    // value in bit 0. For anything else it is nonsense: `if (42)` was false
+    // because 42 is even, `if (43)` true because 43 is odd, and `if (some_str)`
+    // answered on the low bit of a heap address, so it could flip between runs.
+    // Nothing diagnosed it, because the If/While arms called infer_expr and
+    // threw the type away.
+    //
+    // The check is deliberately one-sided: it fires only on a type we can PROVE
+    // is not Bool, exactly like scalar_mismatch. Any, Nil, unions, generics,
+    // class and enum types are all let through. A too-eager version here does
+    // not merely annoy — the checker type-checks the compiler's own source, so a
+    // false error is a broken bootstrap. Tightening the let-through set is a
+    // separate, measured step.
+    //
+    // `ctx` names the construct ("if", "while", "ternary", "and"/"or") so the
+    // message says where. Codegen is unchanged: once the condition is provably
+    // Bool, trunc is the correct lowering.
+    fun check_condition(cond: AST.Expr, ctx: String) {
+        var t: String = this.infer_expr(cond)
+        if (t == "Bool") return
+        var provably_not_bool: Bool = false
+        if (this.is_scalar_name(t)) { provably_not_bool = true }
+        if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") { provably_not_bool = true }
+        if (!provably_not_bool) return
+        var hint: String = ""
+        if (t == "Int" or t == "Float") { hint = "; compare it, e.g. `x != 0`" }
+        else if (t == "String") { hint = "; compare it, e.g. `s != \"\"`" }
+        else if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") {
+            hint = "; test its size, e.g. `xs.length() > 0`"
+        }
+        this.error(ctx + " condition must be Bool, got " + t + hint)
     }
 
     fun is_subtype(child: String, parent: String): Bool {
@@ -2358,7 +2430,7 @@ class NullChecker {
                 }
             }
             If(cond, then_branch, else_branch) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "if")
                 // Then-branch: apply narrowing from condition
                 this.env.push_scope()
                 this.apply_narrowing(cond)
@@ -2373,7 +2445,7 @@ class NullChecker {
                 this.env.pop_scope()
             }
             While(cond, body) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "while")
                 this.env.push_scope()
                 this.loop_depth = this.loop_depth + 1
                 this.check_stmts(body)
@@ -2704,7 +2776,17 @@ class NullChecker {
                 this.env.get_var_type(rname)
             }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
-            Unary(op, right) => this.infer_type(right)
+            // `!` is a condition site too (BUGS #143) and its RESULT is Bool,
+            // not the operand's type — returning the operand type made `!42`
+            // infer as Int, which then passed as a condition and as an Int
+            // elsewhere. `-` and `~` are arithmetic and keep the operand type.
+            Unary(op, right) => match (op) {
+                "!" => {
+                    this.check_condition(right, "`!`")
+                    AST.Type.BoolType
+                }
+                _ => this.infer_type(right)
+            }
             Call(callee, args, __cs) => this.parse_type_node(this.infer_call(callee, args))
             Assign(name, value, __as) => this.parse_type_node(this.check_assign(name, value, __as))
             // Both operands are code, so walk them. Returning BoolType without
@@ -2733,15 +2815,21 @@ class NullChecker {
             // codegen/stmts_body.sf. The scope is pushed and popped so the
             // narrowing cannot escape into the enclosing expression — `(a != nil
             // and b) or a.f` must still reject `a.f`.
+            // Both operands are conditions and go through check_condition
+            // (BUGS #143) — `and`/`or` reach the same `to_i1` low-bit lowering
+            // as `if`, so `42 and true` was false for the same reason `if (42)`
+            // was. The right operand is still checked INSIDE the pushed scope,
+            // for the reason spelled out above: checking it unnarrowed is a new
+            // false error, not a stricter check.
             Logical(left, op, right) => {
-                this.infer_type(left)
+                this.check_condition(left, op)
                 this.env.push_scope()
                 if (op == "and") {
                     this.apply_narrowing(left)
                 } else {
                     this.apply_inverse_narrowing(left)
                 }
-                this.infer_type(right)
+                this.check_condition(right, op)
                 this.env.pop_scope()
                 AST.Type.BoolType
             }
@@ -2828,7 +2916,7 @@ class NullChecker {
                 AST.Type.BoolType
             }
             IfExpr(cond, then_body, then_val, else_body, else_val) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "if-expression")
                 this.check_stmts(then_body)
                 var then_type: AST.Type = this.infer_type(then_val)
                 this.check_stmts(else_body)
@@ -3735,7 +3823,7 @@ class NullChecker {
             // gets the subject's type rather than a payload field's.
             var named_wc: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
             if (named_wc.length() > 0) {
-                this.env.define_var(named_wc, this.parse_type_node(subj_type))
+                this.env.define_pattern_var(named_wc, this.parse_type_node(subj_type))
             }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
             if (subj_type != "Any") {
@@ -3745,7 +3833,7 @@ class NullChecker {
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
                 var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
-                this.env.define_var(bindings[bi], this.parse_type_node(field_type))
+                this.env.define_pattern_var(bindings[bi], this.parse_type_node(field_type))
                 bi = bi + 1
             }
 
