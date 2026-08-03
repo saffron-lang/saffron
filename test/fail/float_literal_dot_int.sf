@@ -1,0 +1,25 @@
+// BUGS #112, second guard: a float literal is never a tuple, so `<float>.<int>`
+// is always a mis-scan and must be rejected.
+//
+// The lexer half of the #112 fix stops `0..5` from producing a float, but it does
+// not cover the shape reached any *other* way. `1.5.0` is scanned entirely
+// correctly — TkFloat("1.5") TkDot TkInt(0) — and hand-writing `0. . 5` with real
+// whitespace produces the same stream #112 produced by accident. Both then hit
+// parse_call's numeric-dot branch, whose purpose is tuple field access, and came
+// out as IndexGet(FloatLit(...), IntLit(...)): __list_get on a double, no
+// diagnostic, segfault at run time.
+//
+// The receiver of a tuple field access can never be a float literal, so this is
+// unambiguously a bug shape and parse_call rejects it by name. That is defence in
+// depth, not a duplicate of the lexer guard — remove the lexer change and this
+// file still fails correctly; remove this guard and `1.5.0` silently segfaults
+// again.
+//
+// Real tuple access (`t._0`) and every genuine float form (`1.5`, `1.`, `1.e3`,
+// `1.5.floor()`) are unaffected — see test/pass/scientific_notation.sf and
+// test/tuple_test.sf.
+//
+// Expected: "cannot use '.' field access on a float literal" and exit 1.
+
+var x = 1.5.0
+IO.println(x)

@@ -1,0 +1,43 @@
+// BUGS #112: `0..5` must be a parse error, not a running program.
+//
+// Saffron has no range syntax. There is no Range token, no Range AST node and no
+// range codegen — `grep -n "Range\|DotDot"` finds nothing in lexer.sf, parser.sf
+// or ast.sf. Asking for a range is therefore a syntax error, and this file's job
+// is to prove the compiler says so.
+//
+// It used to live in test/pass/, where it was asserting a feature that has never
+// existed. What actually happened was worse than a wrong answer: the number
+// scanner consumed the first `.` as a decimal point, so `0..5` came out as
+// TkFloat("0.") TkDot TkInt(5), and parse_call's numeric-dot branch — the one
+// that exists for tuple access, `tuple.0` — built IndexGet(FloatLit(0.),
+// IntLit(5)). Codegen then emitted
+//
+//     %t2 = call i64 @__val_tag_float(double 1.)
+//     %t7 = call i64 @__list_length(i64 %t2)
+//     %t10 = call i64 @__list_get(i64 %t2, i64 %t9)
+//
+// passing a double to the list helpers. The only output from any stage was
+// "[checker] Warning: nums: cannot infer type" — no lexer, parser, checker or
+// codegen diagnostic named the real problem. At run time `0..5` raised
+// "Runtime Error: NullError: null pointer dereference" and `1..5` segfaulted.
+//
+// Nothing here is salvageable as a test of something that exists: every
+// statement is a range literal. The working equivalent is a C-style or
+// list-based loop, which test/pass/ already covers.
+//
+// Expected: three "'..' is not an operator" errors and exit 1. If this file ever
+// compiles cleanly again, either range syntax was added — in which case this
+// test should move back and be rewritten — or the guard regressed and `..` is
+// silently a float-indexed list read again.
+
+var nums = 0..5
+IO.println(nums)
+IO.println(nums.length())
+
+for (i in 1..4) {
+    IO.println(i)
+}
+
+// Reverse range
+var rev = 5..0
+IO.println(rev)
