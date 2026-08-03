@@ -1,6 +1,7 @@
 // LLVM IR code generator for Saffron-mini
 
 import "./ast.sf" as AST
+import "./diag.sf" as Diag
 import "llvm/types" as LLVMTypes
 import "llvm/instructions" as LLVMInst
 import "llvm/module" as LLVMMod
@@ -395,6 +396,22 @@ class Codegen {
     fun emit(line: String) {
         this.sb.append(line)
         this.sb.append("\n")
+    }
+
+    /// Report a codegen error: print the `[codegen] Error: ...` line exactly as
+    /// before, set the has_errors flag, and record it into the shared Diag sink so
+    /// --json and the LSP can read it as data. `msg` is the full message minus the
+    /// `[codegen] Error: ` prefix, which this adds — so the console output is
+    /// byte-for-byte what it was, and the sink stores the clean message.
+    ///
+    /// The span is span_none(): codegen errors are about expressions, and
+    /// expression nodes do not carry spans yet (that is the next stage). When they
+    /// do, this gains a located sibling and these calls pass the offending node's
+    /// span.
+    fun codegen_error(msg: String) {
+        IO.println("[codegen] Error: " + msg)
+        this.has_errors = true
+        Diag.record_error("codegen", AST.span_none(), msg)
     }
 
     fun emit_indent(line: String) {

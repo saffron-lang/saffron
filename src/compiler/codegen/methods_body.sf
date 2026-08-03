@@ -410,7 +410,14 @@
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_ttype.starts_with("Tuple<")) {
+            // Recorded into the sink for --json, but deliberately NOT routed through
+            // codegen_error: unlike every other site here, this one prints an error
+            // and never sets has_errors, so the compile currently exits 0. That is
+            // a latent BUGS #37 shape, but flipping it to fatal is a behavior change
+            // that belongs in its own commit, not smuggled in under a diagnostics
+            // refactor. Preserve the current fatality; surface the message as data.
             IO.println("[codegen] Error: use ._0, ._1 etc. to access tuple fields (not indexing)")
+            Diag.record_error("codegen", AST.span_none(), "use ._0, ._1 etc. to access tuple fields (not indexing)")
         }
     }
     // Map indexing: map["key"] → __map_get(map, key)
@@ -879,8 +886,7 @@
         // func_prefix_map or known_functions before any body is lowered, so reaching
         // here means the method genuinely does not exist. Report it instead of
         // emitting a call to a name that was never defined.
-        IO.println("[codegen] Error: no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
-        this.has_errors = true
+        this.codegen_error("no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
         return full
     }
 
@@ -3379,8 +3385,7 @@
             if (__fields_str.contains(method + ":")) { __method_exists = true }
         }
         if (!__method_exists) {
-            IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + class_name + "' has no method '" + method + "'")
             this.last_type = AST.Type.IntType
             return "0"
         }
@@ -3517,25 +3522,22 @@
             }
         }
         if (!__ft_exists) {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
     } else if (is_builtin_type) {
         // A builtin or `Any` receiver with no matching arm above. `Any` is the
         // common shape and deserves the annotation hint; a concrete builtin
         // means the method genuinely does not exist on that type.
         if (obj_type == "Any") {
-            IO.println("[codegen] Error: cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
+            this.codegen_error("cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
         } else {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
-        this.has_errors = true
     } else {
         // Receiver type unknown to codegen entirely: an empty type string, or a
         // named type with no registered fields. Either way there is nothing to
         // dispatch to, and silently returning 0 is what BUGS #37 is.
-        IO.println("[codegen] Error: cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
-        this.has_errors = true
+        this.codegen_error("cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
     }
     this.last_type = AST.Type.IntType
     return "0"
