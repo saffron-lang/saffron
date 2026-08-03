@@ -4565,8 +4565,11 @@ class NullChecker {
     }
 
     fun error_report(): String {
-        // Print warnings (non-blocking) to stderr
-        if (this.warnings.length() > 0) {
+        // Print warnings (non-blocking). Suppressed under --json, where the sink
+        // (each warn already recorded into it) is the data channel and stdout
+        // must stay parseable JSON. The errors returned below are likewise gated
+        // by the driver before printing.
+        if (this.warnings.length() > 0 and !Diag.is_quiet()) {
             var wi: Float = 0
             while (wi < this.warnings.length()) {
                 IO.println("[checker] Warning: " + this.warnings[wi])
