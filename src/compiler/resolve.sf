@@ -123,16 +123,16 @@ class Resolver {
 
     fun prescan_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 this.globals.set(name, this.current_prefix)
             }
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 this.funcs.set(name, this.current_prefix)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 this.types.set(name, true)
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.types.set(name, true)
             }
             TypeAlias(name, target, ta_vis) => {
@@ -165,30 +165,30 @@ class Resolver {
 
     fun resolve_stmt(stmt: AST.Stmt): AST.Stmt {
         return match (stmt) {
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 // Resolve the initializer BEFORE declaring the name, so
                 // `var x = x` sees the outer x rather than itself.
                 var new_init: AST.Expr = this.resolve_expr(init)
                 if (this.scopes.length() > 0) {
                     this.declare(name, "local")
                 }
-                AST.Stmt.VarDecl(name, type_ann, new_init, doc, v_vis)
+                AST.Stmt.VarDecl(name, type_ann, new_init, doc, v_vis, __ns, __fs)
             }
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 this.funcs.set(name, this.current_prefix)
                 this.push_scope()
                 var pi: Float = 0
                 while (pi < params.length()) {
                     var p: AST.Param = params[pi]
-                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                    var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
                     this.declare(pname, "param")
                     pi = pi + 1
                 }
                 var new_body: List<AST.Stmt> = this.resolve_stmts(body)
                 this.pop_scope()
-                AST.Stmt.FunDecl(name, params, ret_type, new_body, doc, f_vis)
+                AST.Stmt.FunDecl(name, params, ret_type, new_body, doc, f_vis, __ns, __fs)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // Methods get a scope holding the receiver plus the field
                 // names, so `name` inside a method resolves to the field and
                 // not to a like-named module global. Note the checker does not
@@ -204,7 +204,7 @@ class Resolver {
                     var fi: Float = 0
                     while (fi < fields.length()) {
                         var f: AST.Param = fields[fi]
-                        var fname: String = match (f) { Param(n, t, d, p_vis) => n }
+                        var fname: String = match (f) { Param(n, t, d, p_vis, __ns) => n }
                         this.declare(fname, "local")
                         fi = fi + 1
                     }
@@ -212,7 +212,7 @@ class Resolver {
                     this.pop_scope()
                     mi = mi + 1
                 }
-                AST.Stmt.ClassDecl(name, type_params, parents, fields, new_methods, doc, c_vis)
+                AST.Stmt.ClassDecl(name, type_params, parents, fields, new_methods, doc, c_vis, __ns, __fs, __intro)
             }
             ExprStmt(expr) => {
                 AST.Stmt.ExprStmt(this.resolve_expr(expr))
@@ -264,9 +264,9 @@ class Resolver {
                 this.declare_pattern(pattern)
                 AST.Stmt.LetPattern(pattern, new_value)
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.types.set(name, true)
-                AST.Stmt.EnumDecl(name, variants, doc, e_vis)
+                AST.Stmt.EnumDecl(name, variants, doc, e_vis, __ns, __fs)
             }
             TypeAlias(name, target, ta_vis) => {
                 this.types.set(name, true)
@@ -347,7 +347,7 @@ class Resolver {
                 var pi: Float = 0
                 while (pi < params.length()) {
                     var p: AST.Param = params[pi]
-                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                    var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
                     this.declare(pname, "param")
                     pi = pi + 1
                 }

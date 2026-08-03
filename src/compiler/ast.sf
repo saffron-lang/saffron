@@ -148,16 +148,36 @@ enum Param {
     // a field's visibility is class-scoped, a parameter's is meaningless and stays
     // "public" forever. Appended last, as on every widened declaration node; see
     // the note on TypeAlias in `Stmt` for why that position.
-    Param(name: String, type_ann: Type, default_val: Expr, visibility: String)
+    //
+    // `name_span` covers the parameter/field *name* only — it is the rename and
+    // go-to-definition target, so it must not include the type annotation. A
+    // param the parser synthesized (a desugared destructuring, an implicit
+    // `init`) has `span_none()`; see the note on Stmt's spans.
+    Param(name: String, type_ann: Type, default_val: Expr, visibility: String, name_span: Span)
 }
 
 enum Stmt {
     ExprStmt(expr: Expr),
-    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String, visibility: String),
-    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String, visibility: String),
-    // `visibility` is appended last on every declaration node — see the note on
-    // TypeAlias at the bottom of this enum for why that position and not another.
-    EnumDecl(name: String, variants: List<Variant>, docstring: String, visibility: String),
+    // Every declaration node carries two spans, appended after `visibility` for
+    // the same tag-stability reason `visibility` itself was appended last (see
+    // the TypeAlias note at the bottom of this enum):
+    //
+    //   name_span — the declared *name* alone. This is the precise target a
+    //     rename rewrites, a go-to-definition jumps to, and a document-symbol
+    //     highlights. It deliberately excludes the type annotation and body, so
+    //     renaming `foo` cannot disturb `: String`.
+    //   full_span — the whole declaration, first token through last. This is the
+    //     foldable region and the extent a diagnostic underlines when the fault
+    //     is the declaration as a whole rather than its name.
+    //
+    // Both are `span_none()` on a node the parser *synthesized* rather than read:
+    // desugared `for-in` bindings, an implicit `init`, the temporaries a
+    // destructuring `let` expands to. That is not a gap to fill in later — a
+    // synthetic node has no source region, and inventing one would make an editor
+    // jump to a construct the user never wrote. `span_is_real` is the guard.
+    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String, visibility: String, name_span: Span, full_span: Span),
+    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String, visibility: String, name_span: Span, full_span: Span),
+    EnumDecl(name: String, variants: List<Variant>, docstring: String, visibility: String, name_span: Span, full_span: Span),
     // `type_params` holds the declared generic parameter names of `class Box<T>`
     // — ["T"], or [] for a non-generic class. The parser used to consume and
     // *discard* them ("// Skip generic type parameters"), so `T` did not exist
@@ -177,7 +197,15 @@ enum Stmt {
     // BUGS #96 segfaulted on: an arm binding only six read the seventh as 0, and
     // `0.starts_with(...)` is `strncmp(NULL, ...)`. `interface` and `actor` parse
     // through this same node, so all three are in the blast radius.
-    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String, visibility: String),
+    // `introducer` is the keyword the user actually wrote: "class", "interface" or
+    // "actor". All three parse through this one node, and until now which one it
+    // was could not be recovered afterwards — `interface` was indistinguishable
+    // from `class`, and `actor` was inferred by sniffing an "@actor\n" prefix on
+    // `docstring`. That is fine for codegen, which treats them alike, but a tool
+    // cannot label an outline entry or pick a symbol kind without it. Reading a
+    // keyword out of an overloaded metadata string is the kind of re-derivation
+    // BUGS #40 is about; the parser knows the answer, so it records it.
+    ClassDecl(name: String, type_params: List<String>, parents: List<String>, fields: List<Param>, methods: List<Stmt>, docstring: String, visibility: String, name_span: Span, full_span: Span, introducer: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
@@ -201,7 +229,11 @@ enum Stmt {
 }
 
 enum Variant {
-    Variant(name: String, fields: String)
+    // `fields` is an unparsed "name:Type,…" string. Do not add structured data by
+    // widening it — a comma-joined encoding already corrupts on `Map<String,Int>`.
+    // `name_span` is the variant name's own region, so an outline can list enum
+    // variants as children and rename can retarget one.
+    Variant(name: String, fields: String, name_span: Span)
 }
 
 // Typed value — tracks both the LLVM register name and its Saffron type

@@ -418,8 +418,8 @@ class NullChecker {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var ptype: String = this.type_node_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -1040,7 +1040,7 @@ class NullChecker {
 
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
                 // not an AST.Type node. type_node_to_string() matched a String
                 // against AST.Type patterns and fell through to the first arm, so
@@ -1059,7 +1059,7 @@ class NullChecker {
                 var rpi: Float = 0
                 while (rpi < params.length()) {
                     var p: AST.Param = params[rpi]
-                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
                     var pt_str: String = this.type_node_to_string(pt)
                     if (pt_str.starts_with("Fun[")) {
                         // Record: "funcname:index" → receiver class name
@@ -1074,12 +1074,12 @@ class NullChecker {
                 // parameters, so a block-syntax argument can be typed (BUGS #86).
                 this.register_fun_param_sigs(name, params)
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.register_enum(name, variants)
                 this.register_type_visibility(name, e_vis)
                 this.register_module_decl(name, e_vis)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -1119,24 +1119,24 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mn
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mn
                         _ => ""
                     }
                     // A bodyless method is abstract: it is a requirement on
                     // subclasses. A method with a body is inherited as-is.
                     var method_body: List<AST.Stmt> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mb
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mb
                         _ => []
                     }
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
                     var method_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mr
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
                         _ => "Any"
                     }
                     var method_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mp
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                         _ => []
                     }
                     if (method_name.length() > 0) {
@@ -1169,23 +1169,23 @@ class NullChecker {
                     var ami: Float = 0
                     while (ami < methods.length()) {
                         var am_name: String = match (methods[ami]) {
-                            FunDecl(mn, mp, mr, mb, md, f_vis) => mn
+                            FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mn
                             _ => ""
                         }
                         if (am_name.length() > 0 and am_name != "init") {
                             var am_params: List<AST.Param> = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md, f_vis) => mp
+                                FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                                 _ => []
                             }
                             var am_ret: String = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md, f_vis) => mr
+                                FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
                                 _ => "Nil"
                             }
                             var api: Float = 0
                             while (api < am_params.length()) {
                                 var ap: AST.Param = am_params[api]
-                                var ap_name: String = match (ap) { Param(n, t, d, p_vis) => n }
-                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis) => t }
+                                var ap_name: String = match (ap) { Param(n, t, d, p_vis, __ns) => n }
+                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis, __ns) => t }
                                 var ap_type_str: String = this.type_node_to_string(ap_type)
                                 if (ap_type_str != "Any" and !this.is_sendable(ap_type_str)) {
                                     this.warn("actor '" + name + "' method '" + am_name + "' parameter '" + ap_name + "' has non-Sendable type '" + ap_type_str + "'")
@@ -1201,7 +1201,7 @@ class NullChecker {
                     }
                 }
             }
-            VarDecl(n, t, i, d, v_vis) => {
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {
                 // `type Name = T` reaches the checker as a VarDecl carrying the
                 // docstring "@type_alias", not as a TypeAlias node — the parser
                 // desugars it (parser.sf's parse_stmt). So the alias's visibility
@@ -1246,8 +1246,8 @@ class NullChecker {
         var i: Float = 0
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
-            var vname: String = match (v) { Variant(n, f) => n }
-            var vfields: String = match (v) { Variant(n, f) => f }
+            var vname: String = match (v) { Variant(n, f, __ns) => n }
+            var vfields: String = match (v) { Variant(n, f, __ns) => f }
             variant_names.push(vname)
             if (vfields.length() > 0) {
                 this.env.enum_fields.set(name + "." + vname, vfields)
@@ -1586,12 +1586,12 @@ class NullChecker {
 
     fun check_leaks_in_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 if (f_vis != "private") {
                     this.check_fun_leaks(this.exposure_label(f_vis) + " fun '" + name + "'", params, ret_type)
                 }
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // L4: a member of a private class is a no-op, and so is the class's
                 // own parent list. Every path to any of it is already gated by the
                 // enclosing private type, so erroring would force annotating every
@@ -1618,9 +1618,9 @@ class NullChecker {
                 // L1: fields reachable from outside — everything but `private`.
                 var fi: Float = 0
                 while (fi < fields.length()) {
-                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
-                    var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
-                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pt }
+                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+                    var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => p_vis }
+                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
                     if (f_vis != "private") {
                         this.check_leak(this.exposure_label(f_vis) + " field '" + name + "." + f_name + "'",
                             "its declared type", this.type_to_str(f_type))
@@ -1631,19 +1631,19 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var m_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mn
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mn
                         _ => ""
                     }
                     var m_vis: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mv
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mv
                         _ => "public"
                     }
                     var m_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mp
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mp
                         _ => []
                     }
                     var m_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mr
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mr
                         _ => ""
                     }
                     if (m_name.length() > 0 and m_vis != "private") {
@@ -1653,12 +1653,12 @@ class NullChecker {
                     mi = mi + 1
                 }
             }
-            VarDecl(n, t, i, d, v_vis) => {
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {
                 if (v_vis != "private" and d != "@type_alias") {
                     this.check_var_leaks(n, t, i, v_vis)
                 }
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 // A variant's payload spelling is a String on the Variant node
                 // ("field:Type,field:Type"), and mentioned_type_names splits on
                 // the punctuation that separates them, so a private type anywhere
@@ -1666,8 +1666,8 @@ class NullChecker {
                 if (e_vis != "private") {
                     var vi: Float = 0
                     while (vi < variants.length()) {
-                        var v_name: String = match (variants[vi]) { Variant(vn, vf) => vn }
-                        var v_fields: String = match (variants[vi]) { Variant(vn, vf) => vf }
+                        var v_name: String = match (variants[vi]) { Variant(vn, vf, __ns) => vn }
+                        var v_fields: String = match (variants[vi]) { Variant(vn, vf, __ns) => vf }
                         this.check_leak(this.exposure_label(e_vis) + " enum '" + name + "." + v_name + "'",
                             "its payload", v_fields)
                         vi = vi + 1
@@ -1706,8 +1706,8 @@ class NullChecker {
     fun check_fun_leaks(subject: String, params: List<AST.Param>, ret_type: String) {
         var pi: Float = 0
         while (pi < params.length()) {
-            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis) => pn }
-            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis) => pt }
+            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
             // AST.Param is the node for both a class field and a function
             // parameter, so type_to_str is the one renderer for both — the raw
             // String / AST.Type split that forces two entry points here is I3's
@@ -1817,8 +1817,8 @@ class NullChecker {
         var qualified: String = this.current_prefix + name
         var fi: Float = 0
         while (fi < fields.length()) {
-            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
-            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
+            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => p_vis }
             if (this.is_restricting_visibility(f_vis)) {
                 this.mark_restricted_member(name, qualified, f_name, f_vis)
             }
@@ -1827,15 +1827,15 @@ class NullChecker {
         var mi: Float = 0
         while (mi < methods.length()) {
             var m_name: String = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, m_vis) => mn
+                FunDecl(mn, mp, mr, mb, md, m_vis, __ns, __fs) => mn
                 _ => ""
             }
             var m_vis: String = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, mv) => mv
+                FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mv
                 _ => "public"
             }
             var m_body: List<AST.Stmt> = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, mv) => mb
+                FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mb
                 _ => []
             }
             if (m_name.length() > 0 and this.is_restricting_visibility(m_vis)) {
@@ -2202,7 +2202,7 @@ class NullChecker {
 
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
@@ -2248,7 +2248,7 @@ class NullChecker {
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // Register method with class prefix if inside a class
                 var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {
@@ -2282,8 +2282,8 @@ class NullChecker {
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
-                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+                    var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
                     this.env.define_var(pname, pt)
                     j = j + 1
                 }
@@ -2336,7 +2336,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // Unlike register_decl this runs only over the statements being
                 // checked, never over the imported list, so the class here is
                 // the one whose body is about to be walked. Setting the bare key
@@ -2374,7 +2374,7 @@ class NullChecker {
                 this.check_stmts(methods)
                 this.current_class = saved_class
             }
-            EnumDecl(n, v, d, e_vis) => {}
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => {}
             Break => {
                 if (this.loop_depth <= 0) {
                     this.error("break: 'break' outside of a loop")
@@ -2845,8 +2845,8 @@ class NullChecker {
         var li: Float = 0
         while (li < params.length()) {
             var lp: AST.Param = params[li]
-            var lp_name: String = match (lp) { Param(n, t, d, p_vis) => n }
-            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis) => t }
+            var lp_name: String = match (lp) { Param(n, t, d, p_vis, __ns) => n }
+            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis, __ns) => t }
             this.env.define_var(lp_name, lp_type)
             li = li + 1
         }
@@ -4028,7 +4028,7 @@ class NullChecker {
         var i: Float = 0
         while (i < params.length()) {
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var sig: String = this.fun_param_sig_of(pt)
             if (sig != "!") {
                 this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
@@ -4062,13 +4062,13 @@ class NullChecker {
         var changed: Bool = false
         var i: Float = 0
         while (i < params.length()) {
-            var pname: String = match (params[i]) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis) => t }
-            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis) => d }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis, __ns) => d }
             // Rebuilding an existing Param below, so carry its visibility across
             // rather than resetting to "public": this rewrite exists only to fill in
             // an inferred type and must not otherwise alter the declaration.
-            var pvis: String = match (params[i]) { Param(n, t, d, p_vis) => p_vis }
+            var pvis: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => p_vis }
             if (this.is_any_type(pt) and pname != "self") {
                 if (i < declared.length()) {
                     var declared_str: String = declared[i].trim()
@@ -4094,7 +4094,7 @@ class NullChecker {
                         + " so a block can be typed from it.")
                 }
             }
-            new_params.push(AST.Param.Param(pname, pt, pdef, pvis))
+            new_params.push(AST.Param.Param(pname, pt, pdef, pvis, __ns))
             i = i + 1
         }
         if (changed) {
@@ -4111,7 +4111,7 @@ class NullChecker {
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
         if (params.length() > 0) {
-            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis) => n }
+            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis, __ns) => n }
             if (first_param_name == "self") return nil
         }
 
@@ -4130,7 +4130,9 @@ class NullChecker {
 
         // Build new params: prepend 'self' parameter
         var new_params: List<AST.Param> = []
-        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public"))
+        // Synthesized, so it has no source region: the user never wrote `self`
+        // here, and pointing an editor at one would be a lie.
+        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public", AST.span_none()))
         var pi: Float = 0
         while (pi < params.length()) {
             new_params.push(params[pi])
@@ -4155,8 +4157,8 @@ class NullChecker {
                 var result: AST.Stmt = AST.Stmt.ExprStmt(rewritten)
                 result
             }
-            VarDecl(name, type_ann, init, doc, v_vis) => {
-                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis)
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
+                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis, __ns, __fs)
             }
             Return(value) => {
                 AST.Stmt.Return(this.rewrite_receiver_expr(value, fields, methods))

@@ -20,8 +20,8 @@
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var ptype: String = this.type_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -43,7 +43,7 @@
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             sb.append(this.type_to_string(pt))
             i = i + 1
         }
