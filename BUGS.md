@@ -2,8 +2,8 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
-#129, #130, #131, #132. Next free number is **#137**.
+**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
+#129, #131, #132. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -961,24 +961,6 @@ Found while fixing #127, whose filed reduction had been searching along the wron
 
 ---
 
-### 130. Two `strip_nil_from_node` branches type as `AST.Type` vs `NilType`
-
-**Severity: low** — pre-existing, and invisible unless `checker.sf` is compiled
-standalone, which only became possible with #127's fix.
-
-`strip_nil_from_node`'s if-expression branches type as `AST.Type` in one arm and
-`NilType` in the other, which the checker rejects on the standalone path. Confirmed
-**pre-existing rather than introduced** by applying #127's hoist alone to main's
-`checker.sf`, with no #126 lambda-body walk present: both errors appear. So they are
-neither #126's nor #127's doing — they were simply unreachable while #127 stopped the
-file from parsing at all.
-
-Filed rather than fixed because it was outside the owning agent's scope. Note the
-shape: an incomplete type on a branch is exactly what "complete types are a
-requirement" is meant to catch, so this is a soundness gap and not only a nuisance.
-
----
-
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
 **Severity: high**, and the remaining half of #125 — wasm64 output is no longer
@@ -1165,6 +1147,32 @@ gone. Both tests pass; suite failure set unchanged at the 24-name baseline.
 Correction to the closing note above: `IO.open` **does** now throw on a missing
 file (`src/lib/io.sf:359-365` tests `fp == 0` against an `i64`-declared `_fopen`),
 so the latent NULL-`FILE*` defect it describes no longer needs its own entry.
+
+### 130. FIXED (by intervening work) — `strip_nil_from_node`'s if-expression branches no longer mismatch
+
+**Severity: low** — was invisible unless `checker.sf` was compiled standalone,
+which only became possible with #127's fix.
+
+The filed defect: `strip_nil_from_node`'s inner if-expression returns `filtered[0]`
+(an `AST.Type`) in one branch, `AST.Type.NilType` in another, and
+`AST.Type.UnionType(filtered)` in a third, and the checker rejected the branches as
+incompatible on the standalone-compile path.
+
+Re-verified 2026-08-03 on the post-resolve-pass tree: it no longer reproduces.
+`import "../compiler/checker.sf"` and `import "@check"` (via `src/lib/check.sf`,
+the consumer #127 named as broken by this) both compile clean (RC=0), and the
+emitted IR passes `opt -passes=verify` (RC=0). A minimal repro of the exact shape
+— an if-expression whose branches are a general enum-typed value, a narrow variant
+literal, and a constructor call — also compiles clean. Branch-type checking is
+still active and correct: a genuinely incompatible if-expression (`if (c) { 5 }
+else { "hello" }`) is still rejected with "if-expression branches have
+incompatible types: Int vs String".
+
+The fix was not a targeted edit but a consequence of the checker overhaul between
+the filing and now — the `AST.Type`-node migration (`dc30fb6`) and the resolve
+pass (`170804c`, stage 2) — which made the if-expression branches unify to their
+common `AST.Type` rather than to the narrowest branch. No code change was needed;
+this entry records that the soundness gap is closed and verified.
 
 ### 6. FIXED — `break`/`continue` outside a loop is now a checker error
 
