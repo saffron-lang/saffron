@@ -1,7 +1,7 @@
 //! Random number generation using @extern for native compilation.
 
-@extern("i32 rand()") fun _rand(): Int
-@extern("void srand(i32)") fun _srand(seed: Int)
+@extern("i32 rand()") private fun _rand(): Int
+@extern("void srand(i32)") private fun _srand(seed: Int)
 
 /// Seed the random number generator for reproducible sequences.
 fun seed(n: Int) {

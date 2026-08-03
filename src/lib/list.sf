@@ -1,20 +1,20 @@
 //! List<T> — dynamic array.
 //! Wraps a pointer to a runtime list structure { count: i64, capacity: i64, data: i64* }.
 
-@extern("i64 __list_new()") fun _list_new(): Int
-@extern("i64 __list_push(i64, i64)") fun _list_push(list: Int, item: Int): Int
-@extern("i64 __list_pop(i64)") fun _list_pop(list: Int): Int
-@extern("i64 __list_get(i64, i64)") fun _list_get(list: Int, index: Int): Int
-@extern("i64 __list_set(i64, i64, i64)") fun _list_set(list: Int, index: Int, value: Int): Int
-@extern("i64 __list_length(i64)") fun _list_length(list: Int): Int
-@extern("i64 __list_remove(i64, i64)") fun _list_remove(list: Int, index: Int): Int
-@extern("i64 __list_slice(i64, i64, i64)") fun _list_slice(list: Int, start: Int, end: Int): Int
-@extern("i64 __list_contains(i64, i64)") fun _list_contains(list: Int, item: Int): Int
-@extern("i64 __list_join(i64, i64)") fun _list_join(list: Int, sep: Int): Int
-@extern("i64 __list_to_string(i64)") fun _list_to_string(list: Int): Int
-@extern("i64 rt_list_reverse(i64)") fun _list_reverse(list: Int): Int
-@extern("i64 rt_list_copy(i64)") fun _list_copy(list: Int): Int
-@extern("i64 rt_list_sort(i64)") fun _list_sort(list: Int): Int
+@extern("i64 __list_new()") private fun _list_new(): Int
+@extern("i64 __list_push(i64, i64)") private fun _list_push(list: Int, item: Int): Int
+@extern("i64 __list_pop(i64)") private fun _list_pop(list: Int): Int
+@extern("i64 __list_get(i64, i64)") private fun _list_get(list: Int, index: Int): Int
+@extern("i64 __list_set(i64, i64, i64)") private fun _list_set(list: Int, index: Int, value: Int): Int
+@extern("i64 __list_length(i64)") private fun _list_length(list: Int): Int
+@extern("i64 __list_remove(i64, i64)") private fun _list_remove(list: Int, index: Int): Int
+@extern("i64 __list_slice(i64, i64, i64)") private fun _list_slice(list: Int, start: Int, end: Int): Int
+@extern("i64 __list_contains(i64, i64)") private fun _list_contains(list: Int, item: Int): Int
+@extern("i64 __list_join(i64, i64)") private fun _list_join(list: Int, sep: Int): Int
+@extern("i64 __list_to_string(i64)") private fun _list_to_string(list: Int): Int
+@extern("i64 rt_list_reverse(i64)") private fun _list_reverse(list: Int): Int
+@extern("i64 rt_list_copy(i64)") private fun _list_copy(list: Int): Int
+@extern("i64 rt_list_sort(i64)") private fun _list_sort(list: Int): Int
 
 /// The List class — wraps a pointer to a dynamic array managed by the runtime.
 class List {

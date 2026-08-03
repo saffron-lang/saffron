@@ -32,8 +32,8 @@ import "@io" as FileIO
 // it with `strlen`, so it cannot send a body containing an interior NUL byte —
 // it stops at the first one. These bind the socket primitives directly so a
 // response body can be written from an explicit (pointer, length) pair.
-@extern("i64 sf_tcp_write(i64, i8*, i64)") fun _srv_tcp_write(fd: Int, buf: Int, len: Int): Int
-@extern("i64 sf_tls_write(i64, i8*, i64)") fun _srv_tls_write(handle: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tcp_write(i64, i8*, i64)") private fun _srv_tcp_write(fd: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") private fun _srv_tls_write(handle: Int, buf: Int, len: Int): Int
 @intrinsic fun __suspend(reason: Int, arg: Int)
 
 /// Default cap on a single request (headers + body). Requests larger than this
@@ -48,7 +48,7 @@ var DEFAULT_MAX_REQUEST_BYTES: Int = 8388608
 /// Write exactly `len` bytes from `ptr` to a plain (non-TLS) connection,
 /// suspending on EWOULDBLOCK. Unlike a String write this never consults
 /// `strlen`, so NUL bytes inside the range are sent like any other byte.
-fun _write_bytes_plain(handle: Int, ptr: Int, len: Int): Int {
+private fun _write_bytes_plain(handle: Int, ptr: Int, len: Int): Int {
     var fd: Int = handle & 0xFFFFFFFF
     var written: Int = 0
     while (written < len) {
@@ -66,7 +66,7 @@ fun _write_bytes_plain(handle: Int, ptr: Int, len: Int): Int {
 
 /// Byte-exact counterpart for a TLS connection. `handle` is the packed
 /// `fd | (tls_handle << 32)` used throughout @net / @ssl.
-fun _write_bytes_tls(handle: Int, ptr: Int, len: Int): Int {
+private fun _write_bytes_tls(handle: Int, ptr: Int, len: Int): Int {
     var fd: Int = handle & 0xFFFFFFFF
     var tls: Int = handle >> 32
     var written: Int = 0
@@ -337,7 +337,7 @@ fun event_stream(handler: Fun): Response {
 /// Serialize the status line and headers, up to and including the blank line
 /// that ends the header block. The body is written separately by
 /// `_write_response`, because a byte body cannot pass through a StringBuilder.
-fun _serialize_headers(resp: Response): String {
+internal fun _serialize_headers(resp: Response): String {
     var sb = StringBuilder()
     sb.append("HTTP/1.1 ")
     sb.append(resp.status.to_string())
@@ -373,7 +373,7 @@ fun _serialize_headers(resp: Response): String {
 /// Retained for callers that want the bytes in hand (and for tests). NOTE: this
 /// is lossy for a byte body — a String cannot represent interior NUL bytes, so
 /// the payload truncates. Use `_write_response` to actually send a response.
-fun _serialize_response(resp: Response): String {
+internal fun _serialize_response(resp: Response): String {
     var head: String = _serialize_headers(resp)
     if (resp._is_stream) {
         return head
@@ -385,7 +385,7 @@ fun _serialize_response(resp: Response): String {
 /// byte-exactly. This is the only correct way to send a binary body — it writes
 /// from the byte body's (pointer, length) pair rather than handing a String to
 /// `strlen`.
-fun _write_response(conn: Net.TcpConnection, tls_conn: Any, resp: Response) {
+private fun _write_response(conn: Net.TcpConnection, tls_conn: Any, resp: Response) {
     var head: String = _serialize_headers(resp)
     if (tls_conn != nil) {
         tls_conn.write(head)
@@ -432,7 +432,7 @@ class Route {
     }
 }
 
-fun _match_route(pattern: String, path: String): Map<String, String> {
+private fun _match_route(pattern: String, path: String): Map<String, String> {
     var pattern_parts: List<String> = pattern.split("/")
     var path_parts: List<String> = path.split("/")
     if (pattern_parts.length() != path_parts.length()) {
@@ -899,7 +899,7 @@ fun static_files(url_prefix: String, dir: String): Fun {
     }
 }
 
-fun _guess_mime(path: String): String {
+private fun _guess_mime(path: String): String {
     if (path.ends_with(".html")) { return "text/html" }
     if (path.ends_with(".js")) { return "application/javascript" }
     if (path.ends_with(".css")) { return "text/css" }
@@ -935,7 +935,7 @@ class _RawRequest {
 
 /// Parse Content-Length out of a raw header block. Returns 0 when absent.
 /// Case-insensitive on the field name, as HTTP requires.
-fun _content_length_of(head: String): Int {
+internal fun _content_length_of(head: String): Int {
     var lines: List<String> = head.split("\r\n")
     var i: Int = 1
     while (i < lines.length()) {
@@ -957,7 +957,7 @@ fun _content_length_of(head: String): Int {
     return 0
 }
 
-fun _parse_request(raw: String): Request {
+private fun _parse_request(raw: String): Request {
     var lines: List<String> = raw.split("\r\n")
     if (lines.length() == 0) {
         return Request("GET", "/", {}, "", "")

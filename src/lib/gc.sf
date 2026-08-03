@@ -1,17 +1,17 @@
 //! GC module — garbage collector control.
 //! Usage: import "@gc" as GC
 
-@extern("void __gc_collect()") fun _collect()
-@extern("void __gc_enable()") fun _enable()
-@extern("void __gc_disable()") fun _disable()
-@extern("void __gc_debug_stats()") fun _stats()
-@extern("i64 __gc_stat_alloc_count()") fun _alloc_count(): Int
-@extern("i64 __gc_stat_total_bytes()") fun _total_bytes(): Int
-@extern("i64 __gc_stat_threshold()") fun _threshold(): Int
-@extern("void __gc_set_threshold(i64)") fun _set_threshold(bytes: Int)
-@extern("void __mem_set_limit(i64)") fun _set_max_memory(bytes: Int)
-@extern("i64 __mem_get_limit()") fun _max_memory(): Int
-@extern("i64 __mem_live_bytes()") fun _live_bytes(): Int
+@extern("void __gc_collect()") private fun _collect()
+@extern("void __gc_enable()") private fun _enable()
+@extern("void __gc_disable()") private fun _disable()
+@extern("void __gc_debug_stats()") private fun _stats()
+@extern("i64 __gc_stat_alloc_count()") private fun _alloc_count(): Int
+@extern("i64 __gc_stat_total_bytes()") private fun _total_bytes(): Int
+@extern("i64 __gc_stat_threshold()") private fun _threshold(): Int
+@extern("void __gc_set_threshold(i64)") private fun _set_threshold(bytes: Int)
+@extern("void __mem_set_limit(i64)") private fun _set_max_memory(bytes: Int)
+@extern("i64 __mem_get_limit()") private fun _max_memory(): Int
+@extern("i64 __mem_live_bytes()") private fun _live_bytes(): Int
 
 /// Run a full garbage collection cycle.
 fun collect() {

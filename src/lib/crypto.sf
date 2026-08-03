@@ -20,20 +20,20 @@ import "os" as OS
 var _uid_counter = 0
 
 /// Generate a unique temp file path in /tmp.
-fun _temp_path(): String {
+private fun _temp_path(): String {
     _uid_counter = _uid_counter + 1
     var pid = OS.exec("echo $$").trim()
     return "/tmp/_sf_crypto_${pid}_${_uid_counter}"
 }
 
 /// Escape single quotes for safe shell embedding.
-fun _escape_sq(s: String): String {
+private fun _escape_sq(s: String): String {
     return s.replace("'", "'\\''")
 }
 
 /// Write a string to a temp file via shell printf, return the path.
 /// Uses printf '%s' to handle binary data and special characters safely.
-fun _write_temp(input: String): String {
+private fun _write_temp(input: String): String {
     var path = _temp_path()
     var escaped = _escape_sq(input)
     OS.exec("printf '%s' '${escaped}' > ${path}")
@@ -41,7 +41,7 @@ fun _write_temp(input: String): String {
 }
 
 /// Remove a temp file silently.
-fun _cleanup(path: String) {
+private fun _cleanup(path: String) {
     try {
         OS.exec("rm -f ${path} 2>/dev/null")
     } catch (e) {
@@ -51,7 +51,7 @@ fun _cleanup(path: String) {
 
 /// Try to detect which hash command is available for a given algorithm.
 /// Returns "shasum" or "openssl" or throws if neither is found.
-fun _detect_hasher(): String {
+private fun _detect_hasher(): String {
     var check = OS.exec("which shasum 2>/dev/null").trim()
     if (check.length() > 0) {
         return "shasum"
@@ -65,7 +65,7 @@ fun _detect_hasher(): String {
 
 /// Hash a file using shasum with the given algorithm (256, 512, etc).
 /// Returns the hex digest.
-fun _shasum_file(path: String, algo: String): String {
+private fun _shasum_file(path: String, algo: String): String {
     var raw = OS.exec("shasum -a ${algo} '${_escape_sq(path)}' 2>/dev/null")
     // Output format: "<hex>  <filename>\n" or "<hex> *<filename>\n"
     var space_idx = raw.index_of(" ")
@@ -77,7 +77,7 @@ fun _shasum_file(path: String, algo: String): String {
 
 /// Hash a file using openssl dgst with the given algorithm name (sha256, sha512, md5).
 /// Returns the hex digest.
-fun _openssl_file(path: String, algo: String): String {
+private fun _openssl_file(path: String, algo: String): String {
     var raw = OS.exec("openssl dgst -${algo} '${_escape_sq(path)}' 2>/dev/null")
     // Output format: "SHA256(file)= <hex>\n" or "SHA2-256(file)= <hex>\n"
     var eq_idx = raw.index_of("= ")
@@ -90,7 +90,7 @@ fun _openssl_file(path: String, algo: String): String {
 
 /// Hash a file with fallback: try shasum first, then openssl.
 /// algo_shasum: "256", "512" etc.  algo_openssl: "sha256", "sha512", "md5" etc.
-fun _hash_file(path: String, algo_shasum: String, algo_openssl: String): String {
+private fun _hash_file(path: String, algo_shasum: String, algo_openssl: String): String {
     try {
         return _shasum_file(path, algo_shasum)
     } catch (e) {
@@ -100,7 +100,7 @@ fun _hash_file(path: String, algo_shasum: String, algo_openssl: String): String 
 }
 
 /// Hash a string by writing it to a temp file, hashing, and cleaning up.
-fun _hash_string(input: String, algo_shasum: String, algo_openssl: String): String {
+private fun _hash_string(input: String, algo_shasum: String, algo_openssl: String): String {
     var path = _write_temp(input)
     try {
         var result = _hash_file(path, algo_shasum, algo_openssl)

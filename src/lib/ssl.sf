@@ -26,28 +26,28 @@ import "@process" as Process
 
 // FFI declarations for the C TLS runtime (socket_native.c)
 @extern("i64 sf_tls_ctx_new_server(i8*, i8*)")
-fun _tls_ctx_new_server(cert_path: String, key_path: String): Int {}
+private fun _tls_ctx_new_server(cert_path: String, key_path: String): Int {}
 
 @extern("i64 sf_tls_ctx_new_client(i8*, i64)")
-fun _tls_ctx_new_client(ca_path: String, verify_peer: Int): Int {}
+private fun _tls_ctx_new_client(ca_path: String, verify_peer: Int): Int {}
 
 @extern("i64 sf_tls_accept(i64, i64)")
-fun _tls_accept(client_fd: Int, ctx_handle: Int): Int {}
+private fun _tls_accept(client_fd: Int, ctx_handle: Int): Int {}
 
 @extern("i64 sf_tls_connect_ctx(i64, i8*, i64)")
-fun _tls_connect_ctx(fd: Int, hostname: String, ctx_handle: Int): Int {}
+private fun _tls_connect_ctx(fd: Int, hostname: String, ctx_handle: Int): Int {}
 
 @extern("void sf_tls_ctx_free(i64)")
-fun _tls_ctx_free(ctx_handle: Int) {}
+private fun _tls_ctx_free(ctx_handle: Int) {}
 
 @extern("i64 sf_tls_read(i64, i8*, i64)")
-fun _tls_read(handle: Int, buf: String, len: Int): Int {}
+private fun _tls_read(handle: Int, buf: String, len: Int): Int {}
 
 @extern("i64 sf_tls_write(i64, i8*, i64)")
-fun _tls_write(handle: Int, buf: String, len: Int): Int {}
+private fun _tls_write(handle: Int, buf: String, len: Int): Int {}
 
 @extern("void sf_tls_close(i64)")
-fun _tls_close(handle: Int) {}
+private fun _tls_close(handle: Int) {}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,12 +64,12 @@ var TLS_1_3: String = "tls1.3"
 // ---------------------------------------------------------------------------
 
 /// Escape single quotes for safe shell embedding.
-fun _escape_sq(s: String): String {
+private fun _escape_sq(s: String): String {
     return s.replace("'", "'\\''")
 }
 
 /// Shell-escape a value by wrapping in single quotes.
-fun _shell_escape(s: String): String {
+private fun _shell_escape(s: String): String {
     return "'" + _escape_sq(s) + "'"
 }
 
@@ -175,16 +175,16 @@ class TlsConnection {
 // will be replaced with direct @extern calls to sf_tls_read/write/close.
 // ---------------------------------------------------------------------------
 
-@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
-@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
-@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Int)
-@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Int, hostname: Int): Int
-@extern("void* malloc(i64)") fun _ssl_malloc(size: Int): Int
-@extern("void free(void*)") fun _ssl_free(ptr: Int)
-@extern("i64 strlen(void*)") fun _ssl_strlen(s: Int): Int
+@extern("i64 sf_tls_read(i64, i8*, i64)") private fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") private fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
+@extern("void sf_tls_close(i64)") private fun _tls_close_raw(handle: Int)
+@extern("i64 sf_tls_connect(i64, i8*)") private fun _tls_connect_raw(fd: Int, hostname: Int): Int
+@extern("void* malloc(i64)") private fun _ssl_malloc(size: Int): Int
+@extern("void free(void*)") private fun _ssl_free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _ssl_strlen(s: Int): Int
 
 /// Read decrypted data from a packed TLS handle.
-fun _tls_read_via_socket(packed: Int, max_bytes: Int): String {
+private fun _tls_read_via_socket(packed: Int, max_bytes: Int): String {
     var tls: Int = packed >> 32
     var buf: Int = _ssl_malloc(max_bytes + 1)
     var n: Int = _tls_read_raw(tls, buf, max_bytes)
@@ -196,7 +196,7 @@ fun _tls_read_via_socket(packed: Int, max_bytes: Int): String {
 }
 
 /// Write data through a packed TLS handle.
-fun _tls_write_via_socket(packed: Int, data: String): Int {
+private fun _tls_write_via_socket(packed: Int, data: String): Int {
     var tls: Int = packed >> 32
     var ptr: Int = data
     var len: Int = _ssl_strlen(ptr)
@@ -206,7 +206,7 @@ fun _tls_write_via_socket(packed: Int, data: String): Int {
 }
 
 /// Close a packed TLS handle.
-fun _tls_close_via_socket(packed: Int) {
+private fun _tls_close_via_socket(packed: Int) {
     var tls: Int = packed >> 32
     _tls_close_raw(tls)
 }

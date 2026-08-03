@@ -24,18 +24,18 @@ import "@process" as Process
 // ---------------------------------------------------------------------------
 
 /// Escape single quotes for safe shell embedding.
-fun _escape_sq(s: String): String {
+private fun _escape_sq(s: String): String {
     return s.replace("'", "'\\''")
 }
 
 /// Escape a value for SQL string literal (double single quotes).
-fun _escape_sql(s: String): String {
+private fun _escape_sql(s: String): String {
     return s.replace("'", "''")
 }
 
 /// Bind parameters into a SQL string by replacing ? placeholders with
 /// escaped, quoted values. This prevents SQL injection for string values.
-fun _bind_params(sql: String, params: List<String>): String {
+private fun _bind_params(sql: String, params: List<String>): String {
     if (params.length() == 0) {
         return sql
     }
@@ -57,7 +57,7 @@ fun _bind_params(sql: String, params: List<String>): String {
 
 /// Run a SQL statement against a database file via the sqlite3 CLI.
 /// Returns the raw stdout output (TSV with header).
-fun _run_sql(db_path: String, sql: String): String {
+private fun _run_sql(db_path: String, sql: String): String {
     var escaped_sql = _escape_sq(sql)
     var escaped_path = _escape_sq(db_path)
     var cmd = "sqlite3 -header -separator '\t' '${escaped_path}' '${escaped_sql}'"
@@ -73,7 +73,7 @@ fun _run_sql(db_path: String, sql: String): String {
 }
 
 /// Run a SQL statement without expecting output (for INSERT, UPDATE, etc).
-fun _exec_sql(db_path: String, sql: String) {
+private fun _exec_sql(db_path: String, sql: String) {
     var escaped_sql = _escape_sq(sql)
     var escaped_path = _escape_sq(db_path)
     var cmd = "sqlite3 '${escaped_path}' '${escaped_sql}'"
@@ -89,7 +89,7 @@ fun _exec_sql(db_path: String, sql: String) {
 
 /// Parse TSV output from sqlite3 -header into a list of Row objects.
 /// First line is column names (tab-separated), subsequent lines are data.
-fun _parse_rows(output: String): List<Row> {
+private fun _parse_rows(output: String): List<Row> {
     var rows: List<Row> = []
     var trimmed = output.trim()
     if (trimmed.length() == 0) {
@@ -122,7 +122,7 @@ fun _parse_rows(output: String): List<Row> {
 
 /// Check that the sqlite3 binary is available on the system.
 /// Throws a clear error if not found.
-fun _ensure_sqlite3() {
+private fun _ensure_sqlite3() {
     var path = Process.which("sqlite3")
     if (path == "") {
         throw "sqlite: sqlite3 binary not found on PATH (install sqlite3 to use this module)"
@@ -439,7 +439,7 @@ fun rollback(db: Database, migrations_dir: String) {
 
 /// List migration .sql files in a directory, sorted alphabetically.
 /// Excludes files ending in _down.sql.
-fun _list_migration_files(dir: String): List<String> {
+private fun _list_migration_files(dir: String): List<String> {
     // Use ls + grep via shell to find .sql files (not _down.sql)
     var escaped_dir = _escape_sq(dir)
     var result = Process.run("ls '${escaped_dir}' 2>/dev/null | grep '\\.sql$' | grep -v '_down\\.sql$' | sort")
@@ -450,7 +450,7 @@ fun _list_migration_files(dir: String): List<String> {
 }
 
 /// Get list of already-applied migration names from the tracking table.
-fun _get_applied_migrations(db: Database): List<String> {
+private fun _get_applied_migrations(db: Database): List<String> {
     var rows = db.query_all("SELECT name FROM _sf_migrations ORDER BY id", [])
     var names: List<String> = []
     var i = 0
@@ -462,7 +462,7 @@ fun _get_applied_migrations(db: Database): List<String> {
 }
 
 /// Check if a migration filename has already been applied.
-fun _is_applied(filename: String, applied: List<String>): Bool {
+private fun _is_applied(filename: String, applied: List<String>): Bool {
     var i = 0
     while (i < applied.length()) {
         if (applied[i] == filename) {
@@ -474,7 +474,7 @@ fun _is_applied(filename: String, applied: List<String>): Bool {
 }
 
 /// Extract the "up" portion of a migration SQL (everything before `-- @down`).
-fun _extract_up_sql(sql: String): String {
+private fun _extract_up_sql(sql: String): String {
     var marker = "-- @down"
     var idx = sql.index_of(marker)
     if (idx < 0) {
@@ -485,7 +485,7 @@ fun _extract_up_sql(sql: String): String {
 
 /// Find the down SQL for a given migration.
 /// First checks for a separate _down.sql file, then for a -- @down section.
-fun _find_down_sql(dir: String, filename: String): String {
+private fun _find_down_sql(dir: String, filename: String): String {
     // Try separate down file: 001_create_users.sql -> 001_create_users_down.sql
     var base = filename.slice(0, filename.length() - 4)  // strip .sql
     var down_file = dir + "/" + base + "_down.sql"

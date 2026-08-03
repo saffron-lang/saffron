@@ -18,7 +18,7 @@
 // =============================================================================
 
 /// Check if a value is truthy (not "", not nil, not false, not 0).
-fun _is_truthy(value: Any): Bool {
+private fun _is_truthy(value: Any): Bool {
     if (value == nil) { return false }
     if (value == false) { return false }
     if (value == "") { return false }
@@ -27,7 +27,7 @@ fun _is_truthy(value: Any): Bool {
 }
 
 /// Convert any value to its string representation.
-fun _to_str(value: Any): String {
+private fun _to_str(value: Any): String {
     if (value == nil) { return "" }
     if (value is String) { return value }
     if (value is Int or value is Float) { return value.to_string() }
@@ -37,7 +37,7 @@ fun _to_str(value: Any): String {
 
 /// Find the index of a substring starting from a given position.
 /// Returns -1 if not found.
-fun _index_from(source: String, needle: String, start: Int): Int {
+private fun _index_from(source: String, needle: String, start: Int): Int {
     var remaining = source.slice(start, source.length())
     var idx = remaining.index_of(needle)
     if (idx == -1) { return -1 }
@@ -47,7 +47,7 @@ fun _index_from(source: String, needle: String, start: Int): Int {
 /// Find the matching closing tag for a block (handles nesting).
 /// Returns the index of the opening `{{` of the closing tag.
 /// tag_name is "if", "unless", or "each".
-fun _find_closing_tag(template: String, tag_name: String, start: Int): Int {
+private fun _find_closing_tag(template: String, tag_name: String, start: Int): Int {
     var open_tag = "{{#" + tag_name
     var close_tag = "{{/" + tag_name + "}}"
     var depth = 1
@@ -81,7 +81,7 @@ fun _find_closing_tag(template: String, tag_name: String, start: Int): Int {
 /// Find the {{else}} marker at the current nesting level within a block.
 /// Searches between start and end positions.
 /// Returns -1 if no else found at depth 0.
-fun _find_else(template: String, tag_name: String, start: Int, end: Int): Int {
+private fun _find_else(template: String, tag_name: String, start: Int, end: Int): Int {
     var open_tag = "{{#" + tag_name
     var close_tag = "{{/" + tag_name + "}}"
     var else_tag = "{{else}}"
@@ -126,7 +126,7 @@ fun _find_else(template: String, tag_name: String, start: Int, end: Int): Int {
 
 /// Core rendering engine. Processes template string with context and current_item
 /// (for {{this}} inside each blocks).
-fun _render_core(template: String, context: Map<String, Any>, current_item: Any): String {
+private fun _render_core(template: String, context: Map<String, Any>, current_item: Any): String {
     var result = StringBuilder()
     var pos = 0
 

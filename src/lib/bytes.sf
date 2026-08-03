@@ -27,7 +27,7 @@ var _chars_alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 var _printable_ascii = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
 /// Convert a single hex character to its 4-bit value (0-15).
-fun _hex_val(ch: String): Int {
+private fun _hex_val(ch: String): Int {
     var idx: Int = _hex_chars.index_of(ch)
     if (idx >= 0) { return idx }
     // Uppercase A-F: look up in _chars_alnum (positions 10-15 are A-F)
@@ -37,14 +37,14 @@ fun _hex_val(ch: String): Int {
 }
 
 /// Convert a byte value (0-255) to a 2-character lowercase hex string.
-fun _byte_to_hex(b: Int): String {
+private fun _byte_to_hex(b: Int): String {
     var hi: Int = (b >> 4) & 15
     var lo: Int = b & 15
     return _hex_chars.char_at(hi) + _hex_chars.char_at(lo)
 }
 
 /// Convert a byte value (0-255) to a 2-character uppercase hex string.
-fun _byte_to_hex_upper(b: Int): String {
+private fun _byte_to_hex_upper(b: Int): String {
     var hi: Int = (b >> 4) & 15
     var lo: Int = b & 15
     // Use _chars_alnum positions 0-15 which are "0123456789ABCDEF"
@@ -55,7 +55,7 @@ fun _byte_to_hex_upper(b: Int): String {
 
 /// Convert a byte value to its ASCII character (printable range only).
 /// Non-printable bytes (0-31, 127+) return "?".
-fun _byte_to_char(b: Int): String {
+private fun _byte_to_char(b: Int): String {
     if (b >= 32 and b <= 126) {
         return _printable_ascii.char_at(b - 32)
     }
@@ -64,7 +64,7 @@ fun _byte_to_char(b: Int): String {
 
 /// Convert a single character to its ASCII byte value.
 /// Returns 0 for characters not found.
-fun _char_to_byte(ch: String): Int {
+private fun _char_to_byte(ch: String): Int {
     var idx: Int = _printable_ascii.index_of(ch)
     if (idx >= 0) {
         return idx + 32

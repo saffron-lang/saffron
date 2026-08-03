@@ -16,7 +16,7 @@
 //! mangled to `@os___os_cwd` (BUGS #85). Adding a new one here means adding it
 //! there and to `runtime_declares()` in `utils_body.sf`.
 
-@extern("void exit(i32)") fun _exit(code: Int)
+@extern("void exit(i32)") private fun _exit(code: Int)
 
 // Re-tag a raw i64 coming back from the runtime. See the identical helper in
 // src/lib/io.sf for why this is needed (BUGS #23: runtime.sf is compiled with
@@ -24,7 +24,7 @@
 // reads as a subnormal double and compares unequal to any literal). Duplicated
 // rather than imported because io.sf and os.sf are both loadable as modules and
 // a cross-import would collide their module globals.
-fun _retag(n: Int): Int {
+private fun _retag(n: Int): Int {
     return n + 0
 }
 

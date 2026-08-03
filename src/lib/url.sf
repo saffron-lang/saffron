@@ -45,19 +45,19 @@ class URL {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-fun _is_digit(c: String): Bool {
+private fun _is_digit(c: String): Bool {
     return c == "0" or c == "1" or c == "2" or c == "3" or c == "4" or
            c == "5" or c == "6" or c == "7" or c == "8" or c == "9"
 }
 
-fun _is_hex(c: String): Bool {
+private fun _is_hex(c: String): Bool {
     var lower = c.to_lower()
     return _is_digit(c) or lower == "a" or lower == "b" or lower == "c" or
            lower == "d" or lower == "e" or lower == "f"
 }
 
 /// Convert a single hex digit character to its numeric value.
-fun _hex_value(c: String): Int {
+private fun _hex_value(c: String): Int {
     if (c == "0") { return 0 }
     if (c == "1") { return 1 }
     if (c == "2") { return 2 }
@@ -79,7 +79,7 @@ fun _hex_value(c: String): Int {
 }
 
 /// Convert a byte value (0-255) to a two-character uppercase hex string.
-fun _to_hex(n: Int): String {
+private fun _to_hex(n: Int): String {
     var digits = "0123456789ABCDEF"
     var hi = (n / 16).floor()
     var lo = n - hi * 16
@@ -89,13 +89,13 @@ fun _to_hex(n: Int): String {
 /// Return true if the character is unreserved per RFC 3986.
 var _unreserved_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
 
-fun _is_unreserved(c: String): Bool {
+private fun _is_unreserved(c: String): Bool {
     if (c.length() != 1) { return false }
     return _unreserved_chars.contains(c)
 }
 
 /// Return the default port for common schemes, or 0 if unknown.
-fun _default_port(scheme: String): Int {
+private fun _default_port(scheme: String): Int {
     var s = scheme.to_lower()
     if (s == "http") { return 80 }
     if (s == "https") { return 443 }
@@ -108,7 +108,7 @@ fun _default_port(scheme: String): Int {
 }
 
 /// Normalize path by resolving "." and ".." segments.
-fun _normalize_path(p: String): String {
+private fun _normalize_path(p: String): String {
     if (p.length() == 0) { return "" }
     var segments = p.split("/")
     var result = []
@@ -245,7 +245,7 @@ fun decode(s: String): String {
 }
 
 /// Convert an ASCII code point (0-127) to its character.
-fun _code_to_char(code: Int): String {
+private fun _code_to_char(code: Int): String {
     if (code == 9) { return "\t" }
     if (code == 10) { return "\n" }
     if (code == 13) { return "\r" }

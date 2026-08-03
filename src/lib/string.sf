@@ -14,12 +14,12 @@
 //! `replace`, `add` and `eq`. The class is named `CStr` so its parameter types name
 //! it unambiguously; see BUGS #89 for why renaming beats a shadowing rule.
 
-@extern("i64 strlen(void*)") fun _strlen(ptr: Int): Int
-@extern("i64 strcmp(void*, void*)") fun _strcmp(a: Int, b: Int): Int
-@extern("void* strstr(void*, void*)") fun _strstr(haystack: Int, needle: Int): Int
-@extern("void* malloc(i64)") fun _malloc(size: Int): Int
-@extern("void* memcpy(void*, void*, i64)") fun _memcpy(dst: Int, src: Int, n: Int): Int
-@extern("void free(void*)") fun _free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _strlen(ptr: Int): Int
+@extern("i64 strcmp(void*, void*)") private fun _strcmp(a: Int, b: Int): Int
+@extern("void* strstr(void*, void*)") private fun _strstr(haystack: Int, needle: Int): Int
+@extern("void* malloc(i64)") private fun _malloc(size: Int): Int
+@extern("void* memcpy(void*, void*, i64)") private fun _memcpy(dst: Int, src: Int, n: Int): Int
+@extern("void free(void*)") private fun _free(ptr: Int)
 
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
@@ -30,22 +30,22 @@
 // second time, and the caller then gets a bare integer that prints as an address.
 // Declared with the true return type, the pointer comes back through unchanged.
 // (This is the same hazard `src/lib/os.sf` documents at the top of the file.)
-@extern("i64 __str_split(i64, i64)") fun _split(str: Int, delim: Int): List<String>
-@extern("i64 __str_replace(i64, i64, i64)") fun _replace(str: Int, old: Int, new_: Int): String
-@extern("i64 rt_str_trim(i64)") fun _trim(str: Int): String
-@extern("i64 rt_str_to_upper(i64)") fun _to_upper(str: Int): String
-@extern("i64 rt_str_to_lower(i64)") fun _to_lower(str: Int): String
-@extern("i64 rt_str_repeat(i64, i64)") fun _repeat(str: Int, count: Int): String
+@extern("i64 __str_split(i64, i64)") private fun _split(str: Int, delim: Int): List<String>
+@extern("i64 __str_replace(i64, i64, i64)") private fun _replace(str: Int, old: Int, new_: Int): String
+@extern("i64 rt_str_trim(i64)") private fun _trim(str: Int): String
+@extern("i64 rt_str_to_upper(i64)") private fun _to_upper(str: Int): String
+@extern("i64 rt_str_to_lower(i64)") private fun _to_lower(str: Int): String
+@extern("i64 rt_str_repeat(i64, i64)") private fun _repeat(str: Int, count: Int): String
 // These two return a genuine integer / boolean, so `: Int` is correct for them.
-@extern("i64 rt_str_index_of(i64, i64)") fun _index_of(str: Int, sub: Int): Int
-@extern("i64 __str_ends_with(i64, i64)") fun _ends_with(str: Int, suffix: Int): Int
+@extern("i64 rt_str_index_of(i64, i64)") private fun _index_of(str: Int, sub: Int): Int
+@extern("i64 __str_ends_with(i64, i64)") private fun _ends_with(str: Int, suffix: Int): Int
 
 // A String-returning view of the raw pointer this class wraps: `rt_str_repeat(p, 1)`
 // copies the bytes once and changes nothing about them. `rt_str_trim` would have been
 // the shorter spelling and is wrong — it would silently strip surrounding whitespace
 // from a `to_string()`. The point of going through a declared `: String` extern is
 // that the already-tagged pointer is not re-tagged on the way back.
-@extern("i64 rt_str_repeat(i64, i64)") fun _copy_str(str: Int, count: Int): String
+@extern("i64 rt_str_repeat(i64, i64)") private fun _copy_str(str: Int, count: Int): String
 
 /// Wraps a raw pointer to null-terminated bytes.
 class CStr {

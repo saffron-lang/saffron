@@ -245,7 +245,7 @@ fun get_workspace(): Workspace {
 // ---------------------------------------------------------------------------
 
 /// Escape a string value for TOML output (handles backslash and quotes).
-fun _escape_toml_string(s: String): String {
+private fun _escape_toml_string(s: String): String {
     var result = StringBuilder()
     var i: Int = 0
     while (i < s.length()) {
@@ -294,7 +294,7 @@ fun write_toml_to(proj: Project, path: String) {
 }
 
 /// Generate the TOML string representation of a Project.
-fun _generate_toml(proj: Project): String {
+internal fun _generate_toml(proj: Project): String {
     var sb = StringBuilder()
 
     // [package] section
@@ -509,7 +509,7 @@ fun write_workspace_toml(ws: Workspace) {
 }
 
 /// Generate the TOML string for a Workspace.
-fun _generate_workspace_toml(ws: Workspace): String {
+internal fun _generate_workspace_toml(ws: Workspace): String {
     var sb = StringBuilder()
 
     sb.append("[workspace]\n")

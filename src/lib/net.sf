@@ -41,27 +41,27 @@ import "@scheduler" as Scheduler
 // =============================================================================
 
 // --- TCP socket ---
-@extern("void sf_socket_init()") fun _socket_init()
-@extern("i64 sf_tcp_connect(i8*, i64)") fun _tcp_connect_raw(host: Int, port: Int): Int
-@extern("i64 sf_tcp_read(i64, i8*, i64)") fun _tcp_read_raw(fd: Int, buf: Int, len: Int): Int
-@extern("i64 sf_tcp_write(i64, i8*, i64)") fun _tcp_write_raw(fd: Int, buf: Int, len: Int): Int
-@extern("void sf_tcp_close(i64)") fun _tcp_close_raw(fd: Int)
+@extern("void sf_socket_init()") private fun _socket_init()
+@extern("i64 sf_tcp_connect(i8*, i64)") private fun _tcp_connect_raw(host: Int, port: Int): Int
+@extern("i64 sf_tcp_read(i64, i8*, i64)") private fun _tcp_read_raw(fd: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tcp_write(i64, i8*, i64)") private fun _tcp_write_raw(fd: Int, buf: Int, len: Int): Int
+@extern("void sf_tcp_close(i64)") private fun _tcp_close_raw(fd: Int)
 
 // --- TLS ---
-@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Int, hostname: Int): Int
-@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
-@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
-@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Int)
+@extern("i64 sf_tls_connect(i64, i8*)") private fun _tls_connect_raw(fd: Int, hostname: Int): Int
+@extern("i64 sf_tls_read(i64, i8*, i64)") private fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") private fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
+@extern("void sf_tls_close(i64)") private fun _tls_close_raw(handle: Int)
 
 // --- Server ---
-@extern("i64 sf_tcp_bind(i8*, i64)") fun _tcp_bind_raw(host: Int, port: Int): Int
-@extern("i64 sf_tcp_listen(i64, i64)") fun _tcp_listen_raw(fd: Int, backlog: Int): Int
-@extern("i64 sf_tcp_accept(i64)") fun _tcp_accept_raw(fd: Int): Int
+@extern("i64 sf_tcp_bind(i8*, i64)") private fun _tcp_bind_raw(host: Int, port: Int): Int
+@extern("i64 sf_tcp_listen(i64, i64)") private fun _tcp_listen_raw(fd: Int, backlog: Int): Int
+@extern("i64 sf_tcp_accept(i64)") private fun _tcp_accept_raw(fd: Int): Int
 
 // --- Memory ---
-@extern("void* malloc(i64)") fun _net_malloc(size: Int): Int
-@extern("void free(void*)") fun _net_free(ptr: Int)
-@extern("i64 strlen(void*)") fun _net_strlen(s: Int): Int
+@extern("void* malloc(i64)") private fun _net_malloc(size: Int): Int
+@extern("void free(void*)") private fun _net_free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _net_strlen(s: Int): Int
 
 @intrinsic fun __suspend(reason: Int, arg: Int)
 
@@ -70,14 +70,14 @@ import "@scheduler" as Scheduler
 // =============================================================================
 
 // Connect to a TCP host:port. Returns fd or -1 on error.
-fun _raw_connect(host: String, port: Int): Int {
+private fun _raw_connect(host: String, port: Int): Int {
     _socket_init()
     return _tcp_connect_raw(host, port)
 }
 
 // Connect with TLS. Returns a packed handle (fd in low bits, tls handle in high bits).
 // Packed as: fd | (tls_handle << 32)
-fun _raw_connect_tls(host: String, port: Int): Int {
+private fun _raw_connect_tls(host: String, port: Int): Int {
     _socket_init()
     var fd: Int = _tcp_connect_raw(host, port)
     if (fd < 0) { return -1 }
@@ -92,7 +92,7 @@ fun _raw_connect_tls(host: String, port: Int): Int {
 
 // Async read: yields to scheduler when socket would block.
 // Returns the data as a string, or empty string on EOF/error.
-fun _raw_read(fd: Int, max_bytes: Int): String {
+private fun _raw_read(fd: Int, max_bytes: Int): String {
     var buf: Int = _net_malloc(max_bytes + 1)
     var total: Int = 0
     while (total < max_bytes) {
@@ -114,7 +114,7 @@ fun _raw_read(fd: Int, max_bytes: Int): String {
 
 // Async write: yields to scheduler when socket would block.
 // Returns number of bytes written.
-fun _raw_write(fd: Int, data: String): Int {
+private fun _raw_write(fd: Int, data: String): Int {
     var ptr: Int = data
     var len: Int = _net_strlen(ptr)
     var written: Int = 0
@@ -134,7 +134,7 @@ fun _raw_write(fd: Int, data: String): Int {
 }
 
 // Async TLS read
-fun _raw_tls_read(handle: Int, max_bytes: Int): String {
+private fun _raw_tls_read(handle: Int, max_bytes: Int): String {
     var fd: Int = handle & 0xFFFFFFFF
     var tls: Int = handle >> 32
     var buf: Int = _net_malloc(max_bytes + 1)
@@ -156,7 +156,7 @@ fun _raw_tls_read(handle: Int, max_bytes: Int): String {
 }
 
 // Async TLS write
-fun _raw_tls_write(handle: Int, data: String): Int {
+private fun _raw_tls_write(handle: Int, data: String): Int {
     var fd: Int = handle & 0xFFFFFFFF
     var tls: Int = handle >> 32
     var ptr: Int = data
@@ -176,7 +176,7 @@ fun _raw_tls_write(handle: Int, data: String): Int {
 }
 
 // Close a socket (plain or TLS)
-fun _raw_close(handle: Int) {
+private fun _raw_close(handle: Int) {
     var fd: Int = handle & 0xFFFFFFFF
     var tls: Int = handle >> 32
     if (tls > 0) {

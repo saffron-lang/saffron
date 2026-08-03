@@ -1,7 +1,7 @@
 //! Int — 64-bit signed integer type.
 //! Wraps a raw i64 value and provides numeric methods.
 
-@extern("i64 __int_to_string(i64)") fun _int_to_string(val: Int): Int
+@extern("i64 __int_to_string(i64)") private fun _int_to_string(val: Int): Int
 
 /// The Int class — wraps a raw 64-bit signed integer.
 class Int {

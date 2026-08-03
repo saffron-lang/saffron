@@ -34,7 +34,7 @@ class ParsedArgs {
     }
 }
 
-fun _is_long_flag(arg: String): Bool {
+private fun _is_long_flag(arg: String): Bool {
     if (arg.length() < 2) { return false }
     if (arg.char_at(0) == "-") {
         if (arg.char_at(1) == "-") { return true }
@@ -42,7 +42,7 @@ fun _is_long_flag(arg: String): Bool {
     return false
 }
 
-fun _is_short_flag(arg: String): Bool {
+private fun _is_short_flag(arg: String): Bool {
     if (arg.length() < 2) { return false }
     if (arg.char_at(0) == "-") {
         if (arg.char_at(1) == "-") { return false }
@@ -51,7 +51,7 @@ fun _is_short_flag(arg: String): Bool {
     return false
 }
 
-fun _process_arg(result: ParsedArgs, arg: String) {
+private fun _process_arg(result: ParsedArgs, arg: String) {
     if (_is_long_flag(arg)) {
         var rest = arg.slice(2, arg.length())
         var eq_pos = rest.index_of("=")

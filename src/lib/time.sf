@@ -1,11 +1,11 @@
 //! Time utilities using @extern for native compilation.
 
-@extern("double sf_time_now()") fun _time_now(): Float
+@extern("double sf_time_now()") private fun _time_now(): Float
 // The wall clock, distinct from sf_time_now's CLOCK_MONOTONIC. `timestamp()` used
 // to return the monotonic value, which is seconds since an arbitrary boot-relative
 // epoch — so it was a small number (uptime), not a Unix timestamp, and every date
 // derived from it was wrong. Anything that needs a calendar date must start here.
-@extern("i64 time(void*)") fun _time_epoch(ptr: Int): Int
+@extern("i64 time(void*)") private fun _time_epoch(ptr: Int): Int
 
 /// Return a high-resolution monotonic clock value in seconds.
 ///
@@ -49,7 +49,7 @@ fun measure(func: () => Any): Float {
 // datetime.sf uses (howardhinnant.github.io/date_algorithms.html).
 
 /// Split a Unix timestamp into [year, month, day, hour, minute, second] (UTC).
-fun _civil(ts: Int): List<Int> {
+private fun _civil(ts: Int): List<Int> {
     var second: Int = ts % 60
     var rem: Int = ts / 60
     var minute: Int = rem % 60
@@ -76,12 +76,12 @@ fun _civil(ts: Int): List<Int> {
 // A negative `ts` argument means "use the current time". A sentinel rather than
 // two functions because no real Unix timestamp of interest is negative, and it
 // lets `Time.year()` and `Time.year(ts)` both work.
-fun _resolve(ts: Float): Int {
+private fun _resolve(ts: Float): Int {
     if (ts < 0) { return _time_epoch(0) }
     return ts.floor()
 }
 
-fun _pad2(n: Int): String {
+private fun _pad2(n: Int): String {
     if (n < 10) { return "0${n}" }
     return "${n}"
 }

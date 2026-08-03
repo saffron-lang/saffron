@@ -25,13 +25,13 @@ import "@process" as Process
 
 /// Detect whether we are running on macOS (BSD tar) or Linux (GNU tar).
 /// Returns true if the platform is macOS/darwin.
-fun _is_macos(): Bool {
+private fun _is_macos(): Bool {
     return OS.platform() == "darwin"
 }
 
 /// Build the exclude flags for the tar command.
 /// Each pattern becomes a separate --exclude=<pattern> argument.
-fun _build_excludes(patterns: List<String>): String {
+private fun _build_excludes(patterns: List<String>): String {
     var result = ""
     var i = 0
     while (i < patterns.length()) {
@@ -43,7 +43,7 @@ fun _build_excludes(patterns: List<String>): String {
 
 /// Build the transform/substitute flag to add a directory prefix inside the archive.
 /// macOS (BSD tar) uses -s, while Linux (GNU tar) uses --transform.
-fun _build_prefix_flag(prefix: String): String {
+private fun _build_prefix_flag(prefix: String): String {
     if (prefix.length() == 0) {
         return ""
     }
@@ -56,7 +56,7 @@ fun _build_prefix_flag(prefix: String): String {
 }
 
 /// Join a list of file paths into a space-separated string for shell commands.
-fun _join_files(files: List<String>): String {
+private fun _join_files(files: List<String>): String {
     var result = ""
     var i = 0
     while (i < files.length()) {

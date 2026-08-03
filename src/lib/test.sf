@@ -1,6 +1,6 @@
 //! Test framework with assertions and reporting for native compilation.
 
-@extern("void exit(i32)") fun _exit(code: Int)
+@extern("void exit(i32)") private fun _exit(code: Int)
 
 var _passed = 0
 var _failed = 0
@@ -26,7 +26,7 @@ fun test(fn: Any): Any {
     return fn
 }
 
-fun _record_failure(msg: String) {
+private fun _record_failure(msg: String) {
     _failed = _failed + 1
     _test_errors.push("${_current_test}: ${msg}")
     IO.println("    FAIL: ${msg}")

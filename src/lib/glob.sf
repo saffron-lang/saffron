@@ -18,12 +18,12 @@ import "@path" as Path
 var _ascii = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
 /// Get the ordinal position of a single character for range comparison.
-fun _char_ord(c: String): Int {
+private fun _char_ord(c: String): Int {
     return _ascii.index_of(c)
 }
 
 /// Check if character ch falls within the range [lo, hi] inclusive.
-fun _char_in_range(ch: String, lo: String, hi: String): Bool {
+private fun _char_in_range(ch: String, lo: String, hi: String): Bool {
     var ch_ord = _char_ord(ch)
     var lo_ord = _char_ord(lo)
     var hi_ord = _char_ord(hi)
@@ -34,7 +34,7 @@ fun _char_in_range(ch: String, lo: String, hi: String): Bool {
 }
 
 /// Check if a character is a glob separator.
-fun _is_sep(c: String): Bool {
+private fun _is_sep(c: String): Bool {
     return c == "/"
 }
 
@@ -42,7 +42,7 @@ fun _is_sep(c: String): Bool {
 /// pi points to the character after '['.
 /// Returns [match_result, new_pattern_index].
 /// match_result: 1 = matched, 0 = not matched, -1 = malformed.
-fun _match_class(pattern: String, pi: Int, ch: String): List<Int> {
+private fun _match_class(pattern: String, pi: Int, ch: String): List<Int> {
     var negate = false
     var i = pi
     if (i < pattern.length() and (pattern.char_at(i) == "!" or pattern.char_at(i) == "^")) {
@@ -82,7 +82,7 @@ fun _match_class(pattern: String, pi: Int, ch: String): List<Int> {
 }
 
 /// Internal recursive match implementation.
-fun _matches_from(pattern: String, pi: Int, text: String, ti: Int): Bool {
+private fun _matches_from(pattern: String, pi: Int, text: String, ti: Int): Bool {
     while (pi < pattern.length()) {
         var pc = pattern.char_at(pi)
 
@@ -248,7 +248,7 @@ fun split_prefix(pattern: String): List<String> {
 /// Internal helper for .gitignore-style matching.
 /// If pattern has no slash, match against basename only.
 /// If pattern has a slash, match against the full path.
-fun _ignore_matches(pattern: String, path: String): Bool {
+private fun _ignore_matches(pattern: String, path: String): Bool {
     // Strip trailing slash (directory indicator)
     var pat = pattern
     if (pat.length() > 0 and pat.char_at(pat.length() - 1) == "/") {
