@@ -2,8 +2,8 @@
 
 ## Open
 
-**14 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
-#121, #122, #123. Next free number is **#124**.
+**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #123,
+#128, #129, #130, #131, #132. Next free number is **#133**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -23,7 +23,7 @@ each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
 
-### 110. wasm32 never auto-invokes `fun main()`, so a main-only program silently prints nothing
+### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
 
 **Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
 seven tests — which means it also hides whatever else is wrong on that target.
@@ -55,6 +55,35 @@ Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
 and none of them are value-layer bugs. Worth fixing before the remaining
 value-layer drift, since it currently makes wasm32 output unobservable for those
 seven programs.
+
+**Fixed (2026-08-02)** by widening the wasm `__saffron_boot` guard at
+`output_body.sf` to match the native wrapper's:
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, plus a
+second shim body for the main-only case. That body must call `__saffron_main`, not
+`__saffron_entry` — `__saffron_entry` is emitted only under `has_top_level`, so
+calling it here would reintroduce exactly the undefined-symbol-becomes-silent-import
+failure this fixes — and it runs the module inits itself, since with no top-level
+code there is no `__saffron_entry` for them to run inside. The async-main case
+enqueues the coroutine frame (matching the wasm top-level coroutine arm, not native:
+the host event loop cannot be blocked).
+
+The decisive check is running, not linking — the agent's whole framing is that the
+defect *was* that it linked clean. `tools/saffron build test/pass/main_entry_only.sf
+--target wasm32` then `node tools/oracle/wasm_run.mjs`: **before, empty; after,
+`main-only entry ran`**. Three regression tests added
+(`main_entry_only`, `main_entry_and_top_level`, `top_level_entry_only`), each with a
+`.expected`; the main-only file is kept free of any top-level call because a single
+one flips `has_top_level` and tests the branch that was never broken.
+
+Two consequences followed. The `main_entry_only()` capability gate in
+`tools/differential.sh` was dead — the 11 `fun main`-only programs it SKIPped are
+graded again. And the "seven wasm32 mismatches" that motivated this entry were
+partly stale: the 17 remaining differential mismatches are a *different* signature
+(no `fun main` at all). Two adjacent wasm64 defects surfaced while confirming the
+fix and are filed as their own entries: #124 (wasm64's `_start` calls
+`__saffron_entry` directly with no `__saffron_boot` indirection, so the same
+main-only program never runs there either) and #125 (`wasm_base.ll` has no single-arg
+`__io_println` NaN-box dispatcher, so all wasm64 output is dropped regardless).
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -561,22 +590,54 @@ reference; broken paths only negatively.
 ### 116. Enum payload variants compare by address, so two equal values are unequal
 
 ```saffron
-Color.Red == Color.Red              // true  — both are the immediate 0
-Shape.Circle(2) == Shape.Circle(2)  // false — two distinct __sf_malloc's
-Shape.Circle(2) == Shape.Circle(3)  // false — correct, but for the wrong reason
+enum Color { Red, Green }               // no payload variant anywhere
+enum Option { Some(value: Int), None }  // has one
+
+Color.Red == Color.Red              // true  — both are the immediate `tag << 56`
+Option.Some(42) == Option.Some(42)  // false — two distinct __sf_malloc's
+Option.Some(42) == Option.Some(43)  // false — correct, but for the wrong reason
+Option.None == Option.None          // false — and None carries no payload at all
 ```
 
-Verified at HEAD. Note the third line: it answers correctly *by accident*, so a
-test that only checks unequal values passes while equality is broken.
+Verified at HEAD. Two things about the shape of this before you write a repro:
 
-Same root as #115's enum half — a payload variant is a headerless `__sf_malloc`
-array. Giving it a GC header is a prerequisite for structural equality but not
-sufficient: `__any_eq` also needs an enum arm that compares payloads field by
-field.
+- **The third line answers correctly by accident.** A test that only checks
+  *unequal* values passes while equality is entirely broken.
+- **`x == x` on one variable answers true**, because both operands load the same
+  address. A repro must construct the value **twice**.
+
+**The axis is the enum *declaration*, not the variant.** `Option.None` compares
+by address even though it has no fields: once any variant of the enum carries a
+payload, `gen_enum_construct` heap-allocates *every* variant, so a fieldless one
+becomes a one-slot `[tag]` array (`expr_body.sf:3233`) instead of the immediate.
+So adding a field to one variant silently changes `==` for every *other* variant
+of the same enum. `Color.Red == Color.Red` is true only because `Color` declares
+no payload variant anywhere.
+
+**This is codegen-only; there is nothing to fix in the runtime.** Confirmed by
+reading the emitted IR: the sole `__any_eq` in it is the `declare` line — no call
+is ever made. Two operands of static type `EnumType` end at a bare
+`icmp eq i64` on two `ptrtoint`s (`expr_body.sf:958`). The prerequisite chain is
+therefore:
+
+1. `gen_enum_construct` (`expr_body.sf:3243`) must allocate via `__gc_alloc` with
+   a tag — today it uses headerless `__sf_malloc`, so `__rt_gc_tag_of`
+   (`runtime.sf:664`) cannot even identify the value as an enum.
+2. Codegen must route enum `==` to a helper instead of emitting `icmp`. Arity
+   lives only in codegen's `enum_variant_fields`, so the helper needs it passed
+   in or recorded in the header.
+
+Same root as #115's enum half (the missing GC header). A header alone is not
+sufficient — the comparison still has to become a call.
 
 Worth stating plainly because it is a language-semantics wart, not just a bug:
-`==` on an enum currently means **different things** depending on whether the
-variant carries fields — value equality for fieldless, identity for payload.
+`==` on an enum currently means **different things** depending on whether its
+declaration contains a payload variant — value equality if not, identity if so.
+
+Regression test: `test/pass/enum_payload_value_equality.sf`, red on purpose
+(9 failing assertions), listed in `run_tests.sh`'s `KNOWN_FAIL`. It asserts
+invariants rather than expected booleans, so it cannot be satisfied by making
+everything equal.
 
 ---
 
@@ -601,7 +662,7 @@ lists. It also means #115's "only nested elements are wrong" framing holds for
 
 ---
 
-### 121. A variable used only in callee position is falsely reported as an unused variable
+### 121. FIXED — a variable used only in callee position was falsely reported as an unused variable
 
 **Severity: low** — warning-only, no codegen consequence. Filed because it is a
 *false* diagnostic, and a warning that fires on correct code is how people learn to
@@ -618,10 +679,10 @@ fun run(): Int {
 [checker] Warning: unused variable 'fs'
 ```
 
-`infer_call` (`checker.sf:2161`) pattern-matches the callee only to extract a *name
-string* for the return-type lookup, and never calls `infer_expr` on it. Since
+`infer_call` (`checker.sf:2161`) pattern-matched the callee only to extract a *name
+string* for the return-type lookup, and never called `infer_expr` on it. Since
 `mark_used` is reachable only from the `Variable`/`Ref` arms of `infer_type`
-(`checker.sf:1701,1705`), a variable appearing **only** in callee position is never
+(`checker.sf:1701,1705`), a variable appearing **only** in callee position was never
 marked used.
 
 The axis is "appears only as a callee", **not** "has a function type" — which is
@@ -630,17 +691,35 @@ down: a `List<Fun>` variable, which is not a function type at all, warns when it
 only appearance is `fs[0](7)`; and the same variable used as a plain value
 (`var alias: Fun = h`) is correctly marked used.
 
-One wrinkle worth recording so a future reproduction attempt does not conclude the
-bug is absent: at **top level** the same `List<Fun>` spelling does *not* warn — only
-inside a function body. So a repro must put the variable in a `fun`.
+**Fixed (2026-08-02)** by `this.infer_expr(callee)` in `infer_call`. The narrower
+`mark_used(name)` route was rejected on measurement, not preference: (a) the shapes
+that actually trigger the bug — `IndexGet` (`fs[0](7)`), `Call` (`maker(3)(4)`),
+`MethodCall`, parenthesized — all take `infer_call`'s `_ => ""` arm, so there is no
+name to mark and the headline repro would have stayed broken; (b) for a
+`MemberAccess` callee the extracted name is the *field*, and `mark_used` searches
+scopes by string, so `(b.cb)(1)` would have marked an unrelated local `cb` used and
+swallowed a warning that must fire — now a must-still-warn assertion. The walk also
+closes a silent gap: a nested callee's own arguments (`f(a)(b)`) were not checked at
+all before, and now are, exactly once.
 
-Found while fixing #120, and deliberately not fixed alongside it: the correction
-(calling `infer_expr(callee)`, or `mark_used` on the extracted name) touches a
-use-marking path shared by every call site in the compiler, so it wants its own
-change with its own test rather than riding along on an unrelated codegen fix.
+Diagnostics-only, verified over 332 files: emitted `.ll` byte-identical for all 332;
+24 diagnostic files differ — 21 removals each traced to a callback whose only use is
+`func(item)`-shaped, 3 line-number shifts of a pre-existing parse error, zero new
+warnings. Failure set unchanged (24 names before and after). The tests shell out to
+`build/saffronc` because `run_tests.sh` strips `[checker] Warning` lines, so a pass
+test cannot observe a warning about itself; against the pre-fix compiler 5 of the 8
+must-not-warn assertions fail, so they detect the defect rather than merely passing
+alongside the fix.
+
+The "top level does not warn" wrinkle turned out to be orthogonal: every
+`check_unused_in_scope()` call sits inside a `push_scope`/`pop_scope` pair and
+`check_program` never runs one for scope 0, so top-level variables are never checked
+for unusedness at all. Two adjacent defects were left as their own entries: #126 (a
+lambda body is never walked, so a capture-only variable draws the same false warning
+by a different missing walk) and #127 (`checker.sf` does not parse standalone).
 
 ---
-### 122. Assigning to a nonexistent module member compiles clean and emits invalid IR
+### 122. FIXED — assigning to a nonexistent module member compiled clean and emitted invalid IR
 
 **Severity: high**, for the same reason #118 was: exit 0, no diagnostic, and the
 failure that eventually surfaces blames the compiler for the user's typo.
@@ -676,10 +755,53 @@ every distinct path that reaches the fallback needs its own report, and closing 
 does not close the others.
 
 The fix wants the same treatment as #118: at the point where the alias is known to
-be a module and the member lookup has missed, report rather than fall through. Worth
-checking at the same time whether a third path (compound assignment, `Math.NOPE +=
-1`, and indexed assignment `Math.NOPE[0] = 1`) reaches the fallback too, rather than
-fixing only the spelling in this repro.
+be a module and the member lookup has missed, report rather than fall through.
+
+**Fixed (2026-08-02)** by `report_missing_module_write` (`expr_body.sf:3315`),
+called above the shared `gen_set_field` while the alias is still known to be a
+module. `Math.NOPE = 3` went from exit 0 / no output / `%t1 = load i64, i64* %Math`
+(which `opt` rejects) to `[codegen] Error: no member 'NOPE' in module 'Math'`, exit
+1. `Math.pi = 3.0` and a class field write are unaffected, exit 0 before and after —
+verified on both the pre-fix and post-fix compilers.
+
+**Two write sites, one live — measured, as #118's read pair was.** Each got a
+distinct marker string; the compiler was rebootstrapped and 18 syntactic positions
+swept (top level, function body, if/else, while, for-in, C-style for, try, catch,
+match arm, class method, `init`, nested `fun`, actor method, bare block, two writes
+in a row). `gen_arg_value`'s `set_field` branch (`expr_body.sf:1698`) fired in all
+18; the `SetField` arm of `gen_expr` (`:399`) fired in none — `gen_expr`'s four
+callers are all inside `gen_arg_value`, which handles `set_field` first. Both
+hardened, the dead one annotated. The readable arm being the dead one is the same
+trap as #118.
+
+**A second hole, closed in the same guard.** A member that *exists* but is not a
+variable reached the identical fall-through: `Math.abs = 1`, `Iter.sum = 1`,
+`IO.println = 1`, `GC.collect = 1`, a module class `Inner.Widget = 1`, a module enum
+`Inner.Colour = 1` — each gave exit 0 and invalid IR. Reporting only *absence* would
+have left all six open, since the fallback does not care *why* the lookup produced
+nothing. They now get `cannot assign to '<x>' in module '<y>' — it is not a
+variable`, a distinct message because a typo and a category error send the user to
+different places.
+
+Tenth instance of the can't-express-unknown family (#22, #40, #78, #37, #103, #113,
+#114, #118), and the second within #118's own mechanism: a resolver with no way to
+say "not found" guesses instead of reporting absence. The guess lives in the
+*fallback*, so every distinct path that reaches it needs its own report — closing
+the read path (#118) did not close the write path.
+
+The compound-assignment and increment spellings this entry asked about are **not
+#122 sites**: `Math.NOPE += 1` and `Math.NOPE++` are rejected by the parser because
+the lexer has no compound-assignment or increment token at all, so they never reach
+the fallback. Filed separately as #128. `Math.NOPE[0] = 1` and `Math.NOPE.deeper =
+1` were already caught by #118's read guard, since both evaluate their base as a
+read.
+
+Tests: `test/fail/module_member_write_missing.sf`,
+`test/fail/module_member_write_not_variable.sf`,
+`test/pass/module_member_write_valid.sf` (9 assertions, including a read-back that
+proves the store landed rather than being reported and skipped). Both `fail/` files
+compiled cleanly on the pre-fix compiler and are rejected after, so they detect the
+defect. Failure set unchanged at 24 names.
 
 ---
 
@@ -727,6 +849,359 @@ Two separable questions here, and the second is the important one:
    scoping, not a rename.
 
 Found while measuring #118's blast radius across 336 files.
+
+---
+
+### 124. FIXED — wasm64's `_start` called `__saffron_entry` directly, so a main-only program never ran there either
+
+**Severity: high**, and the same shape as #110 by a different mechanism. #110 was
+the wasm32 half — its `_start` calls `@__saffron_boot()` and the shim was not
+emitted for a main-only file. wasm64 does not go through `__saffron_boot` at all:
+`wasm_base.ll:1028` declares and `:1039` calls `@__saffron_entry` directly, and
+`__saffron_entry` is emitted by codegen only under `has_top_level`. So a file whose
+entire contents are `fun main()` links against an undefined `__saffron_entry` on
+wasm64, which `--import-undefined` turns into a silent no-op host import — the module
+builds, runs, and does nothing.
+
+`grep -c __saffron_boot src/runtime/wasm_base.ll` is **0** (wasm32 has 3), which is
+the structural difference: the #110 fix widened the guard on the `__saffron_boot`
+shim, but wasm64 has no such indirection to widen. The fix is to route wasm64's
+`_start` through the same `__saffron_boot` shim the #110 fix now emits, or to emit a
+`__saffron_entry` for the main-only case on this target too.
+
+Found while confirming the #110 fix on wasm32; the sibling target was checked at the
+same time and had the same disease through a different pipe.
+
+**Fixed (2026-08-02)** by routing wasm64's `_start` through `@__saffron_boot()`, the
+same indirection wasm32 uses (`wasm_base_32.ll:2179`). **No codegen change was
+needed** — `output_body.sf:~1294`'s guard already covers `wasm64`, and its main-only
+branch already emits module inits then calls `__saffron_main`; the shim was being
+emitted all along and simply never called. Chosen over "emit `__saffron_entry` for the
+main-only case" for two reasons: a coroutine `__saffron_entry` returns `ptr`, not
+`i64`, whereas `__saffron_boot` is a stable `i64 ()` shim that already handles async
+main (enqueue without `scheduler_run`); and convergence removes the divergence that
+let this survive the #110 fix in the first place.
+
+Verified by **running** the module, not by linking it — the defect was that linking
+succeeded. `test/pass/main_entry_only.sf` built for wasm64 and run under
+`node tools/oracle/wasm_run.mjs` printed nothing before and prints
+`main-only entry ran` after.
+
+---
+
+### 125. FIXED — `wasm_base.ll` had no single-arg `__io_println` dispatcher, so all wasm64 output was silently dropped
+
+**Severity: high.** Independent of #124 — even a program that *does* reach its
+print calls emits nothing on wasm64.
+
+`grep -n 'define i64 @__io_println(i64' src/runtime/*.ll` finds it in
+`base.ll:99`, `base_nanbox.ll:106` and `wasm_base_32.ll:1740`, and **not** in
+`wasm_base.ll`. That single-argument entry is the NaN-box dispatcher every
+`IO.println(x)` call lowers to; with no definition on wasm64 the symbol is undefined
+and `--import-undefined` makes the call a no-op host import. So wasm64 output is
+dropped whether or not #124 lets `main` run at all.
+
+The fix is to port the `wasm_base_32.ll:1740` definition into `wasm_base.ll`,
+adjusting only the pointer width. Filed separately from #124 because they are
+distinct missing symbols with distinct fixes, and #124 alone would leave output
+still silently dropped.
+
+Found while confirming the #110 fix — the wasm64 build of the same regression test
+linked clean and printed nothing even after #124's mechanism was understood, which
+is what surfaced this second missing symbol.
+
+**Fixed (2026-08-02), but this entry's stated fix was WRONG and that is the lesson.**
+It said to port `wasm_base_32.ll:1740` "adjusting only the pointer width." There is
+no pointer width to adjust — `grep i32` over that block returns **nothing**. The two
+bases differ in **value discipline**, not pointer size: `src/runtime/values.spec:41-44`
+declares `wasm64 discipline=identity` and `wasm32 discipline=nanbox`.
+
+The verbatim nanbox port was built and measured rather than reasoned about: it links
+clean and prints `0` for every value. Mechanism — an identity i64 bitcast to double is
+a **denormal**, and `fptosi` truncates every denormal to 0. That is the `untag_int`
+trap in a new location. The identity shape from `base.ll` (the other identity-discipline
+base) was ported instead.
+
+**A "port the working definition from the sibling target" instruction is only safe when
+the two targets share a value discipline.** Check `values.spec` before believing one.
+
+Honest limitation, documented in `wasm_base.ll`: on wasm64 only `String` prints
+correctly. `scratch/w64/battery.sf` run on all three targets shows native and wasm32
+printing all six values while wasm64 prints the two strings and blanks the four
+non-strings — a real improvement over printing nothing at all, but not parity. The
+remaining half is #131.
+
+---
+
+### 126. FIXED — a lambda body was never walked, so a capture-only variable was falsely reported unused
+
+**Severity: low** — warning-only, the same false-diagnostic class as #121, at a
+different missing walk.
+
+```saffron
+fun f() {
+    var base: Int = 10
+    var g: Fun = fun (x: Int): Int => x + base   // warns for 'base'
+    return g(1)
+}
+```
+
+`infer_type`'s `Lambda(p, r, b)` arm returns a `FuncType` without ever visiting `b`,
+so a variable captured *only* inside a lambda body is never marked used. Reproduces
+identically before and after the #121 fix and independently of callee position —
+#121 walked the callee of a `Call`; this is a different node's un-walked subtree.
+
+The fix wants its own test: walking a lambda body means pushing the lambda's
+parameter scope first, or the parameters themselves read as unused. Noted in a
+comment in `test/pass/callee_position_is_a_use.sf`.
+
+Found while fixing #121.
+
+**Fixed (2026-08-02)** by `check_lambda_body` in `src/compiler/checker.sf`, called
+from `infer_type`'s `Lambda` arm. It pushes a scope, defines the lambda's parameters
+into it, walks the statements, pops.
+
+Two deliberate non-behaviours. It does **not** run `check_unused_in_scope()` on the
+lambda scope, so an unused lambda *parameter* stays unwarned: a callback that ignores
+an argument is ordinary, and the parser synthesises Lambdas the user never wrote
+(for-in desugaring, trailing closures) whose parameters would draw warnings naming
+code that is not in the source. And it clears `current_func_ret` for the walk, because
+`parse_lambda` defaults an unannotated lambda's return type to the *string* `"Int"` —
+leaving it set would turn `fun () => nil` into a hard error, and a walk that exists to
+record uses must not start enforcing a return type nobody wrote.
+
+Diagnostics-only, verified over 378 files: emitted `.ll` byte-identical for all 282
+that emit IR, zero exit-code changes. 13 files differ in diagnostics — 16 warnings
+removed, every one a capture-only variable (including the `n` this entry predicted in
+`test/pass/callee_position_is_a_use.sf`), and one added: `i: cannot infer type` for a
+`for-in` inside a lambda, which is pre-existing behaviour the walk merely reaches —
+both compilers emit it for the same `for-in` outside a lambda.
+
+`test/pass/unused_var_lambda_capture.sf` shells out to `build/saffronc` because
+`run_tests.sh` strips `[checker] Warning` lines. Against the pre-fix compiler **4 of
+its 10 assertions fail**, so it detects the defect rather than passing alongside the
+fix. Its must-still-warn half includes the case that separates a *wrong* body walk
+from an absent one: a lambda parameter shadowing an untouched local of the same name
+must still warn.
+
+Caveat worth keeping: the one added diagnostic shows the walk reaches code that was
+never type-checked at all before. In a 378-file corpus the single instance was benign,
+but user code with heavier lambda bodies may surface more previously-unreachable
+diagnostics. Those would be real findings, not regressions — but they will look like
+new noise.
+
+---
+
+### 127. FIXED (consequence only) — `src/compiler/checker.sf` did not parse as a standalone module
+
+**Severity: medium** — it makes the checker's public stdlib API (`@check`, `@lang`)
+uncompilable and untestable, and it is invisible to bootstrap.
+
+`checker.sf` fails to parse on its own with `expected a literal, name or '(' here`,
+pointing at the `and` in a match-arm block body shaped like:
+
+```saffron
+if (cond) { false } else { A and B }
+```
+
+Consequences: `src/lib/check.sf`, `src/lib/lang.sf`, and any direct
+`import "../compiler/checker.sf"` all fail to compile, so the checker cannot be
+exercised in-process by a test. Invisible to bootstrap because bootstrap compiles
+`checker.sf` only as an import of `_main.sf`, where the surrounding context makes it
+parse fine.
+
+Reduced attempts of the same one-liner in a standalone file did *not* reproduce, so
+the trigger is narrower than the shape above suggests and needs isolation before a
+fix. Blocks writing an in-process `@check` test for #121 (which currently has to
+shell out and string-match stderr instead).
+
+Found while trying to write a better test for #121.
+
+**The filed shape above was a red herring, and the reduction that "did not reproduce"
+was reducing along the wrong axis.** The trigger needs no `match`, no `if`, and no
+method call — it is a STATEMENT beginning with `this` followed by an infix operator:
+
+```saffron
+class C { var f: Float
+          fun s1(): Float { this.f + 1   return 0 } }   // same error
+```
+
+`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
+member/call chain and returns an `ExprStmt` **without handing the result back to the
+binary-operator layer**, so the operator is left trying to start a fresh statement. A
+block expression's value slot is a statement, which is how an ordinary-looking `and`
+landed in that position. Reproduces identically on gen2 and gen3 — not a regression.
+The cause is now **#129**.
+
+**Fixed (2026-08-02) at the consequence, not the cause.** `stmts_diverge`
+(`src/compiler/checker.sf:3557`) hoists its two recursive calls into locals, dodging the
+construct. `stmts_diverge` is a pure AST read, so losing `and`'s short-circuit is a cost
+difference only. **The parser defect is untouched and the trap stays set** for the next
+author who writes `this.foo() and this.bar()` in a value position.
+
+Two corrections to this entry as filed, both measured. `src/lib/check.sf` **compiled
+fine before the fix** (exit 0, byte-identical IR either side) — what was blocked was
+*importing* `@check` from a program, which now works;
+`test/pass/check_module_imports.sf` asserts through the in-process API, including the
+#126 case #121 wanted and could not write, and fails pre-fix at checker.sf's parse
+error. Separately, two **pre-existing** checker type errors are newly *visible* on the
+standalone path (`strip_nil_from_node`'s if-expression branches typing as
+`AST.Type vs NilType`); verified pre-existing by applying the hoist alone to main's
+`checker.sf`, which produces them with no #126 walk present. Not fixed — that is
+**#130**.
+
+---
+
+### 128. There is no compound-assignment or increment operator, and `test/pass/increment.sf` tests a feature that does not exist
+
+**Severity: low as a defect, medium as misinformation** — the language reads as if
+it has these, one test asserts it does, and the failure they produce is a bare parse
+error naming no missing feature.
+
+```
+x += 1      // [line 2, col 6] Error: expected a literal, name or '(' here
+b.v += 1    // same
+a++         // same
+```
+
+The lexer has no token for any of them. `TokenKind` (`src/compiler/lexer.sf:3`-77)
+lists `TkPlus`, `TkMinus`, `TkStar`, `TkSlash`, `TkPercent`, `TkEq`, `TkEqEq`,
+`TkBangEq`, `TkLtEq`, `TkGtEq` — and nothing for `+=`, `-=`, `*=`, `/=`, `%=`, `++`
+or `--`. So this is not a parser gap over a lexed token: the characters lex as two
+separate operators and the parser then wants an operand where `=` sits.
+
+`test/pass/increment.sf` asserts otherwise — its first line is `a = a++;` — and it
+is in the 24-name failure baseline as `compile-error`, red long enough to be treated
+as scenery. It is a test for a feature that was never implemented, not a stale
+spelling of one that was. Deleting it and adding the operators are both defensible;
+leaving it as an unexplained red is not.
+
+Found while checking whether the compound forms of #122 reached that bug's
+fall-through. They do not — they never get past the lexer — which is why the #122
+fix neither covered nor needed to cover them.
+
+---
+
+### 129. A statement beginning with `this` swallows a following infix operator
+
+**Severity: medium** — a parse error on valid-looking code, and the message points at
+the operator rather than the cause, so it reads as "the `and` is wrong" when the
+problem is that `this.f` already ended the statement.
+
+```saffron
+class C { var f: Float
+          fun init() { this.f = 1 }
+          fun s1(): Float { this.f + 1   return 0 } }
+// [line 4, col 32] Error: expected a literal, name or '(' here
+```
+
+`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
+member/call chain and returns an `ExprStmt` directly, never handing the result back to
+the binary-operator layer. Any infix operator that follows is left trying to start a
+fresh statement. A block expression's value slot is a statement, so the natural
+spelling `{ this.foo() and this.bar() }` hits it — that is what kept `checker.sf` from
+parsing standalone (#127), which was worked around in `checker.sf` rather than fixed
+here. Reproduces on gen2 and gen3 alike.
+
+Two things measured directly, which bound the bug and were not assumed:
+
+- **It is specific to `this`.** The identical shape through a local variable
+  (`var o = this   o.f + 1`) compiles clean, so the defect is in `parse_this_stmt`'s
+  terminal return and not in statement-versus-expression parsing generally.
+- **`super.` is NOT affected.** `super.g() and super.g()` in a value position compiles
+  clean. So the fix is one function, not a family of them — worth stating because the
+  obvious guess is that every keyword-initial statement shares the shape.
+
+The fix presumably wants `parse_this_stmt`'s result to re-enter the expression parser at
+the binary-operator precedence level rather than returning an `ExprStmt` terminally.
+Worth checking the sibling terminal returns in that function (the `IndexSet` and
+`SetField` early returns) the same way.
+
+Found while fixing #127, whose filed reduction had been searching along the wrong axis.
+
+---
+
+### 130. Two `strip_nil_from_node` branches type as `AST.Type` vs `NilType`
+
+**Severity: low** — pre-existing, and invisible unless `checker.sf` is compiled
+standalone, which only became possible with #127's fix.
+
+`strip_nil_from_node`'s if-expression branches type as `AST.Type` in one arm and
+`NilType` in the other, which the checker rejects on the standalone path. Confirmed
+**pre-existing rather than introduced** by applying #127's hoist alone to main's
+`checker.sf`, with no #126 lambda-body walk present: both errors appear. So they are
+neither #126's nor #127's doing — they were simply unreachable while #127 stopped the
+file from parsing at all.
+
+Filed rather than fixed because it was outside the owning agent's scope. Note the
+shape: an incomplete type on a branch is exactly what "complete types are a
+requirement" is meant to catch, so this is a soundness gap and not only a nuisance.
+
+---
+
+### 131. wasm64's identity discipline makes every non-String value unprintable
+
+**Severity: high**, and the remaining half of #125 — wasm64 output is no longer
+*entirely* dropped, but only strings survive.
+
+`src/runtime/values.spec:41-44` gives wasm64 `discipline=identity` (raw i64 bits) and
+wasm32 `discipline=nanbox`. Under identity there is no tag to discriminate on, so
+`__io_println_any` in `wasm_base.ll` can only treat its argument as a string pointer.
+
+Measured with `scratch/w64/battery.sf` across all three targets. native and wasm32 both
+print all six lines (`a string / 42 / true / false / 3 / hello world`); wasm64 prints
+the two strings and **four blank lines** for `42`, `true`, `false` and `l.length()`.
+
+Not a local patch. It needs either switching `wasm_base.ll` to the nanbox discipline
+wholesale — which also means adding the GC object headers nanbox tagging assumes — or
+giving identity-mode values a type-carrying header. Until then, **treat wasm64 as
+string-output-only.**
+
+Related and worth reading together: this is the same trap as #125's wrong premise. An
+identity i64 bitcast to double is a denormal, and `fptosi` truncates every denormal to
+0, so a nanbox helper dropped into an identity base fails silently rather than loudly.
+
+---
+
+### 132. wasm64's link line accepts every undefined symbol, and nothing in the tree tests wasm64 at all
+
+**Severity: high as a process defect** — this is the mechanism that made #110, #124,
+#125 and four further missing symbols silent instead of link errors. Filed as its own
+entry because fixing the individual symbols does not stop the next one.
+
+Two independent halves, both verified in the source:
+
+**The flag divergence.** `tools/saffron:357` links wasm64 with
+`-Wl,--allow-undefined`, while `tools/saffron:412` deliberately links wasm32 with
+`-Wl,--import-undefined`, carrying a comment that `--allow-undefined` "silently accepts
+EVERY missing symbol." `tools/build_wasm.sh:77` also passes `--allow-undefined`. So on
+wasm64 an undefined symbol becomes a no-op host import: the module builds, runs, and
+does nothing. Also noted while measuring: wasm32 passes `--identity-mode` for the
+runtime compile (`tools/saffron:384`) and wasm64 (`:352`) does not.
+
+Sweeping a linked wasm64 module's `*UND*` list — rather than reading `wasm_base.ll` —
+found **four more** undefined symbols beyond #124's and #125's: `__string_intern`
+(which alone made all string interpolation produce no output), `__print_debug_location`,
+`__val_tag_ptr_nullable`, and `__builtin_trap`, the last `declare`d at
+`wasm_base.ll:557` but never defined, so a trap was a silent return. All four are now
+defined. **The only reliable audit of a wasm64 base's completeness is dumping the
+linked module's undefined symbols, not reading the file.**
+
+**The coverage hole.** `tools/run_tests.sh` never builds for wasm64 — its single
+`wasm` mention is `NOT_A_TEST="goals hello_wasm gc_generational_test"` — and
+`tools/differential.sh` sets `ALL_CONFIGS="native-O0 wasm32"`. No harness in the tree
+builds or runs a wasm64 module, which is how six undefined symbols coexisted with a
+green suite.
+
+Compounding the two: **linking cannot serve as the check here.** A successful wasm64
+build is compatible with the module doing nothing at all, so any wasm64 test must
+execute the module and assert on stdout, treating empty output as failure.
+`scratch/w64/regress_wasm64.sh` is such a check (3 cases, empty stdout is FAIL),
+written to be adoptable by `run_tests.sh` unchanged.
+
+The flag was left as-is deliberately: it may be load-bearing for legitimate host
+imports (`js_log_str` is one), so tightening it is its own measured change rather than
+a one-line edit.
 
 ---
 

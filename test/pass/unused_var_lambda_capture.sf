@@ -1,0 +1,136 @@
+// BUGS #126 — "unused variable" must not fire for a variable whose only
+// appearance is inside a lambda BODY, and must still fire for one that is
+// genuinely never touched.
+//
+// infer_type's `Lambda(p, r, b)` arm returned a FuncType without ever visiting
+// `b`, so the whole body was invisible to the used-variable bookkeeping. Same
+// false-diagnostic class as #121, a different un-walked subtree: #121 was the
+// callee of a Call, this is a lambda's statements.
+//
+// Both halves are asserted, because the fix's whole risk is that it becomes a
+// blanket suppression. Walking the body means pushing the lambda's parameter
+// scope first, and a scope push is exactly the kind of change that can stop the
+// ENCLOSING scope from being checked, so the must-still-warn cases below are
+// what distinguish "the false positive is gone" from "the warning is gone".
+//
+// WHY THIS SHELLS OUT TO THE COMPILER — same reason as
+// test/pass/unused_var_callee_position.sf, which this file is modelled on:
+// tools/run_tests.sh's filter_noise() strips every `[checker] Warning` line out
+// of a test's captured output, so a warning printed while compiling THIS file is
+// invisible to the runner by construction. A "no warning" test written that way
+// would pass no matter what. The in-process route (`import "@check"`) still does
+// not compile — see BUGS #127, a parser defect in parse_this_stmt, not fixable
+// from checker.sf.
+
+import "@test" as Test
+import "@os" as OS
+
+// The compiler under test is the one that built this file. tools/saffron always
+// invokes build/saffronc from the repo root, and the tests run from the repo
+// root, so a relative path is what is actually being exercised.
+fun compiler_path(): String { return "build/saffronc" }
+
+// Compile `src` and return the compiler's combined stdout+stderr.
+//
+// The output path must NOT contain ".sf": saffronc selects its input by
+// contains(".sf") on the last matching argument, so `out.sf.ll` would silently
+// become the input, the real input would never be read, and every case here
+// would report "no warning" and pass vacuously (BUGS #119).
+fun diagnostics_for(src: String, tag: String): String {
+    var src_path: String = "/tmp/saffron_b126_" + tag + ".sf"
+    var out_path: String = "/tmp/saffron_b126_" + tag + "_out.ll"
+    IO.write_file(src_path, src)
+    return OS.exec(compiler_path() + " " + src_path + " " + out_path + " 2>&1")
+}
+
+fun warns_unused(src: String, var_name: String, tag: String): Bool {
+    var out: String = diagnostics_for(src, tag)
+    return out.contains("unused variable '" + var_name + "'")
+}
+
+// A guard on the harness itself. If the compiler path were wrong, or the input
+// were never read (BUGS #119), every warns_unused() below would answer false —
+// which would make the must-not-warn cases pass for the wrong reason.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var never_touched: Int = 5\n  return 1\n}\n",
+    "never_touched", "harness"), "HARNESS: a variable never mentioned still warns")
+
+// --- The false positive (must NOT warn) ---------------------------------------
+
+// The headline repro from BUGS #126: `base` appears exactly once, inside the
+// lambda's body.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var base: Int = 10\n  var g: Fun = fun (x: Int): Int => x + base\n  return g(1)\n}\n",
+    "base", "capture"), "a variable captured only in a lambda body is used")
+
+// The same capture through a BLOCK-bodied lambda rather than the `=>` short
+// form. The parser builds a different statement list for each (short form wraps
+// the expression in a synthetic Return), so one arm walking and the other not is
+// a real possibility.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var base: Int = 10\n  var g: Fun = fun (x: Int): Int { return x + base }\n  return g(1)\n}\n",
+    "base", "blockbody"), "a capture in a block-bodied lambda is used")
+
+// Nested lambdas: the capture is two levels down, so the walk has to recurse
+// rather than look one body deep.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var deep: Int = 3\n  var g: Fun = fun (): Fun => fun (): Int => deep\n  return 1\n}\n",
+    "deep", "nested"), "a capture in a nested lambda is used")
+
+// A capture in a lambda passed directly as a call argument, never bound to a
+// variable at all — the shape most callback code actually takes.
+Test.assert(!warns_unused(
+    "fun apply(f: Fun): Int { return f(1) }\nfun run(): Int {\n  var cap: Int = 4\n  return apply(fun (x: Int): Int => x + cap)\n}\n",
+    "cap", "arg"), "a capture in a lambda argument is used")
+
+// A lambda PARAMETER that the body never mentions must not warn either. This is
+// a deliberate non-warning, not an accident of the fix: a callback that ignores
+// an argument it is handed is ordinary, and the parser synthesises Lambdas the
+// user never wrote (for-in desugaring, trailing closures), whose parameters
+// would name code that does not exist in the source.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var g: Fun = fun (ignored: Int): Int => 7\n  return g(1)\n}\n",
+    "ignored", "unusedparam"), "an unused lambda parameter does not warn")
+
+// A lambda returning nil, with no return-type annotation. parse_lambda defaults
+// ret_type to the *string* "Int" when there is no annotation, so walking the
+// body with current_func_ret left at that default would make this a hard error
+// ("cannot return nullable Nil from function expecting Int"). Asserting on the
+// unused-variable text is not enough here — a compile error would also produce
+// "no warning" — so this case checks that the compiler stayed silent entirely.
+var nil_lambda_out: String = diagnostics_for(
+    "fun run(): Int {\n  var g: Fun = fun () => nil\n  g()\n  return 1\n}\n", "nilret")
+Test.assert(!nil_lambda_out.contains("Error"),
+    "walking a lambda body does not enforce the parser's default return type")
+
+// --- Genuine unused variables (must STILL warn) -------------------------------
+// What would break if the body walk suppressed the warning wholesale, or if the
+// scope it pushes were left unbalanced.
+
+// A genuinely-unused local sitting right beside a real capture, so "the lambda
+// marked something used" cannot be mistaken for "the enclosing scope stopped
+// being checked at all". This is the case that fails loudest if the pushed
+// lambda scope is not popped.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var base: Int = 10\n  var g: Fun = fun (x: Int): Int => x + base\n  var spare: Int = 2\n  return g(1)\n}\n",
+    "spare", "spare"), "an unused local beside a real capture still warns")
+
+// The shadowing trap. The lambda's parameter is named `outer`, so every mention
+// of `outer` inside the body resolves to the PARAMETER, and the enclosing
+// `outer` is still genuinely untouched. If the walk skipped pushing the
+// parameter scope, the body's uses would resolve outward and swallow this
+// warning — which is the specific way a body walk can be wrong rather than
+// merely absent.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var outer: Int = 5\n  var h: Fun = fun (outer: Int): Int => outer\n  return h(1)\n}\n",
+    "outer", "shadow"), "a local shadowed by a lambda parameter still warns")
+
+// A local that only ever appears in a lambda that is itself dead code is still
+// a use of that local — the checker has no reachability analysis and must not
+// grow one here by accident. What must still warn is the lambda binding, which
+// nothing calls.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var cap: Int = 1\n  var dead: Fun = fun (): Int => cap\n  return 0\n}\n",
+    "dead", "deadlambda"), "an uncalled lambda binding still warns")
+
+Test.summary()
