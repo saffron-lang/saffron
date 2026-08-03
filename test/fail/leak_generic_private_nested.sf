@@ -1,0 +1,23 @@
+// L5: type arguments are transitive, at ANY depth.
+//
+// `Map<String, List<Slot>>` leaks Slot exactly as plainly as `Slot` does — the
+// caller receives Slots either way. A check that only looked at the outermost name
+// would see "Map" and pass, which is the failure mode this test exists to prevent.
+//
+// The diagnostic carries the full spelling as a "(via ...)" path, and that is part
+// of the message rather than decoration: "exposes private type 'Slot'" on a return
+// type spelled `Map<String,List<Slot>>` does not tell the reader where to look.
+//
+// The decomposition reuses the existing splitting rather than adding a second `<>`
+// parser (design principle I10; BUGS #27 is what a second one costs).
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+}
+
+fun index(): Map<String, List<Slot>> {
+    var m: Map<String, List<Slot>> = {}
+    return m
+}
+
+IO.println(index().keys().length())

@@ -1,0 +1,17 @@
+// L7: a public class must not extend a private one.
+//
+// Inheritance is the widest leak of the set: every public member Base has becomes
+// reachable through Child, and `x is Base` answers true, so the private type is
+// observable as well as usable.
+private class Base {
+    var secret: Int
+    fun init() { this.secret = 1 }
+    fun reveal(): Int { return this.secret }
+}
+
+class Child extends Base {
+    fun doubled(): Int { return this.reveal() * 2 }
+}
+
+var c: Child = Child()
+IO.println(c.doubled())

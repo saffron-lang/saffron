@@ -1,0 +1,50 @@
+// An unresolvable receiver ALLOWS the access and warns (§3 of
+// docs/design/access-modifiers.md). Not silently allow, not deny.
+//
+// Neither silent answer is honest: silently allowing spells unknown as "public",
+// silently denying spells it as "private". Denying also has direct precedent for
+// how badly it goes — BUGS #56 records that erroring on this same MemberAccess
+// fallback "broke pass/math and test_reflect", trading one silent wrong answer
+// for a batch of false rejections. And the fallback is the normal working route
+// for module constants like `Math.PI`, so it cannot become an error.
+//
+// The warning is gated on the member name being private somewhere. `Any`-typed
+// receivers are pervasive and honest, so warning on every member access through
+// one would bury the signal and teach readers to skip the category entirely.
+//
+// What this test asserts is that the program COMPILES: `read_unknown` names
+// `count`, which is private on Slot, through a receiver whose class the checker
+// cannot determine. Under a deny-on-unknown policy this file would be rejected
+// and the suite would report a compile error. The value such a read produces is
+// not asserted — reading a field off an `Any` yields 0 today, which is a
+// pre-existing inference/codegen limitation and not this feature's business.
+//
+// The warning text itself is NOT machine-checked here, and that is a limitation
+// worth stating rather than papering over: a sibling `.expected` diffs the
+// program's RUNTIME output, and run_tests.sh's filter_noise strips every
+// `^[checker] Warning` line before comparing. So the suite can verify that this
+// file compiles and runs; it cannot currently assert that the warning was
+// printed. Verified by hand:
+//   $ build/saffronc --stdlib src/lib test/pass/visibility_unresolved_receiver.sf out.ll
+//   [checker] Warning: cannot determine the class of the receiver; visibility
+//   of 'count' not checked
+import "@test" as Test
+
+class Slot {
+    private var count: Int
+    fun init() { this.count = 7 }
+    fun get(): Int { return this.count }
+}
+
+// An Any-typed receiver: the checker cannot name a class, so it cannot decide.
+// This is the same shape as a block-syntax HTTP handler parameter (BUGS #86) and
+// as the result of a `Fun` call (BUGS #56).
+fun read_unknown(thing: Any): Any {
+    return thing.count
+}
+
+var s: Slot = Slot()
+Test.assert_eq(s.get(), 7, "the class's own accessor still works")
+var whatever: Any = read_unknown(s)
+Test.assert(true, "the unresolved-receiver read compiled rather than being rejected")
+Test.summary()
