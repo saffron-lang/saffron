@@ -351,6 +351,17 @@ Because gen2 must be able to *read* the widened payloads before compiler source 
 
 **Phase 5 — module-level enforcement (post-promotion, needs Phase 2).** Top-level `private`, all three access paths (named import, alias-qualified, bare cross-module). This is where Phase 2 pays off.
 
+**Phase 5's plumbing slice is done and landed (`c8153d8`), ahead of the enforcement itself.** Phase 2 declared `decl_module_package` and deliberately never wrote to it, with a comment forbidding the shortcut: package membership must come from `main.sf`'s `pantry.toml` reading, and re-deriving it from the module prefix string is the M1 antipattern. That seam is now closed. `main.sf` gains `package_roots_joined(module_file_paths)` — a newline-joined list of owning package **roots**, indexed by the same `i` as `prefixes_joined` and `module_boundaries` — and `check_errors_with_module_packages` decodes it and sets `current_package` in exactly the place that already sets `current_prefix`. `register_class_identity` records it under the same qualified key as `decl_module_file`, so the two answers about one declaration cannot drift.
+
+Four choices in it that a later reader should not undo:
+
+- **`module_file_paths` is a parallel list, pushed in lockstep at all three push sites, not derived afterwards from `loaded_file_paths()`.** That map is in *load* order and holds files that are not modules, so recovering the correspondence later would re-derive what the walk already knew.
+- **Newline, not `"|"`, as the separator.** These entries are filesystem paths and `"|"` is legal in one. It is safe for `prefixes_joined` only because prefixes are identifiers.
+- **The value is a package root, never the declared name** — same reason `same_package` compares roots: two distinct packages in this tree both declare `name = "saffron"`.
+- **The packageless marker has exactly one definition**, `Checker.no_package_marker()`, which `main.sf`'s `_no_package_marker()` delegates to. Two literals that must stay equal is a silent-drift hazard here: a mismatch compiles clean and simply makes every `internal` check answer "different package". Relatedly, a missing or short root list yields the marker, so the degraded path **denies** `internal` rather than granting it — which is what keeps `check_errors_with_imports` valid and conservative.
+
+This was the piece of Phase 5 that needs no new syntax, which is why it could run concurrently with Phase 4 rather than waiting behind it. What remains for Phase 5 proper is the enforcement: the three access paths, and the same-file/same-package tests that read these two maps.
+
 **Phase 6 — annotate the stdlib (post-promotion).** The 156 top-level underscore functions and the 66 class-private-safe underscore fields. Opt-in, incremental, one module per commit. This is the feature's real proving ground.
 
 **Phase 7 — annotate the compiler's own source. Deferred, not part of this work.** See §9.
