@@ -1,0 +1,16 @@
+// L1: a public field of a public class must not have a private type.
+//
+// `c.entry` is readable from anywhere Cache is, so a private Slot in that slot is
+// reachable from anywhere Cache is — the field is the leak, not the class.
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+}
+
+class Cache {
+    var entry: Slot
+    fun init() { this.entry = Slot(0) }
+}
+
+var c: Cache = Cache()
+IO.println(c.entry.value)

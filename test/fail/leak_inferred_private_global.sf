@@ -1,0 +1,19 @@
+// L9, the ERROR half: a public top-level `var` with no annotation whose
+// initializer is syntactically a constructor call of a private class.
+//
+// The verdict splits on whether there is an anchor to point at. Here there is one —
+// the call `Slot()` — so the diagnostic can name it and the answer is an error.
+// When the type is inferred through several steps the anchor is the compiler's
+// guess, and this codebase's history is unambiguous about erroring on guesses (BUGS
+// #56's over-erroring "traded one silent wrong answer for a batch of false
+// rejections"), so that case WARNS instead. test/pass/leak_inferred_warns.sf covers
+// the warning half.
+private class Slot {
+    var value: Int
+    fun init() { this.value = 0 }
+    fun get(): Int { return this.value }
+}
+
+var registry = Slot()
+
+IO.println(registry.get())
