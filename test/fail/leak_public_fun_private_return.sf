@@ -1,0 +1,18 @@
+// L3 of docs/design/access-modifiers.md §6b: a public function must not return a
+// private type.
+//
+// Without this the modifier is decorative in the direction that matters most —
+// another module cannot NAME Slot, but it can hold one, call every public method
+// on it, and pass it back in. The type is private and its whole surface is
+// reachable.
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+    fun get(): Int { return this.value }
+}
+
+fun lookup(): Slot {
+    return Slot(1)
+}
+
+IO.println(lookup().get())

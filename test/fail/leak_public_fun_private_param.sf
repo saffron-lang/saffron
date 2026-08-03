@@ -1,0 +1,14 @@
+// L2: a public function must not take a private type as a parameter.
+//
+// The diagnostic names the position and the parameter, not just the type — a
+// signature with several parameters gives the reader nothing to act on otherwise.
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+}
+
+fun store(label: String, s: Slot): Int {
+    return s.value
+}
+
+IO.println(store("a", Slot(1)))

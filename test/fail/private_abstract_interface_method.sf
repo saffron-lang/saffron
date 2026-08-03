@@ -1,0 +1,23 @@
+// `private` on a BODYLESS interface method is a contradiction, not a restriction.
+//
+// A bodyless method is a requirement on subclasses (that is the distinction
+// class_abstract_methods draws). An implementor must be able to name the method
+// in order to implement it, and check_conformance would then demand an
+// implementation the implementor is forbidden to write — so the declaration makes
+// the interface unimplementable by anyone.
+//
+// `private` on a DEFAULT interface method (one with a body) is allowed and is a
+// perfectly good private helper; test/pass/visibility_private_ok.sf covers that
+// form, so this test is specifically about the bodyless case.
+interface Drawable {
+    private fun draw(): String
+    fun description(): String { return "a drawable" }
+}
+
+class Circle extends Drawable {
+    fun init() {}
+    fun draw(): String { return "O" }
+}
+
+var c: Circle = Circle()
+IO.println(c.draw())

@@ -1,0 +1,20 @@
+// `internal` in a single-file program with no imports. This was
+// test/fail/visibility_internal_unimplemented until Phase 5 landed package scope:
+// while the semantics were unimplemented, refusing the word was the only honest
+// answer, and now that they are implemented the same source must compile and run.
+//
+// Kept as a pass test rather than deleted because the flat entry point is its own
+// path — there are no module boundaries, so the declaring and the using side are
+// both the entry module, and check_module_ref_visibility must take the same-prefix
+// early exit without ever consulting package identity. Were that exit missing, a
+// flat program's own `internal` name would be refused against itself.
+//
+// The cross-package refusal is test/fail/visibility_internal_cross_package.sf and
+// same-package acceptance is test/pass/visibility_module_ok.sf; this pins the
+// degenerate case between them.
+internal fun packaged_helper(): Int {
+    return 1
+}
+
+var result: Int = packaged_helper()
+IO.println(result)

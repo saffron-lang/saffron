@@ -1,0 +1,26 @@
+// L7 again, for a base that is NOT the first one.
+//
+// This is the case the design originally recorded as a coverage hole and BUGS #111
+// closed: the parser used to discard parents 2..n, so `extends Public, Private`
+// silently meant `extends Public` and the private base was invisible to any check.
+// The L7 loop therefore has to walk the whole `parents` list, and the diagnostic
+// has to name WHICH base leaks — with three bases and one message saying only "a
+// private base", the reader is no better off.
+//
+// Only parents[0] contributes fields, but every base contributes methods and
+// answers `is`, so a private type in a secondary position leaks its members just as
+// completely as in the first.
+interface Visible {
+    fun label(): String { return "v" }
+}
+
+private interface Hidden {
+    fun tag(): String { return "h" }
+}
+
+class Thing extends Visible, Hidden {
+    fun init() {}
+}
+
+var t: Thing = Thing()
+IO.println(t.label() + t.tag())

@@ -1,0 +1,12 @@
+// An `internal` declaration is package-scoped: legal from any module in the same
+// package, refused from another package. This file lives under the repo root's
+// pantry.toml; the support lib it imports lives under test/support/vispkg, which
+// has its OWN pantry.toml, so the two are different packages and the reference to
+// `vp_packaged` crosses a package boundary it may not.
+//
+// Package identity is the manifest DIRECTORY, not the declared name — the
+// authority is main.sf's pantry.toml reading, handed to the checker through the
+// decl_module_package / current_package seam.
+import "../support/vispkg/src/lib.sf" as Vp
+
+IO.println(Vp.vp_packaged())

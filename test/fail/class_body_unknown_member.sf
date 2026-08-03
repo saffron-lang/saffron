@@ -1,0 +1,21 @@
+// An unrecognised token in a class body must be a diagnostic, not a hang.
+//
+// The class-body loop in parse_class_decl_with_doc tests only `}` and `eof` in
+// its condition, and each of its member branches advances only when it matches.
+// Before the unconditional `else`, a token matching none of them left the parser
+// position unchanged and the compiler spun forever — rc=124 under `timeout`,
+// with no output to grep for.
+//
+// `let` is used deliberately: it is a real keyword, it is NOT valid as a class
+// member (fields are declared with `var`), and it is not part of the visibility
+// syntax. So this test keeps meaning exactly the same thing after
+// `private`/`public` are recognised in this loop.
+class Broken {
+    let x: Int = 1
+    fun init() {}
+}
+
+fun main(): Int {
+    var b: Broken = Broken()
+    return 0
+}

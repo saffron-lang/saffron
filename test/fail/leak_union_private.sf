@@ -1,0 +1,21 @@
+// L6: a union or nullable position leaks just as much as a bare one.
+//
+// `Slot|Nil` hands the caller a Slot on the non-nil branch, so the type is exposed.
+//
+// The check is PURELY LEXICAL — it decomposes on `|` as text and never emits a
+// runtime type test. Nothing here lowers to `is`, so BUGS #69 (`is` broken on
+// unions: both `v is Slot` and `v is Nil` evaluate false) is untouched by design.
+// This is worth stating out loud so nobody later "improves" the check into a
+// runtime one and inherits that bug.
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+}
+
+fun maybe_slot(flag: Bool): Slot|Nil {
+    if (flag) { return Slot(1) }
+    return nil
+}
+
+var s: Slot|Nil = maybe_slot(true)
+if (s != nil) { IO.println("got one") }

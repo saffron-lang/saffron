@@ -1,0 +1,72 @@
+// Every access that class-private DOES permit, so the enforcement in
+// test/fail/private_*.sf is shown to be a boundary rather than a blanket refusal.
+//
+// A check that rejects too much passes every fail test and is still wrong. These
+// are the forms that must keep working.
+import "@test" as Test
+
+class Vec {
+    private var x: Int
+    private var y: Int
+    fun init(x: Int, y: Int) {
+        this.x = x
+        this.y = y
+    }
+    // `this.private` — the ordinary case.
+    private fun _mag2(): Int { return this.x * this.x + this.y * this.y }
+    fun mag2(): Int { return this._mag2() }
+    // A SIBLING instance of the same class. Class-private is scoped to the class
+    // BODY, not to `this`, so `other.x` is legal here — and it has to be, or no
+    // class could implement its own equality or arithmetic against another
+    // instance without exposing its representation.
+    fun add(other: Vec): Vec { return Vec(this.x + other.x, this.y + other.y) }
+    fun eq(other: Vec): Bool { return this.x == other.x and this.y == other.y }
+    fun get_x(): Int { return this.x }
+}
+
+interface Shape {
+    // A private DEFAULT method — has a body, so it is a helper rather than a
+    // requirement on implementors, and is allowed. The bodyless form is a
+    // contradiction and is rejected; see
+    // test/fail/private_abstract_interface_method.sf.
+    private fun _unit(): String { return "px" }
+    fun unit_label(): String { return "1" + this._unit() }
+}
+
+class Square extends Shape {
+    private var side: Int
+    fun init(side: Int) { this.side = side }
+    fun area(): Int { return this.side * this.side }
+}
+
+// The factory pattern the design cites as the motivating win: a private-heavy
+// class with a same-module free function as the public constructor. Six stdlib
+// modules already have this shape (`fun new(): Stack` in stack.sf, queue.sf,
+// sorted_set.sf, heap.sf, deque.sf, sorted_map.sf).
+class Counter {
+    private var n: Int
+    fun init() { this.n = 0 }
+    fun tick(): Int { this.n = this.n + 1  return this.n }
+}
+
+fun new_counter(): Counter { return Counter() }
+
+var a: Vec = Vec(3, 4)
+Test.assert_eq(a.mag2(), 25, "public method calls a private one")
+Test.assert_eq(a.get_x(), 3, "public accessor reads a private field")
+
+var b: Vec = Vec(1, 1)
+var sum: Vec = a.add(b)
+Test.assert_eq(sum.get_x(), 4, "private field of a sibling instance is readable")
+Test.assert(a.eq(Vec(3, 4)), "sibling comparison over private fields")
+Test.assert(!a.eq(b), "sibling comparison distinguishes")
+
+var sq: Square = Square(3)
+Test.assert_eq(sq.area(), 9, "private field in a class with an interface base")
+Test.assert_eq(sq.unit_label(), "1px", "inherited default method calls its own private helper")
+
+var counter: Counter = new_counter()
+Test.assert_eq(counter.tick(), 1, "factory-constructed instance")
+Test.assert_eq(counter.tick(), 2, "private state mutates through a public method")
+
+Test.summary()

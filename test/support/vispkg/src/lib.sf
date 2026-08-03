@@ -1,0 +1,6 @@
+//! A DIFFERENT package from the repo root — it has its own pantry.toml, so its
+//! owning package is this directory, not the repo. A repo-root test importing
+//! from here is a genuine cross-package reference, which is what an `internal`
+//! declaration here must refuse.
+public fun vp_exported(): Int { return 1 }
+internal fun vp_packaged(): Int { return 2 }

@@ -1,0 +1,22 @@
+// A subclass may NOT read a base's private field. This is Kotlin's rule:
+// `private` does not extend to subclasses, `protected` is the modifier that does,
+// and `protected` is Phase 5b.
+//
+// This is the case that makes the check worth having rather than cosmetic. A
+// member is inherited by NAME, so `this.secret` inside Child reads a private
+// member of Base without ever naming Base — checking only the receiver's own
+// class would let any `class Child extends Base {}` launder every private field
+// Base declares, one line of code defeating the whole feature. So
+// private_declaring_class searches the inheritance DAG rather than one class.
+class Base {
+    private var secret: Int
+    fun init() { this.secret = 1 }
+}
+
+class Child extends Base {
+    fun init() { this.secret = 2 }
+    fun peek(): Int { return this.secret }
+}
+
+var c: Child = Child()
+IO.println(c.peek())
