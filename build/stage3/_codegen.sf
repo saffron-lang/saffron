@@ -2409,6 +2409,50 @@ class Codegen {
                 return local
             }
 
+            // Enum equality: structural, not by address (BUGS #116).
+            //
+            // This arm must sit above the integer fall-through, which is where two
+            // operands of the same EnumType used to land. A payload variant is a
+            // heap `[tag, f0, ...]` array (gen_enum_construct below), so `icmp eq`
+            // on the two value slots compared the two *malloc addresses*:
+            // `Option.Some(42) == Option.Some(42)` answered false, and so did
+            // `Option.None == Option.None`, because as soon as ANY variant of the
+            // enum carries a field EVERY variant is heap-allocated — a fieldless
+            // one becomes a one-slot `[tag]` array instead of the `tag << 56`
+            // immediate. `==` therefore meant value equality for an enum declared
+            // without payloads and identity for one declared with them: one
+            // spelling, two semantics, chosen by a detail of the declaration that
+            // the comparison site cannot see.
+            //
+            // The comparison is routed to a per-enum `__enum_eq_<Name>` function
+            // rather than to a generic runtime helper because variant arity and
+            // field types live only in codegen's `enum_variant_fields`, and the
+            // heap array carries no GC header or type tag that a runtime helper
+            // could read (which is why `__rt_gc_tag_of` cannot identify one, and
+            // why #115's enum half wants the header). Everything needed to compare
+            // two of these values is known statically, right here.
+            //
+            // Only fires when both operands are the SAME declared enum and that
+            // enum is heap-encoded. A fieldless enum keeps the `icmp eq` below,
+            // which is already correct for immediates, and a mismatched pair falls
+            // through unchanged.
+            var __ee_lbase: String = this.generic_base_name(left_type)
+            var __ee_rbase: String = this.generic_base_name(right_type)
+            if (__ee_lbase == __ee_rbase and this.enum_defs.has(__ee_lbase) and this.get_max_fields(__ee_lbase) > 0) {
+                var ee_sym: String = this.ensure_enum_eq(__ee_lbase)
+                var ee_raw: String = this.fresh_local()
+                this.emit_indent(ee_raw + " = call i64 @" + ee_sym + "(i64 " + lhs + ", i64 " + rhs + ")")
+                // `!=` is the negation of the same call, so the two operators
+                // cannot drift apart.
+                var ee_cmp: String = this.fresh_local()
+                if (op == "==") { this.emit_indent(ee_cmp + " = icmp ne i64 " + ee_raw + ", 0") }
+                else { this.emit_indent(ee_cmp + " = icmp eq i64 " + ee_raw + ", 0") }
+                var ee_bool: String = this.fresh_local()
+                this.emit_indent(ee_bool + " = zext i1 " + ee_cmp + " to i64")
+                this.last_type = AST.Type.BoolType
+                return this.emit_tag_bool(ee_bool)
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
@@ -4744,6 +4788,278 @@ class Codegen {
         // Cast pointer to i64 for storage
         var as_int: String = this.typed_ptr_to_val(arr_ptr, "[" + num_slots.to_string() + " x i64]*")
         this.last_type = AST.Type.EnumType(enum_name); return as_int
+    }
+
+    /// Emit (once per module) `__enum_eq_<Name>`, the structural equality of a
+    /// heap-encoded enum, and return its symbol. See the #116 arm in gen_binary
+    /// for why the comparison is a *generated* function rather than a runtime
+    /// helper: variant arity and field types live only in `enum_variant_fields`,
+    /// and the `[tag, f0, ...]` array carries nothing a runtime helper could read
+    /// to recover them.
+    ///
+    /// Shape of the emitted body: bitwise-identical fast path, a guard that both
+    /// operands really are bare heap pointers, null checks, tag equality, then a
+    /// switch to a per-variant arm that compares that variant's fields in order.
+    /// A fieldless variant's arm is just "the tags matched", which is what makes
+    /// `Option.None == Option.None` true.
+    fun ensure_enum_eq(enum_name: String): String {
+        var sym: String = "__enum_eq_" + this.sanitize_name(enum_name)
+        if (this.str_in_list(this.defined_funcs, sym)) { return sym }
+        // Registered BEFORE the body is built. A recursive enum — `enum Tree {
+        // Leaf, Node(l: Tree, r: Tree) }` — reaches ensure_enum_eq for its own
+        // name while emitting its payload compare, and this is what makes that
+        // emit a self-call instead of expanding forever.
+        this.defined_funcs.push(sym)
+
+        var variants: List<String> = this.enum_defs.get(enum_name)
+
+        // Emit into a scratch buffer and park the result in `globals`, the same
+        // save/restore as a nested lambda (closures_body.sf). Doing it this way
+        // rather than by string concatenation is what keeps the pointer and
+        // untag helpers — and so wasm32's i32 pointers — working here for free.
+        // The save/restore nests correctly, which matters because the recursive
+        // case above re-enters this function mid-body.
+        var saved_sb: StringBuilder = this.sb
+        var saved_term: Bool = this.block_terminated
+        var saved_counter: Float = this.local_counter
+        var saved_in_fn: Bool = this.in_function
+        this.sb = StringBuilder()
+        this.local_counter = 0
+        this.block_terminated = false
+        this.in_function = true
+
+        var linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            linkage = "define"
+        }
+
+        var l_eq: String = this.fresh_label("eeq.yes")
+        var l_ne: String = this.fresh_label("eeq.no")
+        var l_shape: String = this.fresh_label("eeq.shape")
+        var l_null: String = this.fresh_label("eeq.null")
+        var l_tags: String = this.fresh_label("eeq.tags")
+        var l_disp: String = this.fresh_label("eeq.disp")
+
+        this.emit("")
+        this.emit(linkage + " i64 @" + sym + "(i64 %a, i64 %b) {")
+        this.emit("entry:")
+        var same: String = this.fresh_local()
+        this.emit_indent(same + " = icmp eq i64 %a, %b")
+        this.emit_terminator("br i1 " + same + ", label %" + l_eq + ", label %" + l_shape)
+
+        // A well-formed value of a heap-encoded enum is a BARE pointer — the
+        // construction path ends at a plain ptrtoint, with no NaN-box tag — so
+        // its top 16 bits are zero. Anything else (a nil, an int, a value of
+        // another type reaching here through an `Any`) is not a comparable
+        // payload, and the loads below would dereference its tag bits. Such an
+        // operand answers with the bitwise comparison instead, which is what the
+        // fast path above already decided: unequal.
+        this.start_block(l_shape)
+        var ahi: String = this.fresh_local()
+        this.emit_indent(ahi + " = lshr i64 %a, 48")
+        var bhi: String = this.fresh_local()
+        this.emit_indent(bhi + " = lshr i64 %b, 48")
+        var ahi_nz: String = this.fresh_local()
+        this.emit_indent(ahi_nz + " = icmp ne i64 " + ahi + ", 0")
+        var bhi_nz: String = this.fresh_local()
+        this.emit_indent(bhi_nz + " = icmp ne i64 " + bhi + ", 0")
+        var not_ptr: String = this.fresh_local()
+        this.emit_indent(not_ptr + " = or i1 " + ahi_nz + ", " + bhi_nz)
+        this.emit_terminator("br i1 " + not_ptr + ", label %" + l_ne + ", label %" + l_null)
+
+        this.start_block(l_null)
+        var a_z: String = this.fresh_local()
+        this.emit_indent(a_z + " = icmp eq i64 %a, 0")
+        var b_z: String = this.fresh_local()
+        this.emit_indent(b_z + " = icmp eq i64 %b, 0")
+        var either_z: String = this.fresh_local()
+        this.emit_indent(either_z + " = or i1 " + a_z + ", " + b_z)
+        this.emit_terminator("br i1 " + either_z + ", label %" + l_ne + ", label %" + l_tags)
+
+        this.start_block(l_tags)
+        var pa: String = this.val_to_typed_ptr("%a", "i64*")
+        var pb: String = this.val_to_typed_ptr("%b", "i64*")
+        var ta: String = this.fresh_local()
+        this.emit_indent(ta + " = load i64, i64* " + pa)
+        var tb: String = this.fresh_local()
+        this.emit_indent(tb + " = load i64, i64* " + pb)
+        var tag_eq: String = this.fresh_local()
+        this.emit_indent(tag_eq + " = icmp eq i64 " + ta + ", " + tb)
+        this.emit_terminator("br i1 " + tag_eq + ", label %" + l_disp + ", label %" + l_ne)
+
+        // Tag first, then payload. Without the tag test a future payload
+        // comparison could let `None == Some(0)` answer true, since a fieldless
+        // variant has no field to disagree about.
+        var arm_labels: List<String> = []
+        var ai: Float = 0
+        while (ai < variants.length()) {
+            arm_labels.push(this.fresh_label("eeq.v"))
+            ai = ai + 1
+        }
+        var cases: String = ""
+        ai = 0
+        while (ai < variants.length()) {
+            cases = cases + " i64 " + ai.floor().to_string() + ", label %" + arm_labels[ai]
+            ai = ai + 1
+        }
+        this.start_block(l_disp)
+        // Default arm: the tags agree but name no declared variant, so the value
+        // is not one this enum can produce and its shape is unknown. Unequal is
+        // the only answer that cannot read past the allocation.
+        this.emit_terminator("switch i64 " + ta + ", label %" + l_ne + " [" + cases + " ]")
+
+        ai = 0
+        while (ai < variants.length()) {
+            var vname: String = variants[ai]
+            var vkey: String = enum_name + "." + vname
+            var vfields: String = ""
+            if (this.enum_variant_fields.has(vkey)) { vfields = this.enum_variant_fields.get(vkey) }
+            this.start_block(arm_labels[ai])
+            if (vfields.length() == 0) {
+                // Fieldless variant of a heap-encoded enum: a one-slot [tag]
+                // array. The tags already matched and there is nothing else
+                // allocated to read, so these two values ARE equal — the case
+                // that made `Option.None == Option.None` false.
+                this.emit_terminator("br label %" + l_eq)
+            } else {
+                var fparts: List<String> = this.split_respecting_generics(vfields, ",")
+                var fi: Float = 0
+                while (fi < fparts.length()) {
+                    var slot_idx: Float = fi + 1
+                    var a_slot: String = this.fresh_local()
+                    this.emit_indent(a_slot + " = getelementptr i64, i64* " + pa + ", i64 " + slot_idx.floor().to_string())
+                    var a_val: String = this.fresh_local()
+                    this.emit_indent(a_val + " = load i64, i64* " + a_slot)
+                    var b_slot: String = this.fresh_local()
+                    this.emit_indent(b_slot + " = getelementptr i64, i64* " + pb + ", i64 " + slot_idx.floor().to_string())
+                    var b_val: String = this.fresh_local()
+                    this.emit_indent(b_val + " = load i64, i64* " + b_slot)
+                    var f_type: String = this.declared_field_type(fparts[fi])
+                    var f_eq: String = this.emit_enum_field_eq(f_type, a_val, b_val)
+                    // Fields are compared in order and short-circuit to "not
+                    // equal", so a difference in the FIRST field and a difference
+                    // in the LAST are both detected.
+                    var l_next: String = this.fresh_label("eeq.f")
+                    this.emit_terminator("br i1 " + f_eq + ", label %" + l_next + ", label %" + l_ne)
+                    this.start_block(l_next)
+                    fi = fi + 1
+                }
+                this.emit_terminator("br label %" + l_eq)
+            }
+            ai = ai + 1
+        }
+
+        this.start_block(l_eq)
+        this.emit_terminator("ret i64 1")
+        this.start_block(l_ne)
+        this.emit_terminator("ret i64 0")
+        this.emit("}")
+        this.block_terminated = false
+
+        var ir: String = this.sb.to_string()
+        this.sb = saved_sb
+        this.block_terminated = saved_term
+        this.local_counter = saved_counter
+        this.in_function = saved_in_fn
+        this.globals.push(ir)
+        return sym
+    }
+
+    /// The declared type of one entry of an `enum_variant_fields` string
+    /// ("value:Int" → "Int"). Unlike `get_variant_field_type` this does NOT
+    /// collapse the answer onto the handful of names codegen lowers with —
+    /// equality needs to tell a nested enum and a class apart, and that
+    /// distinction is exactly what the collapse discards. An entry without a
+    /// type is "Any", the honest answer for "the source did not say".
+    fun declared_field_type(field_def: String): String {
+        if (!field_def.contains(":")) { return "Any" }
+        var parts: List<String> = field_def.split(":")
+        if (parts.length() < 2) { return "Any" }
+        return parts[1]
+    }
+
+    /// Emit the comparison of one enum payload slot and return the `i1` register
+    /// holding "equal". The comparison is chosen by the field's DECLARED type,
+    /// which is the whole reason this lives in codegen: the slot itself is an
+    /// opaque i64 and nothing in it says which of these comparisons is right.
+    fun emit_enum_field_eq(decl_type: String, av: String, bv: String): String {
+        var base: String = this.generic_base_name(decl_type)
+
+        // Identity mode has no tags, so no representation to interpret: every
+        // field is its bits. It also links against base.ll, which has no
+        // __any_eq at all, so the runtime fallback below is not available here.
+        if (this.identity_mode and base != "String") {
+            var idc: String = this.fresh_local()
+            this.emit_indent(idc + " = icmp eq i64 " + av + ", " + bv)
+            return idc
+        }
+
+        if (base == "String") {
+            // Two equal strings need not share a pointer, which is the same
+            // reason gen_binary routes String == to this helper.
+            var sr: String = this.fresh_local()
+            this.emit_indent(sr + " = call i64 @__string_eq(i64 " + av + ", i64 " + bv + ")")
+            var sc: String = this.fresh_local()
+            this.emit_indent(sc + " = icmp ne i64 " + sr + ", 0")
+            return sc
+        }
+
+        if (base == "Float" or base == "Number") {
+            // gen_enum_construct normalises a Float/Number payload to a double
+            // on construction, so both slots hold the same representation here.
+            // Comparing at double level is still the right lowering rather than
+            // a bit compare: it is what makes -0.0 equal 0.0, and it matches the
+            // Float arm of gen_binary.
+            var ad: String = this.emit_untag_float(av)
+            var bd: String = this.emit_untag_float(bv)
+            var fc: String = this.fresh_local()
+            this.emit_indent(fc + " = fcmp oeq double " + ad + ", " + bd)
+            return fc
+        }
+
+        // A nested value of a heap-encoded enum recurses structurally, so
+        // equality is deep for the whole enum tree and not just its top level.
+        if (this.enum_defs.has(base) and this.get_max_fields(base) > 0) {
+            var sub: String = this.ensure_enum_eq(base)
+            var sr2: String = this.fresh_local()
+            this.emit_indent(sr2 + " = call i64 @" + sub + "(i64 " + av + ", i64 " + bv + ")")
+            var sc2: String = this.fresh_local()
+            this.emit_indent(sc2 + " = icmp ne i64 " + sr2 + ", 0")
+            return sc2
+        }
+
+        // Bit equality covers the cases whose representation the declared type
+        // already pins down to a unique pattern per value (a tagged Int, a
+        // tagged Bool, a fieldless enum's `tag << 56` immediate), and it is also
+        // the deliberate answer for a reference type: two class instances, Lists
+        // or Maps compare by identity here for exactly the reason they do
+        // everywhere else in the language — value equality for a mutable
+        // reference is a separate design question, not something enum equality
+        // should decide on its own.
+        if (base == "Int" or base == "Bool" or base == "Nil") { return this.emit_bit_eq(av, bv) }
+        if (this.enum_defs.has(base)) { return this.emit_bit_eq(av, bv) }
+        if (this.class_fields.has(base)) { return this.emit_bit_eq(av, bv) }
+        if (base == "List" or base == "Map" or base == "Set" or base == "StringBuilder") {
+            return this.emit_bit_eq(av, bv)
+        }
+
+        // Anything left is a type this site cannot resolve: an `Any` field, or a
+        // generic parameter (`enum Result<T, E> { Ok(value: T) }` — T names
+        // nothing at the IR level). A static choice would be a guess, so defer
+        // to the one comparison that reads the operands' actual tags. That is
+        // the same delegation gen_binary makes for an `Any` operand, and the
+        // same one #104 made for ordering.
+        var ar: String = this.fresh_local()
+        this.emit_indent(ar + " = call i64 @__any_eq(i64 " + av + ", i64 " + bv + ")")
+        var ac: String = this.fresh_local()
+        this.emit_indent(ac + " = icmp ne i64 " + ar + ", 0")
+        return ac
+    }
+
+    fun emit_bit_eq(av: String, bv: String): String {
+        var c: String = this.fresh_local()
+        this.emit_indent(c + " = icmp eq i64 " + av + ", " + bv)
+        return c
     }
 
     /// The write half of the #118 member-read guard: is `object.field = ...` an
