@@ -1,0 +1,11 @@
+// Writing the modifier on BOTH sides of the decorator is refused.
+//
+// Both orders are accepted individually, which raises the question of what two
+// disagreeing modifiers on one declaration would mean. Nothing coherent — so it
+// is an error, and the diagnostic names both words rather than silently
+// preferring one. Preferring one would make `private @extern(...) public fun f()`
+// compile as whichever the parser happened to read last, and that is precisely
+// the modifier-silently-ignored failure this whole feature was built to remove.
+private @extern("i64 llabs(i64)") internal fun _twice(v: Int): Int
+
+IO.println(_twice(-1))

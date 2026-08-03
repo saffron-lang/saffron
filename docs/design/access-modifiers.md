@@ -97,6 +97,8 @@ The good news, which shapes §8: for top-level `_` *functions*, I found **zero**
 
 So: all 156 top-level underscore functions are safe to annotate `private` later; 66 of 90 underscore fields are safe as `private`.
 
+> **Corrected by Phase 6a's re-measurement — read that entry before trusting the paragraph above.** Two errors, both in the sweep rather than the reasoning. The count is **292**, not 156: 142 of the declarations are `@extern` and the pattern used here could not match a decorated line. And there are **nine** genuine cross-module callers, not zero, all reaching a qualified `Module._name` from `test/` — so "zero genuine cross-module callers" is false as written. The conclusion survives in a better form than it was stated: because `test/` is in the root package, those nine take `internal` and the remaining 283 take `private`, so *nothing* needs a permanent exemption. The methodological point is the one worth keeping: three distinct things look identical to a name-based grep — a comment mention, a duplicated local declaration, and a `this._x` method call — and only the qualified `Alias._name` spelling is evidence of a cross-module reach.
+
 **Kotlin parity changes the answer for the remaining 24.** The earlier draft left them permanently public for want of a middle scope. There is now one: the 24 fields read by same-file free functions become **`internal`** (package-scoped), or `public` where they are genuinely part of the API. That is the concrete payoff of the third modifier — `http/server.Response._is_stream`, `pantry_config.Project._deps`, `sorted_set.SortedSet._items` all get a real answer instead of an exemption. Their exact classification is Phase 6 work, per-module, and needs re-measuring then: the counts above are same-**file** counts, and `internal` asks a same-**package** question, which is a strictly wider net.
 
 Coexistence rule, stated so it can be tested: **`_` has no semantic weight.** An unannotated `_foo` is public. `test/pass/private_underscore_coexist.sf` asserts this so a future "let's just make `_` mean private" change trips a test rather than a customer.
@@ -405,7 +407,27 @@ One latent defect fell out of the work rather than being sought: the §6b leak p
 
 One case is enforced but has no runnable pass test, stated rather than papered over: a subclass in **another** module constructing its `protected`-init base. The checker accepts it (verified directly), but subclassing a named-imported class emits an undefined LLVM symbol for the inherited method — a pre-existing codegen bug that reproduces with a plain `public init` and no modifier anywhere. So the cross-module constructor rule is pinned by `test/fail/protected_init_external.sf` (not a subclass ⇒ refused) and the monotonicity clause by the same-module factory in `test/pass/protected_from_subclass.sf`. This is the second pre-existing codegen limitation this design has run into around directly-imported `.sf` files; both are worth filing.
 
-**Phase 6 — annotate the stdlib (post-promotion).** The 156 top-level underscore functions and the 66 class-private-safe underscore fields. Opt-in, incremental, one module per commit. This is the feature's real proving ground.
+**Phase 6 — annotate the stdlib (post-promotion).** The top-level underscore functions and the class-private-safe underscore fields. Opt-in, incremental, one module per commit. This is the feature's real proving ground.
+
+**Phase 6a — decorated declarations, and the re-measurement that forced it.** The phase opened by re-measuring the counts above, as §2 said it had to, and two of the numbers in this document were wrong in ways that changed the plan.
+
+The first: **292**, not 156, top-level `fun _name` declarations in `src/lib` — because **142 of them are `@extern`**, and the earlier sweep's pattern could not match a decorated line. The second, and the reason it mattered: **a modifier on a decorated declaration did not work in either order.** `@` is lexed as an identifier and was absent from `at_visibility_modifier`'s declaration lookahead, so `private @extern(...) fun _f()` read the modifier as an *expression statement naming a variable* and died in codegen with `undefined variable 'private'`; and the decorator branch of `parse_stmt` passed a hardcoded `"public"` to `parse_fun_decl_with_doc`, so `@extern(...) private fun _f()` never reached a modifier check at all. Nearly half of the surface this phase exists to annotate was unannotatable, and neither failure mode was a parse error that named the problem.
+
+Both orders are now accepted, `extend fun` too (it had the same hardcoded `"public"`), and writing the modifier on both sides of a decorator is a diagnostic that names both words rather than silently preferring whichever the parser read last. Accepting Kotlin's own order — annotations, then modifiers — is what lets an existing `@extern("...") fun _x` line be annotated by inserting one word instead of rearranging the signature, which for 142 lines is the difference between a mechanical change and a risky one.
+
+Worth stating plainly, because it is the phase's first lesson: **the modifier parsed cleanly in one of the two orders before this fix and enforced nothing.** `test/fail/visibility_decorated_private.sf` is the test that distinguishes those, and a parse-only test would have been satisfied by the broken behaviour. Verified by stripping the modifier and confirming the file then compiles — the same modifier-dependence check every fail test in Phase 5b got.
+
+**Phase 6b — the classification, measured.** With decorated declarations included, all 292 were swept for genuine references from outside their declaring file, separating three things the first sweep conflated: comment mentions, *independently duplicated declarations* of the same helper name (`_pad2` in both `datetime.sf` and `time.sf`, `_escape_sq` in three modules — these are not cross-file uses at all), and `this._name` method calls, which are class members in a different namespace and never the top-level function. What survives is **9 names, in 4 modules**, reached by a qualified `Module._name` from outside:
+
+| name | declared in | reached from |
+|---|---|---|
+| `_content_length_of`, `_serialize_headers`, `_serialize_response` | `http/server.sf` | `test/pass/http_binary_response.sf` |
+| `_has_pending`, `_has_parked_work`, `_park_on_actor`, `_reset_for_test` | `scheduler.sf` | `test/test_actor_scheduler_liveness.sf`, `test/pass/module_extern_dispatch.sf` |
+| `_generate_toml`, `_generate_workspace_toml` | `pantry_config.sf` | `test/pantry_config.sf` |
+
+Every one of those callers is in `test/`, which has **no `pantry.toml` of its own** and therefore belongs to the root package — the same package `src/lib` belongs to. So `internal` covers all nine, and **the classification is `private` for 283 and `internal` for 9, with none staying `public`.** That is a stronger result than §2 anticipated: it expected some underscore names to be permanently public for want of a scope that fit, and none are. It is also the concrete payoff of adding the third modifier, since without `internal` those nine would have had to stay `public` and the sweep would have had a permanent exemption list.
+
+The earlier claim that these functions have "zero callers outside their module" is **false as written** and is corrected here rather than left to be rediscovered: nine of them have exactly such callers, and `internal` is what makes annotating them possible without breaking the tests that reach them.
 
 **Phase 7 — annotate the compiler's own source. Deferred, not part of this work.** See §9.
 
@@ -430,7 +452,8 @@ Phase 4   parser + class-member enforcement + leak pass (public/private)
           ← in progress, and now landable
 Phase 5   package-level enforcement (internal)   DONE  (private all 3 paths + internal)
 Phase 5b  protected                              DONE  (3b's DAG walk is what made it answerable)
-Phase 6   annotate the stdlib
+Phase 6a  decorated declarations take modifiers      DONE  (unblocks 142 @extern)
+Phase 6b  annotate the stdlib — 283 private, 9 internal
 ```
 
 **What can be parallelised, and what cannot.** Phases 2, 2b and 3b were genuinely independent — different files, no shared tables — and were run concurrently in three worktrees, then merged with one hand-resolved hunk (the `ClassDecl` arm of `check_stmt`, where Phase 2's prefix-keyed sets and Phase 3b's list-valued parents are complementary and had to be *combined*, not chosen between). Failure name sets went 32 → 30 with zero regressions.
