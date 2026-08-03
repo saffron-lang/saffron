@@ -1089,7 +1089,7 @@ fun li(cls: String = "", id: String = "", style: String = "",
 }
 
 fun link(cls: String = "", id: String = "", style: String = "",
-         as: String = "",
+         as_: String = "",
          disabled: Bool = false,
          href: String = "",
          hreflang: String = "",
@@ -1105,7 +1105,7 @@ fun link(cls: String = "", id: String = "", style: String = "",
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
-    if (as.length() > 0) { _tc_set_attr(el, "as", as) }
+    if (as_.length() > 0) { _tc_set_attr(el, "as", as_) }
     if (disabled) { _tc_set_attr(el, "disabled", "true") }
     if (href.length() > 0) { _tc_set_attr(el, "href", href) }
     if (hreflang.length() > 0) { _tc_set_attr(el, "hreflang", hreflang) }
