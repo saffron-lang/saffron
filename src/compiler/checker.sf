@@ -23,11 +23,22 @@ class Scope {
     var vars: Map<String, AST.Type>
     var narrowed: Map<String, AST.Type>
     var used: Map<String, Bool>
+    // Names bound by a match-arm payload pattern, which check_unused_in_scope
+    // exempts. They live in `vars` like any other binding — they must, so uses
+    // resolve and types are known — but they are not *declarations the author
+    // chose to make*: check_pattern_arity requires every payload field to be
+    // named, so `match (s) { Span(line, col, offset, len) => line }` has to
+    // spell all four and an unread one is compiler-mandated, not a defect.
+    // Tracking them as a separate set rather than skipping the arm scope
+    // wholesale keeps a `var` declared inside an arm body checked: BlockExpr
+    // pushes no scope of its own, so such a var lands in this same scope.
+    var pattern_bound: Map<String, Bool>
 
     fun init() {
         this.vars = {}
         this.narrowed = {}
         this.used = {}
+        this.pattern_bound = {}
     }
 }
 
@@ -68,6 +79,14 @@ class TypeEnv {
     fun define_var(name: String, typ: AST.Type) {
         var scope: Scope = this.current_scope()
         scope.vars.set(name, typ)
+    }
+
+    // Same as define_var, but marks the name as bound by a match-arm pattern so
+    // check_unused_in_scope skips it. See the comment on Scope.pattern_bound.
+    fun define_pattern_var(name: String, typ: AST.Type) {
+        var scope: Scope = this.current_scope()
+        scope.vars.set(name, typ)
+        scope.pattern_bound.set(name, true)
     }
 
     fun get_var_type(name: String): AST.Type {
@@ -399,13 +418,29 @@ class NullChecker {
         this.warnings.push(msg)
     }
 
+    // Warn about declarations in the innermost scope that nothing ever read.
+    //
+    // Match-arm payload bindings are exempt, and that exemption is 97.8% of this
+    // warning's former output — 1725 of 1763 lines emitted while checking the
+    // compiler's own source. check_pattern_arity REQUIRES every payload field to
+    // be named, so `match (s) { Span(line, col, offset, len) => line }` cannot be
+    // written any shorter and the three unread bindings are the language's doing,
+    // not the author's. `src/compiler/ast.sf` is built out of that idiom, and
+    // this file's own `TypeAlias(ta_n, ta_t, ta_vis) => {}` was three warnings
+    // from an empty arm. Same rationale already written down for lambda params in
+    // check_lambda_body: a compiler-mandated binding must not draw a warning.
+    //
+    // The exemption is by binding kind, not by skipping the arm scope, because
+    // BlockExpr pushes no scope — a `var` declared inside a match-arm body lands
+    // in the arm's scope, and dropping the whole scope's check would stop
+    // reporting those. `_` and a `_`-prefix still silence any binding.
     fun check_unused_in_scope() {
         var scope: Scope = this.env.scopes[this.env.scopes.length() - 1]
         var declared: List<String> = scope.vars.keys()
         var i: Float = 0
         while (i < declared.length()) {
             var name: String = declared[i]
-            if (!name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
+            if (!scope.pattern_bound.has(name) and !name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
                 this.warn("unused variable '" + name + "'")
             }
             i = i + 1
@@ -3762,7 +3797,7 @@ class NullChecker {
             // gets the subject's type rather than a payload field's.
             var named_wc: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
             if (named_wc.length() > 0) {
-                this.env.define_var(named_wc, this.parse_type_node(subj_type))
+                this.env.define_pattern_var(named_wc, this.parse_type_node(subj_type))
             }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
             if (subj_type != "Any") {
@@ -3772,7 +3807,7 @@ class NullChecker {
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
                 var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
-                this.env.define_var(bindings[bi], this.parse_type_node(field_type))
+                this.env.define_pattern_var(bindings[bi], this.parse_type_node(field_type))
                 bi = bi + 1
             }
 
