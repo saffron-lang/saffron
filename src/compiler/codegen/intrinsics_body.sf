@@ -1,7 +1,13 @@
     fun gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
         if (name.ends_with("load64")) {
             var addr: String = this.gen_arg_value(args[0])
-            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
+            // Untag before dereferencing: a void* extern return arrives NaN-tagged
+            // (via __val_tag_ptr_nullable), so a bare inttoptr would load through
+            // TAG_PTR bits and segfault. load8/store8 route through emit_untag_ptr
+            // for the same reason; the 64-bit pair was the outlier (BUGS #80).
+            var raw_ptr: String = this.emit_untag_ptr(addr)
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw_ptr + " to i64*")
             var val: String = this.fresh_local()
             this.emit_indent(val + " = load i64, i64* " + ptr)
             this.last_type = AST.Type.IntType
@@ -10,7 +16,9 @@
         if (name.ends_with("store64")) {
             var addr: String = this.gen_arg_value(args[0])
             var val: String = this.gen_arg_value(args[1])
-            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
+            var raw_ptr: String = this.emit_untag_ptr(addr)
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw_ptr + " to i64*")
             this.emit_indent("store i64 " + val + ", i64* " + ptr)
             this.last_type = AST.Type.NilType
             return "0"

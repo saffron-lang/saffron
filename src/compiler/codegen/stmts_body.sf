@@ -1879,7 +1879,7 @@
         this.block_terminated = false
         this.reset_locals()
         var tag_r: String = this.fresh_local()
-        this.emit_indent(tag_r + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(tag_r + " = call i64 @__val_class_tag(i64 %val)")
         var end_lbl: String = this.fresh_label("rcn.end")
         var switch_str: String = ""
         var arm_labels: List<String> = []
@@ -1920,7 +1920,7 @@
         this.block_terminated = false
         this.reset_locals()
         var is_tag: String = this.fresh_local()
-        this.emit_indent(is_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(is_tag + " = call i64 @__val_class_tag(i64 %val)")
         var cmp: String = this.fresh_local()
         this.emit_indent(cmp + " = icmp uge i64 " + is_tag + ", 10")
         var result: String = this.fresh_local()
@@ -1953,7 +1953,7 @@
         this.block_terminated = false
         this.reset_locals()
         var gf_tag: String = this.fresh_local()
-        this.emit_indent(gf_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(gf_tag + " = call i64 @__val_class_tag(i64 %val)")
         var gf_end: String = this.fresh_label("rgf.end")
         var gf_switch: String = ""
         var gf_arms: List<String> = []

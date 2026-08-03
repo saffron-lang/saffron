@@ -1194,6 +1194,17 @@
         // --identity-mode and calls it to hand tagged values back to value
         // space. Omitting the declare left gen4 unable to link.
         out.append("declare i64 @__rt_tag_ptr(i64)\n")
+        // Deep by-value equality, used by the List/Map arm of gen_binary. Chosen
+        // over __any_eq because its body is compiled from runtime.sf and so exists
+        // on every target that links runtime.ll — including identity mode (base.ll)
+        // and wasm64 (wasm_base.ll), neither of which has __any_eq. The flip side
+        // is that runtime.sf DEFINES this symbol, so the module that compiles
+        // runtime.sf must not also declare it (clang rejects declare+define of one
+        // name). Guard exactly as __runtime_error is guarded below: emit the
+        // declare only when this module did not itself define it.
+        if (!this.str_in_list(this.defined_funcs, "__rt_val_eq")) {
+            out.append("declare i64 @__rt_val_eq(i64, i64)\n")
+        }
         out.append("declare double @strtod(i8*, i8*)\n")
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
