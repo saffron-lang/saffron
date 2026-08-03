@@ -1393,6 +1393,65 @@ class NullChecker {
         this.error("private " + what + " '" + owner + "." + member + "' is not accessible" + where)
     }
 
+    /// Which class declares the `init` that constructing `class_name` will
+    /// actually run, or "" if none does.
+    ///
+    /// Deliberately NOT private_declaring_class's breadth-first search over every
+    /// base. Only `parents[0]` forwards its `init` (the field-layout invariant in
+    /// ast.sf's ClassDecl note), and a class that declares its own `init` runs
+    /// that one and never reaches a base's. A DAG-wide search would reject
+    /// `Child()` whenever *any* ancestor had a private constructor, even with
+    /// Child declaring a perfectly public one of its own — a false denial, which
+    /// is the failure mode BUGS #56 warns about.
+    ///
+    /// Depth-capped rather than visited-set-guarded because the walk is a single
+    /// chain, not a fan-out: a cyclic `extends` terminates instead of hanging.
+    fun constructor_owner(class_name: String): String {
+        var base: String = this.generic_base(class_name)
+        var depth: Float = 0
+        while (depth < 32) {
+            if (this.get_receiver_methods(base).contains("init")) { return base }
+            if (!this.class_parents.has(base)) { return "" }
+            var bases: List<String> = this.class_parents.get(base)
+            if (bases.length() == 0) { return "" }
+            base = this.generic_base(bases[0])
+            depth = depth + 1
+        }
+        return ""
+    }
+
+    /// May code at the current position construct `class_name`?
+    ///
+    /// `private init` is MODULE-scoped, not class-scoped, and that is §6a's rule
+    /// rather than an inconsistency with fields and methods. The whole point of
+    /// the modifier is the factory pattern — `private init` plus a public
+    /// same-module `fun new()` — which the stdlib already has the shape for in
+    /// six modules (stack.sf, queue.sf, sorted_set.sf, heap.sf, deque.sf,
+    /// sorted_map.sf). A class-scoped reading would reject exactly the free
+    /// function the feature exists to enable, leaving the class constructible by
+    /// nobody at all.
+    ///
+    /// Locality is read from local_classes — the recorded answer to "did the
+    /// statement list under check declare this?" — and not re-derived from the
+    /// key shape, which cannot answer it: the module under check is unprefixed,
+    /// so its qualified and bare keys are the same string (Phase 2's finding).
+    /// Phase 5 should prefer `Ref.slot`, which carries the defining module's
+    /// prefix at the use site and so can also police a construction inside an
+    /// imported module's own body; this pass only ever checks the main program's
+    /// bodies, so the two agree here.
+    fun check_constructor_visibility(class_name: String) {
+        var owner: String = this.constructor_owner(class_name)
+        if (owner.length() == 0) { return nil }
+        if (!this.is_private_member(owner, "init")) { return nil }
+        // Declared by the module being checked: same module, so allowed —
+        // including from a free function, which is the factory.
+        if (this.local_classes.contains(owner)) { return nil }
+        // Inside the class body itself, whichever module that body is in.
+        if (this.current_class.length() > 0
+            and this.generic_base(this.current_class) == owner) { return nil }
+        this.error("private constructor '" + owner + ".init' is not accessible outside the module that declares '" + owner + "'")
+    }
+
     /// The assignment-target half of check_member_visibility: `obj.field = v`.
     ///
     /// Reads and writes are separate paths in this checker — a read is a
@@ -2379,6 +2438,18 @@ class NullChecker {
             this.infer_expr(args[ai])
             ai = ai + 1
         }
+        // A construction is a call: `Secret(42)` reaches here with name="Secret",
+        // and so does `Mod.Secret(42)` (the MemberAccess arm above yields the
+        // field name). register_decl registers every class as a function
+        // returning its own type, so there is no separate instantiation node to
+        // hang this off — which is why `private init` was ignorable until now.
+        //
+        // Gated on the name actually being a declared class so an ordinary call
+        // never consults the visibility tables. A method call does not come
+        // through here at all (infer_method_call handles those).
+        if (name.length() > 0 and this.env.class_fields.has(this.qualified_class_key(name))) {
+            this.check_constructor_visibility(name)
+        }
         // Look up declared return type
         if (name.length() > 0) {
             // Check generic constraints if this is a generic function
@@ -2498,6 +2569,22 @@ class NullChecker {
             }
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
                 return obj_name
+            }
+            // Alias-qualified construction: `Mod.Gauge(42)`. This is the SECOND
+            // spelling of a construction and it does not reach infer_call at all
+            // — the parser builds a MethodCall here, with the module alias as the
+            // receiver, so the bare `Gauge(42)` check in infer_call never sees
+            // it. Missing this arm is what made `private init` enforceable only
+            // through the importing file's own bare references, i.e. not at all
+            // across the boundary it exists to police.
+            //
+            // Sits in the `obj_type == "Any"` branch beside the enum-variant
+            // lookup because a module alias is exactly that: a receiver the
+            // checker has no type for. Gated on the method name being a declared
+            // class, so an ordinary method call on an Any-typed receiver never
+            // consults the visibility tables.
+            if (this.env.class_fields.has(this.qualified_class_key(method))) {
+                this.check_constructor_visibility(method)
             }
         }
 
