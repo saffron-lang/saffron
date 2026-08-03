@@ -9,6 +9,18 @@
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
 a gap is cheaper than two entries sharing a number in the git history.
 
+**Read the next-free number from `main`, never from a worktree.** On 2026-08-03
+three separate worktrees each numbered a different bug #137, and two of them also
+claimed #138: the `as`-as-expression bug (this file's #137), ph5's List/Map `==`
+bug (re-filed as #142), and ide-stage0-spans' `var X = Module.Type` alias bug
+(still unmerged and still mis-numbered). ph5's had *already* been renumbered once,
+from an internal task ID that collided with the resolved #28. A worktree branched
+before a filing carries the pre-filing note forward and reads it as authoritative,
+so the collision is the default outcome rather than an accident, and it is only
+visible at merge time — by which point the number is in commit messages, code
+comments and test names. If you are filing from a worktree, `git show
+main:BUGS.md | head -10` first.
+
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
 title says FIXED belongs in `## Resolved`** — if you find one here, move it. That
