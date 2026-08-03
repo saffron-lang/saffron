@@ -39,11 +39,76 @@ info()  { printf "${CYAN}[%s]${NC} %s\n" "$1" "$2"; }
 pass()  { printf "${GREEN}[%s]${NC} %s\n" "$1" "$2"; }
 fail()  { printf "${RED}[%s]${NC} %s\n" "$1" "$2"; exit 1; }
 
+# One timeout for every compiler-compiles-the-compiler step, so no single step
+# sits closer to the limit than the others. main.sf alone takes ~116s on an idle
+# M-series host; two gen3 steps used to be capped at 120 while every sibling got
+# 180, leaving a 4-second margin that any background CPU load erased. When
+# `timeout` fires it SIGTERMs before the compiler can print anything, so the
+# failure surfaced as "gen3 failed to compile main.sf" with zero diagnostics —
+# indistinguishable from a real defect. Raise this if the compiler gets slower;
+# don't set per-step values.
+COMPILE_TIMEOUT="${COMPILE_TIMEOUT:-300}"
+
+# Run a compile step, distinguishing a timeout from a genuine compile error.
+# `timeout` exits 124 on expiry, which says nothing about whether the source is
+# valid — reporting it as a compile failure sends people hunting for a codegen
+# bug that isn't there.
+run_compile() {
+    local stage="$1" what="$2"; shift 2
+    timeout "$COMPILE_TIMEOUT" "$@" && return 0
+    local rc=$?
+    if [[ $rc -eq 124 ]]; then
+        fail "$stage" "timed out after ${COMPILE_TIMEOUT}s compiling $what (no diagnostics: the process was killed, NOT a compile error). Re-run on an idle machine or raise COMPILE_TIMEOUT."
+    fi
+    fail "$stage" "failed to compile $what"
+}
+
+# Serialize bootstraps across ALL worktrees. Each worktree has its own build/, so
+# concurrent runs never corrupt each other's artifacts — but they do contend for
+# CPU, and a compiler-compiles-the-compiler step that takes ~2min idle can slow
+# enough under load to hit COMPILE_TIMEOUT. `timeout` then SIGTERMs before any
+# diagnostic is printed, so the run fails with an empty error that reads exactly
+# like a codegen bug. Two such runs were misdiagnosed that way before this lock
+# existed. The lock is machine-wide (not per-worktree) because the contention is
+# for the machine's CPUs. Set SAFFRON_NO_BOOTSTRAP_LOCK=1 to opt out.
+BOOTSTRAP_LOCK="${TMPDIR:-/tmp}/saffron-bootstrap.lock"
+
+acquire_bootstrap_lock() {
+    [[ -n "${SAFFRON_NO_BOOTSTRAP_LOCK:-}" ]] && return 0
+    local waited=0 announced=false
+    while ! mkdir "$BOOTSTRAP_LOCK" 2>/dev/null; do
+        # Reclaim a lock whose owner died (crash, or a killed parent shell taking
+        # the bootstrap down with it — which is how these get orphaned).
+        local owner
+        owner="$(cat "$BOOTSTRAP_LOCK/pid" 2>/dev/null || true)"
+        if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
+            rm -rf "$BOOTSTRAP_LOCK"
+            continue
+        fi
+        if [[ "$announced" == false ]]; then
+            info "LOCK" "another bootstrap is running (pid ${owner:-?}); waiting so we don't contend for CPU..."
+            announced=true
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge 1800 ]]; then
+            fail "LOCK" "waited 30min for $BOOTSTRAP_LOCK. If no bootstrap is running, remove it: rm -rf $BOOTSTRAP_LOCK"
+        fi
+    done
+    echo "$$" > "$BOOTSTRAP_LOCK/pid"
+    # Release on any exit, including failure and Ctrl-C.
+    trap 'rm -rf "$BOOTSTRAP_LOCK"' EXIT
+    [[ "$announced" == true ]] && info "LOCK" "acquired after ${waited}s"
+    return 0
+}
+
 # --- Preflight ---
 
 if ! command -v clang &>/dev/null; then
     fail "ERROR" "clang not found. Install LLVM/Clang."
 fi
+
+acquire_bootstrap_lock
 
 mkdir -p "$BUILD_DIR/stage2" "$BUILD_DIR/stage3"
 
@@ -112,7 +177,7 @@ done
 GEN2_OK=true
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    if ! timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
+    if ! timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
         GEN2_OK=false
         break
     fi
@@ -120,7 +185,7 @@ done
 
 if [[ "$GEN2_OK" == true ]]; then
     [[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
-    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
         || GEN2_OK=false
 fi
 
@@ -135,14 +200,14 @@ if [[ "$GEN2_OK" == true ]]; then
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     # Rewrite the codegen import to use the assembled file
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
-    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
         || GEN2_OK=false
 fi
 
 if [[ "$GEN2_OK" == true ]]; then
     # Compile runtime.sf
     [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
         || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 fi
 
@@ -161,13 +226,13 @@ if [[ "$GEN2_OK" == false ]]; then
     # Now use gen3 to recompile itself from current source
     for src in "${SOURCES[@]}"; do
         [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
-        timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
-            || fail "STAGE 1" "gen3 failed to compile $src.sf"
+        run_compile "STAGE 1" "$src.sf (gen3)" \
+            "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll"
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
-    timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
-        || fail "STAGE 1" "gen3 failed to compile codegen.sf"
+    run_compile "STAGE 1" "codegen.sf (gen3)" \
+        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll"
 
     cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
     cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
@@ -177,12 +242,12 @@ if [[ "$GEN2_OK" == false ]]; then
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
-    timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
-        || fail "STAGE 1" "gen3 failed to compile main.sf"
+    run_compile "STAGE 1" "main.sf (gen3)" \
+        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
-    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
-        || fail "STAGE 1" "gen3 failed to compile runtime.sf"
+    run_compile "STAGE 1" "runtime.sf (gen3)" \
+        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll"
 fi
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
@@ -231,13 +296,13 @@ else
 
     for src in "${SOURCES[@]}"; do
         [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
-        timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+        timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
             "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage4/${src}.ll" \
             || fail "STAGE 2" "gen3 rejects $src.sf — it cannot compile itself. Diagnostics go to stdout, so run it directly: $GEN3 --identity-mode --stdlib $ROOT/src/lib $COMPILER_DIR/$src.sf /tmp/out.ll"
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
-    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/codegen.ll" \
         || fail "STAGE 2" "gen3 rejects the assembled codegen.sf — it cannot compile itself"
 
@@ -253,12 +318,12 @@ else
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage4/_main.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
-    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$BUILD_DIR/stage4/_main.sf" "$BUILD_DIR/stage4/main.ll" \
         || fail "STAGE 2" "gen3 rejects main.sf — it cannot compile itself"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
-    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$RUNTIME_SRC" "$BUILD_DIR/stage4/runtime.ll" \
         || fail "STAGE 2" "gen3 rejects runtime.sf"
 
@@ -276,7 +341,7 @@ else
 var xs = [1, 2, 3]
 IO.println("gen4 works: ${xs.length()}")
 EOF
-    timeout 120 "$BUILD_DIR/stage4/saffronc" "$BUILD_DIR/stage4/probe.sf" "$BUILD_DIR/stage4/probe.ll" \
+    timeout "$COMPILE_TIMEOUT" "$BUILD_DIR/stage4/saffronc" "$BUILD_DIR/stage4/probe.sf" "$BUILD_DIR/stage4/probe.ll" \
         || fail "STAGE 2" "gen4 links but cannot compile a program"
 
     pass "STAGE 2" "gen3 compiles itself; gen4 links and compiles: $BUILD_DIR/stage4/saffronc"

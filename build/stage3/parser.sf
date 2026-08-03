@@ -2551,8 +2551,18 @@ class Parser {
 
     fun parse_return(): AST.Stmt {
         this.advance() // consume return
-        // Bare return (no value) → return nil
-        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+        // Bare return (no value) → return nil.
+        //
+        // `;` belongs in this set for the same reason `}` does: it terminates the
+        // statement, so there is no value to parse. Without it, `return;` — legal
+        // in every C-family language and written throughout this repo's own
+        // tests — parsed the `;` as the start of the return VALUE and reported
+        // "expected a literal, name or '(' here" pointing at the semicolon, with
+        // no hint that the return was the problem. Semicolons are optional
+        // elsewhere in the grammar (see the `while (this.match_kind(";"))` skips),
+        // which made this the one place they were rejected rather than ignored.
+        if (this.match_kind_check("}") or this.match_kind_check("eof")
+            or this.match_kind_check(";")) {
             return AST.Stmt.Return(AST.Expr.NilLit)
         }
         // A `return` is also bare when the next token is on a later line. There
