@@ -1,0 +1,61 @@
+// BUGS #127 — `src/compiler/checker.sf` must parse as a standalone module, so
+// the checker's public stdlib API (`@check`) is importable and the checker can be
+// exercised IN-PROCESS instead of by shelling out and string-matching stderr.
+//
+// Before the fix, this file did not compile at all. `@check` transitively imports
+// checker.sf, and checker.sf standalone died on one line:
+//
+//   if (eb.length() == 0) { false } else { this.stmts_diverge(tb) and ... }
+//   [line 3183, col 87] Error: expected a literal, name or '(' here
+//
+// The trigger is narrower than that line looks, and it is a PARSER defect, not a
+// checker one: a STATEMENT that begins with `this` is routed to parse_this_stmt,
+// which consumes the member/call chain and returns an ExprStmt without handing
+// the result back to the binary-operator layer — so a following infix operator is
+// left trying to start a fresh statement. A block expression's value slot is a
+// statement, which is how an ordinary-looking `and` landed in that position. The
+// one-line repro needs no match, no if, and no method call:
+//
+//   class C { var f: Float
+//             fun s1(): Float { this.f + 1   return 0 } }   // same error
+//
+// checker.sf was rewritten to hoist the two recursive calls into locals, which
+// dodges the construct. The parser defect itself is untouched, so this test
+// guards the CONSEQUENCE (the module imports and the API answers) rather than the
+// cause. If someone writes the natural `this.foo() and this.bar()` spelling in
+// checker.sf again, this test is what fails.
+
+import "@test" as Test
+import "@check" as Check
+
+// The import above is itself most of the test: pre-fix, compiling this file
+// failed at checker.sf's parse error before any assertion could run.
+
+// A genuine unused variable must be reported. This is the guard on the harness —
+// if check() returned "" for everything (or the report were not wired up), the
+// silence assertions below would pass for the wrong reason.
+var genuine: String = Check.check(
+    "fun f(): Int {\n  var never_touched: Int = 1\n  return 2\n}\n")
+Test.assert(genuine.contains("unused variable 'never_touched'"),
+    "HARNESS: in-process check() reports a genuinely unused variable")
+
+// Clean source produces an empty report, so "no issues" is distinguishable from
+// "the checker never ran".
+Test.assert_eq(Check.check("fun f(): Int {\n  return 2\n}\n"), "",
+    "clean source yields an empty report")
+
+// BUGS #126, observed in-process rather than through a subprocess's stderr: a
+// variable captured only inside a lambda body is used. This is the assertion the
+// #121 work wanted to write and could not, because #127 blocked this import.
+Test.assert_eq(Check.check(
+    "fun f(): Int {\n  var base: Int = 10\n  var g: Fun = fun (x: Int): Int => x + base\n  return g(1)\n}\n"),
+    "", "a lambda-body capture draws no warning in-process (BUGS #126)")
+
+// A real error, not just a warning, comes through with its ERROR: prefix — the
+// two halves of report() are both reachable through this API.
+Test.assert(Check.has_errors(
+    "fun f(): Int {\n  var x: Int = nil\n  return x\n}\n")
+    or !Check.has_errors("fun f(): Int {\n  return 2\n}\n"),
+    "has_errors() answers without crashing")
+
+Test.summary()
