@@ -289,14 +289,14 @@
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
-        // If init is a Call(callee, args), try to infer generic type from args:
+        // If init is a Call(callee, args, ...), try to infer generic type from args:
         // 1. Lambda args with explicit return type
         // 2. String literal args → String
         // 3. Number literal args → Float
         // 4. Typed variable args → that variable's type
         var ek: String = this.classify_expr(init)
         if (ek == "call") {
-            var call_args: List<AST.Expr> = match (init) { Call(c, a) => a   _ => [] }
+            var call_args: List<AST.Expr> = match (init) { Call(c, a, __cs) => a   _ => [] }
             var ai: Float = 0
             while (ai < call_args.length()) {
                 var arg_kind: String = this.classify_expr(call_args[ai])

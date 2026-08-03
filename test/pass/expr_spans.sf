@@ -1,0 +1,114 @@
+// Expression AST nodes carry source spans, and the spans point at the right
+// bytes.
+//
+// line/col alone cannot catch an off-by-one: a one-character-wide span at the
+// wrong column still prints a plausible "3:7". So every assertion here slices
+// the ORIGINAL source with offset+len and compares the text. If the slice is not
+// the identifier we expect, the span is wrong no matter how good it looks.
+//
+// The span choice per node is deliberate and is what these assertions pin down:
+//
+//   Variable / Ref / Assign               the bare name
+//   MemberAccess / GetField / SetField    the `.field`, NOT the object
+//   MethodCall                            the `.method`, NOT receiver or args
+//   Call                                  the full extent, callee through `)`
+//
+// A span covering `holder.slot` would make a rename rewrite `holder` too, which
+// is why the field span must be the field alone.
+import "@test" as Test
+import "@ast" as PubAst
+import "@parser" as Parser
+
+// The identifier a span covers, taken out of the real source text. A span that
+// is not real slices to a sentinel rather than to an accidental empty string.
+fun slice_of(source: String, s: PubAst.Span): String {
+    if (!PubAst.span_is_real(s)) { return "<none>" }
+    var off: Float = PubAst.span_offset(s)
+    return source.slice(off, off + PubAst.span_len(s))
+}
+
+// --- Variable ---------------------------------------------------------------
+var src1: String = "alpha"
+var e1: PubAst.Expr = Parser.parse_expr(src1)
+var v_span: PubAst.Span = PubAst.expr_name_span(e1)
+Test.assert(PubAst.span_is_real(v_span), "Variable span is real")
+Test.assert_eq(slice_of(src1, v_span), "alpha", "Variable span slices to 'alpha'")
+Test.assert_eq(PubAst.span_col(v_span), 1, "Variable col is 1-based")
+
+// --- MemberAccess: the field ALONE, not the object --------------------------
+var src2: String = "obj.field"
+var e2: PubAst.Expr = Parser.parse_expr(src2)
+var ma_span: PubAst.Span = PubAst.expr_name_span(e2)
+Test.assert_eq(slice_of(src2, ma_span), "field", "MemberAccess span is the field, NOT 'obj.field'")
+Test.assert_eq(PubAst.span_col(ma_span), 5, "and it starts where 'field' starts")
+
+// The object underneath keeps its own, distinct span. If these collapsed into
+// one, renaming `field` would rewrite `obj` as well.
+var ma_obj: PubAst.Expr = match (e2) {
+    MemberAccess(o, f, fs) => o
+    _ => PubAst.Expr.NilLit
+}
+Test.assert_eq(slice_of(src2, PubAst.expr_name_span(ma_obj)), "obj",
+    "MemberAccess object has its own span")
+
+// --- MethodCall: the method name, not the receiver or the args --------------
+var src3: String = "thing.compute(1, 2)"
+var e3: PubAst.Expr = Parser.parse_expr(src3)
+Test.assert_eq(slice_of(src3, PubAst.expr_name_span(e3)), "compute",
+    "MethodCall span is the method name only")
+
+// --- Call: the whole extent, callee through the closing paren ---------------
+var src4: String = "compute(7)"
+var e4: PubAst.Expr = Parser.parse_expr(src4)
+var call_span: PubAst.Span = PubAst.expr_full_span(e4)
+Test.assert_eq(slice_of(src4, call_span), "compute(7)", "Call full span covers callee through ')'")
+// A Call has no identifier of its own, so it declines to answer expr_name_span
+// rather than guessing at its callee's.
+Test.assert(!PubAst.span_is_real(PubAst.expr_name_span(e4)), "Call has no name span of its own")
+// ...and the callee inside it is still pinpointed separately.
+var callee: PubAst.Expr = match (e4) {
+    Call(c, a, cs) => c
+    _ => PubAst.Expr.NilLit
+}
+Test.assert_eq(slice_of(src4, PubAst.expr_name_span(callee)), "compute",
+    "Call's callee keeps its own name span")
+
+// Only Call records an extent; a Variable is not a shape that can be at fault.
+Test.assert(!PubAst.span_is_real(PubAst.expr_full_span(e1)), "only Call carries a full span")
+
+// --- Assign -----------------------------------------------------------------
+var src5: String = "target = 42"
+var e5: PubAst.Expr = Parser.parse_expr(src5)
+Test.assert_eq(slice_of(src5, PubAst.expr_name_span(e5)), "target",
+    "Assign span is the target name")
+
+// --- GetField / SetField through `this` -------------------------------------
+var src7: String = "this.total"
+var e7: PubAst.Expr = Parser.parse_expr(src7)
+Test.assert_eq(slice_of(src7, PubAst.expr_name_span(e7)), "total",
+    "GetField span is the field name")
+
+// --- obj.field = v : the WRITE must land where the READ does ----------------
+// The parser rewrites a MemberAccess into a SetField for the assignment form.
+// Both spell the same identifier in the source, so a rename has to find them at
+// the same place. This is the assertion that catches the rewrite dropping the
+// MemberAccess's span and silently substituting span_none().
+var src8: String = "holder.slot = 3"
+var e8: PubAst.Expr = Parser.parse_expr(src8)
+var sf_span: PubAst.Span = PubAst.expr_name_span(e8)
+Test.assert_eq(slice_of(src8, sf_span), "slot", "rewritten SetField keeps the MemberAccess span")
+Test.assert_eq(PubAst.span_col(sf_span), 8, "at the same column the read form reports")
+
+// --- Multi-line: offset must track newlines, not restart per line ----------
+var src9: String = "outer.first\nouter.second"
+var stmts9: List<PubAst.Stmt> = Parser.parse(src9)
+var second: PubAst.Expr = match (stmts9[1]) {
+    ExprStmt(ex) => ex
+    _ => PubAst.Expr.NilLit
+}
+var second_span: PubAst.Span = PubAst.expr_name_span(second)
+Test.assert_eq(PubAst.span_line(second_span), 2, "second-line span reports line 2")
+Test.assert_eq(slice_of(src9, second_span), "second",
+    "offset is absolute, so a line-2 span still slices correctly")
+
+Test.summary()

@@ -706,6 +706,13 @@ class Parser {
     }
 
     fun parse_call(): AST.Expr {
+        // The postfix chain's start, captured before the primary is consumed.
+        // `Call`'s span runs from here to the closing paren, so in `a.b.c(x)`
+        // the span underlines the whole callee chain and its arguments — the
+        // extent a wrong-arity error wants to point at. Note this is a running
+        // start, not per-link: each iteration re-merges from the same origin, so
+        // a chained `f(1)(2)` gives the outer Call the full extent.
+        var chain_start: AST.Span = this.current_span()
         var expr: AST.Expr = this.parse_primary()
 
         while (true) {
@@ -747,6 +754,11 @@ class Parser {
                     expr = AST.Expr.IndexGet(expr, AST.Expr.IntLit(idx_val))
                     continue
                 }
+                // Captured before `expect_ident` consumes it. This span covers the
+                // field/method identifier ALONE — not the object it hangs off —
+                // because that is what a rename rewrites and what go-to-definition
+                // resolves. A span covering `obj.field` would rename `obj` too.
+                var field_span: AST.Span = this.ident_span()
                 var field: String = this.expect_ident()
                 if (this.match_kind_check("(")) {
                     // Method call: obj.method(args)
@@ -765,9 +777,9 @@ class Parser {
                     if (this.match_kind_check("{")) {
                         args.push(this.parse_trailing_closure())
                     }
-                    expr = AST.Expr.MethodCall(expr, field, args)
+                    expr = AST.Expr.MethodCall(expr, field, args, field_span)
                 } else {
-                    expr = AST.Expr.MemberAccess(expr, field)
+                    expr = AST.Expr.MemberAccess(expr, field, field_span)
                 }
             } else if (this.match_kind_check("[")) {
                 // Index access: obj[expr]
@@ -791,17 +803,17 @@ class Parser {
                 if (this.match_kind_check("{")) {
                     args.push(this.parse_trailing_closure())
                 }
-                expr = AST.Expr.Call(expr, args)
+                expr = AST.Expr.Call(expr, args, this.span_from(chain_start))
             } else if (this.match_kind_check("{") and this.current_line_num() == this.prev_line_num()) {
                 // Paren-free trailing closure: ident { ... } → ident(fun () { ... })
                 var is_callable: String = match (expr) {
-                    Variable(n) => "yes"
-                    MemberAccess(o, f) => "yes"
+                    Variable(n, __vs) => "yes"
+                    MemberAccess(o, f, __ms) => "yes"
                     _ => "no"
                 }
                 if (is_callable == "yes") {
                     var tc_args: List<AST.Expr> = [this.parse_trailing_closure()]
-                    expr = AST.Expr.Call(expr, tc_args)
+                    expr = AST.Expr.Call(expr, tc_args, this.span_from(chain_start))
                 } else {
                     break
                 }
@@ -848,8 +860,9 @@ class Parser {
             return AST.Expr.This
         }
         if (this.is_ident_named("super")) {
+            var super_span: AST.Span = this.current_span()
             this.advance()
-            return AST.Expr.Variable("super")
+            return AST.Expr.Variable("super", super_span)
         }
         if (this.match_kind_check("[")) {
             return this.parse_list_lit()
@@ -939,16 +952,16 @@ class Parser {
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
-                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [key, value])))
+                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar, AST.span_none()), "set", [key, value], AST.span_none())))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
                     var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
-                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [k, v])))
+                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar, AST.span_none()), "set", [k, v], AST.span_none())))
                 }
                 this.consume("}")
-                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar))
+                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar, AST.span_none()))
             }
             // Block expression: { stmts...; expr }
             //
@@ -985,6 +998,10 @@ class Parser {
         }
 
         var kind: Lexer.TokenKind = this.current_kind()
+        // Captured before `advance`, because the TkIdent arm below needs the span
+        // of the token being consumed and `prev_span()` would be correct only for
+        // as long as no arm consumes anything further — TkLParen does.
+        var prim_span: AST.Span = this.current_span()
         this.advance()
 
         return match (kind) {
@@ -994,7 +1011,7 @@ class Parser {
             TkFalse => AST.Expr.BoolLit(false)
             TkNil => AST.Expr.NilLit
             TkString(s) => AST.Expr.StringLit(s)
-            TkIdent(name) => AST.Expr.Variable(name)
+            TkIdent(name) => AST.Expr.Variable(name, prim_span)
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
                 if (this.match_kind(",")) {
@@ -1845,6 +1862,7 @@ class Parser {
         }
         // Check for index assignment: ident[expr] = value
         if (this.match_kind_check("ident") and this.peek_is("[")) {
+            var obj_span: AST.Span = this.ident_span()
             var obj_name: String = this.expect_ident()
             this.advance() // consume [
             var idx: AST.Expr = this.parse_expr()
@@ -1852,10 +1870,10 @@ class Parser {
             if (this.match_kind("=")) {
                 var value: AST.Expr = this.parse_expr()
                 return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
-                    AST.Expr.Variable(obj_name), idx, value))
+                    AST.Expr.Variable(obj_name, obj_span), idx, value))
             }
             // Not an assignment — just index access as expression
-            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
+            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name, obj_span), idx)
             return AST.Stmt.ExprStmt(get_expr)
         }
         // Default: expression statement (may be field assignment if followed by =)
@@ -1864,13 +1882,20 @@ class Parser {
             var value: AST.Expr = this.parse_expr()
             var ek: String = this.classify_expr_for_assign(expr)
             if (ek == "member") {
-                var obj: AST.Expr = match (expr) { MemberAccess(o, f) => o
+                var obj: AST.Expr = match (expr) { MemberAccess(o, f, __ms) => o
                     _ => AST.Expr.NilLit
                 }
-                var field: String = match (expr) { MemberAccess(o, f) => f
+                var field: String = match (expr) { MemberAccess(o, f, __ms) => f
                     _ => ""
                 }
-                return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value))
+                // The MemberAccess we are rewriting away already located this
+                // field; carry its span over rather than re-deriving one. The
+                // read `obj.f` and the write `obj.f = v` name the same source
+                // identifier, so a rename must find both at the same place.
+                var fs: AST.Span = match (expr) { MemberAccess(o, f, __ms) => __ms
+                    _ => AST.span_none()
+                }
+                return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value, fs))
             }
         }
         return AST.Stmt.ExprStmt(expr)
@@ -1878,7 +1903,7 @@ class Parser {
 
     fun classify_expr_for_assign(expr: AST.Expr): String {
         return match (expr) {
-            MemberAccess(o, f) => "member"
+            MemberAccess(o, f, __ms) => "member"
             _ => "other"
         }
     }
@@ -1893,19 +1918,21 @@ class Parser {
     fun parse_call_arg(): AST.Expr {
         // Named argument: ident = expr (Kotlin-style)
         if (this.match_kind_check("ident") and this.peek_is("=")) {
+            var arg_span: AST.Span = this.ident_span()
             var arg_name: String = this.expect_ident()
             this.advance()
             var arg_val: AST.Expr = this.parse_expr()
-            return AST.Expr.Assign(arg_name, arg_val)
+            return AST.Expr.Assign(arg_name, arg_val, arg_span)
         }
         return this.parse_expr()
     }
 
     fun parse_assign(): AST.Stmt {
+        var name_span: AST.Span = this.ident_span()
         var name: String = this.expect_ident()
         this.consume("=")
         var value: AST.Expr = this.parse_expr()
-        return AST.Stmt.ExprStmt(AST.Expr.Assign(name, value))
+        return AST.Stmt.ExprStmt(AST.Expr.Assign(name, value, name_span))
     }
 
     fun parse_var_decl(): AST.Stmt {
@@ -2020,7 +2047,7 @@ class Parser {
         stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, "", "public", AST.span_none(), AST.span_none()))
         var i: Float = 0
         while (i < names.length()) {
-            var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
+            var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name, AST.span_none()), AST.Expr.IntLit(i))
             stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, "", "public", AST.span_none(), AST.span_none()))
             i = i + 1
         }
@@ -2179,7 +2206,7 @@ class Parser {
             var ptype: String = this.parse_type()
             var syn_name: String = "__p" + idx.floor().to_string()
             params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit, "public", AST.span_none()))
-            pattern_prepend.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(pname, pb), AST.Expr.Variable(syn_name)))
+            pattern_prepend.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(pname, pb), AST.Expr.Variable(syn_name, AST.span_none())))
         } else if (pname == "_") {
             this.consume(":")
             var ptype: String = this.parse_type()
@@ -2279,16 +2306,18 @@ class Parser {
     }
 
     fun parse_this_stmt(): AST.Stmt {
+        var this_start: AST.Span = this.current_span()
         this.advance() // consume this
         this.consume(".")
+        var field_span: AST.Span = this.ident_span()
         var field: String = this.expect_ident()
         if (this.match_kind("=")) {
             // this.field = value
             var value: AST.Expr = this.parse_expr()
-            return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
+            return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value, field_span))
         }
         // Build the initial expression and continue chaining (dots, indexes, calls)
-        var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field)
+        var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field, field_span)
         var chained: Bool = false
         while (this.match_kind_check(".") or this.match_kind_check("[")) {
             chained = true
@@ -2303,6 +2332,7 @@ class Parser {
                 expr = AST.Expr.IndexGet(expr, idx)
             } else {
                 this.advance()
+                var next_span: AST.Span = this.ident_span()
                 var next_field: String = this.expect_ident()
                 if (this.match_kind("(")) {
                     var args: List<AST.Expr> = []
@@ -2313,12 +2343,12 @@ class Parser {
                         }
                     }
                     this.consume(")")
-                    expr = AST.Expr.MethodCall(expr, next_field, args)
+                    expr = AST.Expr.MethodCall(expr, next_field, args, next_span)
                 } else if (this.match_kind("=")) {
                     var value: AST.Expr = this.parse_expr()
-                    return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, next_field, value))
+                    return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, next_field, value, next_span))
                 } else {
-                    expr = AST.Expr.MemberAccess(expr, next_field)
+                    expr = AST.Expr.MemberAccess(expr, next_field, next_span)
                 }
             }
         }
@@ -2334,18 +2364,20 @@ class Parser {
             this.consume(")")
             if (chained) {
                 // expr was modified by indexing/chaining — this is an indirect call
-                return AST.Stmt.ExprStmt(AST.Expr.Call(expr, args))
+                return AST.Stmt.ExprStmt(AST.Expr.Call(expr, args, this.span_from(this_start)))
             }
-            return AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.This, field, args))
+            return AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.This, field, args, field_span))
         }
         return AST.Stmt.ExprStmt(expr)
     }
 
     fun parse_dot_stmt(): AST.Stmt {
+        var obj_span: AST.Span = this.ident_span()
         var obj_name: String = this.expect_ident()
-        var expr: AST.Expr = AST.Expr.Variable(obj_name)
+        var expr: AST.Expr = AST.Expr.Variable(obj_name, obj_span)
         while (this.match_kind_check(".")) {
             this.advance()
+            var field_span: AST.Span = this.ident_span()
             var field: String = this.expect_ident()
             if (this.match_kind_check("(")) {
                 this.advance()
@@ -2359,12 +2391,12 @@ class Parser {
                 } else {
                     this.advance()
                 }
-                expr = AST.Expr.MethodCall(expr, field, args)
+                expr = AST.Expr.MethodCall(expr, field, args, field_span)
             } else if (this.match_kind("=")) {
                 var value: AST.Expr = this.parse_expr()
-                return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, field, value))
+                return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, field, value, field_span))
             } else {
-                expr = AST.Expr.MemberAccess(expr, field)
+                expr = AST.Expr.MemberAccess(expr, field, field_span)
             }
         }
         if (this.match_kind_check("[")) {
@@ -2488,7 +2520,7 @@ class Parser {
                     }
                     // Generate: this.fname = default_val (to prepend to init)
                     field_defaults.push(AST.Stmt.ExprStmt(
-                        AST.Expr.SetField(AST.Expr.This, fname, default_val)))
+                        AST.Expr.SetField(AST.Expr.This, fname, default_val, AST.span_none())))
                 }
                 fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit, member_vis, fname_span))
             } else if (this.is_ident_named("@")) {
@@ -2698,12 +2730,13 @@ class Parser {
             this.consume(";")
             var cond: AST.Expr = this.parse_expr()
             this.consume(";")
+            var update_span: AST.Span = this.ident_span()
             var update_name: String = this.expect_ident()
             this.consume("=")
             var update_expr: AST.Expr = this.parse_expr()
             this.consume(")")
             var body: List<AST.Stmt> = this.parse_block_stmts()
-            body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
+            body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr, update_span)))
             var stmts: List<AST.Stmt> = []
             stmts.push(init)
             stmts.push(AST.Stmt.While(cond, body))
@@ -2725,7 +2758,7 @@ class Parser {
             var desugar_body: List<AST.Stmt> = []
             var pdi: Float = 0
             while (pdi < pat_names.length()) {
-                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item", AST.span_none()), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
                 pdi = pdi + 1
             }
             pdi = 0
@@ -2748,7 +2781,7 @@ class Parser {
             this.consume(")")
             var vp_body: List<AST.Stmt> = this.parse_block_stmts()
             var vp_desugar: List<AST.Stmt> = []
-            vp_desugar.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, vp_bindings), AST.Expr.Variable("__for_item")))
+            vp_desugar.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, vp_bindings), AST.Expr.Variable("__for_item", AST.span_none())))
             var vpi: Float = 0
             while (vpi < vp_body.length()) { vp_desugar.push(vp_body[vpi]); vpi = vpi + 1 }
             return this.desugar_for_in("__for_item", vp_iter, vp_desugar)
@@ -2768,12 +2801,13 @@ class Parser {
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
+        var update_span: AST.Span = this.ident_span()
         var update_name: String = this.expect_ident()
         this.consume("=")
         var update_expr: AST.Expr = this.parse_expr()
         this.consume(")")
         var body: List<AST.Stmt> = this.parse_block_stmts()
-        body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
+        body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr, update_span)))
         var stmts: List<AST.Stmt> = []
         stmts.push(init)
         stmts.push(AST.Stmt.While(cond, body))
@@ -2809,7 +2843,7 @@ class Parser {
         var idx_var: String = "__for_i" + uid
         var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "", "public", AST.span_none(), AST.span_none())
         var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "", "public", AST.span_none(), AST.span_none())
-        var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
+        var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "length", [], AST.span_none()))
         // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
         // For a List or String the two are the same thing, but for a Map `m[k]`
         // is a *key* lookup: the loop's integer cursor went to __map_get as a
@@ -2823,8 +2857,8 @@ class Parser {
         // variant deliberately: a variant would need arms at ~30 match sites,
         // and a missing arm yields an indeterminate value rather than an error
         // (BUGS #76), so the variant is the riskier encoding of the same thing.
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "__iter_get", [AST.Expr.Variable(idx_var)]), "", "public", AST.span_none(), AST.span_none())
-        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "__iter_get", [AST.Expr.Variable(idx_var, AST.span_none())], AST.span_none()), "", "public", AST.span_none(), AST.span_none())
+        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "+", AST.Expr.IntLit(1)), AST.span_none()))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
         while_body.push(increment)
@@ -2873,7 +2907,7 @@ class Parser {
             // Bare string literals desugar to text(string)
             if (this.match_kind_check("string")) {
                 var str_expr: AST.Expr = this.parse_expr()
-                body.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [str_expr])))
+                body.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text", AST.span_none()), [str_expr], AST.span_none())))
             } else {
                 body.push(this.parse_stmt())
             }
@@ -2983,8 +3017,12 @@ class Parser {
 
     fun parse_html_element(): AST.Expr {
         // < already checked but not consumed. Consume it.
+        var elem_start: AST.Span = this.current_span()
         this.advance()
-        // Read tag name
+        // Read tag name. A tag is not decoration: `<div>` lowers to a call of a
+        // real function named `div`, so the tag identifier is a genuine reference
+        // and go-to-definition on it must land on that function.
+        var tag_span: AST.Span = this.ident_span()
         var tag: String = this.expect_ident()
 
         // Parse attributes
@@ -2995,14 +3033,14 @@ class Parser {
             this.advance()
             this.consume(">")
             // Self-closing: tag(attrs...)
-            return AST.Expr.Call(AST.Expr.Variable(tag), args)
+            return AST.Expr.Call(AST.Expr.Variable(tag, tag_span), args, this.span_from(elem_start))
         }
 
         this.consume(">")
 
         if (this.is_void_tag(tag)) {
             // Void element: tag(attrs...)
-            return AST.Expr.Call(AST.Expr.Variable(tag), args)
+            return AST.Expr.Call(AST.Expr.Variable(tag, tag_span), args, this.span_from(elem_start))
         }
 
         // Parse children until </tag>
@@ -3011,7 +3049,7 @@ class Parser {
         // Emit: tag(attrs...) { children }
         // Add trailing closure (Lambda with children as body)
         args.push(AST.Expr.Lambda([], "Nil", children))
-        return AST.Expr.Call(AST.Expr.Variable(tag), args)
+        return AST.Expr.Call(AST.Expr.Variable(tag, tag_span), args, this.span_from(elem_start))
     }
 
     fun parse_html_attrs(): List<AST.Expr> {
@@ -3035,14 +3073,17 @@ class Parser {
             } else {
                 attr_name = this.expect_ident()
             }
+            // `prev_span` and not `ident_span`: every branch above has already
+            // consumed the attribute-name token by this point.
+            var attr_span: AST.Span = this.prev_span()
 
             if (this.match_kind("=")) {
                 // name=value
                 var attr_val: AST.Expr = this.parse_html_attr_value()
-                args.push(AST.Expr.Assign(attr_name, attr_val))
+                args.push(AST.Expr.Assign(attr_name, attr_val, attr_span))
             } else {
                 // Boolean attribute: name (no value) → name=true
-                args.push(AST.Expr.Assign(attr_name, AST.Expr.BoolLit(true)))
+                args.push(AST.Expr.Assign(attr_name, AST.Expr.BoolLit(true), attr_span))
             }
         }
         return args
@@ -3150,17 +3191,17 @@ class Parser {
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
-                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [key, value])))
+                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar, AST.span_none()), "set", [key, value], AST.span_none())))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
                     var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
-                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar), "set", [k, v])))
+                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable(mvar, AST.span_none()), "set", [k, v], AST.span_none())))
                 }
                 this.consume("}")
                 this.html_depth = saved_depth
-                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar))
+                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable(mvar, AST.span_none()))
             }
             // General expression (lambda, arithmetic, etc.)
             var expr: AST.Expr = this.parse_expr()
@@ -3224,9 +3265,9 @@ class Parser {
                     var interp_is_expr: Bool = match (interp_stmts[0]) { ExprStmt(e) => true   _ => false }
                     if (interp_is_expr) {
                         var interp_expr: AST.Expr = match (interp_stmts[0]) { ExprStmt(e) => e    _ => AST.Expr.NilLit }
-                        var interp_skip: Bool = match (interp_expr) { Call(c, a) => true   MethodCall(o, m, a) => true   Assign(n, v) => true   _ => false }
+                        var interp_skip: Bool = match (interp_expr) { Call(c, a, __cs) => true   MethodCall(o, m, a, __ks) => true   Assign(n, v, __as) => true   _ => false }
                         if (!interp_skip) {
-                            stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [interp_expr])))
+                            stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text", AST.span_none()), [interp_expr], AST.span_none())))
                         } else {
                             stmts.push(interp_stmts[0])
                         }
@@ -3246,7 +3287,7 @@ class Parser {
                 var kind: Lexer.TokenKind = this.current_kind()
                 this.advance()
                 var text: String = match (kind) { TkString(s) => s    _ => "" }
-                stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(text)])))
+                stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text", AST.span_none()), [AST.Expr.StringLit(text)], AST.span_none())))
             }
             else {
                 // Text tokens (identifiers, numbers, symbols) until < or { or EOF
@@ -3273,7 +3314,7 @@ class Parser {
                     this.advance()
                 }
                 if (full_text.length() > 0) {
-                    stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(full_text)])))
+                    stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text", AST.span_none()), [AST.Expr.StringLit(full_text)], AST.span_none())))
                 } else {
                     this.advance()
                 }

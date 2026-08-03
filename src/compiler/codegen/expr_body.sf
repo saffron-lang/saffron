@@ -63,7 +63,7 @@
                     local
                 }
             }
-            Variable(name) => {
+            Variable(name, __vs) => {
                 if (this.typed_vars.has(name)) {
                     this.last_type = this.typed_vars.get(name)
                 } else {
@@ -155,7 +155,7 @@
                 }
                 local
             }
-            Ref(rkind, rname, rslot) => {
+            Ref(rkind, rname, rslot, __rs) => {
                 // Resolved by resolve.sf with a scope chain in hand, so the
                 // local-vs-global question is already answered. The Variable arm
                 // above has to re-derive it from module_globals, and gets it
@@ -203,10 +203,10 @@
             Unary(op, right) => {
                 this.gen_unary(op, right)
             }
-            Call(callee, args) => {
+            Call(callee, args, __cs) => {
                 this.gen_call(callee, args)
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 var val: String = this.gen_arg_value(value)
                 // Prefixed key only — see the note in stmts_body.sf's
                 // gen_var_decl_with_name. The bare-name fallback could only
@@ -240,7 +240,7 @@
             Logical(left, op, right) => {
                 this.gen_logical(left, op, right)
             }
-            MemberAccess(object, field) => {
+            MemberAccess(object, field, __ms) => {
                 // Check if object is This -> field access
                 if (this.is_this_expr(object)) {
                     return this.gen_get_field(object, field)
@@ -390,10 +390,10 @@
                 }
                 local
             }
-            GetField(object, field) => {
+            GetField(object, field, __gs) => {
                 this.gen_get_field(object, field)
             }
-            SetField(object, field, value) => {
+            SetField(object, field, value, __ss) => {
                 // This arm is currently UNREACHABLE, and measured so rather than
                 // argued: with a distinct marker string on each of the two write
                 // sites, 18 syntactic positions were swept (top level, function
@@ -420,7 +420,7 @@
             IndexSet(object, index, value) => {
                 this.gen_index_set(object, index, value)
             }
-            MethodCall(object, method, args) => {
+            MethodCall(object, method, args, __ks) => {
                 this.gen_method_call(object, method, args)
             }
             MapLit => {
@@ -1605,8 +1605,8 @@
         // Handle function references as values (e.g. passing HomePage to Router.Route)
         var expr_kind: String = this.classify_expr(expr)
         if (expr_kind == "variable") {
-            var __vn: String = match (expr) { Variable(n) => n
-                Ref(rk, rn, rs) => rn
+            var __vn: String = match (expr) { Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             // Nested-`fun` binding in this body wins over a like-named module
@@ -1641,13 +1641,13 @@
             }
         }
         if (expr_kind == "method_call") {
-            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o
+            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a, __ks) => o
                 _ => AST.Expr.NilLit
             }
-            var mc_method: String = match (expr) { MethodCall(o, m, a) => m
+            var mc_method: String = match (expr) { MethodCall(o, m, a, __ks) => m
                 _ => ""
             }
-            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a
+            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a, __ks) => a
                 _ => []
             }
             return this.gen_method_call(mc_obj, mc_method, mc_args)
@@ -1711,10 +1711,10 @@
             return this.gen_arg_value(be_value)
         }
         if (expr_kind == "get_field") {
-            var gf_obj: AST.Expr = match (expr) { GetField(o, f) => o
+            var gf_obj: AST.Expr = match (expr) { GetField(o, f, __gs) => o
                 _ => AST.Expr.NilLit
             }
-            var gf_field: String = match (expr) { GetField(o, f) => f
+            var gf_field: String = match (expr) { GetField(o, f, __gs) => f
                 _ => ""
             }
             return this.gen_get_field(gf_obj, gf_field)
@@ -1730,13 +1730,13 @@
             return local
         }
         if (expr_kind == "set_field") {
-            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v) => o
+            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v, __ss) => o
                 _ => AST.Expr.NilLit
             }
-            var sf_field: String = match (expr) { SetField(o, f, v) => f
+            var sf_field: String = match (expr) { SetField(o, f, v, __ss) => f
                 _ => ""
             }
-            var sf_val: AST.Expr = match (expr) { SetField(o, f, v) => v
+            var sf_val: AST.Expr = match (expr) { SetField(o, f, v, __ss) => v
                 _ => AST.Expr.NilLit
             }
             // The LIVE write site — this is the copy every spelling of
@@ -1766,11 +1766,11 @@
             // beat a like-named parameter and the parameter became unreachable
             // — BUGS #40, whose repro is `var x` in the main program silently
             // capturing math.sf's `sqrt(x)` parameter.
-            var ref_kind: String = match (expr) { Ref(rk, rn, rs) => rk
+            var ref_kind: String = match (expr) { Ref(rk, rn, rs, __rs) => rk
                 _ => ""
             }
             if (ref_kind == "local" or ref_kind == "param") {
-                var pname: String = match (expr) { Ref(rk, rn, rs) => rn
+                var pname: String = match (expr) { Ref(rk, rn, rs, __rs) => rn
                     _ => ""
                 }
                 if (this.typed_vars.has(pname)) {
@@ -1791,8 +1791,8 @@
                 }
                 return plocal
             }
-            var vname: String = match (expr) { Variable(n) => n
-                Ref(rk, rn, rs) => rn
+            var vname: String = match (expr) { Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             if (this.typed_vars.has(vname)) {
@@ -1837,10 +1837,10 @@
             return local
         }
         if (expr_kind == "member") {
-            var m_obj: Any = match (expr) { MemberAccess(o, f) => o
+            var m_obj: Any = match (expr) { MemberAccess(o, f, __ms) => o
                 _ => ""
             }
-            var m_field: String = match (expr) { MemberAccess(o, f) => f
+            var m_field: String = match (expr) { MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             // Check if object is This → field access
@@ -1956,7 +1956,7 @@
             if (mn.length() == 0) {
                 var obj_kind2: String = this.classify_expr(m_obj)
                 if (obj_kind2 == "member") {
-                    var inner_field: String = match (m_obj) { MemberAccess(o, f) => f
+                    var inner_field: String = match (m_obj) { MemberAccess(o, f, __ms) => f
                         _ => ""
                     }
                     var key: String = inner_field + "." + m_field
@@ -1965,7 +1965,7 @@
                     }
                     // Fallback: maybe the inner MemberAccess root is a module alias
                     // e.g. AST.Type.IntType where AST is module, Type is enum, IntType is variant
-                    var inner_obj: AST.Expr = match (m_obj) { MemberAccess(o, f) => o
+                    var inner_obj: AST.Expr = match (m_obj) { MemberAccess(o, f, __ms) => o
                         _ => AST.Expr.NilLit
                     }
                     var root_name: String = this.get_variable_name(inner_obj)
@@ -2638,11 +2638,11 @@
                             var si: Float = 0
                             while (si < tc_args.length()) {
                                 if (this.classify_expr(tc_args[si]) == "assign") {
-                                    var arg_name: String = match (tc_args[si]) { Assign(n, v) => n
+                                    var arg_name: String = match (tc_args[si]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (arg_name == pname) {
-                                        var arg_value: AST.Expr = match (tc_args[si]) { Assign(n, v) => v
+                                        var arg_value: AST.Expr = match (tc_args[si]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         tc_new.push(arg_value)
@@ -2705,11 +2705,11 @@
                     var si: Float = 0
                     while (si < args.length()) {
                         if (this.classify_expr(args[si]) == "assign") {
-                            var arg_name: String = match (args[si]) { Assign(n, v) => n
+                            var arg_name: String = match (args[si]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (arg_name == pname) {
-                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v) => v
+                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 new_args.push(arg_value)
@@ -2880,11 +2880,11 @@
                             var si2: Float = 0
                             while (si2 < tc_args2.length()) {
                                 if (this.classify_expr(tc_args2[si2]) == "assign") {
-                                    var arg_name2: String = match (tc_args2[si2]) { Assign(n, v) => n
+                                    var arg_name2: String = match (tc_args2[si2]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (arg_name2 == pname2) {
-                                        var arg_value2: AST.Expr = match (tc_args2[si2]) { Assign(n, v) => v
+                                        var arg_value2: AST.Expr = match (tc_args2[si2]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         tc_new2.push(arg_value2)
@@ -2944,11 +2944,11 @@
                     var si2: Float = 0
                     while (si2 < args.length()) {
                         if (this.classify_expr(args[si2]) == "assign") {
-                            var arg_name2: String = match (args[si2]) { Assign(n, v) => n
+                            var arg_name2: String = match (args[si2]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (arg_name2 == pname2) {
-                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v) => v
+                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 new_args2.push(arg_value2)
@@ -3201,9 +3201,9 @@
         // looked up in string_vars, and the 24 hand-written `=> ""` arms had
         // likewise gone stale (MapLit, IndexGet, IndexSet, MethodCall missing).
         var name: String = match (expr) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
-            GetField(o, f) => f
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
+            GetField(o, f, __gs) => f
             _ => ""
         }
         if (name.length() > 0) {
