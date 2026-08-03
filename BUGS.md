@@ -2,8 +2,8 @@
 
 ## Open
 
-**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
-#129, #130, #131, #132, #133. Next free number is **#134**.
+**17 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+#129, #130, #131, #132, #134, #135. Next free number is **#136**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -22,6 +22,81 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 134. a method call on a builtin receiver silently dispatches to an unrelated user class
+
+**Severity: high — a silent wrong answer, and a segfault in the field-touching
+variant.** A call to a method name the receiver's real type does not have, but
+which *some* unrelated user class declares, resolves to that class's method
+instead of being rejected.
+
+```saffron
+class Widget { fun init() {} fun frobnicate(): Int { return 42 } }
+fun main() {
+    var s: String = "ab"
+    IO.println(s.frobnicate())   // prints 42 — String has no frobnicate()
+}
+main()
+```
+
+`String` has no `frobnicate`, `Widget` is never even constructed, yet the call
+prints `42`. Make the borrowed method touch a field and it is worse — the
+unrelated class's `this` is now a `String` pointer read at a class field offset:
+
+```saffron
+class Widget { var tag: Int  fun init() { this.tag = 7 } fun frobnicate(): Int { return this.tag } }
+// var s: String = "ab"; s.frobnicate()  →  Segmentation fault: 11
+```
+
+**Not String-specific.** I ran the same `Widget`/`frobnicate` shape over five
+receiver types and every one prints `42`:
+
+| receiver | result |
+|---|---|
+| `var s: String = "ab"` | 42 |
+| `var s: Int = 5` | 42 |
+| `var s: List<Int> = [1,2]` | 42 |
+| `var s: Bool = true` | 42 |
+| `var s: Float = 1.5` | 42 |
+
+So it is not "String is under-checked" — it is that a call on *any* builtin
+receiver, when nothing legitimately matches, falls through to whatever user class
+declares that name rather than erroring. Distinct from #37 (no branch matches →
+call silently dropped, RC 0): here the *wrong* branch matches. Same
+dispatch-permissiveness family as the resolved #37/#38/#91 cluster, so the
+receiver-type guard on the user-class method arm in `methods_body.sf` is where to
+look — a method arm is being emitted without first confirming the receiver's
+static type is that class (or a subtype).
+
+### 135. a method inherited from a grandparent but not redeclared on the leaf has no dispatch symbol
+
+**Severity: high — rejects valid programs at codegen.** A three-level chain where
+the middle class overrides a method and the leaf does not redeclare it fails to
+compile *when the call goes through a base-typed receiver* (the case that forces
+runtime dispatch):
+
+```saffron
+class Base { fun init() {} fun label(): String { return "base" }
+             fun show(): String { return this.label() } }
+class Mid extends Base { fun init() {} fun label(): String { return "mid" } }
+class Leaf extends Mid { fun init() {} }
+fun main() {
+    var x: Base = Leaf()
+    IO.println(x.label())   // [codegen] Error: no symbol for method 'label' on class 'Leaf'
+}
+main()
+```
+
+`var x: Leaf = Leaf(); x.label()` compiles and prints `mid` — the failure needs
+the base-typed variable, which is what makes codegen emit a runtime dispatch arm
+per concrete class. For `Leaf`, `effective_method_owner` resolves `Leaf`→`Mid`
+(the nearest ancestor that declares `label`), which differs from `ns_owner`
+(`Base`), so the arm is emitted — but it calls `resolve_method_symbol("Leaf",
+"label")` and no `Leaf__label` forwarder was ever emitted, only `Mid__label`. The
+arm should target the *resolved owner's* symbol (`Mid__label`), not the leaf's.
+Reported region: `methods_body.sf:904-938`. `test/pass/` has no three-level chain
+with a non-redeclaring leaf, which is why it survived; both cases above were
+reproduced on clean main.
 
 ### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
 
@@ -1157,6 +1232,76 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 133. FIXED — a variable used only inside an `and`/`or` operand was reported unused
+
+```saffron
+fun f() {
+    var e: Int = 1
+    if (e > 0 and e < 5) { IO.println("ok") }   // Warning: unused variable 'e'
+}
+```
+
+`infer_type`'s `Logical(left, op, right)` arm (`checker.sf:2632`) returned
+`AST.Type.BoolType` without visiting either operand, so both subtrees were
+invisible to the used-variable bookkeeping. Fixed by walking them; the arm still
+returns `BoolType` unconditionally, because it is a walk and not new inference.
+
+Reproduced against the untouched checked-in gen2, so it predates the current
+round of work and is not a regression from it. Cosmetic — a false diagnostic, no
+wrong code emitted.
+
+**The axis was measured, not guessed.** Eight shapes were compiled and the
+warnings counted one at a time:
+
+| shape | warns |
+|---|---|
+| `if (x == 1 and true)` | yes |
+| `if (true and x == 1)` | yes |
+| `if (x == 1 or true)` | yes |
+| `var b: Bool = x == 1 and true` | yes |
+| `IO.println("${x == 1 and true}")` | yes |
+| `if (x + 1 == 2 and true)` | yes |
+| `if (!(x == 1))` | **no** |
+| `if ((x == 1) == true)` | **no** |
+
+So it was never specific to `if` conditions, and `!` (Unary) and a nested `==`
+(Binary) were already correct — both of those arms recurse. That table is what
+located the single arm; reading the file would have offered `apply_narrowing`'s
+two `Logical` arms as equally plausible culprits, and they are not the bug.
+
+**This is the third instance of one defect class, and naming it predicts the
+fourth.** #121 (the callee of a `Call`), #126 (a lambda's body) and #133 (a
+logical operand) are all `infer_type` arms that knew their own result type and
+therefore never asked what was underneath them. `Logical` is the easiest of the
+three to write wrongly, because unlike `Binary` the operand types genuinely *do
+not* contribute to the result — Saffron's `and`/`or` yield a `Bool` rather than
+one of their operands — so returning `BoolType` without recursing looks complete
+rather than truncated. **The audit this suggests:** any `infer_type` arm whose
+body is a bare type constructor with no `infer_type` call is a candidate. At the
+time of writing `GetField(obj, field) => AST.Type.AnyType` and
+`ListLit(elements) => AST.Type.GenericType("List", [AnyType])` both have that
+shape.
+
+Regression test: `test/pass/unused_var_logical_operand.sf`, 16 assertions,
+modelled on `unused_var_lambda_capture.sf` (#126) and
+`unused_var_callee_position.sf` (#121) — it shells out to `build/saffronc` and
+greps the diagnostics, because `run_tests.sh`'s `filter_noise()` strips every
+`[checker] Warning` line from a test's captured output, so an in-file "no
+warning" test would pass no matter what. Measured 6/16 before the fix and 16/16
+after. It asserts both halves: left operand and right operand separately (two
+recursive calls, so dropping either is a one-line half-fix), `or` as well as
+`and` (a fix keyed on `op == "and"` — which is how `apply_narrowing` is
+legitimately written a few hundred lines above — would leave `or` broken), a use
+reached *through* arithmetic, and three must-still-warn cases so the walk cannot
+become a blanket suppression.
+
+One wrinkle worth recording because it cost a cycle: the interpolation case
+cannot be written as a string literal. A `${...}` inside this test's own source
+is interpolated by the compiler *building the test*, where `s` names nothing, so
+the literal has to be assembled by concatenation around a helper returning `"$"`.
+
+---
 
 ### 116. FIXED — enum payload variants compared by address, so two equal values were unequal
 

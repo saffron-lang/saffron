@@ -396,7 +396,16 @@
         var gi: Float = 1
         while (gi < parents.length()) {
             var extra: String = parents[gi]
-            if (this.class_fields.has(extra) and this.class_fields.get(extra).length() > 0) {
+            // Bound to a local and nil-checked rather than written as
+            // `has(extra) and get(extra).length() > 0`. An `and` narrows its right
+            // operand from its left (see the Logical arm of checker.sf's
+            // infer_type), but only for a *nil check on a variable* — `has()` is an
+            // unrelated call the checker cannot connect to the `get()` beside it,
+            // so that spelling would still call `.length()` on a `String|Nil`.
+            // `!= nil` on a bound local is the guard that both narrows and
+            // evaluates correctly (`is` is broken on unions, BUGS #69).
+            var extra_fields: String|Nil = this.class_fields.get(extra)
+            if (extra_fields != nil and extra_fields.length() > 0) {
                 IO.println("Error: class " + name + " cannot extend " + extra
                     + " as a secondary base: it declares fields, and only the first base's fields are inherited. Make it the first base, or give it no fields.")
             }
