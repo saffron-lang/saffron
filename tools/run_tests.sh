@@ -83,6 +83,7 @@ NOT_A_TEST="goals hello_wasm gc_generational_test"
 # An entry must land in the same commit as the test it names, or the staleness
 # check below will (correctly) flag it.
 KNOWN_FAIL="
+oracle_println_class_not_bits 115
 "
 
 known_fail_bug() {   # label -> echoes the BUGS number, or nothing

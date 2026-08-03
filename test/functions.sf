@@ -67,11 +67,24 @@ fun outer() {
 
 
 
-// Errors
+// Call chains
 fun a() { b(); }
 fun b() { c(); }
-fun c() {
-  c("too", "many");
-}
+fun c() { IO.print("chain reached c"); }
 
 a();
+
+// This block used to read:
+//
+//   fun c() { c("too", "many"); }
+//   a();
+//
+// a Crafting Interpreters stack-trace test, inherited from the C VM where
+// over-applying a function was a catchable RUNTIME error that printed a trace.
+// It has no runtime meaning under the native compiler -- arity is a compile-time
+// check -- and it was silently mis-serving as neither. `expected > 0` in the
+// codegen arity check exempted every 0-arity function from checking (BUGS #113),
+// so the over-application was accepted, `c` recursed into itself forever, and
+// this file was a `timeout -- hung for >10s` failure in the main suite rather
+// than the diagnostic test it was written to be. The compile-time half now lives
+// in test/fail/arity_zero_overapplied.sf, where a clean compile is the failure.

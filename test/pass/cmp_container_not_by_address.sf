@@ -1,0 +1,111 @@
+// Ordering two Lists / Maps / class instances must not depend on where they
+// happen to sit in the heap.
+//
+// BUGS #104's fix routes an unsettled `<` to __val_cmp, which dispatches on the
+// NaN-box tag. But a List, Map or instance reaches it *untagged* (upper 16 bits
+// zero), not as TAG_PTR, so it missed the pointer branch and fell through to the
+// numeric path — i.e. got ordered by address:
+//
+//   fun lt_any(a: Any, b: Any): Bool { return a < b }
+//   lt_any([1, 2, 3], [9])      // true at -O2, false at -O0
+//
+// Same source, same compiler, answer flips with the optimization level, which is
+// #104's own layout-luck signature. tools/differential.sh reported it as a
+// native-O2 != native-O0 MISMATCH.
+//
+// WHAT THIS TEST DOES AND DOES NOT PIN DOWN
+//
+// It deliberately does NOT assert that `[1] < [2]` is false. There is no correct
+// ordering of two Lists, so "false" is not a right answer to freeze — the
+// checker ought to reject the comparison outright (src/compiler/checker.sf), and
+// when it does these calls become compile errors rather than assertions with a
+// blessed result. Recording the current output as intended would make that fix
+// look like a regression (BUGS #107).
+//
+// What it asserts instead are three properties that hold whatever the eventual
+// answer is, and each of which the address ordering violated:
+//
+//   1. DETERMINISM — comparing the same two values twice agrees with itself.
+//   2. ANTISYMMETRY — `a < b` and `b < a` are not both true. Under address
+//      ordering exactly one was true, which is precisely the tell that a real
+//      total order over addresses had been invented.
+//   3. INDEPENDENCE FROM ALLOCATION ORDER — building the same two values in the
+//      opposite order gives the same answer. This is the one that fails
+//      loudest under address ordering, and unlike an -O0/-O2 diff it can be
+//      checked inside a single run.
+//
+// The string and number cases below are controls: those DO have an ordering,
+// #104 exists to make them work, and they must keep working.
+import "@test" as Test
+
+fun lt_any(a: Any, b: Any): Bool { return a < b }
+fun gt_any(a: Any, b: Any): Bool { return a > b }
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun main() {
+    // --- Controls: ordering that is real and must still work.
+    Test.assert(lt_any("apple", "banana"), "strings still order by content")
+    Test.assert(!lt_any("banana", "apple"), "and in the right direction")
+    Test.assert(lt_any(1, 2), "ints still order")
+    Test.assert(lt_any(1.5, 2.5), "floats still order")
+    Test.assert(lt_any(1, 2.5), "int vs float still orders")
+
+    // --- Lists. Determinism.
+    var l1 = [1, 2, 3]
+    var l2 = [9]
+    var first = lt_any(l1, l2)
+    Test.assert_eq(lt_any(l1, l2), first, "list < list is deterministic")
+    Test.assert_eq(lt_any(l1, l2), first, "and again")
+
+    // Antisymmetry: both directions cannot be true.
+    Test.assert(!(lt_any(l1, l2) and lt_any(l2, l1)),
+        "list < list is not true in both directions")
+    Test.assert(!(gt_any(l1, l2) and gt_any(l2, l1)),
+        "list > list is not true in both directions")
+
+    // Independence from allocation order. Same two values, built the other way
+    // round; under address ordering this flipped.
+    var r2 = [9]
+    var r1 = [1, 2, 3]
+    Test.assert_eq(lt_any(r1, r2), lt_any(l1, l2),
+        "list ordering does not depend on which was allocated first")
+    Test.assert_eq(gt_any(r1, r2), gt_any(l1, l2),
+        "nor for >")
+
+    // --- Maps, same three properties.
+    var m1 = {"a": 1}
+    var m2 = {"b": 2}
+    var mfirst = lt_any(m1, m2)
+    Test.assert_eq(lt_any(m1, m2), mfirst, "map < map is deterministic")
+    Test.assert(!(lt_any(m1, m2) and lt_any(m2, m1)),
+        "map < map is not true in both directions")
+    var n2 = {"b": 2}
+    var n1 = {"a": 1}
+    Test.assert_eq(lt_any(n1, n2), lt_any(m1, m2),
+        "map ordering does not depend on allocation order")
+
+    // --- Class instances.
+    var b1 = Box(1)
+    var b2 = Box(2)
+    var bfirst = lt_any(b1, b2)
+    Test.assert_eq(lt_any(b1, b2), bfirst, "instance < instance is deterministic")
+    Test.assert(!(lt_any(b1, b2) and lt_any(b2, b1)),
+        "instance < instance is not true in both directions")
+    var c2 = Box(2)
+    var c1 = Box(1)
+    Test.assert_eq(lt_any(c1, c2), lt_any(b1, b2),
+        "instance ordering does not depend on allocation order")
+
+    // A container compared with itself: reflexivity of the non-strict form is
+    // the one thing any ordering must agree on.
+    Test.assert(!lt_any(l1, l1), "a list is not less than itself")
+    Test.assert(!gt_any(l1, l1), "nor greater than itself")
+    Test.assert(!lt_any(m1, m1), "a map is not less than itself")
+    Test.assert(!lt_any(b1, b1), "an instance is not less than itself")
+
+    Test.summary()
+}
