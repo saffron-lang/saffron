@@ -1,0 +1,97 @@
+// BUGS #6 — the checker now rejects break/continue outside a loop, but every
+// legal placement must still compile AND run. This exercises break/continue in
+// each loop form (while, C-style for, for-in), nested loops, and a loop nested
+// inside a function declared inside another loop — the boundary case whose
+// reset is the subtle half of the fix.
+
+import "@test" as Test
+
+// while + break
+fun sum_to(limit: Int): Int {
+    var total: Int = 0
+    var i: Int = 0
+    while (true) {
+        if (i >= limit) { break }
+        total = total + i
+        i = i + 1
+    }
+    return total
+}
+
+// while + continue (skip odds)
+fun sum_evens(limit: Int): Int {
+    var total: Int = 0
+    var i: Int = 0
+    while (i < limit) {
+        var cur: Int = i
+        i = i + 1
+        if (cur == 1 or cur == 3) { continue }
+        total = total + cur
+    }
+    return total
+}
+
+// C-style for + break
+fun first_over(threshold: Int): Int {
+    var found: Int = 0
+    for (var j: Int = 0; j < 100; j = j + 1) {
+        if (j > threshold) { found = j; break }
+    }
+    return found
+}
+
+// for-in + continue
+fun count_positive(xs: List<Int>): Int {
+    var n: Int = 0
+    for (x in xs) {
+        if (x <= 0) { continue }
+        n = n + 1
+    }
+    return n
+}
+
+// nested loops: break only exits the inner loop
+fun inner_break_count(): Int {
+    var count: Int = 0
+    var a: Int = 0
+    while (a < 3) {
+        var b: Int = 0
+        while (b < 10) {
+            if (b == 2) { break }
+            count = count + 1
+            b = b + 1
+        }
+        a = a + 1
+    }
+    return count
+}
+
+// a loop inside a function declared inside a loop: the inner break is legal
+// because it has its own enclosing loop, even though the boundary reset means
+// the outer loop does not license it.
+fun outer(): Int {
+    var acc: Int = 0
+    var k: Int = 0
+    while (k < 2) {
+        fun helper(): Int {
+            var h: Int = 0
+            while (true) {
+                if (h == 5) { break }
+                h = h + 1
+            }
+            return h
+        }
+        acc = acc + helper()
+        k = k + 1
+    }
+    return acc
+}
+
+Test.assert_eq(sum_to(5), 10, "while + break sums 0..4")
+Test.assert_eq(sum_evens(5), 6, "while + continue skips 1 and 3 (0+2+4)")
+Test.assert_eq(first_over(7), 8, "C-style for + break finds first > 7")
+Test.assert_eq(count_positive([-1, 2, 0, 3, -4, 5]), 3, "for-in + continue counts positives")
+Test.assert_eq(inner_break_count(), 6, "nested break exits only inner loop (3*2)")
+Test.assert_eq(outer(), 10, "loop in a nested function: inner break is legal (2*5)")
+
+Test.summary()

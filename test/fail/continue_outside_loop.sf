@@ -1,0 +1,10 @@
+// Expected error: continue: 'continue' outside of a loop
+//
+// BUGS #6 — companion to break_outside_loop.sf. A bare `continue` at the top
+// level of a function body has no loop to continue and must be rejected rather
+// than emitting a jump to a nonexistent label.
+
+fun main() {
+    continue
+}
+main()
