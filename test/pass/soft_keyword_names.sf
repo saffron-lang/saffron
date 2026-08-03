@@ -1,0 +1,74 @@
+// BUGS #137 — a soft keyword is a legal binding name, so it must also be a
+// legal *reference*.
+//
+// `as`, `in` and `is` get dedicated token kinds from the lexer, so the primary
+// expression dispatch's `TkIdent` arm never saw them: declaring `fun f(as:
+// String)` parsed and type checked fine (expect_ident maps the three tokens back
+// to their spelling), but *reading* `as` in the body fell through to the `_ =>`
+// catch-all and reported "expected a literal, name or '('".
+//
+// `actor` and `interface` are soft keywords too, but the lexer leaves them as
+// TkIdent, so they were never affected. They are covered here anyway — the point
+// of the test is declare-and-read for every soft keyword, not just the ones that
+// happened to be broken.
+
+import "@test" as Test
+
+fun take_as(as: String): String { return as }
+fun take_in(in: String): String { return in }
+fun take_is(is: String): String { return is }
+fun take_actor(actor: String): String { return actor }
+fun take_interface(interface: String): String { return interface }
+
+// Read a soft-keyword binding in a more demanding position than `return`:
+// interpolation, a method call on it, and an operand of a binary expression.
+fun interp_as(as: String): String { return "<${as}>" }
+fun method_on_in(in: String): String { return in.to_upper() }
+fun concat_is(is: String): String { return is + "!" }
+
+// Soft keywords as local variable names, not just parameters.
+fun locals(): String {
+    var as: String = "L1"
+    var in: String = "L2"
+    var is: String = "L3"
+    var actor: String = "L4"
+    var interface: String = "L5"
+    return as + in + is + actor + interface
+}
+
+// A soft-keyword local must still be assignable and re-readable.
+fun reassign(): String {
+    var as: String = "before"
+    as = "after"
+    return as
+}
+
+fun main() {
+    // Parameters: declare and read.
+    Test.assert_eq(take_as("A"), "A", "param named 'as' reads back")
+    Test.assert_eq(take_in("B"), "B", "param named 'in' reads back")
+    Test.assert_eq(take_is("C"), "C", "param named 'is' reads back")
+    Test.assert_eq(take_actor("D"), "D", "param named 'actor' reads back")
+    Test.assert_eq(take_interface("E"), "E", "param named 'interface' reads back")
+
+    // Reads in non-trivial expression positions.
+    Test.assert_eq(interp_as("x"), "<x>", "'as' reads inside interpolation")
+    Test.assert_eq(method_on_in("hi"), "HI", "'in' is a method receiver")
+    Test.assert_eq(concat_is("y"), "y!", "'is' is a binary operand")
+
+    // Locals.
+    Test.assert_eq(locals(), "L1L2L3L4L5", "soft keywords as local var names")
+    Test.assert_eq(reassign(), "after", "a soft-keyword local is assignable")
+
+    // The keyword meanings must still work: `is` as the type-test operator, and
+    // `in` as the for-in separator. A fallback arm that swallowed these would
+    // pass every assertion above and still be wrong.
+    var n: Int = 7
+    Test.assert(n is Number, "'is' still works as the type-test operator")
+    var total: Int = 0
+    var nums: List<Int> = [1, 2, 3]
+    for (item in nums) { total = total + item }
+    Test.assert_eq(total, 6, "'in' still works as the for-in separator")
+
+    Test.summary()
+}

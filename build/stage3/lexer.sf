@@ -55,6 +55,24 @@ enum TokenKind {
     TkLtEq,
     TkGt,
     TkGtEq,
+    // Compound assignment and increment/decrement. Appended at the end of the
+    // operator group rather than next to their base operators so that every
+    // pre-existing variant keeps the tag it already had — the same reason the
+    // AST's widened nodes append fields instead of inserting them.
+    //
+    // Adding `++` and `--` makes the lexer maximal-munch on those two
+    // characters, so `3--2` is now `3 -- 2` and a parse error rather than
+    // `3 - (-2)`. That is C's and JavaScript's reading of the same text; write
+    // `3 - -2` for the subtraction. Nothing in the tree relied on the old
+    // spelling (checked: no `--`, `++` or `+=` outside strings and comments
+    // anywhere under src/, test/, tools/ or the app directories).
+    TkPlusEq,
+    TkMinusEq,
+    TkStarEq,
+    TkSlashEq,
+    TkPercentEq,
+    TkPlusPlus,
+    TkMinusMinus,
 
     // Delimiters
     TkLParen,
@@ -475,18 +493,55 @@ class Lexer {
         else if (ch == ".") { this.emit(TokenKind.TkDot) }
         else if (ch == ":") { this.emit(TokenKind.TkColon) }
         else if (ch == ";") { this.emit(TokenKind.TkSemicolon) }
-        else if (ch == "+") { this.emit(TokenKind.TkPlus) }
+        else if (ch == "+") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkPlusEq)
+            } else if (this.peek() == "+") {
+                this.advance()
+                this.emit(TokenKind.TkPlusPlus)
+            } else {
+                this.emit(TokenKind.TkPlus)
+            }
+        }
         else if (ch == "-") {
             if (this.peek() == ">") {
                 this.advance()
                 this.emit(TokenKind.TkArrow)
+            } else if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkMinusEq)
+            } else if (this.peek() == "-") {
+                this.advance()
+                this.emit(TokenKind.TkMinusMinus)
             } else {
                 this.emit(TokenKind.TkMinus)
             }
         }
-        else if (ch == "*") { this.emit(TokenKind.TkStar) }
-        else if (ch == "/") { this.emit(TokenKind.TkSlash) }
-        else if (ch == "%") { this.emit(TokenKind.TkPercent) }
+        else if (ch == "*") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkStarEq)
+            } else {
+                this.emit(TokenKind.TkStar)
+            }
+        }
+        else if (ch == "/") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkSlashEq)
+            } else {
+                this.emit(TokenKind.TkSlash)
+            }
+        }
+        else if (ch == "%") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkPercentEq)
+            } else {
+                this.emit(TokenKind.TkPercent)
+            }
+        }
         else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
         else if (ch == "^") { this.emit(TokenKind.TkCaret) }
         else if (ch == "~") { this.emit(TokenKind.TkTilde) }

@@ -1,0 +1,20 @@
+// BUGS #123 fixture 2 of 3. See test/pass/alias_scope_file_local.sf.
+//
+// Same alias name as alias_scope_alpha.sf (`Shared`), bound to a different
+// module. If aliases are not file-scoped, one of these two files resolves
+// against the other's prefix and returns the wrong string — or fails to
+// compile at all with "no member 'who' in module 'Shared'".
+import "./alias_scope_target_b.sf" as Shared
+
+fun beta_calls_through_alias(): String {
+    return Shared.who()
+}
+
+fun beta_reads_global(): String {
+    return Shared.label
+}
+
+fun beta_builds_marker(): String {
+    var m = Shared.Marker("beta")
+    return m.describe()
+}

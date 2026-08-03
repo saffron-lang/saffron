@@ -1,6 +1,170 @@
-var a: Int = 4;
-a = a++;
-IO.println(a);
-var b: Int = a--;
-IO.println(b);
-IO.println(a);
+// Regression test for BUGS #128: compound assignment and increment/decrement.
+//
+// This file used to be six lines with no assertions, testing a feature that did
+// not exist — the lexer had no token for `+=`, `++` or any of the others, so
+// `a = a++` was a bare parse error ("expected a literal, name or '(' here") and
+// the file sat in the failure baseline as scenery. The operators are real now,
+// and this asserts their semantics rather than merely compiling.
+//
+// The two lines the old file contained are kept as the first block below, with
+// the values C gives them, because `a = a++` is the shape that makes postfix a
+// genuine expression rather than a statement-only shorthand.
+
+import "@test" as Test
+
+// --- The original file's two lines, now with asserted values ---
+var a: Int = 4
+a = a++
+// Postfix yields the OLD value, and that value is what gets assigned back — so
+// the increment is overwritten and `a` is unchanged. This is C's answer, and it
+// is the one case where `a = a++` differs from a bare `a++`.
+Test.assert_eq(a, 4, "a = a++ assigns the pre-increment value back")
+
+var b: Int = a--
+Test.assert_eq(b, 4, "a-- yields the pre-decrement value")
+Test.assert_eq(a, 3, "a-- decrements the variable")
+
+// --- Bare postfix in statement position ---
+var s: Int = 10
+s++
+Test.assert_eq(s, 11, "s++ as a statement increments")
+s--
+Test.assert_eq(s, 10, "s-- as a statement decrements")
+
+// --- Compound assignment on a local ---
+var x: Int = 10
+x += 5
+Test.assert_eq(x, 15, "+= adds")
+x -= 3
+Test.assert_eq(x, 12, "-= subtracts")
+x *= 2
+Test.assert_eq(x, 24, "*= multiplies")
+x /= 4
+Test.assert_eq(x, 6, "/= divides")
+x %= 4
+Test.assert_eq(x, 2, "%= takes the remainder")
+
+// The right-hand side is a whole expression, so the compound operator binds
+// loosest: `y *= 3 + 4` is `y = y * (3 + 4)`, not `(y * 3) + 4`.
+var y: Int = 2
+y *= 3 + 4
+Test.assert_eq(y, 14, "the rhs of *= is a whole expression, not just its first term")
+
+// --- Floats and strings ---
+var f: Float = 1.5
+f += 0.5
+Test.assert_eq(f, 2, "+= on a Float")
+f *= 3
+Test.assert_eq(f, 6, "*= on a Float")
+
+var str: String = "a"
+str += "b"
+str += "c"
+Test.assert_eq(str, "abc", "+= concatenates Strings")
+
+// --- Fields ---
+class Counter {
+    var n: Int
+    fun init() { this.n = 0 }
+    // Through `this`, which is parse_this_stmt's path — the same function BUGS
+    // #129 was about, and the reason these two fixes travel together.
+    fun via_compound() { this.n += 2 }
+    fun via_postfix() { this.n++ }
+    fun via_decr() { this.n-- }
+    fun get(): Int { return this.n }
+}
+
+var counter: Counter = Counter()
+counter.via_compound()
+Test.assert_eq(counter.get(), 2, "this.n += 2 inside a method")
+counter.via_postfix()
+Test.assert_eq(counter.get(), 3, "this.n++ inside a method")
+counter.via_decr()
+Test.assert_eq(counter.get(), 2, "this.n-- inside a method")
+
+// The same field through an ordinary receiver, which hoists the receiver into a
+// temporary instead of keeping `this`.
+counter.n += 10
+Test.assert_eq(counter.n, 12, "receiver.field += through a local receiver")
+counter.n++
+Test.assert_eq(counter.n, 13, "receiver.field++ through a local receiver")
+counter.n -= 3
+Test.assert_eq(counter.n, 10, "receiver.field -= through a local receiver")
+
+// --- List elements ---
+var lst: List<Int> = [1, 2, 3]
+lst[0] += 100
+Test.assert_eq(lst[0], 101, "element +=")
+lst[1]++
+Test.assert_eq(lst[1], 3, "element++")
+lst[2] -= 1
+Test.assert_eq(lst[2], 2, "element -=")
+
+// --- Postfix as an expression, in the positions that matter ---
+var e: Int = 5
+var captured: Any = e++
+Test.assert_eq(captured, 5, "postfix in a var initializer yields the old value")
+Test.assert_eq(e, 6, "and still increments")
+
+// In a call argument.
+var g: Int = 1
+Test.assert_eq(g++, 1, "postfix as a call argument yields the old value")
+Test.assert_eq(g, 2, "and still increments")
+
+// In a condition. `h++ > 0` is false for h == 0, and h is 1 afterwards.
+var h: Int = 0
+var took_else: Bool = false
+if (h++ > 0) { took_else = false } else { took_else = true }
+Test.assert(took_else, "postfix in a condition compares the old value")
+Test.assert_eq(h, 1, "and still increments")
+
+// --- Each subexpression is evaluated exactly once ---
+// The naive `t = e; e = t + 1` rewrite would evaluate the index twice. The
+// desugaring hoists the receiver and index into temporaries first, so a target
+// with a side effect in it runs that side effect once.
+var eval_count: Int = 0
+fun counting_index(): Int {
+    eval_count += 1
+    return 0
+}
+var arr: List<Int> = [7, 8]
+arr[counting_index()]++
+Test.assert_eq(arr[0], 8, "the element was incremented")
+Test.assert_eq(eval_count, 1, "the index expression was evaluated exactly once")
+
+// --- Nesting: two desugarings in one scope must not share temporaries ---
+// A fixed temp name would let the second redeclare and clobber the first, which
+// is BUGS #41's failure mode for map literals.
+var p: Int = 0
+var q: Int = 10
+var pair_first: Any = p++
+var pair_second: Any = q++
+Test.assert_eq(pair_first, 0, "first nested postfix keeps its own value")
+Test.assert_eq(pair_second, 10, "second nested postfix keeps its own value")
+Test.assert_eq(p, 1, "first target incremented")
+Test.assert_eq(q, 11, "second target incremented")
+
+// --- C-style for loops, the place these operators are most wanted ---
+var seen: List<Int> = []
+for (var i = 0; i < 3; i++) { seen.push(i) }
+Test.assert_eq(seen.length(), 3, "for with i++ runs the right number of times")
+Test.assert_eq(seen[0], 0, "for with i++ starts at 0")
+Test.assert_eq(seen[2], 2, "for with i++ ends at 2")
+
+var stepped: List<Int> = []
+for (var j = 0; j < 6; j += 2) { stepped.push(j) }
+Test.assert_eq(stepped.length(), 3, "for with j += 2 runs three times")
+Test.assert_eq(stepped[1], 2, "for with j += 2 steps by two")
+
+var down: List<Int> = []
+for (var k = 3; k > 0; k--) { down.push(k) }
+Test.assert_eq(down.length(), 3, "for with k-- runs three times")
+Test.assert_eq(down[0], 3, "for with k-- counts down")
+
+// The long-hand update clause must keep working — it is the only spelling that
+// used to parse, so every existing C-style loop in the tree depends on it.
+var longhand: List<Int> = []
+for (var m = 0; m < 2; m = m + 1) { longhand.push(m) }
+Test.assert_eq(longhand.length(), 2, "for with m = m + 1 still works")
+
+Test.summary()

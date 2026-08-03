@@ -1,0 +1,49 @@
+// BUGS #123 regression: an import alias is FILE-LOCAL.
+//
+// `import "..." as Shared` binds `Shared` for the file that wrote that line and
+// for no other file. Two imported files may each bind the same alias to a
+// different module, and each must resolve to its own.
+//
+// The defect this guards: codegen held aliases in ONE flat map keyed by alias
+// name, filled by a whole-program module walk with first-writer-wins. Whichever
+// file the walk reached first won the name for everybody; every other file's
+// `Shared.*` silently resolved against the winner's prefix. In src/lib that hit
+// three files binding `Internal` to ast.sf / lexer.sf / parser.sf, and
+// src/lib/lang.sf — which imports all three — could not compile:
+//
+//     [codegen] Error: no member 'Token' in module 'Internal'
+//     [codegen] Error: no member 'TokenKind' in module 'Internal'
+//
+// The fixtures name their members IDENTICALLY (`who`, `label`, `Marker`) on
+// purpose, so a misresolution produces a *wrong value* instead of a link error.
+// A version of this test whose fixtures had distinct member names would have
+// passed on the broken compiler for two of the three paths.
+//
+// This test also pins the alias-shadowing order both ways: `Alpha` is imported
+// before `Beta` here, and the assertions below would fail whichever of the two
+// the module walk happened to visit first.
+import "@test" as Test
+import "../fixtures/alias_scope_alpha.sf" as Alpha
+import "../fixtures/alias_scope_beta.sf" as Beta
+// The entry file has its own alias scope too. `Shared` here is a THIRD binding
+// of that name, and neither fixture's `Shared` leaks out to this file: the
+// assertions below must hold with this import present.
+import "../fixtures/alias_scope_target_a.sf" as Shared
+
+// Function call through the alias, from each file's own scope.
+Test.assert_eq(Alpha.alpha_calls_through_alias(), "target-a", "alpha's Shared is target-a")
+Test.assert_eq(Beta.beta_calls_through_alias(), "target-b", "beta's Shared is target-b")
+
+// Module global read through the alias — a different codegen path than a call.
+Test.assert_eq(Alpha.alpha_reads_global(), "target-a-global", "alpha's Shared global is target-a's")
+Test.assert_eq(Beta.beta_reads_global(), "target-b-global", "beta's Shared global is target-b's")
+
+// Class construction through the alias.
+Test.assert_eq(Alpha.alpha_builds_marker(), "target-a:alpha", "alpha's Shared.Marker is target-a's")
+Test.assert_eq(Beta.beta_builds_marker(), "target-b:beta", "beta's Shared.Marker is target-b's")
+
+// The entry file's own `Shared` binding (imported at the top) resolves too.
+Test.assert_eq(Shared.who(), "target-a", "the entry file's own Shared binding resolves")
+Test.assert_eq(Shared.label, "target-a-global", "the entry file's Shared global resolves")
+
+Test.summary()

@@ -13,6 +13,7 @@ class Parser {
     var html_depth: Float
     var for_counter: Int
     var map_counter: Int
+    var incr_counter: Int
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -23,6 +24,7 @@ class Parser {
         this.html_depth = 0
         this.for_counter = 0
         this.map_counter = 0
+        this.incr_counter = 0
     }
 
     /// Suffix that makes each desugared `for-in`'s temporaries unique.
@@ -702,7 +704,157 @@ class Parser {
             var right: AST.Expr = this.parse_unary()
             return AST.Expr.Unary("~", right)
         }
-        return this.parse_call()
+        // Prefix `++x` / `--x` is rejected by name rather than silently parsed.
+        //
+        // It is not implemented because it would be a second spelling for the
+        // one thing postfix already does in every position this language can
+        // reach: statement position discards the value, so the two forms would
+        // be identical there, and the pre-increment value is `x + 1` written
+        // more clearly. Accepting it would also collide with unary minus —
+        // `--x` is already `-(-x)` in C-free languages — so leaving it as a
+        // lexer-level `--` and reporting it here is the only reading that cannot
+        // be mistaken for arithmetic.
+        if (this.match_kind_check("++") or this.match_kind_check("--")) {
+            var pre_op: String = this.kind_name(this.current_kind())
+            this.parse_error("'" + pre_op + "' is postfix only in Saffron - write 'x" + pre_op + "' or, for the incremented value, 'x " + pre_op.slice(0, 1) + " 1'")
+            this.advance()
+            return this.parse_unary()
+        }
+        return this.parse_postfix()
+    }
+
+    /// A call/member/index chain, then any postfix `++` / `--`.
+    ///
+    /// `x++` desugars to a BlockExpr that reads the old value into a temporary,
+    /// writes back `old <op> 1` and evaluates to the temporary — so it is an
+    /// expression with the value C gives it, usable anywhere an expression is,
+    /// and it needs no new AST node or codegen support. The receiver and index
+    /// are hoisted into their own temporaries first so that `f()[g()]++`
+    /// evaluates `f()` and `g()` exactly once each, which the naive
+    /// `t = e; e = t + 1` rewrite would not.
+    ///
+    /// Applied only once, not in a loop: `x++++` is not a thing, because the
+    /// result of `x++` is a value and not a place. Leaving the second `++`
+    /// unconsumed makes it a parse error at the operator rather than a silently
+    /// accepted double increment.
+    fun parse_postfix(): AST.Expr {
+        var expr: AST.Expr = this.parse_call()
+        if (this.match_kind_check("++") or this.match_kind_check("--")) {
+            var op: String = "+"
+            if (this.match_kind_check("--")) { op = "-" }
+            var spelling: String = this.kind_name(this.current_kind())
+            this.advance()
+            return this.build_postfix_incr(expr, op, spelling)
+        }
+        return expr
+    }
+
+    /// The BlockExpr behind `target++` / `target--`.
+    ///
+    /// Shape, for a variable target `x`:
+    ///     { var __inc_N: Any = x
+    ///       x = __inc_N <op> 1
+    ///       __inc_N }
+    ///
+    /// For a field or element target the receiver (and index) are hoisted first,
+    /// so each subexpression is evaluated once:
+    ///     { var __inc_recv_N = <receiver>
+    ///       var __inc_idx_N = <index>
+    ///       var __inc_N: Any = __inc_recv_N[__inc_idx_N]
+    ///       __inc_recv_N[__inc_idx_N] = __inc_N <op> 1
+    ///       __inc_N }
+    ///
+    /// The value temp is annotated `Any` rather than left to inference because
+    /// the checker cannot infer an element or field read and would warn "cannot
+    /// infer type" on a temporary the user never wrote. `Any` costs nothing at
+    /// runtime here — measured: an `Any`-annotated temp round-trips Int, Float
+    /// and String unchanged, and arithmetic and comparison on it behave as the
+    /// underlying type.
+    ///
+    /// The uid makes nesting safe, for the same reason next_for_uid and
+    /// next_map_uid exist: `lst[i++] = j++` puts two of these in one scope, and
+    /// a fixed name would let the second redeclare the first (BUGS #41).
+    fun build_postfix_incr(target: AST.Expr, op: String, spelling: String): AST.Expr {
+        var ek: String = this.classify_expr_for_assign(target)
+        if (ek == "other") {
+            this.parse_error("the operand of '" + spelling + "' must be a variable, field or element, not an expression")
+            return target
+        }
+        var uid: String = this.next_incr_uid()
+        var val_name: String = "__inc" + uid
+        var stmts: List<AST.Stmt> = []
+        // Every node built below is synthetic — `__inc_N`, `__inc_recv_N` and the
+        // rewritten place appear nowhere in the user's source — so they all carry
+        // span_none(). Giving them the operand's span would be worse than giving
+        // them nothing: go-to-definition on `x` would offer a binding the author
+        // cannot see, and rename would try to rewrite a name that is not there.
+        // The one span that must survive is the *place*'s, and it does: the
+        // MemberAccess/GetField arms below read the field name out of the original
+        // target, and build_assign carries the rebuilt place's span into the write.
+        var synth: AST.Span = AST.span_none()
+        // The `"Any"` in each VarDecl below is not a widened type — VarDecl's
+        // `type_ann` field is a String, and "Any" is the sentinel meaning "infer
+        // from the initializer", the same one parse_var_decl_with_doc writes for
+        // an unannotated `var`. The checker's VarDecl arm reads it that way. So
+        // these temporaries are typed as precisely as `var t = <expr>` is.
+        //
+        // The place to read from and write back to, rewritten over the hoisted
+        // temporaries. For a plain variable there is nothing to hoist.
+        var place: AST.Expr = target
+        if (ek == "index") {
+            var iobj: AST.Expr = match (target) { IndexGet(o, i) => o
+                _ => AST.Expr.NilLit
+            }
+            var iidx: AST.Expr = match (target) { IndexGet(o, i) => i
+                _ => AST.Expr.NilLit
+            }
+            var recv_name: String = "__inc_recv" + uid
+            var idx_name: String = "__inc_idx" + uid
+            stmts.push(AST.Stmt.VarDecl(recv_name, "Any", iobj, "", "public", synth, synth))
+            stmts.push(AST.Stmt.VarDecl(idx_name, "Any", iidx, "", "public", synth, synth))
+            place = AST.Expr.IndexGet(AST.Expr.Variable(recv_name, synth), AST.Expr.Variable(idx_name, synth))
+        } else if (ek == "member" or ek == "get_field") {
+            var mobj: AST.Expr = match (target) { MemberAccess(o, f, __ms) => o
+                GetField(o, f, __gs) => o
+                _ => AST.Expr.NilLit
+            }
+            var mfield: String = match (target) { MemberAccess(o, f, __ms) => f
+                GetField(o, f, __gs) => f
+                _ => ""
+            }
+            // The field's own span, unlike the temporaries, IS real and is the
+            // operand the user wrote. Carrying it into the rebuilt place means
+            // `holder.slot++` still locates `slot` where the source has it.
+            var mfs: AST.Span = match (target) { MemberAccess(o, f, __ms) => __ms
+                GetField(o, f, __gs) => __gs
+                _ => AST.span_none()
+            }
+            // `this.f++` keeps `this` as the receiver rather than hoisting it:
+            // `this` is already a single evaluation with no side effect, and a
+            // local holding it would defeat the field-access paths in codegen
+            // that special-case a `This` receiver.
+            var recv_is_this: Bool = match (mobj) { This => true
+                _ => false
+            }
+            if (recv_is_this) {
+                place = AST.Expr.GetField(AST.Expr.This, mfield, mfs)
+            } else {
+                var mrecv_name: String = "__inc_recv" + uid
+                stmts.push(AST.Stmt.VarDecl(mrecv_name, "Any", mobj, "", "public", synth, synth))
+                place = AST.Expr.MemberAccess(AST.Expr.Variable(mrecv_name, synth), mfield, mfs)
+            }
+        }
+        stmts.push(AST.Stmt.VarDecl(val_name, "Any", place, "", "public", synth, synth))
+        var updated: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(val_name, synth), op, AST.Expr.IntLit(1))
+        stmts.push(this.build_assign(place, updated))
+        return AST.Expr.BlockExpr(stmts, AST.Expr.Variable(val_name, synth))
+    }
+
+    /// Suffix that makes each desugared `++`/`--`'s temporaries unique. Same
+    /// role as next_for_uid / next_map_uid.
+    fun next_incr_uid(): String {
+        this.incr_counter = this.incr_counter + 1
+        return "_" + this.incr_counter.to_string()
     }
 
     fun parse_call(): AST.Expr {
@@ -741,11 +893,11 @@ class Parser {
                     // and so did `0..5` before the lexer stopped eating the first
                     // dot as a decimal point (BUGS #112). Guarding the shape keeps
                     // it from becoming __list_get on a double.
-                    var recv_is_float: String = match (expr) {
-                        FloatLit(v) => "yes"
-                        _ => "no"
+                    var recv_is_float: Bool = match (expr) {
+                        FloatLit(v) => true
+                        _ => false
                     }
-                    if (recv_is_float == "yes") {
+                    if (recv_is_float) {
                         this.parse_error("cannot use '.' field access on a float literal - a '.' right after a number is its decimal point")
                         this.advance()
                         continue
@@ -806,12 +958,12 @@ class Parser {
                 expr = AST.Expr.Call(expr, args, this.span_from(chain_start))
             } else if (this.match_kind_check("{") and this.current_line_num() == this.prev_line_num()) {
                 // Paren-free trailing closure: ident { ... } → ident(fun () { ... })
-                var is_callable: String = match (expr) {
-                    Variable(n, __vs) => "yes"
-                    MemberAccess(o, f, __ms) => "yes"
-                    _ => "no"
+                var is_callable: Bool = match (expr) {
+                    Variable(n, __vs) => true
+                    MemberAccess(o, f, __ms) => true
+                    _ => false
                 }
-                if (is_callable == "yes") {
+                if (is_callable) {
                     var tc_args: List<AST.Expr> = [this.parse_trailing_closure()]
                     expr = AST.Expr.Call(expr, tc_args, this.span_from(chain_start))
                 } else {
@@ -1012,6 +1164,17 @@ class Parser {
             TkNil => AST.Expr.NilLit
             TkString(s) => AST.Expr.StringLit(s)
             TkIdent(name) => AST.Expr.Variable(name, prim_span)
+            // Soft keywords are legal binding names, so they must also be legal
+            // *references*. `as`, `in` and `is` get their own token kinds from the
+            // lexer, so a `TkIdent` arm alone never sees them: `fun f(as: String)`
+            // parsed and type checked (expect_ident maps all three back to their
+            // spelling), but reading `as` in the body hit the `_ =>` catch-all
+            // below and died with "expected a literal, name or '('" (BUGS #137).
+            // `actor` and `interface` are soft keywords too but stay `TkIdent`, so
+            // they were never affected and need no arm here.
+            TkAs => AST.Expr.Variable("as", prim_span)
+            TkIn => AST.Expr.Variable("in", prim_span)
+            TkIs => AST.Expr.Variable("is", prim_span)
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
                 if (this.match_kind(",")) {
@@ -1388,6 +1551,11 @@ class Parser {
             UnionType(types) => "Union"
             FuncType(p, r) => "Fun"
             NullableType(inner) => "Nullable"
+            // The parser never *builds* either of these — there is no surface
+            // syntax for them — but the arms must exist, because a missing arm
+            // returns an indeterminate value rather than failing to compile.
+            UnknownType => "Unknown"
+            NeverType => "Never"
         }
     }
 
@@ -1514,6 +1682,13 @@ class Parser {
             TkLtEq => "<="
             TkGt => ">"
             TkGtEq => ">="
+            TkPlusEq => "+="
+            TkMinusEq => "-="
+            TkStarEq => "*="
+            TkSlashEq => "/="
+            TkPercentEq => "%="
+            TkPlusPlus => "++"
+            TkMinusMinus => "--"
             TkLParen => "("
             TkRParen => ")"
             TkLBrace => "{"
@@ -1857,53 +2032,271 @@ class Parser {
             return this.parse_assign()
         }
         // Check for this.field = value
+        //
+        // parse_this_stmt (and the `ident[...]` branch below) consume a
+        // member/index/call chain and return an ExprStmt *terminally*, never
+        // handing the result back to the binary-operator layer. So an infix
+        // operator that followed was left trying to start a fresh statement:
+        // `this.f + 1` reported "expected a literal, name or '(' here" at the
+        // `+` (BUGS #129), which reads as if the operator were the mistake.
+        //
+        // Rather than thread a precedence level through both functions, note
+        // where the statement began and, if one of them stopped on an operator
+        // that can only continue an expression, rewind and re-parse the whole
+        // thing through parse_expr — which already handles `this` and indexing
+        // as ordinary primaries. Re-parsing cannot loop: parse_expr does not
+        // consult this branch, and the assignment forms never stop on an infix
+        // operator (their right-hand side has already absorbed it), so a rewind
+        // only ever happens for a shape parse_expr can handle by itself.
         if (this.match_kind_check("this")) {
-            return this.parse_this_stmt()
-        }
-        // Check for index assignment: ident[expr] = value
-        if (this.match_kind_check("ident") and this.peek_is("[")) {
-            var obj_span: AST.Span = this.ident_span()
-            var obj_name: String = this.expect_ident()
-            this.advance() // consume [
-            var idx: AST.Expr = this.parse_expr()
-            this.consume("]")
-            if (this.match_kind("=")) {
-                var value: AST.Expr = this.parse_expr()
-                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
-                    AST.Expr.Variable(obj_name, obj_span), idx, value))
+            var this_start: Float = this.pos
+            var this_errs: Float = this.error_count
+            var this_stmt: AST.Stmt = this.parse_this_stmt()
+            if (this.error_count == this_errs and this.at_expr_continuation()) {
+                this.pos = this_start
+                return this.parse_expr_stmt()
             }
-            // Not an assignment — just index access as expression
-            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name, obj_span), idx)
-            return AST.Stmt.ExprStmt(get_expr)
+            return this_stmt
         }
-        // Default: expression statement (may be field assignment if followed by =)
+        // A statement beginning `ident[` needs no special case. It used to have
+        // one — consume the name, `[`, the index, `]`, then check for `=` — and
+        // that branch is BUGS #138: it *returned* at the `]`, so the postfix
+        // chain past it (`xs[0].bump()`) was left in the token stream and
+        // re-parsed as a fresh statement starting at `.`.
+        //
+        // A rewind-on-continuation guard was tried here first (the shape used for
+        // `this` above) and is NOT sufficient: `at_expr_continuation` lists infix
+        // operators, so it catches `xs[0] + 1` but not `.`, `[` or `(`. Adding
+        // those three to it would work, and would still leave a branch whose only
+        // remaining job is duplicating what the general path does.
+        //
+        // parse_expr_stmt already handles every shape this branch existed for:
+        // parse_expr's postfix loop consumes `[ ] -> . -> call` to the end, and a
+        // trailing `=` reaches build_assign, whose "index" arm builds the same
+        // IndexSet this branch built by hand. So the fix is deletion, not
+        // another guard.
+        return this.parse_expr_stmt()
+    }
+
+    /// The general expression-statement path: parse one expression, then handle
+    /// a trailing `=`, a compound assignment (`+=` and friends) or a postfix
+    /// `++`/`--`.
+    ///
+    /// Split out of parse_stmt so the two rewind sites above can re-enter it,
+    /// and so all three assignment forms share one place that decides what
+    /// counts as an assignable target.
+    fun parse_expr_stmt(): AST.Stmt {
         var expr: AST.Expr = this.parse_expr()
         if (this.match_kind("=")) {
             var value: AST.Expr = this.parse_expr()
-            var ek: String = this.classify_expr_for_assign(expr)
-            if (ek == "member") {
-                var obj: AST.Expr = match (expr) { MemberAccess(o, f, __ms) => o
-                    _ => AST.Expr.NilLit
-                }
-                var field: String = match (expr) { MemberAccess(o, f, __ms) => f
-                    _ => ""
-                }
-                // The MemberAccess we are rewriting away already located this
-                // field; carry its span over rather than re-deriving one. The
-                // read `obj.f` and the write `obj.f = v` name the same source
-                // identifier, so a rename must find both at the same place.
-                var fs: AST.Span = match (expr) { MemberAccess(o, f, __ms) => __ms
-                    _ => AST.span_none()
-                }
-                return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value, fs))
-            }
+            return this.build_assign(expr, value)
         }
+        if (this.at_compound_assign_op()) {
+            var cop: String = this.compound_assign_base_op()
+            this.advance()
+            var rhs: AST.Expr = this.parse_expr()
+            return this.build_compound_assign(expr, cop, rhs)
+        }
+        // `x++` is NOT handled here. It is a postfix *expression* operator
+        // (parse_postfix), so by this point parse_expr has already consumed it
+        // and `expr` is the BlockExpr it desugars to. Adding a branch for it
+        // here would be dead code that looks live — the shape that made #38 and
+        // #91 hard to find.
         return AST.Stmt.ExprStmt(expr)
     }
 
+    /// `target = value`, as the statement node the target's shape calls for.
+    ///
+    /// A plain `MemberAccess` target has to become `SetField`; everything else
+    /// (a `Variable` handled by parse_assign, an `IndexGet` handled by the
+    /// branch above, an `Assign` already built by the expression layer) is
+    /// already in its assignment form by the time it gets here.
+    fun build_assign(target: AST.Expr, value: AST.Expr): AST.Stmt {
+        var ek: String = this.classify_expr_for_assign(target)
+        // Every arm here rewrites a *read* node into its matching *write* node,
+        // and both spell the same source identifier. So the write inherits the
+        // read's span rather than re-deriving one: `obj.f` and `obj.f = v` must
+        // locate at the same place or a rename finds only half its occurrences.
+        // By this point the tokens are long consumed, so the node's own span is
+        // the only record of where they were.
+        if (ek == "member") {
+            var obj: AST.Expr = match (target) { MemberAccess(o, f, __ms) => o
+                _ => AST.Expr.NilLit
+            }
+            var field: String = match (target) { MemberAccess(o, f, __ms) => f
+                _ => ""
+            }
+            var fs: AST.Span = match (target) { MemberAccess(o, f, __ms) => __ms
+                _ => AST.span_none()
+            }
+            return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value, fs))
+        }
+        if (ek == "index") {
+            var iobj: AST.Expr = match (target) { IndexGet(o, i) => o
+                _ => AST.Expr.NilLit
+            }
+            var iidx: AST.Expr = match (target) { IndexGet(o, i) => i
+                _ => AST.Expr.NilLit
+            }
+            // IndexSet carries no span: there is no identifier to point at.
+            return AST.Stmt.ExprStmt(AST.Expr.IndexSet(iobj, iidx, value))
+        }
+        if (ek == "get_field") {
+            var gobj: AST.Expr = match (target) { GetField(o, f, __gs) => o
+                _ => AST.Expr.NilLit
+            }
+            var gfield: String = match (target) { GetField(o, f, __gs) => f
+                _ => ""
+            }
+            var gs: AST.Span = match (target) { GetField(o, f, __gs) => __gs
+                _ => AST.span_none()
+            }
+            return AST.Stmt.ExprStmt(AST.Expr.SetField(gobj, gfield, value, gs))
+        }
+        if (ek == "variable") {
+            var vname: String = match (target) { Variable(n, __vs) => n
+                _ => ""
+            }
+            var vs: AST.Span = match (target) { Variable(n, __vs) => __vs
+                _ => AST.span_none()
+            }
+            return AST.Stmt.ExprStmt(AST.Expr.Assign(vname, value, vs))
+        }
+        // Some other shape on the left of `=` — a literal, a call, an
+        // arithmetic result. Silently discarding `value` (the old behaviour)
+        // is worse than saying so; this diagnostic came from the BUGS #137 fix,
+        // where the soft-keyword read arms exposed that `as = "x"` had its value
+        // dropped with no error at all. `as`/`in`/`is` now classify as
+        // "variable" above, so this arm is the genuine non-place case.
+        this.parse_error("cannot assign to this expression")
+        return AST.Stmt.ExprStmt(target)
+    }
+
+    /// `target <op>= rhs`, desugared to `target = target <op> (rhs)`.
+    ///
+    /// The target is re-evaluated rather than held in a temporary, so a target
+    /// with a side effect in it (`f().x += 1`) evaluates `f()` twice. Rust and
+    /// Python both evaluate the place exactly once; matching them needs a real
+    /// place-expression AST node, which is more surgery than this feature is
+    /// worth today. This is a known and deliberate gap, NOT a rejected case —
+    /// `f().x += 1` compiles and calls `f()` twice. Postfix `++`/`--` does not
+    /// share it: `build_postfix_incr` hoists the receiver and index into
+    /// temporaries, so `arr[g()]++` calls `g()` once (asserted in
+    /// test/pass/increment.sf). If the double evaluation here ever bites, the
+    /// fix is to give compound assignment the same hoisting, not to reject the
+    /// shape.
+    ///
+    /// `rhs` is wrapped in nothing, but `parse_expr` has already given it the
+    /// whole remainder of the expression, so `x *= 2 + 3` is `x = x * (2 + 3)`
+    /// — the low precedence of the compound operator falls out of parsing the
+    /// right-hand side as a complete expression, as it should.
+    fun build_compound_assign(target: AST.Expr, op: String, rhs: AST.Expr): AST.Stmt {
+        if (!this.check_compound_assign_target(target, op)) {
+            return AST.Stmt.ExprStmt(target)
+        }
+        return this.build_assign(target, AST.Expr.Binary(target, op, rhs))
+    }
+
+    /// Reject a compound-assignment target that is not a simple place, with a
+    /// diagnostic naming the restriction.
+    ///
+    /// Returns true when the target is assignable. `Variable`, `MemberAccess`,
+    /// `GetField` and `IndexGet` are the four shapes `build_assign` can turn
+    /// into an assignment; anything else — a literal, a call, an arithmetic
+    /// result — is not a place, and the desugaring would otherwise produce
+    /// `1 = 1 + 1` and hand it to the checker as a confusing downstream error.
+    fun check_compound_assign_target(target: AST.Expr, op: String): Bool {
+        var ek: String = this.classify_expr_for_assign(target)
+        if (ek == "variable" or ek == "member" or ek == "get_field" or ek == "index") {
+            return true
+        }
+        this.parse_error("the left side of '" + op + "=' must be a variable, field or element, not an expression")
+        return false
+    }
+
+    fun at_compound_assign_op(): Bool {
+        return this.match_kind_check("+=") or this.match_kind_check("-=") or
+               this.match_kind_check("*=") or this.match_kind_check("/=") or
+               this.match_kind_check("%=")
+    }
+
+    /// The arithmetic operator underlying the compound-assignment token the
+    /// parser is sitting on — `+=` yields `"+"`.
+    fun compound_assign_base_op(): String {
+        if (this.match_kind_check("+=")) { return "+" }
+        if (this.match_kind_check("-=")) { return "-" }
+        if (this.match_kind_check("*=")) { return "*" }
+        if (this.match_kind_check("/=")) { return "/" }
+        if (this.match_kind_check("%=")) { return "%" }
+        // Callers check at_compound_assign_op first, so this is unreachable
+        // rather than a real spelling — named so the function has no
+        // indeterminate result (BUGS #76).
+        return "+"
+    }
+
+    /// True when the current token can only *continue* an expression, never
+    /// begin a statement — i.e. some infix operator.
+    ///
+    /// Used by the `this`- and `ident[`-initial statement branches to detect
+    /// that they stopped mid-expression and should hand the whole statement to
+    /// parse_expr instead (BUGS #129). Every operator listed here is one the
+    /// precedence ladder in parse_or..parse_factor consumes, plus the two
+    /// logical keywords and `is`.
+    ///
+    /// `is` carries parse_comparison's same-line guard, because that is the
+    /// condition under which parse_comparison would actually absorb it; without
+    /// the guard a following line's `is`-pattern match arm would drag the
+    /// previous statement into itself.
+    ///
+    /// `.`, `[` and `(` are deliberately absent, and the reason is specific to
+    /// the one caller: parse_this_stmt's chain loops already consume those, so
+    /// seeing one here would mean the chain ended for some other reason and
+    /// rewinding would change nothing.
+    ///
+    /// That reasoning does NOT generalise. The `ident[`-initial branch had no
+    /// such loop — it returned at the `]` — so for it the postfix tokens were
+    /// exactly the continuations that mattered, and this predicate missed them
+    /// (BUGS #138: `xs[0].bump()` still failed with the rewind in place). That
+    /// branch is gone rather than patched. Before adding a second caller, check
+    /// whether it consumes postfix tokens itself; if it does not, this predicate
+    /// is the wrong tool.
+    ///
+    /// The compound-assignment and increment operators are included for the same
+    /// reason as the infix ones: `this.f += 1` and `this.f++` need to reach
+    /// parse_expr_stmt's handling of them, and parse_this_stmt stops on both.
+    fun at_expr_continuation(): Bool {
+        if (this.at_compound_assign_op()) { return true }
+        if (this.match_kind_check("++") or this.match_kind_check("--")) { return true }
+        if (this.is_term_op()) { return true }
+        if (this.is_factor_op()) { return true }
+        if (this.is_shift_op()) { return true }
+        if (this.is_equality_op()) { return true }
+        if (this.is_comparison_op()) { return true }
+        if (this.match_kind_check("&")) { return true }
+        if (this.match_kind_check("|")) { return true }
+        if (this.match_kind_check("^")) { return true }
+        if (this.match_kind_check("and")) { return true }
+        if (this.match_kind_check("or")) { return true }
+        if (this.match_kind_check("is") and this.current_line_num() == this.prev_line_num()) {
+            return true
+        }
+        return false
+    }
+
+    /// Which assignment form `expr` can serve as the target of.
+    ///
+    /// "member"/"get_field" become SetField, "index" becomes IndexSet,
+    /// "variable" becomes Assign, and "other" is not a place at all. Only
+    /// "member" mattered while `=` was the sole assignment operator and the
+    /// other three shapes were each handled by their own branch in parse_stmt;
+    /// compound assignment routes all four through build_assign, so they all
+    /// need naming here.
     fun classify_expr_for_assign(expr: AST.Expr): String {
         return match (expr) {
             MemberAccess(o, f, __ms) => "member"
+            GetField(o, f, __gs) => "get_field"
+            IndexGet(o, i) => "index"
+            Variable(n, __vs) => "variable"
             _ => "other"
         }
     }
@@ -2651,8 +3044,17 @@ class Parser {
 
     fun parse_return(): AST.Stmt {
         this.advance() // consume return
-        // Bare return (no value) → return nil
-        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+        // Bare return (no value) → return nil.
+        //
+        // `;` counts as a terminator here. Statements do not consume their own
+        // trailing `;` — the enclosing body skips them afterwards with
+        // `while (this.match_kind(";"))` — so `return;` reaches this point with
+        // the `;` still current. Without it in this check, `return;` fell
+        // through to parse_expr, which reported "expected a literal, name or
+        // '(' here" against whatever followed. `return` and `return 1;` both
+        // parsed, so the gap looked like anything but a missing terminator.
+        if (this.match_kind_check("}") or this.match_kind_check("eof")
+                or this.match_kind_check(";")) {
             return AST.Stmt.Return(AST.Expr.NilLit)
         }
         // A `return` is also bare when the next token is on a later line. There
@@ -2730,13 +3132,16 @@ class Parser {
             this.consume(";")
             var cond: AST.Expr = this.parse_expr()
             this.consume(";")
-            var update_span: AST.Span = this.ident_span()
-            var update_name: String = this.expect_ident()
-            this.consume("=")
-            var update_expr: AST.Expr = this.parse_expr()
+            // The update clause used to be hardcoded as `ident = expr`, which
+            // made `for (var i = 0; i < 10; i++)` and `i += 1` parse errors —
+            // the two spellings a C-style `for` is mostly written with. Routing
+            // it through parse_expr_stmt accepts all three forms and keeps
+            // `i = i + 1` working, since that is the shape parse_expr_stmt's
+            // plain-`=` branch already builds.
+            var update: AST.Stmt = this.parse_expr_stmt()
             this.consume(")")
             var body: List<AST.Stmt> = this.parse_block_stmts()
-            body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr, update_span)))
+            body.push(update)
             var stmts: List<AST.Stmt> = []
             stmts.push(init)
             stmts.push(AST.Stmt.While(cond, body))
@@ -2801,13 +3206,13 @@ class Parser {
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
-        var update_span: AST.Span = this.ident_span()
-        var update_name: String = this.expect_ident()
-        this.consume("=")
-        var update_expr: AST.Expr = this.parse_expr()
+        // Same widening as the `var`-keyword form above: the update clause is a
+        // statement, so `i++` and `i += 1` work here too rather than only
+        // `i = i + 1`.
+        var update: AST.Stmt = this.parse_expr_stmt()
         this.consume(")")
         var body: List<AST.Stmt> = this.parse_block_stmts()
-        body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr, update_span)))
+        body.push(update)
         var stmts: List<AST.Stmt> = []
         stmts.push(init)
         stmts.push(AST.Stmt.While(cond, body))

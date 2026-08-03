@@ -306,8 +306,8 @@
                         }
                     }
                     // Module-prefixed function reference: e.g. Routes.list_packages used as value
-                    if (this.module_prefixes.has(obj_name)) {
-                        var mp_resolved: String = this.module_prefixes.get(obj_name) + field
+                    if (this.has_module_alias(obj_name)) {
+                        var mp_resolved: String = this.module_alias_prefix(obj_name) + field
                         if (this.str_in_list(this.known_functions, mp_resolved)) {
                             return this.gen_func_ref(mp_resolved)
                         }
@@ -464,8 +464,8 @@
 
     fun gen_yield(value: AST.Expr): String {
         // Detect yield [reason, arg] pattern for sleep/IO
-        var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
-        if (is_list == "yes") {
+        var is_list: Bool = match (value) { ListLit(elems) => true _ => false }
+        if (is_list) {
             var elems: List<AST.Expr> = match (value) { ListLit(e) => e    _ => [] }
             if (elems.length() >= 1) {
                 var reason: String = this.gen_arg_value(elems[0])
@@ -1901,8 +1901,8 @@
                 }
             }
             // Module-prefixed function reference: e.g. Routes.list_packages used as value
-            if (mn.length() > 0 and this.module_prefixes.has(mn)) {
-                var mp_resolved: String = this.module_prefixes.get(mn) + m_field
+            if (mn.length() > 0 and this.has_module_alias(mn)) {
+                var mp_resolved: String = this.module_alias_prefix(mn) + m_field
                 if (this.str_in_list(this.known_functions, mp_resolved)) {
                     return this.gen_func_ref(mp_resolved)
                 }
@@ -2315,8 +2315,8 @@
                 resolved_callee = this.named_imports.get(resolved_callee)
             } else {
                 var dot_parts: List<String> = resolved_callee.split(".")
-                if (dot_parts.length() >= 2 and this.module_prefixes.has(dot_parts[0])) {
-                    resolved_callee = this.module_prefixes.get(dot_parts[0]) + dot_parts[1]
+                if (dot_parts.length() >= 2 and this.has_module_alias(dot_parts[0])) {
+                    resolved_callee = this.module_alias_prefix(dot_parts[0]) + dot_parts[1]
                 } else if (this.func_prefix_map.has(resolved_callee)) {
                     resolved_callee = this.func_prefix_map.get(resolved_callee)
                 }
@@ -3623,7 +3623,7 @@
     fun report_missing_module_write(object: AST.Expr, field: String): Bool {
         var obj_name: String = this.get_variable_name(object)
         if (obj_name.length() == 0) { return false }
-        if (!this.module_prefixes.has(obj_name)) { return false }
+        if (!this.has_module_alias(obj_name)) { return false }
         // A local, parameter or global of the same name shadows the alias: the
         // write is a field store on that value, not a module write. Checked
         // before the member lookup because a shadowed alias has no members.
@@ -3641,7 +3641,7 @@
         // (`Math.pi = 3.0`, `Flag.enabled = true` in test/cross_module_global.sf),
         // and this is exactly the lookup `gen_set_field` makes before its
         // fall-through.
-        var resolved: String = this.module_prefixes.get(obj_name) + field
+        var resolved: String = this.module_alias_prefix(obj_name) + field
         if (this.module_globals.has(resolved)) { return false }
         if (this.global_var_types.has(resolved)) { return false }
         // A member that EXISTS but is not a variable — a function, a class, an

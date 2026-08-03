@@ -99,6 +99,30 @@ var sf_span: PubAst.Span = PubAst.expr_name_span(e8)
 Test.assert_eq(slice_of(src8, sf_span), "slot", "rewritten SetField keeps the MemberAccess span")
 Test.assert_eq(PubAst.span_col(sf_span), 8, "at the same column the read form reports")
 
+// --- `holder.slot++` : a desugaring must not lose the operand's span ---------
+// Postfix `++` expands to a BlockExpr over synthetic temporaries (`__inc_N`,
+// `__inc_recv_N`) that appear nowhere in the source and correctly carry
+// span_none(). But the *field* is the user's own text, and the rebuilt place has
+// to keep pointing at it — otherwise rename on `slot` misses every `slot++`.
+//
+// The check walks into the desugaring rather than asking the BlockExpr, because
+// the BlockExpr as a whole has no identifier: the span lives on the place
+// expression inside it. Anything that flattens the temporaries would break this.
+var src10: String = "holder.slot++"
+var e10: PubAst.Expr = Parser.parse_expr(src10)
+var incr_stmts: List<PubAst.Stmt> = match (e10) {
+    BlockExpr(body, tail) => body
+    _ => []
+}
+// The last statement of the block is the write-back that build_assign produced.
+var writeback: PubAst.Expr = match (incr_stmts[incr_stmts.length() - 1]) {
+    ExprStmt(ex) => ex
+    _ => PubAst.Expr.NilLit
+}
+var wb_span: PubAst.Span = PubAst.expr_name_span(writeback)
+Test.assert_eq(slice_of(src10, wb_span), "slot", "`slot++` write-back keeps the field's span")
+Test.assert_eq(PubAst.span_col(wb_span), 8, "and at the column the plain read reports")
+
 // --- Multi-line: offset must track newlines, not restart per line ----------
 var src9: String = "outer.first\nouter.second"
 var stmts9: List<PubAst.Stmt> = Parser.parse(src9)
