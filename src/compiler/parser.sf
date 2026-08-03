@@ -2918,8 +2918,17 @@ class Parser {
 
     fun parse_return(): AST.Stmt {
         this.advance() // consume return
-        // Bare return (no value) → return nil
-        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+        // Bare return (no value) → return nil.
+        //
+        // `;` counts as a terminator here. Statements do not consume their own
+        // trailing `;` — the enclosing body skips them afterwards with
+        // `while (this.match_kind(";"))` — so `return;` reaches this point with
+        // the `;` still current. Without it in this check, `return;` fell
+        // through to parse_expr, which reported "expected a literal, name or
+        // '(' here" against whatever followed. `return` and `return 1;` both
+        // parsed, so the gap looked like anything but a missing terminator.
+        if (this.match_kind_check("}") or this.match_kind_check("eof")
+                or this.match_kind_check(";")) {
             return AST.Stmt.Return(AST.Expr.NilLit)
         }
         // A `return` is also bare when the next token is on a later line. There

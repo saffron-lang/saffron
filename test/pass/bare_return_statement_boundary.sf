@@ -87,6 +87,43 @@ Test.assert_eq(braced, 0, "a braced bare return still returns")
 bare_before_brace(7)
 Test.assert_eq(braced, 7, "and the code after the braced if still runs")
 
+// BUGS #141 — `return;` with an explicit semicolon.
+//
+// Statements never consume their own trailing `;`; the enclosing body skips them
+// afterwards. So `return;` reached parse_return with the `;` still current, and
+// the bare-return check tested only `}` and eof — it fell through to parse_expr,
+// which reported "expected a literal, name or '(' here" against whatever came
+// next. `return` alone and `return 1;` both parsed, so the failure looked like
+// anything but a missing terminator.
+var semi: Int = 0
+fun bare_return_semicolon(n: Int) {
+    if (n < 0) {
+        return;
+    }
+    semi = semi + n
+}
+bare_return_semicolon(-5)
+Test.assert_eq(semi, 0, "`return;` returns")
+bare_return_semicolon(6)
+Test.assert_eq(semi, 6, "and the code after it still runs")
+
+// `return;` as the last statement of a body, where the `;` sits directly before
+// the `}` — the two terminators adjacent.
+var semi_tail: Int = 0
+fun semi_before_brace() {
+    semi_tail = semi_tail + 1
+    return;
+}
+semi_before_brace()
+Test.assert_eq(semi_tail, 1, "`return;` immediately before `}` parses and runs")
+
+// A value return with a semicolon must keep working — it never went through the
+// bare-return branch, and must not start doing so.
+fun value_semicolon(n: Int): Int {
+    return n * 3;
+}
+Test.assert_eq(value_semicolon(5), 15, "`return v;` still returns the value")
+
 // Inside a loop, where the statement after the guard is the loop's own
 // increment — swallowing it would have hung rather than produced a diagnostic.
 fun loop_guard(limit: Int): Int {
