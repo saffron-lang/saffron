@@ -52,6 +52,48 @@ value is an integer, when in fact the type is unknown." The fix was to fall back
 to `AnyType` — honest, and the runtime dispatch machinery handles it. #33 calls
 it "the same dishonest 'unknown means Int' fallback as #32."
 
+#### Measured 2026-08-03: 9 sites, not "every resolution site"
+
+"The fallback at every resolution site" was the right instinct and the wrong
+count, and the difference decides how stage 1 is done. There are **23**
+`return "Int"` in the compiler, and only **9** of them mean "I don't know". The
+other 14 are correct answers that happen to be `Int` — and rewriting those to
+`Unknown` would be a regression, not progress:
+
+| legitimate `Int` | why |
+|---|---|
+| `ek == "int"` | it is an integer literal |
+| `length` / `index_of` / `to_number` | those builtins do return `Int` |
+| `&` `\|` `^` `<<` `>>` | bitwise operators are integer-typed |
+| `ftype == "Bool"` | `Bool` is represented as `i64` |
+| the six `identity_mode and ... == "Float"` collapses | `Float` and `Int` *are* the same type there |
+
+The nine that are M2, each with what it actually means:
+
+| site | "I don't know" because |
+|---|---|
+| `match_body.sf:602` | the enum variant is not registered |
+| `match_body.sf:604` | the variant has no recorded fields |
+| `match_body.sf:606` | the field index is out of bounds |
+| `match_body.sf:609` | the field definition has no `name:type` split |
+| `match_body.sf:619` | the type string matched none of the known spellings |
+| `methods_body.sf:293` | `.pop()` on a receiver that is not a `List<T>` |
+| `methods_body.sf:332` | a binary op where neither side resolved |
+| `methods_body.sf:3642` | the class has no registered fields |
+| `methods_body.sf:3655` | the field is not on the class |
+
+Five of the nine are in one function (`get_variant_field_type`), which is the
+useful part: the mechanism is concentrated, not diffuse. Each of the five is a
+*distinct* failure to read enum metadata, so each wants its own diagnostic rather
+than one shared "cannot infer" — the message should say which lookup missed.
+
+Practical consequence for the stage-1 ordering: converting these nine cannot be
+a `replace_all`. The two families are textually identical and semantically
+opposite, so the sweep has to be site-by-site with the classification above in
+hand. That is also why "make the `Int` fallback an error" is cheaper than the
+migration table implies — nine call sites, one hot function — while being no
+less valuable.
+
 ### M3. Representation is a convention, not a type
 
 Every value is an `i64`. Whether a given `i64` is NaN-boxed, a raw integer, or a
@@ -567,7 +609,7 @@ resolve to exist first.
 | # | Stage | Retires | Notes |
 |---|---|---|---|
 | 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | Mechanical. No semantic change. Do first — it makes everything after it debuggable. |
-| 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | Will surface a pile of latent inference gaps. That is the point. Measure first, as #37's progress notes did. |
+| 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Variants landed 2026-08-03**; the fallback conversion is what remains. Measured: 9 real fallbacks of 23 `return "Int"`, five of them in `get_variant_field_type` — see M2 above. Not a `replace_all`: the honest and dishonest `Int`s are textually identical. |
 | 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | Self-contained; the backend keeps its string paths until stage 4 flips them. |
 | 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
