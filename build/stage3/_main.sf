@@ -1067,29 +1067,62 @@ fun main(): Int {
     }
     _lib_paths = canon_lib_paths
 
-    // Find the last .sf arg (input) and anything after it (output)
-    var last_sf_idx: Float = -1
-    i = 0
+    // Input and output are POSITIONAL: the first non-flag argument is the input,
+    // the second is the output. They are NOT sniffed for by name (BUGS #119).
+    //
+    // This used to scan every argument for `arg.contains(".sf")` and keep the
+    // LAST match. Two defects compounded: `contains` matches `.sf` anywhere, so
+    // an *output* named `out.sf.ll` qualified; and last-match-wins meant that
+    // when both the input and the output qualified, the OUTPUT was compiled and
+    // the real input was never read — silently, with exit 0. `saffronc real.sf
+    // decoy.sf` compiled decoy.sf. That makes a compiler which *rejects* a file
+    // look like it accepted it, so any batch sweep whose output names embed
+    // `.sf` measures nothing while appearing to measure everything.
+    //
+    // No name test can fix this, because an output path is allowed to resemble
+    // an input path — only position distinguishes the two. So position is what
+    // we use, and `ends_with(".sf")` appears nowhere in this decision.
+    //
+    // Flags that take a following value must have that value skipped, or a
+    // value which happens to look like a source file (`--lib-path vendor.sf`)
+    // would be taken as the input. Keep this list in sync with the flag loop
+    // above: --stdlib, --lib-path and --target are the value-taking flags; every
+    // other flag is a bare switch.
+    var positionals: List<String> = []
+    i = 1
     while (i < args.length()) {
         var arg: String = args[i]
-        if (arg.contains(".sf") and arg != "--stdlib") {
-            last_sf_idx = i
+        if (arg == "--stdlib" or arg == "--lib-path" or arg == "--target") {
+            i = i + 1
+        } else if (!arg.starts_with("-")) {
+            positionals.push(arg)
         }
         i = i + 1
     }
 
-    if (last_sf_idx < 0) {
+    if (positionals.length() == 0) {
+        IO.println("saffronc: no input file")
         IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... [--dump-packages] <input.sf> [output.ll]")
-        return 1
+        // `return 1` from main() does NOT set the process exit status — the
+        // driver ignores it — so this path used to exit 0 after printing the
+        // usage text. c_exit is the only thing that actually fails.
+        c_exit(1)
     }
 
-    var input_path: String = args[last_sf_idx]
+    var input_path: String = positionals[0]
     var output_path: String = input_path + ".ll"
-    if (args.length() > last_sf_idx + 1) {
-        var next_arg: String = args[last_sf_idx + 1]
-        if (!next_arg.starts_with("--")) {
-            output_path = next_arg
-        }
+    if (positionals.length() > 1) {
+        output_path = positionals[1]
+    }
+
+    // An input path that does not exist read back as "" from IO.read_file, which
+    // lexes and parses as an empty program, so the compiler emitted valid IR for
+    // nothing and exited 0. Same silent-success shape as BUGS #119 and just as
+    // corrosive to measurement: a typo'd path in a sweep looked like a clean
+    // compile. Diagnose it here, where the path is first known.
+    if (!OS.file_exists(input_path)) {
+        IO.println("saffronc: cannot open input file: " + input_path)
+        c_exit(1)
     }
 
     // Determine stdlib directory
