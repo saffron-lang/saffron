@@ -2841,6 +2841,17 @@ class NullChecker {
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
                 return obj_name
             }
+            // §6a path 2 for a plain member READ: `Mod._name` where `Mod` is a
+            // module alias. The twin path for a member CALL — `Mod.method()` —
+            // routes through check_module_ref_visibility in the MethodCall arm,
+            // but a bare read is a MemberAccess and never reached that arm, so a
+            // module-level `private`/`internal` `var`/`let` parsed clean and was
+            // exported anyway (the same parses-but-unenforced shape §6a exists to
+            // close, one level up). Gated on obj_name being a known alias so an
+            // ordinary field read on an Any-typed receiver never consults the map.
+            if (obj_name.length() > 0 and this.entry_aliases.has(obj_name)) {
+                this.check_module_ref_visibility(field, this.entry_aliases.get(obj_name))
+            }
         }
         // The fallback: no class resolved, so no visibility decision is possible.
         // check_member_visibility takes the soft-fail branch and warns only if
