@@ -1,0 +1,22 @@
+//! A module with one declaration of each top-level visibility, used by the
+//! Phase 5 module-level tests (docs/design/access-modifiers.md §6a).
+//!
+//! Lives in test/support/ rather than test/fail/ or test/pass/ because it is a
+//! fixture imported by both — a file globbed as a test would be run on its own,
+//! and on its own it declares things nothing uses. It sits under the repo root's
+//! pantry.toml, so its owning package is the repo root; a same-package consumer
+//! is therefore any other file under the repo root (which every test/ file is),
+//! and a cross-package consumer needs its own manifest.
+
+public fun mod_exported(): Int { return 1 }
+
+// Module-private: legal only from within this same file.
+private fun mod_secret(): Int { return 2 }
+
+// Package-internal: legal from any file in the same package (the repo root).
+internal fun mod_packaged(): Int { return 3 }
+
+// A public function that uses the private one internally — the shape the
+// modifier exists to allow. Its own visibility does not leak the private helper
+// because the helper's *type* is not exposed, only called.
+public fun mod_use_secret(): Int { return mod_secret() + 10 }

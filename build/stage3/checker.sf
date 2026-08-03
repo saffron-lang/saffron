@@ -323,6 +323,29 @@ class NullChecker {
     // imported from elsewhere; that case needs Phase 5's cross-module resolution
     // to know the reference even lands there.
     var private_types: Map<String, Bool>
+    // The module-level visibility of every top-level declaration — `fun`, `var`,
+    // `let`, `class`, `enum`, `interface`, `actor`, `type` — that is NOT public,
+    // keyed by the qualified name (defining prefix + bare name). Public is the
+    // default and is deliberately never stored: the table's presence is the
+    // signal that a cross-module reference must be checked, so an absent key
+    // means "public, nothing to enforce" and the common case costs one `has`.
+    //
+    // This is Phase 5's registration half (§6a): module-level enforcement needs
+    // to know, at a use site, both *which* module declared the name (already in
+    // decl_module_file / decl_module_package) and *how restricted* it is. Only
+    // ClassDecl recorded module identity before this phase; the four other
+    // top-level kinds recorded nothing, so there was no entry for a `fun`, `var`,
+    // `enum` or `type` to compare a use site against. register_module_decl fills
+    // all three tables for every kind through one path.
+    var decl_visibility: Map<String, String>
+    // The entry file's `import "..." as Alias` map, alias → the defining module's
+    // prefix, as main.sf already computes it for codegen (resolved_aliases). It is
+    // what turns §6a path 2 — an alias-qualified `Mod.name` — into the same
+    // prefix+name key the other two paths use: the checker has no type for a
+    // module alias (it infers `Any`), so without this map it cannot recover which
+    // module `Mod` names. Empty for the flat/no-module entry points, which have no
+    // aliases to resolve and so never reach the path-2 branch.
+    var entry_aliases: Map<String, String>
 
     fun init() {
         this.env = TypeEnv()
@@ -348,6 +371,8 @@ class NullChecker {
         this.private_members = {}
         this.private_member_names = {}
         this.private_types = {}
+        this.decl_visibility = {}
+        this.entry_aliases = {}
     }
 
     fun error(msg: String) {
@@ -1007,6 +1032,11 @@ class NullChecker {
                 // silently defeated exhaustiveness on `match (some_call())`.
                 this.env.define_func_str(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
+                // Module-level identity + visibility, so a cross-module reference
+                // to this function can be checked (§6a path 1/2/3). Public is not
+                // stored; register_module_decl records the module either way so
+                // decl_module_file is complete for every top-level kind.
+                this.register_module_decl(name, f_vis)
                 // Extract generic type params from docstring: @generic:T,U:Constraint\n
                 this.extract_and_register_generics(name, doc)
                 // Detect receiver-typed parameters: Fun[Type](...):Ret
@@ -1031,6 +1061,7 @@ class NullChecker {
             EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum(name, variants)
                 this.register_type_visibility(name, e_vis)
+                this.register_module_decl(name, e_vis)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 if (doc.starts_with("@actor")) {
@@ -1045,6 +1076,15 @@ class NullChecker {
                 this.register_class_identity(name, this.params_list_to_string(fields))
                 this.register_private_members(name, fields, methods)
                 this.register_type_visibility(name, c_vis)
+                // register_class_identity already wrote decl_module_file /
+                // decl_module_package under the qualified key; record only the
+                // module-level visibility here so a cross-module reference to the
+                // class (including a `private init`'d constructor call) can be
+                // decided. Not routed through register_module_decl to avoid
+                // re-writing the two identity maps register_class_identity owns.
+                if (c_vis != "public") {
+                    this.decl_visibility.set(this.current_prefix + name, c_vis)
+                }
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
                 if (parents.length() > 0) {
@@ -1155,6 +1195,14 @@ class NullChecker {
                 if (d == "@type_alias") {
                     this.register_type_visibility(n, v_vis)
                 }
+                // A top-level `var`/`let` (and a desugared `type` alias) is a
+                // module-level name a cross-module reference can bind to via
+                // resolve's globals prescan, so it needs an identity + visibility
+                // entry just like a `fun`. register_decl runs over the imported
+                // modules as well as the program under check, and only top-level
+                // statements reach it, so this never fires for a local variable
+                // inside a body.
+                this.register_module_decl(n, v_vis)
             }
             ExprStmt(e) => {}
             Return(v) => {}
@@ -1172,6 +1220,7 @@ class NullChecker {
             // for a tree built some other way.
             TypeAlias(ta_n, ta_t, ta_vis) => {
                 this.register_type_visibility(ta_n, ta_vis)
+                this.register_module_decl(ta_n, ta_vis)
             }
         }
     }
@@ -1294,6 +1343,79 @@ class NullChecker {
             }
         }
         this.env.class_fields.set(name, fields_str)
+    }
+
+    // Record a top-level declaration's owning module and its module-level
+    // visibility, for every kind of top-level declaration. This is Phase 5's
+    // single registration path (§6a). ClassDecl also calls register_class_identity
+    // for its field table and ambiguity handling; this fills the identity and
+    // visibility tables the module-level check reads, and it is the ONLY writer of
+    // decl_visibility so the three tables stay keyed identically.
+    //
+    // Keyed by the qualified name (defining prefix + bare name) exactly like
+    // decl_module_file, so a use site that has reconstructed the defining prefix
+    // — the bare cross-module path carries it on Ref.slot — finds the same entry
+    // the registration wrote. Public is never stored (see the decl_visibility
+    // field comment): the presence of a key is the "must check" signal.
+    fun register_module_decl(name: String, visibility: String) {
+        var qualified: String = this.current_prefix + name
+        this.decl_module_file.set(qualified, this.current_prefix)
+        this.decl_module_package.set(qualified, this.current_package)
+        if (visibility != "public") {
+            this.decl_visibility.set(qualified, visibility)
+        }
+    }
+
+    // May the code being checked reference a top-level `name` that resolved to
+    // the module whose prefix is `slot`? This is Phase 5's module-level
+    // enforcement (§6a), and it decides all three access paths at once because
+    // they converge on the same fact: a resolved reference carrying the DEFINING
+    // module's prefix.
+    //
+    //   path 3 (bare cross-module) — resolve.sf binds `helper()` to a module's
+    //     function and stamps Ref.slot with that module's prefix. The checker
+    //     sees Ref, not Variable, so `slot` is exactly the defining prefix.
+    //   path 2 (alias-qualified `Mod.name`) — arrives as MethodCall/MemberAccess;
+    //     its constructor/member forms are handled where those are inferred and
+    //     also route their qualified name through here.
+    //
+    // `slot` is the qualifying key. An empty slot is a local/main-program name
+    // (resolve leaves it "" for locals, params and the entry module), so there is
+    // no boundary to cross and nothing to check — return early. That early return
+    // is also what keeps the entry program's own private declarations legal to
+    // use within the entry program.
+    fun check_module_ref_visibility(name: String, slot: String) {
+        var qualified: String = slot + name
+        if (!this.decl_visibility.has(qualified)) { return nil }
+        var vis: String = this.decl_visibility.get(qualified)
+        if (vis == "private") {
+            // Module-private: legal only from within the SAME module (file). The
+            // use site's module is current_prefix; the defining module is `slot`.
+            // Equal prefixes mean the same file, which is what module-private
+            // permits — including a same-file free function, the deliberate
+            // difference from class-private (§6a).
+            if (slot == this.current_prefix) { return nil }
+            this.error("private '" + name + "' is not accessible outside the module that declares it")
+            return nil
+        }
+        if (vis == "internal") {
+            // Package-internal: legal from any module in the SAME package. The
+            // authority for package membership is main.sf's manifest reading,
+            // handed across the seam into decl_module_package (defining side) and
+            // current_package (use site). A packageless marker on either side
+            // denies rather than grants — same conservative posture as
+            // same_package in main.sf — so `internal` never leaks to a file that
+            // provably belongs to no package.
+            var def_pkg: String = no_package_marker()
+            if (this.decl_module_package.has(qualified)) {
+                def_pkg = this.decl_module_package.get(qualified)
+            }
+            if (def_pkg != no_package_marker()
+                and this.current_package != no_package_marker()
+                and def_pkg == this.current_package) { return nil }
+            this.error("internal '" + name + "' is not accessible outside the package that declares it")
+            return nil
+        }
     }
 
     // True when `class_name` names more than one distinct declaration. A caller
@@ -2335,6 +2457,16 @@ class NullChecker {
             }
             Ref(rkind, rname, rslot) => {
                 this.env.mark_used(rname)
+                // A global or func Ref carries the DEFINING module's prefix in
+                // rslot (resolve.sf resolve_variable), so a bare cross-module
+                // read of a module-private/internal name is decided here — §6a
+                // path 3, the one most easily forgotten. A local/self/type Ref
+                // has an empty slot and check_module_ref_visibility returns at
+                // once. Gated on kind so only the two module-level kinds pay for
+                // the lookup.
+                if (rkind == "global" or rkind == "func") {
+                    this.check_module_ref_visibility(rname, rslot)
+                }
                 this.env.get_var_type(rname)
             }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
@@ -2828,6 +2960,21 @@ class NullChecker {
             // caller below already treats as "unknown callee".
             _ => ""
         }
+        // A called bare cross-module function is a Ref in callee position and is
+        // NOT routed through infer_type's Ref arm (infer_call reads the name off
+        // the callee directly and never infers the callee expression), so §6a
+        // path 3 for a *call* must be decided here. The slot carries the defining
+        // module's prefix; a func-kind Ref with a non-empty slot is exactly a
+        // cross-module call. Placed before arg inference so the diagnostic points
+        // at the call, not at something inside its arguments.
+        match (callee) {
+            Ref(rk, rn, rs) => {
+                if (rk == "func" or rk == "global") {
+                    this.check_module_ref_visibility(rn, rs)
+                }
+            }
+            _ => nil
+        }
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
         var di: Float = 0
         while (di < args.length()) {
@@ -2998,6 +3145,18 @@ class NullChecker {
             // consults the visibility tables.
             if (this.env.class_fields.has(this.qualified_class_key(method))) {
                 this.check_constructor_visibility(method)
+            }
+            // §6a path 2: alias-qualified `Mod.name`. The receiver is a module
+            // alias — an Any-typed name to the checker — so it is resolved to the
+            // defining module's prefix through entry_aliases (main.sf's
+            // resolved_aliases) and the module-level visibility of `prefix+method`
+            // is decided exactly as the bare and named-import paths are. Gated on
+            // obj_name actually being a known alias, so an ordinary method call on
+            // an Any-typed receiver never consults the map. Uses the alias's
+            // prefix as the defining side; check_module_ref_visibility compares it
+            // against current_prefix / current_package as usual.
+            if (obj_name.length() > 0 and this.entry_aliases.has(obj_name)) {
+                this.check_module_ref_visibility(method, this.entry_aliases.get(obj_name))
             }
         }
 
@@ -4077,7 +4236,7 @@ fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>):
 // With an empty boundary list this degrades to the old flat behaviour rather
 // than failing, which is what makes check_errors_with_imports above still valid.
 fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): String {
-    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker())
+    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker(), {})
 }
 
 // The `internal` (package-scope) half of module identity: same walk as
@@ -4098,8 +4257,9 @@ fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, 
 // gets the packageless marker, which denies `internal` access rather than
 // granting it. That is what keeps check_errors_with_modules above — and every
 // caller that has no manifest information at all — valid and conservative.
-fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String): String {
+fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String, entry_aliases: Map<String, String>): String {
     var checker: NullChecker = NullChecker()
+    checker.entry_aliases = entry_aliases
     var prefixes: List<String> = prefixes_joined.split("|")
     var pkg_roots: List<String> = []
     if (package_roots_joined.length() > 0) {

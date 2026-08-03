@@ -1,0 +1,9 @@
+// §6a path 2 (alias-qualified): a module-private function may not be reached
+// through `Mod.name`. The receiver is a module alias, which the checker infers
+// as `Any`; the entry file's alias map (main.sf's resolved_aliases, threaded into
+// the checker) is what recovers the defining module's prefix so the visibility of
+// `prefix+mod_secret` can be decided. Without that map this path would silently
+// pass, which is exactly the hole §6a warns is the easiest to leave open.
+import "../support/visibility_module_lib.sf" as Lib
+
+IO.println(Lib.mod_secret())
