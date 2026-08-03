@@ -1,0 +1,57 @@
+// The two cases the leak pass deliberately does NOT reject, each for a stated
+// reason. Both are recorded here as tests so that "the check allows this" is a
+// decision on the record rather than an accident nobody noticed.
+//
+// L8 — any `Fun`-typed position is UNCHECKED, and it is not merely hard. The
+// surface `Fun` erases to a signature-free type: BUGS #56 records that "the static
+// type of an indirect call's result is not recovered (`Fun` carries no return
+// type)", and #86 is the same root for block parameters. So `fun subscribe(cb:
+// Fun)` where `cb` is expected to receive a private type is structurally unable to
+// be checked — there is no information present to check against, and closing the
+// hole means giving `Fun` a signature, which is a language change tracked by #56.
+// Stating the hole beats pretending coverage.
+//
+// L9 warning half — a public `var` whose private type is inferred through several
+// steps rather than from a direct constructor call. The error half has an anchor to
+// point at (the call); here the anchor would be the compiler's guess, and this
+// codebase's history is unambiguous about erroring on guesses — #56's over-erroring
+// "traded one silent wrong answer for a batch of false rejections". So it warns and
+// says what it does not know. The asymmetry is deliberate.
+//
+// The warning text is not machine-checked here: run_tests.sh's filter_noise strips
+// every `^[checker] Warning` line before diffing a sibling `.expected`, and
+// `.expected` compares RUNTIME output in any case. Verified by hand:
+//   $ build/saffronc --stdlib src/lib test/pass/leak_soft_cases.sf out.ll
+//   [checker] Warning: public var 'via_factory' may expose private type 'Slot' in
+//   its inferred type 'Slot'; add an explicit annotation to say which you mean
+import "@test" as Test
+
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+    fun get(): Int { return this.value }
+}
+
+// L8: `Fun` in a public signature, with a private type flowing through it. Accepted
+// — the spelling carries no type names, so there is nothing to find.
+fun apply_to_slot(cb: Fun): Int {
+    return 0
+}
+
+fun public_taking_fun(cb: Fun): String {
+    return "ok"
+}
+
+// L9 warning: inferred through a call rather than from a constructor call, so the
+// anchor is a guess and the verdict is a warning rather than an error.
+private fun build(): Slot {
+    return Slot(5)
+}
+
+var via_factory = build()
+
+Test.assert_eq(via_factory.get(), 5, "an inferred private type warns rather than erroring")
+Test.assert_eq(apply_to_slot(fun () => 1), 0, "a Fun-typed public parameter is accepted (L8)")
+Test.assert_eq(public_taking_fun(fun () => 1), "ok", "and again with a String return")
+
+Test.summary()
