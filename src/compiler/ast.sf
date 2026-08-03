@@ -89,7 +89,26 @@ enum Type {
     GenericType(base: String, args: List<Type>),
     UnionType(types: List<Type>),
     FuncType(params: List<Type>, ret: Type),
-    NullableType(inner: Type)
+    NullableType(inner: Type),
+    // The three bottom-ish members the type lattice used to conflate into one.
+    // `AnyType` above is the honest "runtime decides" answer and stays
+    // user-writable; these two are not user-writable and mean different things:
+    //
+    //   UnknownType — inference has not resolved this yet. Legal ONLY inside
+    //     inference. It must never reach codegen: the old behaviour was to
+    //     answer `Int` when nothing was known, which is how a missing inference
+    //     became a wrong i64 instead of a diagnostic (mechanism M2 in
+    //     docs/design/compiler-rewrite.md, invariant I2).
+    //   NeverType — this expression does not return (throw, or a call that
+    //     always diverges). Legal anywhere; unifies with everything, because a
+    //     branch that cannot produce a value must not constrain its sibling.
+    //
+    // Appended last, like `visibility` on the Stmt nodes above and for the same
+    // reason: appending leaves every pre-existing variant on the tag it already
+    // had, so a match arm that was missed in the sweep still binds correctly
+    // rather than silently reading a neighbour's payload.
+    UnknownType,
+    NeverType
 }
 
 // Expressions carry spans on exactly the *reference-bearing* variants, and on
@@ -286,5 +305,10 @@ fun type_to_string(t: Type): String {
         UnionType(types) => "Union"
         FuncType(params, ret) => "Fun"
         NullableType(inner) => type_to_string(inner) + "|Nil"
+        // Deliberately NOT "Int" and NOT "Any". These strings are what a
+        // diagnostic prints, and both must be recognisable on sight: an
+        // "Unknown" in compiler output is a bug report, not a type.
+        UnknownType => "Unknown"
+        NeverType => "Never"
     }
 }

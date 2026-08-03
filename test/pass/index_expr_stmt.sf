@@ -1,0 +1,82 @@
+// BUGS #138 — a statement that *begins* with an index expression must keep
+// parsing the rest of the postfix chain.
+//
+// parse_stmt special-cased `ident [ expr ]`, parsed exactly one index, and
+// returned. Anything after the `]` was left in the token stream and re-parsed as
+// a fresh statement, so it started at `.` or `+` and reported "expected a
+// literal, name or '('". `xs[0].show()`, `xs[0].v = 3` and `ns[0] + 1` all failed
+// as statements while working as rvalues — the same expression one `var` away
+// parsed fine, which is why this looked like a user-method-dispatch bug rather
+// than a statement-position bug.
+//
+// The assertions check observable effects, not just that the file compiled: each
+// call mutates state that is read back afterwards.
+
+import "@test" as Test
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun bump() { this.v = this.v + 1 }
+    fun add(n: Int): Int { this.v = this.v + n; return this.v }
+    fun get(): Int { return this.v }
+    fun label(): String { return "box:" + this.v.to_string() }
+}
+
+fun main() {
+    var xs: List<Box> = [Box(10), Box(20)]
+
+    // The original repro: a user-defined method called directly on an index
+    // expression, in statement position, with its result discarded.
+    xs[0].bump()
+    Test.assert_eq(xs[0].get(), 11, "user method on index expr ran (10 -> 11)")
+
+    // Same shape with arguments, and on a non-zero index.
+    xs[1].add(5)
+    Test.assert_eq(xs[1].get(), 25, "user method with args on index expr ran")
+
+    // A builtin method in the same position. This reportedly worked, but it
+    // shared the broken path, so it is worth pinning.
+    var ns: List<Int> = [3, 1, 2]
+    ns.sort()
+    Test.assert_eq(ns[0], 1, "builtin method on the list itself still works")
+
+    // Chained calls off an index expression in statement position.
+    xs[0].label().length()
+    Test.assert_eq(xs[0].label(), "box:11", "chained call off index expr parses")
+
+    // Field *assignment* through an index expression — this went through the
+    // special case's `=` branch, so it must still work now that the branch moved.
+    xs[0].v = 99
+    Test.assert_eq(xs[0].get(), 99, "field assignment through index expr")
+
+    // Plain index assignment: the case the special case existed for.
+    ns[0] = 42
+    Test.assert_eq(ns[0], 42, "index assignment still works")
+
+    // Nested index target on the left of an assignment.
+    var grid: List<List<Int>> = [[1, 2], [3, 4]]
+    grid[1][0] = 30
+    Test.assert_eq(grid[1][0], 30, "nested index assignment still works")
+
+    // An index expression as the head of a binary expression statement. The
+    // trailing `+ 1` used to be orphaned into its own statement. `ns` is
+    // [42, 2, 3] here — sorted to [1, 2, 3], then ns[0] overwritten above — and
+    // the statement is pure, so the element must be unchanged afterwards.
+    ns[1] + 1
+    Test.assert_eq(ns[1], 2, "binary expr statement headed by an index expr")
+
+    // A bare index expression statement, the other thing the special case
+    // returned early for.
+    ns[2]
+    Test.assert_eq(ns[2], 3, "bare index expression statement")
+
+    // Index into a map, then call a user method on the result.
+    var boxes: Map<String, Box> = {"a": Box(1)}
+    var got: Box|Nil = boxes.get("a")
+    if (got != nil) {
+        Test.assert_eq(got.get(), 1, "map value read back")
+    }
+
+    Test.summary()
+}

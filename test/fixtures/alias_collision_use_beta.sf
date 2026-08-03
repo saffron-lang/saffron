@@ -1,8 +1,0 @@
-// Binds the same alias `Shared` to a different file than
-// alias_collision_use_alpha.sf does. Each file is internally consistent, so
-// neither is wrong on its own — only a shared alias table makes them collide.
-import "./alias_collision_beta.sf" as Shared
-
-fun ask(): String {
-    return Shared.which()
-}

@@ -4,7 +4,31 @@ const handles = [null];
 let instance;
 
 function allocHandle(el) { handles.push(el); return handles.length - 1; }
-function getHandle(id) { return handles[Number(id)] || null; }
+
+// DOM handles are declared `Float` on the Saffron side, so a handle we hand back
+// as a bare integer comes to us NaN-box tagged (TAG_INT | handle) on the next
+// call in. Masking off the payload accepts both shapes: a tagged handle and a
+// plain integer both mask down to the same index.
+const PAYLOAD_MASK = 0x0000FFFFFFFFFFFFn;
+function handleIndex(id) {
+    return Number(BigInt(id) & PAYLOAD_MASK);
+}
+function getHandle(id) { return handles[handleIndex(id)] || null; }
+
+// Decode a NaN-boxed i64 to a JS number. A `Float` parameter arrives as raw
+// double bits when it holds a non-integral value (a 1.0 delay comes through as
+// 0x3FF0000000000000), and as TAG_INT|payload when the producer tagged it, so
+// both cases have to be distinguished by tag rather than assumed.
+const TAG_MASK = 0xFFFF000000000000n;
+const TAG_INT_BITS = 0x7FF9000000000000n;
+const _f64buf = new DataView(new ArrayBuffer(8));
+function valToNumber(v) {
+    const bits = BigInt(v);
+    if ((bits & TAG_MASK) === TAG_INT_BITS) return Number(bits & PAYLOAD_MASK);
+    _f64buf.setBigUint64(0, bits & 0xFFFFFFFFFFFFFFFFn);
+    const d = _f64buf.getFloat64(0);
+    return Number.isNaN(d) ? Number(bits & PAYLOAD_MASK) : d;
+}
 function readCString(ptr) {
     const p = Number(ptr);
     if (p === 0) return "";
@@ -167,13 +191,11 @@ const imports = { env: new Proxy({
     js_fetch_json: (urlPtr, callbackId) => {
         const url = readCString(urlPtr);
         fetch(url).then(r => r.text()).then(text => {
-            const ptr = writeCString(text);
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
+            if (fn) fn(callbackId, taggedString(text));
         }).catch(() => {
-            const ptr = writeCString('{"error":"fetch failed"}');
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
+            if (fn) fn(callbackId, taggedString('{"error":"fetch failed"}'));
         });
     },
     js_fetch_post: (urlPtr, bodyPtr, callbackId) => {
@@ -181,13 +203,11 @@ const imports = { env: new Proxy({
         const body = readCString(bodyPtr);
         fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
             .then(r => r.text()).then(text => {
-                const ptr = writeCString(text);
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, taggedString(text));
             }).catch(() => {
-                const ptr = writeCString('{"error":"fetch failed"}');
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, taggedString('{"error":"fetch failed"}'));
             });
     },
     js_fetch_post_auth: (urlPtr, bodyPtr, tokenPtr, callbackId) => {
@@ -196,34 +216,32 @@ const imports = { env: new Proxy({
         const token = readCString(tokenPtr);
         fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body })
             .then(r => r.text()).then(text => {
-                const ptr = writeCString(text);
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, taggedString(text));
             }).catch(() => {
-                const ptr = writeCString('{"error":"fetch failed"}');
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, taggedString('{"error":"fetch failed"}'));
             });
     },
     js_set_timeout: (callbackId, ms) => {
         const id = setTimeout(() => {
             const fn = _findExport('__on_timeout');
             if (fn) fn(callbackId);
-        }, Number(ms));
+        }, valToNumber(ms));
         return BigInt(id);
     },
     js_clear_timeout: (timerId) => {
-        clearTimeout(Number(timerId));
+        clearTimeout(handleIndex(timerId));
     },
     js_set_interval: (callbackId, ms) => {
         const id = setInterval(() => {
             const fn = _findExport('__on_timeout');
             if (fn) fn(callbackId);
-        }, Number(ms));
+        }, valToNumber(ms));
         return BigInt(id);
     },
     js_clear_interval: (timerId) => {
-        clearInterval(Number(timerId));
+        clearInterval(handleIndex(timerId));
     },
     __string_intern: (ptr) => ptr,
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
@@ -232,10 +250,23 @@ const imports = { env: new Proxy({
 function writeCString(str) {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str + '\0');
-    const ptrBig = instance.exports.malloc(BigInt(bytes.length));
+    const ptr = instance.exports.malloc(BigInt(bytes.length));
     const mem = new Uint8Array(instance.exports.memory.buffer);
-    mem.set(bytes, Number(ptrBig));
-    return ptrBig;
+    mem.set(bytes, Number(ptr));
+    return ptr;
+}
+
+// Wrap a raw pointer as a NaN-boxed Saffron String value (TAG_PTR | payload).
+//
+// Imports declared `void*` (js_get_hash, js_event_get_string, ...) return a raw
+// pointer and codegen emits the inttoptr + tag_ptr itself, so writeCString's
+// result goes back untouched. Exported functions are the other direction:
+// their params are already-tagged Saffron values and nothing on the wasm side
+// tags them, so JS has to do it here. On wasm32 malloc is `(i64) -> i32`, which
+// reaches JS as a Number — hence the BigInt conversion too.
+const TAG_PTR = 0x7FF8000000000000n;
+function taggedString(str) {
+    return (BigInt(writeCString(str)) & 0xFFFFFFFFn) | TAG_PTR;
 }
 
 // Boot the WASM app

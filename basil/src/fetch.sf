@@ -1,34 +1,40 @@
 //! Fetch wrapper — async HTTP requests via browser fetch API.
 
-@extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Float)
-@extern("void js_fetch_post(void*, void*, i64)") fun _fetch_post(url: String, body: String, callback_id: Float)
-@extern("void js_fetch_post_auth(void*, void*, void*, i64)") fun _fetch_post_auth(url: String, body: String, token: String, callback_id: Float)
+// Callback ids are Int, not Float. A Float id is NaN-boxed as a raw double, and
+// the map-key path untags it with __val_untag_ptr, which keeps only the low 48
+// bits — all zero for small whole doubles (1.0 is 0x3FF0000000000000). Every id
+// therefore collapsed to key 0, so the second in-flight request overwrote the
+// first and __on_fetch_complete trapped on a null indirect call. Int ids are
+// tagged TAG_INT|payload, so the same untag yields the id back intact.
+@extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Int)
+@extern("void js_fetch_post(void*, void*, i64)") fun _fetch_post(url: String, body: String, callback_id: Int)
+@extern("void js_fetch_post_auth(void*, void*, void*, i64)") fun _fetch_post_auth(url: String, body: String, token: String, callback_id: Int)
 
-var _next_id: Float = 0
-var _callbacks: Map<Float, (String) => Nil> = {}
+var _next_id: Int = 0
+var _callbacks: Map<Int, (String) => Nil> = {}
 
 fun get(url: String, callback: (String) => Nil) {
     _next_id = _next_id + 1
-    var id: Float = _next_id
+    var id: Int = _next_id
     _callbacks.set(id, callback)
     _fetch_json(url, id)
 }
 
 fun post(url: String, body: String, callback: (String) => Nil) {
     _next_id = _next_id + 1
-    var id: Float = _next_id
+    var id: Int = _next_id
     _callbacks.set(id, callback)
     _fetch_post(url, body, id)
 }
 
 fun post_auth(url: String, body: String, token: String, callback: (String) => Nil) {
     _next_id = _next_id + 1
-    var id: Float = _next_id
+    var id: Int = _next_id
     _callbacks.set(id, callback)
     _fetch_post_auth(url, body, token, id)
 }
 
-fun __on_fetch_complete(id: Float, response: String) {
+fun __on_fetch_complete(id: Int, response: String) {
     if (_callbacks.has(id)) {
         _callbacks.get(id)(response)
         _callbacks.set(id, nil)

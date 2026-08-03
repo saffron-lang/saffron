@@ -1,0 +1,17 @@
+// BUGS #123 fixture: the module alias_scope_beta.sf binds as `Shared`.
+// Same member names as target_a.sf on purpose — see the note there.
+var label: String = "target-b-global"
+
+fun who(): String {
+    return "target-b"
+}
+
+class Marker {
+    var tag: String
+    fun init(tag: String) {
+        this.tag = tag
+    }
+    fun describe(): String {
+        return "target-b:" + this.tag
+    }
+}
