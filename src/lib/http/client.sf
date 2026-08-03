@@ -231,7 +231,7 @@ fun request(method: String, url: String, body: String, headers: Map<String, Stri
 // ---------------------------------------------------------------------------
 
 // Recursive request handler with redirect tracking.
-fun _do_request(method: String, url: String, body: String, headers: Map<String, String>, follow_redirects: Bool, max_redirects: Int, redirect_count: Int): Response {
+private fun _do_request(method: String, url: String, body: String, headers: Map<String, String>, follow_redirects: Bool, max_redirects: Int, redirect_count: Int): Response {
     if (redirect_count > max_redirects) {
         throw "httpx: too many redirects (max ${max_redirects})"
     }
@@ -292,7 +292,7 @@ fun _do_request(method: String, url: String, body: String, headers: Map<String, 
 // ---------------------------------------------------------------------------
 
 // Open a TCP or TLS connection. Returns a TcpConnection.
-fun _open_connection(host: String, port: Int, use_tls: Bool): Net.TcpConnection {
+private fun _open_connection(host: String, port: Int, use_tls: Bool): Net.TcpConnection {
     if (use_tls) {
         return Net.connect_tls(host, port)
     }
@@ -306,7 +306,7 @@ fun _open_connection(host: String, port: Int, use_tls: Bool): Net.TcpConnection 
 
 // Read the full HTTP response from the connection.
 // Handles Content-Length, chunked transfer-encoding, and connection close.
-fun _recv_response(conn: Net.TcpConnection, head_only: Bool): String {
+private fun _recv_response(conn: Net.TcpConnection, head_only: Bool): String {
     var buf = ""
     var header_end = -1
     var read_size = 4096
@@ -375,7 +375,7 @@ fun _recv_response(conn: Net.TcpConnection, head_only: Bool): String {
 }
 
 // Read until we have the complete chunked body (terminated by 0-length chunk).
-fun _recv_until_chunked_end(conn: Net.TcpConnection, buf: String, body_start: Int): String {
+private fun _recv_until_chunked_end(conn: Net.TcpConnection, buf: String, body_start: Int): String {
     var read_size = 4096
     while (true) {
         var body_portion = buf.slice(body_start, buf.length())
@@ -395,7 +395,7 @@ fun _recv_until_chunked_end(conn: Net.TcpConnection, buf: String, body_start: In
 }
 
 // Extract a header value from the raw header section (case-insensitive key match).
-fun _extract_header_value(header_section: String, name: String): String {
+private fun _extract_header_value(header_section: String, name: String): String {
     var lower_name = name.to_lower()
     // Determine line separator
     var line_sep = "\r\n"
@@ -423,7 +423,7 @@ fun _extract_header_value(header_section: String, name: String): String {
 // ---------------------------------------------------------------------------
 
 // Build the raw HTTP/1.1 request string.
-fun _format_request(method: String, parsed: URL.URL, host: String, port: Int, body: String, custom_headers: Map<String, String>): String {
+private fun _format_request(method: String, parsed: URL.URL, host: String, port: Int, body: String, custom_headers: Map<String, String>): String {
     var path = parsed.path
     if (path == "") { path = "/" }
     if (parsed.query != "") {
@@ -493,7 +493,7 @@ fun _format_request(method: String, parsed: URL.URL, host: String, port: Int, bo
 // ---------------------------------------------------------------------------
 
 // Parse a raw HTTP response string into a Response object.
-fun _parse_response(raw: String, request_url: String): Response {
+private fun _parse_response(raw: String, request_url: String): Response {
     // Find header/body boundary
     var header_end = raw.index_of("\r\n\r\n")
     var sep_len = 4
@@ -561,7 +561,7 @@ fun _parse_response(raw: String, request_url: String): Response {
 }
 
 // Decode a chunked transfer-encoded body.
-fun _decode_chunked(body: String): String {
+private fun _decode_chunked(body: String): String {
     var sb = StringBuilder()
     var pos = 0
     while (pos < body.length()) {
@@ -598,7 +598,7 @@ fun _decode_chunked(body: String): String {
 // ---------------------------------------------------------------------------
 
 // Parse a hexadecimal string to a number.
-fun _parse_hex(s: String): Int {
+private fun _parse_hex(s: String): Int {
     var hex_chars = "0123456789abcdef"
     var result = 0
     var i = 0
@@ -613,7 +613,7 @@ fun _parse_hex(s: String): Int {
 }
 
 // Find substring starting from a given position.
-fun _index_of_from(s: String, sub: String, start: Int): Int {
+private fun _index_of_from(s: String, sub: String, start: Int): Int {
     if (start >= s.length()) { return -1 }
     var remaining = s.slice(start, s.length())
     var idx = remaining.index_of(sub)
@@ -622,6 +622,6 @@ fun _index_of_from(s: String, sub: String, start: Int): Int {
 }
 
 // Check if a status code is a redirect.
-fun _is_redirect(status: Int): Bool {
+private fun _is_redirect(status: Int): Bool {
     return status == 301 or status == 302 or status == 303 or status == 307 or status == 308
 }

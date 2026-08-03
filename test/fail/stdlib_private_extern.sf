@@ -1,0 +1,10 @@
+// The @extern half of the Phase 6b sweep — 142 of the 292 annotated functions.
+//
+// Kept separate from stdlib_private_helper.sf on purpose: decorated declarations
+// reach the modifier through a different branch of parse_stmt, and that branch
+// dropped the modifier entirely until Phase 6a. So a single test over a plain
+// `fun` would have passed against a compiler that silently exported every one of
+// the 142 externs.
+import "@math" as Math
+
+IO.println(Math._sin(0.0))

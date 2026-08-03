@@ -418,13 +418,13 @@ fun from_env(name: String): Logger {
 
 // --- Internal helpers ---
 
-fun _format_timestamp(ts: Float): String {
+private fun _format_timestamp(ts: Float): String {
     // Simple ISO-ish timestamp from unix seconds
     // Full ISO 8601 would need date math; for now use seconds since epoch
     return Time.to_iso(ts)
 }
 
-fun _format_fields(fields: Map<String, String>): String {
+private fun _format_fields(fields: Map<String, String>): String {
     var parts: List<String> = []
     var keys = fields.keys()
     var i = 0
@@ -437,7 +437,7 @@ fun _format_fields(fields: Map<String, String>): String {
     return "{" + _join(parts, ", ") + "}"
 }
 
-fun _join(parts: List<String>, sep: String): String {
+private fun _join(parts: List<String>, sep: String): String {
     var result = ""
     var i = 0
     while (i < parts.length()) {
@@ -450,7 +450,7 @@ fun _join(parts: List<String>, sep: String): String {
     return result
 }
 
-fun _escape_json(s: String): String {
+private fun _escape_json(s: String): String {
     var result = ""
     var i = 0
     while (i < s.length()) {
@@ -473,7 +473,7 @@ fun _escape_json(s: String): String {
     return result
 }
 
-fun _colorize(level: Level, line: String): String {
+private fun _colorize(level: Level, line: String): String {
     var code = match (level) {
         Trace => "90",
         Debug => "36",

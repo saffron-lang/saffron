@@ -1,11 +1,11 @@
 //! Float — 64-bit IEEE 754 double-precision floating point.
 //! Wraps a raw f64 value (stored as i64 bits) and provides numeric methods.
 
-@extern("i64 __float_to_string(i64)") fun _float_to_string(val: Int): Int
-@extern("double llvm.floor.f64(double)") fun _llvm_floor(val: Float): Float
-@extern("double llvm.ceil.f64(double)") fun _llvm_ceil(val: Float): Float
-@extern("double llvm.fabs.f64(double)") fun _llvm_fabs(val: Float): Float
-@extern("double llvm.sqrt.f64(double)") fun _llvm_sqrt(val: Float): Float
+@extern("i64 __float_to_string(i64)") private fun _float_to_string(val: Int): Int
+@extern("double llvm.floor.f64(double)") private fun _llvm_floor(val: Float): Float
+@extern("double llvm.ceil.f64(double)") private fun _llvm_ceil(val: Float): Float
+@extern("double llvm.fabs.f64(double)") private fun _llvm_fabs(val: Float): Float
+@extern("double llvm.sqrt.f64(double)") private fun _llvm_sqrt(val: Float): Float
 
 /// The Float class — wraps a raw 64-bit double-precision float.
 class Float {

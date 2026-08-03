@@ -1,11 +1,11 @@
 //! Map<K,V> — hash map.
 //! Wraps a pointer to a runtime hash map structure.
 
-@extern("i64 __map_new()") fun _map_new(): Int
-@extern("i64 __map_set(i64, i64, i64)") fun _map_set(map: Int, key: Int, value: Int): Int
-@extern("i64 __map_get(i64, i64)") fun _map_get(map: Int, key: Int): Int
-@extern("i64 __map_has(i64, i64)") fun _map_has(map: Int, key: Int): Int
-@extern("i64 __map_keys(i64)") fun _map_keys(map: Int): Int
+@extern("i64 __map_new()") private fun _map_new(): Int
+@extern("i64 __map_set(i64, i64, i64)") private fun _map_set(map: Int, key: Int, value: Int): Int
+@extern("i64 __map_get(i64, i64)") private fun _map_get(map: Int, key: Int): Int
+@extern("i64 __map_has(i64, i64)") private fun _map_has(map: Int, key: Int): Int
+@extern("i64 __map_keys(i64)") private fun _map_keys(map: Int): Int
 
 @intrinsic fun load64(addr: Int): Int
 

@@ -31,12 +31,12 @@ class Version {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-fun _is_digit(c: String): Bool {
+private fun _is_digit(c: String): Bool {
     return c == "0" or c == "1" or c == "2" or c == "3" or c == "4" or
            c == "5" or c == "6" or c == "7" or c == "8" or c == "9"
 }
 
-fun _is_all_digits(s: String): Bool {
+private fun _is_all_digits(s: String): Bool {
     if (s.length() == 0) { return false }
     var i = 0
     while (i < s.length()) {
@@ -48,7 +48,7 @@ fun _is_all_digits(s: String): Bool {
 
 var _ascii_order = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
-fun _strcmp(a: String, b: String): Int {
+private fun _strcmp(a: String, b: String): Int {
     var i = 0
     var len = a.length()
     if (b.length() < len) { len = b.length() }
@@ -68,7 +68,7 @@ fun _strcmp(a: String, b: String): Int {
 /// Numeric identifiers are compared as integers; alphanumeric identifiers are
 /// compared lexically. Numeric identifiers always have lower precedence than
 /// alphanumeric identifiers.
-fun _compare_identifiers(a: String, b: String): Int {
+private fun _compare_identifiers(a: String, b: String): Int {
     var a_num = _is_all_digits(a)
     var b_num = _is_all_digits(b)
     if (a_num and b_num) {
@@ -85,7 +85,7 @@ fun _compare_identifiers(a: String, b: String): Int {
 }
 
 /// Compare prerelease strings per semver precedence rules.
-fun _compare_prerelease(a: String, b: String): Int {
+private fun _compare_prerelease(a: String, b: String): Int {
     // No prerelease on either — equal
     if (a == "" and b == "") { return 0 }
     // A version without prerelease has HIGHER precedence
@@ -108,7 +108,7 @@ fun _compare_prerelease(a: String, b: String): Int {
 
 /// Parse a version core (major.minor.patch) from a string that may be partial.
 /// Returns a Version with prerelease and build set to "".
-fun _parse_core(s: String): Version {
+private fun _parse_core(s: String): Version {
     var parts = s.split(".")
     var major = 0
     var minor = 0
@@ -255,7 +255,7 @@ fun lte(a: Version, b: Version): Bool {
 }
 
 /// Internal: evaluate a single constraint (no spaces).
-fun _satisfies_single(version: Version, constraint: String): Bool {
+private fun _satisfies_single(version: Version, constraint: String): Bool {
     var c = constraint.trim()
     if (c == "" or c == "*") { return true }
 

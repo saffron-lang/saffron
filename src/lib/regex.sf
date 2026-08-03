@@ -14,13 +14,13 @@
 
 // --- C Library Bindings ---
 
-@extern("void* malloc(i64)") fun _malloc(size: Int): Int
-@extern("void free(void*)") fun _free(ptr: Int)
-@extern("i64 strlen(void*)") fun _strlen(s: Int): Int
-@extern("void* memcpy(void*, void*, i64)") fun _memcpy(dst: Int, src: Int, n: Int): Int
-@extern("i32 regcomp(void*, void*, i32)") fun _regcomp(preg: Int, pattern: Int, cflags: Int): Int
-@extern("i32 regexec(void*, void*, i64, void*, i32)") fun _regexec(preg: Int, str: Int, nmatch: Int, pmatch: Int, eflags: Int): Int
-@extern("void regfree(void*)") fun _regfree(preg: Int)
+@extern("void* malloc(i64)") private fun _malloc(size: Int): Int
+@extern("void free(void*)") private fun _free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _strlen(s: Int): Int
+@extern("void* memcpy(void*, void*, i64)") private fun _memcpy(dst: Int, src: Int, n: Int): Int
+@extern("i32 regcomp(void*, void*, i32)") private fun _regcomp(preg: Int, pattern: Int, cflags: Int): Int
+@extern("i32 regexec(void*, void*, i64, void*, i32)") private fun _regexec(preg: Int, str: Int, nmatch: Int, pmatch: Int, eflags: Int): Int
+@extern("void regfree(void*)") private fun _regfree(preg: Int)
 
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
@@ -47,7 +47,7 @@ var _REGMATCH_SIZE: Int = 16
 // --- Internal Helpers ---
 
 /// Read a signed 32-bit integer from memory (little-endian).
-fun _load_i32(addr: Int): Int {
+private fun _load_i32(addr: Int): Int {
     var b0: Int = load8(addr)
     var b1: Int = load8(addr + 1)
     var b2: Int = load8(addr + 2)
@@ -62,12 +62,12 @@ fun _load_i32(addr: Int): Int {
 }
 
 /// Read a regoff_t (64-bit signed integer on macOS/64-bit) from memory.
-fun _load_regoff(addr: Int): Int {
+private fun _load_regoff(addr: Int): Int {
     return load64(addr)
 }
 
 /// Extract a substring from str[start..end) as a new heap-allocated string.
-fun _substr(s: Int, start: Int, end: Int): Int {
+private fun _substr(s: Int, start: Int, end: Int): Int {
     var len: Int = end - start
     if (len <= 0) {
         var empty: Int = _malloc(1)
@@ -82,7 +82,7 @@ fun _substr(s: Int, start: Int, end: Int): Int {
 
 /// Compile a regex pattern with REG_EXTENDED. Returns the regex_t pointer,
 /// or 0 on compilation failure. Caller must call _regex_free on success.
-fun _regex_compile(pattern: Int, nosub: Bool): Int {
+private fun _regex_compile(pattern: Int, nosub: Bool): Int {
     var preg: Int = _malloc(_REGEX_T_SIZE)
     var flags: Int = _REG_EXTENDED
     if (nosub) {
@@ -97,7 +97,7 @@ fun _regex_compile(pattern: Int, nosub: Bool): Int {
 }
 
 /// Free a compiled regex.
-fun _regex_free(preg: Int) {
+private fun _regex_free(preg: Int) {
     _regfree(preg)
     _free(preg)
 }

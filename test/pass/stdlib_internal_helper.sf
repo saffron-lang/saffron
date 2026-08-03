@@ -1,0 +1,32 @@
+// The nine exceptions to Phase 6b's sweep, and why `internal` had to exist.
+//
+// These stdlib helpers ARE reached from outside their declaring module — by
+// tests, which is what they were written for. `private` would break those
+// callers, and leaving them `public` would mean a permanent exemption list. They
+// are `internal` instead: reachable from anywhere in the same package, refused
+// outside it.
+//
+// This file is in test/, which has no pantry.toml of its own and therefore
+// belongs to the root package — the same one src/lib belongs to. That shared
+// package identity is the entire reason these calls are legal, so if the manifest
+// layout ever changes this test is what notices.
+//
+// The design doc's §2 claimed there were ZERO cross-module callers of these
+// functions. There are nine; this pins them so the claim cannot silently rot back.
+import "@test" as T
+import "@scheduler" as Scheduler
+import "@pantry_config" as PantryConfig
+
+// Scheduler's four: the actor-liveness tests drive the scheduler directly.
+T.assert(Scheduler._has_pending() == 0 or Scheduler._has_pending() == 1,
+    "internal _has_pending is reachable from the same package")
+T.assert(Scheduler._has_parked_work() == 0 or Scheduler._has_parked_work() == 1,
+    "internal _has_parked_work is reachable from the same package")
+
+// pantry_config's two: the config tests assert on generated TOML.
+var proj: PantryConfig.Project = PantryConfig.Project()
+proj.name = "demo"
+T.assert(PantryConfig._generate_toml(proj).contains("demo"),
+    "internal _generate_toml is reachable from the same package")
+
+T.summary()

@@ -146,7 +146,7 @@ fun resolve_all(hostnames: List<String>): List<String> {
 // ---------------------------------------------------------------------------
 
 // Generate a unique-ish query ID
-fun _next_query_id(): Int {
+private fun _next_query_id(): Int {
     _query_id = _query_id + 1
     if (_query_id > 65535) {
         _query_id = 1
@@ -156,7 +156,7 @@ fun _next_query_id(): Int {
 
 // Build a DNS query packet for an A record lookup.
 // Returns the total packet length, or 0 on error.
-fun _build_query(buf: Int, id: Int, hostname: String): Int {
+private fun _build_query(buf: Int, id: Int, hostname: String): Int {
     var pos: Int = 0
 
     // --- Header (12 bytes) ---
@@ -221,7 +221,7 @@ fun _build_query(buf: Int, id: Int, hostname: String): Int {
 // Encode a hostname into DNS label format at buf+pos.
 // "www.example.com" -> [3]www[7]example[3]com[0]
 // Returns the new position after encoding.
-fun _encode_hostname(buf: Int, pos: Int, hostname: String): Int {
+private fun _encode_hostname(buf: Int, pos: Int, hostname: String): Int {
     var host_ptr: Int = hostname  // String is a pointer to chars
     var host_len: Int = dns_strlen(hostname)
 
@@ -261,7 +261,7 @@ fun _encode_hostname(buf: Int, pos: Int, hostname: String): Int {
 // ---------------------------------------------------------------------------
 
 // Send a UDP packet, yielding if would block.
-fun _udp_send(fd: Int, buf: Int, len: Int, host: String, port: Int): Int {
+private fun _udp_send(fd: Int, buf: Int, len: Int, host: String, port: Int): Int {
     while (true) {
         var n: Int = udp_sendto_raw(fd, buf, len, host, port)
         if (n > 0) {
@@ -279,7 +279,7 @@ fun _udp_send(fd: Int, buf: Int, len: Int, host: String, port: Int): Int {
 }
 
 // Receive a UDP packet with timeout, yielding if would block.
-fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Float): Int {
+private fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Float): Int {
     var start: Float = time_now()
 
     while (true) {
@@ -308,7 +308,7 @@ fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Float): Int {
 
 // Parse a DNS response packet and extract the first A record IP.
 // Returns "x.x.x.x" or "" on failure.
-fun _parse_response(buf: Int, len: Int, expected_id: Int): String {
+private fun _parse_response(buf: Int, len: Int, expected_id: Int): String {
     if (len < 12) {
         return ""  // Too short for header
     }
@@ -399,7 +399,7 @@ fun _parse_response(buf: Int, len: Int, expected_id: Int): String {
 
 // Skip a DNS name at the given position (handles compression pointers).
 // Returns the new position after the name, or -1 on error.
-fun _skip_name(buf: Int, pos: Int, len: Int): Int {
+private fun _skip_name(buf: Int, pos: Int, len: Int): Int {
     var jumped: Bool = false
     var max_jumps: Int = 10  // Prevent infinite loops from malformed packets
     var jumps: Int = 0

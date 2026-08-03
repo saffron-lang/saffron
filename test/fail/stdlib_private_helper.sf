@@ -1,0 +1,15 @@
+// Phase 6b annotated all 292 top-level underscore functions in src/lib. This is
+// the test that keeps that from being a no-op.
+//
+// The full suite's failure name set was IDENTICAL before and after the sweep,
+// which is the right outcome — but it is also exactly what an unapplied
+// annotation would produce, so on its own it proves nothing. This file is the
+// other half: reaching a now-private stdlib helper from outside its module must
+// be an error.
+//
+// `_lookup` is a plain Saffron function; test/fail/stdlib_private_extern.sf
+// covers an @extern one, since those took a different route through the parser
+// and were the 142 that Phase 6a had to unblock first.
+import "@base64" as Base64
+
+IO.println(Base64._lookup("abc", "a"))

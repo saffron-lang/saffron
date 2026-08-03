@@ -1,21 +1,21 @@
 //! Mathematical constants and functions using @extern for native compilation.
 
-@extern("double sin(double)") fun _sin(x: Float): Float
-@extern("double cos(double)") fun _cos(x: Float): Float
-@extern("double tan(double)") fun _tan(x: Float): Float
-@extern("double asin(double)") fun _asin(x: Float): Float
-@extern("double acos(double)") fun _acos(x: Float): Float
-@extern("double atan(double)") fun _atan(x: Float): Float
-@extern("double atan2(double, double)") fun _atan2(y: Float, x: Float): Float
-@extern("double sqrt(double)") fun _sqrt(x: Float): Float
-@extern("double pow(double, double)") fun _pow(x: Float, y: Float): Float
-@extern("double log(double)") fun _log(x: Float): Float
-@extern("double log2(double)") fun _log2(x: Float): Float
-@extern("double log10(double)") fun _log10(x: Float): Float
-@extern("double floor(double)") fun _floor(x: Float): Float
-@extern("double ceil(double)") fun _ceil(x: Float): Float
-@extern("double round(double)") fun _round(x: Float): Float
-@extern("double fabs(double)") fun _fabs(x: Float): Float
+@extern("double sin(double)") private fun _sin(x: Float): Float
+@extern("double cos(double)") private fun _cos(x: Float): Float
+@extern("double tan(double)") private fun _tan(x: Float): Float
+@extern("double asin(double)") private fun _asin(x: Float): Float
+@extern("double acos(double)") private fun _acos(x: Float): Float
+@extern("double atan(double)") private fun _atan(x: Float): Float
+@extern("double atan2(double, double)") private fun _atan2(y: Float, x: Float): Float
+@extern("double sqrt(double)") private fun _sqrt(x: Float): Float
+@extern("double pow(double, double)") private fun _pow(x: Float, y: Float): Float
+@extern("double log(double)") private fun _log(x: Float): Float
+@extern("double log2(double)") private fun _log2(x: Float): Float
+@extern("double log10(double)") private fun _log10(x: Float): Float
+@extern("double floor(double)") private fun _floor(x: Float): Float
+@extern("double ceil(double)") private fun _ceil(x: Float): Float
+@extern("double round(double)") private fun _round(x: Float): Float
+@extern("double fabs(double)") private fun _fabs(x: Float): Float
 
 /// The ratio of a circle's circumference to its diameter.
 var pi: Float = 3.14159265358979

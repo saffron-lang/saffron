@@ -6,26 +6,26 @@
 //!   var line = f.read_line()
 //!   f.close()
 
-@extern("i32 puts(void*)") fun _puts(s: Int): Int
-@extern("void __io_print_str(i64)") fun _print_str(s: Int)
-@extern("i64 __any_to_string(i64)") fun _any_to_string(val: Int): Int
-@extern("void __io_println_any(i64)") fun _println_any(val: Int)
+@extern("i32 puts(void*)") private fun _puts(s: Int): Int
+@extern("void __io_print_str(i64)") private fun _print_str(s: Int)
+@extern("i64 __any_to_string(i64)") private fun _any_to_string(val: Int): Int
+@extern("void __io_println_any(i64)") private fun _println_any(val: Int)
 
 // --- C Library Bindings for File I/O ---
 
-@extern("void* fopen(void*, void*)") fun _fopen(path: Int, mode: Int): Int
-@extern("i32 fclose(void*)") fun _fclose(fp: Int): Int
-@extern("i64 fread(void*, i64, i64, void*)") fun _fread(buf: Int, size: Int, count: Int, fp: Int): Int
-@extern("i64 fwrite(void*, i64, i64, void*)") fun _fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
-@extern("i32 fseek(void*, i64, i32)") fun _fseek(fp: Int, offset: Int, whence: Int): Int
-@extern("i64 ftell(void*)") fun _ftell(fp: Int): Int
-@extern("void* fgets(void*, i32, void*)") fun _fgets(buf: Int, size: Int, fp: Int): Int
-@extern("i32 feof(void*)") fun _feof(fp: Int): Int
-@extern("i32 fflush(void*)") fun _fflush(fp: Int): Int
-@extern("void* malloc(i64)") fun _io_malloc(size: Int): Int
-@extern("void free(void*)") fun _io_free(ptr: Int)
-@extern("i64 strlen(void*)") fun _io_strlen(s: Int): Int
-@extern("void* memcpy(void*, void*, i64)") fun _io_memcpy(dst: Int, src: Int, n: Int): Int
+@extern("void* fopen(void*, void*)") private fun _fopen(path: Int, mode: Int): Int
+@extern("i32 fclose(void*)") private fun _fclose(fp: Int): Int
+@extern("i64 fread(void*, i64, i64, void*)") private fun _fread(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fwrite(void*, i64, i64, void*)") private fun _fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i32 fseek(void*, i64, i32)") private fun _fseek(fp: Int, offset: Int, whence: Int): Int
+@extern("i64 ftell(void*)") private fun _ftell(fp: Int): Int
+@extern("void* fgets(void*, i32, void*)") private fun _fgets(buf: Int, size: Int, fp: Int): Int
+@extern("i32 feof(void*)") private fun _feof(fp: Int): Int
+@extern("i32 fflush(void*)") private fun _fflush(fp: Int): Int
+@extern("void* malloc(i64)") private fun _io_malloc(size: Int): Int
+@extern("void free(void*)") private fun _io_free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _io_strlen(s: Int): Int
+@extern("void* memcpy(void*, void*, i64)") private fun _io_memcpy(dst: Int, src: Int, n: Int): Int
 
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
@@ -39,12 +39,12 @@
 // is unconditionally false, silently taking the success branch on a failed open.
 // (`IO.open` has exactly that latent defect — see BUGS.) An `i64` return is
 // tagged as an integer, so a genuine NULL compares equal to 0 as written.
-@extern("i64 fopen(void*, void*)") fun _b_fopen(path: Int, mode: Int): Int
-@extern("i64 fclose(i64)") fun _b_fclose(fp: Int): Int
-@extern("i64 fseek(i64, i64, i64)") fun _b_fseek(fp: Int, offset: Int, whence: Int): Int
-@extern("i64 ftell(i64)") fun _b_ftell(fp: Int): Int
-@extern("i64 fread(void*, i64, i64, i64)") fun _b_fread(buf: Int, size: Int, count: Int, fp: Int): Int
-@extern("i64 fwrite(void*, i64, i64, i64)") fun _b_fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fopen(void*, void*)") private fun _b_fopen(path: Int, mode: Int): Int
+@extern("i64 fclose(i64)") private fun _b_fclose(fp: Int): Int
+@extern("i64 fseek(i64, i64, i64)") private fun _b_fseek(fp: Int, offset: Int, whence: Int): Int
+@extern("i64 ftell(i64)") private fun _b_ftell(fp: Int): Int
+@extern("i64 fread(void*, i64, i64, i64)") private fun _b_fread(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fwrite(void*, i64, i64, i64)") private fun _b_fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
 
 // Seek whence constants (inlined to avoid duplicate globals when runtime imports io):
 // 0 = 0, SEEK_CUR = 1, 2 = 2
@@ -464,7 +464,7 @@ fun write_file_bytes(path: String, data: Bytes) {
 //
 // This is a boundary patch, not a fix: BUGS #23 is that the runtime should tag
 // on the way out. Remove this when it does.
-fun _retag(n: Int): Int {
+private fun _retag(n: Int): Int {
     return n + 0
 }
 

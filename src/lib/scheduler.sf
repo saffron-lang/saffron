@@ -75,7 +75,7 @@ fun enqueue(handle: Int) {
 /// This is the single source of truth for that list. `_has_parked_work()` and
 /// `scheduler_tick()`'s idle check both delegate here so they cannot drift
 /// apart; a new self-reviving park reason is added here and nowhere else.
-fun _has_self_reviving_work(): Int {
+private fun _has_self_reviving_work(): Int {
     if (sleep_queue.length() > 0) { return 1 }
     if (await_waiters.length() > 0) { return 1 }
     if (io_handles.length() > 0) { return 1 }
@@ -87,7 +87,7 @@ fun _has_self_reviving_work(): Int {
 /// resume — but unlike the queues above they cannot revive themselves, which is
 /// why `scheduler_tick()` treats an actor-only queue as a deadlock rather than a
 /// reason to keep spinning.
-fun _has_parked_work(): Int {
+internal fun _has_parked_work(): Int {
     if (_has_self_reviving_work() == 1) { return 1 }
     if (actor_wait_handles.length() > 0) { return 1 }
     return 0
@@ -95,7 +95,7 @@ fun _has_parked_work(): Int {
 
 /// True (1) when the scheduler still has work: something runnable now, or
 /// something parked that may become runnable later.
-fun _has_pending(): Int {
+internal fun _has_pending(): Int {
     if (run_queue.length() > 0) { return 1 }
     return _has_parked_work()
 }
@@ -105,7 +105,7 @@ fun _has_pending(): Int {
 /// coroutines; this is exposed so the scheduler's own liveness tests can build
 /// the "only actor waiters remain" state directly instead of trying to race two
 /// coroutines into contention.
-fun _park_on_actor(handle: Int, actor_ptr: Int) {
+internal fun _park_on_actor(handle: Int, actor_ptr: Int) {
     actor_wait_handles.push(handle)
     actor_wait_targets.push(actor_ptr)
 }
@@ -118,7 +118,7 @@ fun deadlock_flag(): Int {
 /// Clear all scheduler state. Test-only: lets the liveness tests return the
 /// scheduler to a known-empty state between cases in one step, rather than
 /// draining each queue with `List.remove()`.
-fun _reset_for_test() {
+internal fun _reset_for_test() {
     run_queue = []
     sleep_queue = []
     sleep_times = []
@@ -132,7 +132,7 @@ fun _reset_for_test() {
     deadlock_detected = 0
 }
 
-fun _wake_waiters(finished_handle: Int) {
+private fun _wake_waiters(finished_handle: Int) {
     var i: Int = await_targets.length() - 1
     while (i >= 0) {
         if (await_targets[i] == finished_handle) {
@@ -147,7 +147,7 @@ fun _wake_waiters(finished_handle: Int) {
 // Poll all parked IO fds for readiness.
 // Moves ready tasks back to the run queue.
 // timeout_ms: how long to block if nothing is immediately ready.
-fun _poll_io(timeout_ms: Int) {
+private fun _poll_io(timeout_ms: Int) {
     // First pass: check each fd with 0ms timeout (non-blocking)
     var i: Int = io_handles.length() - 1
     while (i >= 0) {

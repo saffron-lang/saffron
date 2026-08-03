@@ -36,22 +36,22 @@ import "os" as OS
 // FFI declarations — native process primitives (process_native.c)
 // =============================================================================
 
-@extern("i64 sf_process_spawn(i8*, i8*, i8*, i8*, i64)") fun _spawn(program: String, argv: Int, envp: Int, cwd: String, flags: Int): Int
-@extern("i64 sf_process_write_stdin(i64, i8*, i64)") fun _write_stdin(handle: Int, data: Int, len: Int): Int
-@extern("i64 sf_process_read_stdout(i64, i8*, i64)") fun _read_stdout(handle: Int, buf: Int, max_len: Int): Int
-@extern("i64 sf_process_read_stderr(i64, i8*, i64)") fun _read_stderr(handle: Int, buf: Int, max_len: Int): Int
-@extern("i64 sf_process_read_nonblock(i64, i64, i8*, i64)") fun _read_nonblock(handle: Int, stream: Int, buf: Int, max_len: Int): Int
-@extern("i64 sf_process_poll(i64)") fun _poll(handle: Int): Int
-@extern("i64 sf_process_wait(i64)") fun _wait(handle: Int): Int
-@extern("void sf_process_kill(i64, i64)") fun _kill(handle: Int, signal: Int)
-@extern("void sf_process_close(i64)") fun _close(handle: Int)
-@extern("void sf_process_close_stdin(i64)") fun _close_stdin(handle: Int)
-@extern("i64 sf_process_pid(i64)") fun _pid(handle: Int): Int
+@extern("i64 sf_process_spawn(i8*, i8*, i8*, i8*, i64)") private fun _spawn(program: String, argv: Int, envp: Int, cwd: String, flags: Int): Int
+@extern("i64 sf_process_write_stdin(i64, i8*, i64)") private fun _write_stdin(handle: Int, data: Int, len: Int): Int
+@extern("i64 sf_process_read_stdout(i64, i8*, i64)") private fun _read_stdout(handle: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_read_stderr(i64, i8*, i64)") private fun _read_stderr(handle: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_read_nonblock(i64, i64, i8*, i64)") private fun _read_nonblock(handle: Int, stream: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_poll(i64)") private fun _poll(handle: Int): Int
+@extern("i64 sf_process_wait(i64)") private fun _wait(handle: Int): Int
+@extern("void sf_process_kill(i64, i64)") private fun _kill(handle: Int, signal: Int)
+@extern("void sf_process_close(i64)") private fun _close(handle: Int)
+@extern("void sf_process_close_stdin(i64)") private fun _close_stdin(handle: Int)
+@extern("i64 sf_process_pid(i64)") private fun _pid(handle: Int): Int
 
 // Memory management
-@extern("void* malloc(i64)") fun _proc_malloc(size: Int): Int
-@extern("void free(void*)") fun _proc_free(ptr: Int)
-@extern("i64 strlen(void*)") fun _proc_strlen(s: Int): Int
+@extern("void* malloc(i64)") private fun _proc_malloc(size: Int): Int
+@extern("void free(void*)") private fun _proc_free(ptr: Int)
+@extern("i64 strlen(void*)") private fun _proc_strlen(s: Int): Int
 
 // Intrinsic for null-termination
 @intrinsic fun store8(addr: Int, val: Int)
@@ -308,7 +308,7 @@ class Subprocess {
 // =============================================================================
 
 /// Parse exit code from a string. Returns 0 if parsing fails.
-fun _parse_exit_code(s: String): Int {
+private fun _parse_exit_code(s: String): Int {
     if (s.length() == 0) { return 0 }
     try {
         return s.to_number()
@@ -318,12 +318,12 @@ fun _parse_exit_code(s: String): Int {
 }
 
 /// Escape a string for safe use in single-quoted shell context.
-fun _escape_single_quotes(s: String): String {
+private fun _escape_single_quotes(s: String): String {
     return s.replace("'", "'\\''")
 }
 
 /// Shell-escape a value by wrapping in single quotes.
-fun _shell_escape(s: String): String {
+private fun _shell_escape(s: String): String {
     return "'" + _escape_single_quotes(s) + "'"
 }
 
