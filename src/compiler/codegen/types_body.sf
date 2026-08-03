@@ -158,6 +158,11 @@
             UnionType(types) => this.union_type_string(types)
             FuncType(p, r) => this.func_type_string(p, r)
             NullableType(inner) => this.type_to_string(inner) + "|Nil"
+            // These render as themselves rather than collapsing to "Int"/"Any".
+            // Codegen printing "Unknown" anywhere is the signal invariant I2
+            // wants visible, not something to paper over at the last step.
+            UnknownType => "Unknown"
+            NeverType => "Never"
         }
         // In identity mode, Float and Int are both i64 — treat Float as Int
         if (this.identity_mode and result == "Float") { return "Int" }
@@ -282,6 +287,11 @@
             UnionType(types) => AST.Type.AnyType
             FuncType(p, r) => AST.Type.AnyType
             NullableType(inner) => AST.Type.AnyType
+            // Not a list, so it has no element type. Answering Unknown rather
+            // than Any keeps "we never knew" distinct from "deliberately
+            // dynamic" for the caller that eventually reports it.
+            UnknownType => AST.Type.UnknownType
+            NeverType => AST.Type.NeverType
         }
     }
 
@@ -299,6 +309,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -316,6 +328,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -333,6 +347,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -350,6 +366,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -367,6 +385,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -384,6 +404,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -405,6 +427,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -422,6 +446,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -444,6 +470,12 @@
             EnumType(n) => false
             GenericType(base, args) => false
             FuncType(p, r) => false
+            // Unknown genuinely admits any representation, so it belongs with
+            // Any/Union here: no compile-time answer about the value is
+            // available. Never is the opposite — there is no value at all, so
+            // nothing is undecidable about it.
+            UnknownType => true
+            NeverType => false
         }
     }
 
@@ -461,6 +493,8 @@
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 

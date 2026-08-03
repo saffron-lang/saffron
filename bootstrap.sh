@@ -166,7 +166,14 @@ if [[ "$GEN2_OK" == false ]]; then
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
-    timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+    # 180, not 120, to match every other gen3 compile in this script. These two
+    # steps (codegen.sf and main.sf below) are the largest inputs the compiler
+    # ever sees, and main.sf measured 116s unloaded on 2026-08-03 — a 4s margin.
+    # Under any CPU contention `timeout` killed it, and the failure is
+    # indistinguishable from a crash: RC=1, no `Error:` line, so `grep -c ERROR`
+    # reads 0 and the log just ends in warnings. A timeout that trips on a
+    # healthy compile costs more than it protects against.
+    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
         || fail "STAGE 1" "gen3 failed to compile codegen.sf"
 
     cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
