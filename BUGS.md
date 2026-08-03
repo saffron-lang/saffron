@@ -2,15 +2,29 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
-#129, #131, #132, #143. Next free number is **#144**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#139, #143. Next free number is **#144**.
 
-Numbering note: #137–#141 were taken concurrently on `main` for unrelated bugs
-(`as` as an expression, index-headed statements, a `Signal<T>.get()` regression,
-`return;`). Two entries filed on this branch were renumbered to avoid the
-collision — structural `==` on List/Map is **#142**, formerly #137, and the
-condition-lowering bug below is **#143**, formerly #138. If you follow a git
-message or commit that cites the old number, this is why it does not match.
+#140 was never filed — the count was bumped past it in the same commit that
+closed five entries, so the number is burnt rather than in use. Do not reuse it;
+a gap is cheaper than two entries sharing a number in the git history.
+
+**Read the next-free number from `main`, never from a worktree.** On 2026-08-03
+three separate worktrees each numbered a different bug #137, and two of them also
+claimed #138: the `as`-as-expression bug (this file's #137), ph5's List/Map `==`
+bug (re-filed as #142), and ide-stage0-spans' `var X = Module.Type` alias bug
+(still unmerged and still mis-numbered). ph5's had *already* been renumbered once,
+from an internal task ID that collided with the resolved #28. A worktree branched
+before a filing carries the pre-filing note forward and reads it as authoritative,
+so the collision is the default outcome rather than an accident, and it is only
+visible at merge time — by which point the number is in commit messages, code
+comments and test names. If you are filing from a worktree, `git show
+main:BUGS.md | head -10` first.
+
+The condition-lowering bug below is **#143**, filed from ph5 after reading
+`main`'s then-next-free number, so it is the one worktree filing in this round
+that did not collide. Its commit message and the `BUGS #143` comments in
+`src/compiler/checker.sf` cite it correctly.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -18,6 +32,20 @@ title says FIXED belongs in `## Resolved`** — if you find one here, move it. T
 drift is why this heading is worth keeping honest: for a while `## Open` held 81
 entries of which only 14 were actually open, so the count could not be read off
 the file at all.
+
+The drift recurs, so it is worth checking mechanically rather than by eye — on
+2026-08-03 seven FIXED entries (#110, #121, #122, #124–#127) were sitting in
+`## Open` while the count above said otherwise. The check is that these two
+agree, and that the first prints nothing:
+
+```bash
+awk '/^## Resolved$/{exit} /^### [0-9]+\. FIXED/{print}' BUGS.md
+awk '/^## Resolved$/{exit} /^### [0-9]+\./{print}' BUGS.md | wc -l
+```
+
+Note the `^## Resolved$` anchor: the heading is also mentioned in this preamble
+between backticks, so an unanchored search for it finds the prose first and
+reports every open entry as resolved.
 
 Two titles here are deliberately hedged rather than resolved. #107 says LARGELY
 CLOSED because the assertion backfill is incomplete, and #12 was moved to
@@ -78,68 +106,6 @@ that makes the rule unmemorable. Write the comparison.
 
 The fix is a diagnostic in the checker, not a change to `to_i1`: once the
 condition is provably `Bool`, `trunc` is correct and stays.
-
-### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
-
-**Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
-seven tests — which means it also hides whatever else is wrong on that target.
-
-Minimal repro — a file whose entire contents are:
-
-```saffron
-fun main(): Int { IO.println("inside main"); return 0 }
-```
-
-prints `inside main` natively and **nothing at all** on wasm32. Adding an
-explicit `main()` call at top level makes both agree.
-
-`output_body.sf:1276` emits the `__saffron_boot` shim only when
-`has_top_level`, but `wasm_base_32.ll:2188`'s `_start` calls `@__saffron_boot()`
-unconditionally. A main-only program has no top-level statements, so no shim is
-emitted, `_start`'s call resolves to an undefined symbol, and
-`--import-undefined` turns it into a silent no-op import. Nothing fails; the
-module simply does nothing.
-
-The native path one screen away is correct, which is what makes this a drift
-rather than an oversight: line 1301 guards on
-`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, i.e.
-it has the explicit `__saffron_main` branch that the wasm path lacks. The fix is
-to give the wasm branch the same case.
-
-Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
-`tools/differential.sh` sweep share this one signature — wasm32 emits nothing —
-and none of them are value-layer bugs. Worth fixing before the remaining
-value-layer drift, since it currently makes wasm32 output unobservable for those
-seven programs.
-
-**Fixed (2026-08-02)** by widening the wasm `__saffron_boot` guard at
-`output_body.sf` to match the native wrapper's:
-`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, plus a
-second shim body for the main-only case. That body must call `__saffron_main`, not
-`__saffron_entry` — `__saffron_entry` is emitted only under `has_top_level`, so
-calling it here would reintroduce exactly the undefined-symbol-becomes-silent-import
-failure this fixes — and it runs the module inits itself, since with no top-level
-code there is no `__saffron_entry` for them to run inside. The async-main case
-enqueues the coroutine frame (matching the wasm top-level coroutine arm, not native:
-the host event loop cannot be blocked).
-
-The decisive check is running, not linking — the agent's whole framing is that the
-defect *was* that it linked clean. `tools/saffron build test/pass/main_entry_only.sf
---target wasm32` then `node tools/oracle/wasm_run.mjs`: **before, empty; after,
-`main-only entry ran`**. Three regression tests added
-(`main_entry_only`, `main_entry_and_top_level`, `top_level_entry_only`), each with a
-`.expected`; the main-only file is kept free of any top-level call because a single
-one flips `has_top_level` and tests the branch that was never broken.
-
-Two consequences followed. The `main_entry_only()` capability gate in
-`tools/differential.sh` was dead — the 11 `fun main`-only programs it SKIPped are
-graded again. And the "seven wasm32 mismatches" that motivated this entry were
-partly stale: the 17 remaining differential mismatches are a *different* signature
-(no `fun main` at all). Two adjacent wasm64 defects surfaced while confirming the
-fix and are filed as their own entries: #124 (wasm64's `_start` calls
-`__saffron_entry` directly with no `__saffron_boot` indirection, so the same
-main-only program never runs there either) and #125 (`wasm_base.ll` has no single-arg
-`__io_println` NaN-box dispatcher, so all wasm64 output is dropped regardless).
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -558,6 +524,599 @@ lists. It also means #115's "only nested elements are wrong" framing holds for
 
 ---
 
+### 131. wasm64's identity discipline makes every non-String value unprintable
+
+**Severity: high**, and the remaining half of #125 — wasm64 output is no longer
+*entirely* dropped, but only strings survive.
+
+`src/runtime/values.spec:41-44` gives wasm64 `discipline=identity` (raw i64 bits) and
+wasm32 `discipline=nanbox`. Under identity there is no tag to discriminate on, so
+`__io_println_any` in `wasm_base.ll` can only treat its argument as a string pointer.
+
+Measured with `scratch/w64/battery.sf` across all three targets. native and wasm32 both
+print all six lines (`a string / 42 / true / false / 3 / hello world`); wasm64 prints
+the two strings and **four blank lines** for `42`, `true`, `false` and `l.length()`.
+
+Not a local patch. It needs either switching `wasm_base.ll` to the nanbox discipline
+wholesale — which also means adding the GC object headers nanbox tagging assumes — or
+giving identity-mode values a type-carrying header. Until then, **treat wasm64 as
+string-output-only.**
+
+Related and worth reading together: this is the same trap as #125's wrong premise. An
+identity i64 bitcast to double is a denormal, and `fptosi` truncates every denormal to
+0, so a nanbox helper dropped into an identity base fails silently rather than loudly.
+
+---
+
+### 132. wasm64's link line accepts every undefined symbol, and nothing in the tree tests wasm64 at all
+
+**Severity: high as a process defect** — this is the mechanism that made #110, #124,
+#125 and four further missing symbols silent instead of link errors. Filed as its own
+entry because fixing the individual symbols does not stop the next one.
+
+Two independent halves, both verified in the source:
+
+**The flag divergence.** `tools/saffron:357` links wasm64 with
+`-Wl,--allow-undefined`, while `tools/saffron:412` deliberately links wasm32 with
+`-Wl,--import-undefined`, carrying a comment that `--allow-undefined` "silently accepts
+EVERY missing symbol." `tools/build_wasm.sh:77` also passes `--allow-undefined`. So on
+wasm64 an undefined symbol becomes a no-op host import: the module builds, runs, and
+does nothing. Also noted while measuring: wasm32 passes `--identity-mode` for the
+runtime compile (`tools/saffron:384`) and wasm64 (`:352`) does not.
+
+Sweeping a linked wasm64 module's `*UND*` list — rather than reading `wasm_base.ll` —
+found **four more** undefined symbols beyond #124's and #125's: `__string_intern`
+(which alone made all string interpolation produce no output), `__print_debug_location`,
+`__val_tag_ptr_nullable`, and `__builtin_trap`, the last `declare`d at
+`wasm_base.ll:557` but never defined, so a trap was a silent return. All four are now
+defined. **The only reliable audit of a wasm64 base's completeness is dumping the
+linked module's undefined symbols, not reading the file.**
+
+**The coverage hole.** `tools/run_tests.sh` never builds for wasm64 — its single
+`wasm` mention is `NOT_A_TEST="goals hello_wasm gc_generational_test"` — and
+`tools/differential.sh` sets `ALL_CONFIGS="native-O0 wasm32"`. No harness in the tree
+builds or runs a wasm64 module, which is how six undefined symbols coexisted with a
+green suite.
+
+Compounding the two: **linking cannot serve as the check here.** A successful wasm64
+build is compatible with the module doing nothing at all, so any wasm64 test must
+execute the module and assert on stdout, treating empty output as failure.
+`scratch/w64/regress_wasm64.sh` is such a check (3 cases, empty stdout is FAIL),
+written to be adoptable by `run_tests.sh` unchanged.
+
+The flag was left as-is deliberately: it may be load-bearing for legitimate host
+imports (`js_log_str` is one), so tightening it is its own measured change rather than
+a one-line edit.
+
+---
+
+### 139. OPEN — REGRESSION: a value flowing through `Signal<T>.get()` re-infers as `Nil`, and no annotation clears it
+
+**Severity: high.** This is the sole blocker for the `bazaar/frontend` build, and
+it is a **regression against the committed gen2** — see the gen2-vs-gen3 split
+below. Almost certainly fallout from the in-flight type-lattice rewrite
+(`UnknownType`/`NeverType`, uncommitted in `ast.sf`/`checker.sf`).
+
+Repro (needs `basil` on the lib path):
+
+```saffron
+import { Query, query } from "basil/query"
+var q: Query<Any> = query("http://x")
+var data = q.data.get()               // Signal<T>.get(): T, T bound to Any
+if (data != nil and data.has("k")) {
+    var pkgs = data.get("k")
+    if (pkgs != nil) {                 // guard is present and correct
+        IO.println(pkgs.length().to_string())   // ERROR: .length() on nullable 'pkgs' (type Nil)
+    }
+}
+```
+
+The gen split is the diagnosis:
+
+```
+build/stage2/saffronc  (committed gen2)  -> 0 errors
+build/saffronc         (current gen3)    -> 1 error   (.length() on nullable Nil)
+```
+
+Two properties make this nastier than an ordinary narrowing gap:
+
+1. **It ignores explicit annotations.** `var data: Any = q.data.get()` still
+   errors, and so does `var pkgs: Any = data.get("k")`. The RHS type wins over
+   the declared type — the value is stamped `Nil` at the generic boundary and the
+   annotation does not launder it. That is the part that reads as a genuine bug
+   rather than a missing feature: a declared `Any` should never re-narrow to `Nil`.
+
+2. **The `!= nil` guard then narrows `Nil` to nothing.** Because `pkgs` is
+   *already* pure `Nil` (not `Any|Nil`), the guard is vacuous and the method call
+   is reported anyway.
+
+Isolation notes, to save the next person the bisect:
+- `Any.get("k")` on a plain `Any` narrows fine (0 errors). The poison is specific
+  to the value coming back from the generic `Signal<T>.get()`.
+- A hand-rolled `class Sig<T> { fun get(): T ... }` does **not** reproduce it, nor
+  does `Sig` initialized with `sig(nil)`. It only reproduces through basil's real
+  `Query`/`Signal` chain, so the trigger is some combination this minimal clone
+  doesn't capture (candidate: `this.data = Signal.signal(nil)` at `query.sf:27`
+  fixing the field's `T` to `Nil` at construction, independent of the class's `T`).
+
+**Only working workaround found:** launder through a function whose return type is
+declared `Any`, at *every* level the poisoned value is read:
+
+```saffron
+fun as_any(x: Any): Any { return x }
+var data = as_any(q.data.get())
+var pkgs = as_any(data.get("k"))      // both levels, or the inner one still errors
+```
+
+A single `Query.snapshot(): Any` that returns `this.data.value` only launders the
+outer read — the inner `data.get("k")` still errors — so it is not enough on its
+own. Given that, and that the regression is in uncommitted rewrite work, the
+frontend was left un-worked-around pending the checker fix rather than sprayed
+with `as_any` calls.
+
+The reference build path, for whoever fixes this:
+
+```
+cd bazaar/frontend
+../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
+```
+
+Gen2 fails it too, but for an unrelated and already-fixed reason — the
+`{ stmt; stmt() }` arrow-body form at `main.sf:151,306` is BUGS #136, which gen3
+handles. So the frontend genuinely needs *both* the #136 fix (gen3-only) and the
+absence of this regression (gen2-only); no single existing binary compiles it.
+
+---
+
+## Resolved
+
+Full narratives for bugs that are closed. Kept in the file rather than deleted
+because several of these entries are the only written record of *why* a
+subsystem is shaped the way it is, and of the measurement mistakes that let the
+bug survive.
+
+### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
+
+**Severity: high.** `[1,2] == [1,2]` was `false`; `{"a":1} == {"a":1}` was
+`false`; nested and reordered cases likewise. `IO.println` showed the operands
+identical, so the wrongness was invisible until you compared them.
+
+`gen_binary`'s `==` chain (`expr_body.sf`) had arms for String (`__string_eq`),
+Any (`__any_eq`), Float (`fcmp`), and same-enum (`__enum_eq_<Name>`), then fell
+through to a raw `icmp eq i64`. Two Lists or two Maps landed on that fall-through,
+which compares the two malloc addresses — the same "one spelling, two semantics"
+defect the enum arm right above it was added to fix, in a different shape.
+
+`__rt_val_eq` in `runtime.sf` already did the correct deep by-value comparison but
+nothing reached it: no arm routed a statically-typed List/Map to it. The fix adds
+an arm above the integer fall-through that sends both-aggregate operands to
+`__rt_val_eq`. It targets `__rt_val_eq`, not `__any_eq`, because `__any_eq`'s body
+is hand-written IR present only in `base_nanbox.ll` and `wasm_base_32.ll`, so an
+arm keyed on it would emit an unresolvable symbol under `--identity-mode`
+(`base.ll`) and on wasm64 (`wasm_base.ll`). `__rt_val_eq` is compiled from
+`runtime.sf` and links on every target, and is the body `__any_eq` itself
+delegates to, so the two cannot drift apart. A user `eq` overload cannot reach
+this: List and Map are runtime primitives with no Saffron class for the
+operator-overload dispatch to key on, which is why the fix lives in codegen.
+
+The declare needs the same `defined_funcs` guard `__runtime_error` uses:
+`runtime.sf` *defines* `__rt_val_eq`, and clang rejects a `declare`+`define` of one
+name in a single module. Emitting it unconditionally broke the gen4 link.
+**Filed as #142, not #137.** The fix landed on the `phase5-internal` worktree,
+which branched before #137/#138/#139 existed and numbered this entry #137 off its
+own stale next-free note. #137 is the soft-keyword `as` bug, already resolved
+below. The worktree's own commit message flags that it had earlier been called
+"BUGS #28" — an internal task-list ID colliding with the resolved #28 (Int->Float
+literal). Two renumberings for one bug is what a per-worktree next-free counter
+buys; the number is only free if you read the number from `main`.
+
+### 141. FIXED — `return;` was a parse error, while `return` and `return 1;` both parsed
+
+**Severity: low as a defect, medium as a diagnostic.** The error names neither
+`return` nor the semicolon, and points at the *following* line.
+
+```saffron
+fun f(): Nil {
+    return;          // [line N, col C] Error: expected a literal, name or '(' here
+}
+```
+
+The caret lands on whatever follows the `;` — for a `return;` last in its body,
+on the closing `}`. Both neighbouring spellings work, which is what makes it
+misread as anything but a missing terminator:
+
+```saffron
+return       // fine
+return 1;    // fine — never enters the bare-return branch
+return;      // parse error
+```
+
+Cause: `parse_return` (`src/compiler/parser.sf:2922`) decided a `return` was bare
+when the next token was `}` or `eof`, and separately when the next token sat on a
+later line (the #99 fix). `;` is in none of those categories. Statements in this
+parser never consume their own trailing `;` — the enclosing body skips them
+afterwards with `while (this.match_kind(";")) {}`, at fourteen sites — so
+`return;` arrives at `parse_return` with the `;` still current, falls past every
+bare-return check, and reaches `parse_expr`, which demands an operand.
+
+Fixed by adding `;` to the existing bare-return check. This is the same class of
+gap as #99 and shares its condition, so the regression coverage went into
+`test/pass/bare_return_statement_boundary.sf` rather than a new file: the `;`
+cases sit alongside the line-boundary cases that constrain the same `if`. The
+test also pins `return v;` and `return;` directly before `}`, since a future
+rewrite of that condition could plausibly break either.
+
+Found by triaging the suite's standing red set, where it was the cause of
+`test_lib_repro` — one parse error in a 160-line file, reported against a line
+that had nothing wrong with it.
+
+---
+
+### 123. FIXED — three stdlib files bound different modules to the same alias `Internal`, so the alias resolved to whichever won
+
+**Severity: medium** — it currently breaks exactly one file, and that file has no
+importers. The mechanism is what matters: an import alias is not scoped to the file
+that declares it the way the syntax implies.
+
+```
+src/lib/ast.sf:13     import "../compiler/ast.sf"    as Internal
+src/lib/lexer.sf:9    import "../compiler/lexer.sf"  as Internal
+src/lib/parser.sf:10  import "../compiler/parser.sf" as Internal
+```
+
+`src/lib/lang.sf` imports all three (`@ast`, `@lexer`, `@parser` at lines 13–15).
+The alias collides, so `Internal.Token` inside `lexer.sf` resolves against
+`compiler_ast_Token` rather than `compiler_lexer_Token`, and misses:
+
+```
+[codegen] Error: no member 'Token' in module 'Internal'
+[codegen] Error: no member 'TokenKind' in module 'Internal'
+```
+
+**Not a regression from #118.** Verified on the pre-#118 build, where `lang.sf`
+already emitted invalid IR — `use of undefined value '%Internal'` — for the same
+reason. #118's fix converts a silent invalid-IR failure into a named diagnostic, so
+`lang.sf` moves from exit 0 to exit 1 while being equally broken either way. It was
+never working; it was failing invisibly.
+
+`@lang` has no real importers — the three hits for `"@lang"` in the tree are all
+commented-out documentation lines (`//! import "@lang" as Lang`), including the one
+in `lang.sf` itself. So no test moves, and nothing downstream breaks. That is also
+why this survived: the file is dead weight that nothing compiles.
+
+Two separable questions here, and the second is the important one:
+
+1. The immediate fix is to give the three files distinct aliases (`InternalAst`,
+   `InternalLexer`, `InternalParser`). Cheap, and it makes `lang.sf` compile.
+2. The real defect is that an alias declared in one file can be shadowed by an alias
+   of the same name declared in another, and the collision is silent. An alias should
+   either be file-local (the reading the syntax suggests) or a collision should be
+   diagnosed. Renaming the three aliases fixes this instance and leaves the trap set
+   for the next one. Whichever way it is resolved should be a decision about alias
+   scoping, not a rename.
+
+Found while measuring #118's blast radius across 336 files.
+
+**Fixed (2026-08-03)** by option 2 — alias scoping — not the rename. The three
+`Internal` bindings still have that name in the source; they no longer collide
+because an alias is now keyed by the file that declares it.
+
+`codegen`'s module-alias table was global: one `alias -> module prefix` map for
+the whole compilation, so the last `import ... as Internal` parsed won and every
+earlier one silently resolved to it. It is now keyed by
+`<declaring module prefix>|<alias>`, with `has_module_alias` /
+`module_alias_prefix` helpers replacing the 15 direct lookups. A lookup that
+carries the current module's prefix cannot see another file's aliases at all, so
+the syntax now means what it reads as.
+
+Renaming the three would have made `lang.sf` compile while leaving the trap set,
+which is what the entry above argued against. `@lang` went 6/8 to 8/8 on its own
+assertions.
+
+---
+
+### 128. FIXED — there was no compound-assignment or increment operator, and `test/pass/increment.sf` tested a feature that did not exist
+
+**Severity: low as a defect, medium as misinformation** — the language reads as if
+it has these, one test asserts it does, and the failure they produce is a bare parse
+error naming no missing feature.
+
+```
+x += 1      // [line 2, col 6] Error: expected a literal, name or '(' here
+b.v += 1    // same
+a++         // same
+```
+
+The lexer has no token for any of them. `TokenKind` (`src/compiler/lexer.sf:3`-77)
+lists `TkPlus`, `TkMinus`, `TkStar`, `TkSlash`, `TkPercent`, `TkEq`, `TkEqEq`,
+`TkBangEq`, `TkLtEq`, `TkGtEq` — and nothing for `+=`, `-=`, `*=`, `/=`, `%=`, `++`
+or `--`. So this is not a parser gap over a lexed token: the characters lex as two
+separate operators and the parser then wants an operand where `=` sits.
+
+`test/pass/increment.sf` asserts otherwise — its first line is `a = a++;` — and it
+is in the 24-name failure baseline as `compile-error`, red long enough to be treated
+as scenery. It is a test for a feature that was never implemented, not a stale
+spelling of one that was. Deleting it and adding the operators are both defensible;
+leaving it as an unexplained red is not.
+
+Found while checking whether the compound forms of #122 reached that bug's
+fall-through. They do not — they never get past the lexer — which is why the #122
+fix neither covered nor needed to cover them.
+
+**Fixed (2026-08-03)** by implementing the operators, not by deleting the test —
+`+=`, `-=`, `*=`, `/=`, `%=`, postfix `++` and postfix `--` are real syntax now,
+and `test/pass/increment.sf` was rewritten around them (21 parse errors -> 43
+assertions pass). It leaves the failure baseline, which drops from 24 names to 23.
+
+Seven `TokenKind` variants, appended at the end of the operator group so every
+pre-existing tag is untouched, plus maximal-munch lexing. No new AST node and no
+codegen change: `<op>=` desugars to `target = target <op> (rhs)`, and postfix
+`++` desugars to a `BlockExpr` that hoists the receiver and index into
+uid-suffixed temporaries, so it is an expression with C's value and `arr[g()]++`
+calls `g()` exactly once.
+
+Prefix `++x` and a non-place target (`5 += 1`) are **rejected by name** rather
+than accepted. `--a` already means `-(-a)` here, so accepting prefix `--` would
+make one spelling mean two things depending on a lexer decision the reader cannot
+see; and without the place check the desugaring yields `5 = 5 + 1`, which falls
+through `build_assign` and makes the statement silently vanish.
+`test/fail/prefix_increment.sf` and `test/fail/compound_assign_non_place.sf` pin
+both refusals.
+
+One consequence worth knowing: the lexer is now maximal-munch over these, so
+`3--2` is a parse error rather than `3 - (-2)`. Write `3 - -2`.
+
+**A separate, PRE-EXISTING codegen bug fell out of this one.** Alloca hoisting
+(`collect_vars_stmt`) walked the bodies of `if` and `while` but not their
+*conditions*, and a `match`'s arms but not its *subject*. A declaration desugared
+into any of those three got a `store` with no `alloca` — invalid IR, "use of
+undefined value". `if (h++ > 0)` is what surfaced it, but this predates `++`
+entirely: `if ({"a": 1}.has("a"))` fails identically under the checked-in gen2,
+emitting `store i64 %t1, i64* %__map_1` with no alloca. There is no expression
+position that cannot contain a declaration, so the walk has to be total.
+`test/pass/decl_in_condition.sf` pins all six shapes.
+
+---
+
+### 129. FIXED — a statement beginning with `this` swallowed a following infix operator
+
+**Severity: medium** — a parse error on valid-looking code, and the message points at
+the operator rather than the cause, so it reads as "the `and` is wrong" when the
+problem is that `this.f` already ended the statement.
+
+```saffron
+class C { var f: Float
+          fun init() { this.f = 1 }
+          fun s1(): Float { this.f + 1   return 0 } }
+// [line 4, col 32] Error: expected a literal, name or '(' here
+```
+
+`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
+member/call chain and returns an `ExprStmt` directly, never handing the result back to
+the binary-operator layer. Any infix operator that follows is left trying to start a
+fresh statement. A block expression's value slot is a statement, so the natural
+spelling `{ this.foo() and this.bar() }` hits it — that is what kept `checker.sf` from
+parsing standalone (#127), which was worked around in `checker.sf` rather than fixed
+here. Reproduces on gen2 and gen3 alike.
+
+Two things measured directly, which bound the bug and were not assumed:
+
+- **It is specific to `this`.** The identical shape through a local variable
+  (`var o = this   o.f + 1`) compiles clean, so the defect is in `parse_this_stmt`'s
+  terminal return and not in statement-versus-expression parsing generally.
+- **`super.` is NOT affected.** `super.g() and super.g()` in a value position compiles
+  clean. So the fix is one function, not a family of them — worth stating because the
+  obvious guess is that every keyword-initial statement shares the shape.
+
+The fix presumably wants `parse_this_stmt`'s result to re-enter the expression parser at
+the binary-operator precedence level rather than returning an `ExprStmt` terminally.
+Worth checking the sibling terminal returns in that function (the `IndexSet` and
+`SetField` early returns) the same way.
+
+Found while fixing #127, whose filed reduction had been searching along the wrong axis.
+
+**Fixed (2026-08-03)** by rewind-and-reparse: record the token position and error
+count, run `parse_this_stmt`, and if it produced no errors and the parser is now
+sitting on an expression continuation, rewind and re-enter through
+`parse_expr_stmt`. The precedent is `kl_before` at `parser.sf:841` for
+Kotlin-style lambdas. Re-parsing cannot loop, because the second pass goes through
+`parse_expr`, which never consults the `this`-initial branch.
+
+**The entry above bounded the wrong axis, and that is the part worth keeping.** It
+called the defect specific to `this` on the strength of `var o = this   o.f + 1`
+compiling clean. That shape reaches `parse_stmt`'s *default* `parse_expr` path —
+not the branch with the terminal return — so the control measurement did not
+discriminate what it appeared to. `lst[0] + 1` in statement position fails
+identically, through the `ident[`-initial branch, which got the same rewind.
+`super.` genuinely was unaffected, so that half of the measurement held.
+
+`test/pass/this_infix_stmt.sf` covers both receivers (12 parse errors -> 16
+assertions pass).
+
+---
+
+### 137. FIXED — reading `as` as an expression was a parse error, though declaring it was fine
+
+**Severity: medium.** Two-line repro, and it blocks compiling `turmeric/src/prelude.sf`
+(the `link()` element helper takes an HTML `as` attribute).
+
+```saffron
+fun f(as: String) { IO.println(as) }   // [line 1, col 34] expected a literal, name or '(' here
+```
+
+The asymmetry is the useful part of the diagnosis: the **declaration** parses and
+type checks clean, and so does a call. Only the *reference* fails.
+
+```saffron
+fun f(as: String): String { return "x" }   // fine — warns "unused variable 'as'"
+fun main() { IO.println(f("q")) }          // fine, prints x
+```
+
+So `as` is accepted as a binding name and reaches the checker as an ordinary
+parameter; it is only the primary-expression path that has no arm for it.
+`as` is a soft keyword (import aliasing, `import "x" as Y`), and unlike the other
+soft keywords it never got a fallback arm in the `TkIdent`-style dispatch at
+`src/compiler/parser.sf:965`. The error is the `_ =>` catch-all at
+`parser.sf:997`.
+
+Worth checking the other soft keywords (`actor`, `interface`) for the same gap
+while fixing; the fix is presumably one arm, but the *test* should cover
+declare-and-read for every soft keyword rather than just `as`.
+
+**Workaround:** rename to `as_`. Trailing underscore is already the convention
+here — `prelude.sf` spells the HTML `type` attribute `type_` for the same reason.
+
+**Fixed (2026-08-03).** `as`, `in` and `is` get their own token kinds from the
+lexer, so the `TkIdent` arm never saw them; added `TkAs`/`TkIn`/`TkIs` arms to the
+primary-expression dispatch returning `Variable(<spelling>)`. Declaring worked all
+along because `expect_ident` maps all three back to their spelling.
+
+The entry asked for `actor` and `interface` to be checked for the same gap. They
+were: both are soft keywords, but the lexer leaves them as `TkIdent`, so they
+never had the gap and need no arm. **`in` and `is` did have it and were not in the
+report** — which is the argument for the test covering declare-and-read for every
+soft keyword rather than just the one that was filed.
+`test/pass/soft_keyword_names.sf` does that.
+
+**A silent value-drop was found while testing this.** `as = "x"` took neither the
+`ident =` fast path (wrong token kind) nor any arm of the assignment
+classification, so the write was discarded with **no diagnostic at all**. Fixed by
+adding a `Variable` arm, plus a `cannot assign to this expression` error in place
+of the silent fall-through — so a genuinely non-assignable left side now says so
+instead of evaporating.
+
+---
+
+### 138. FIXED — a statement beginning with an index expression stopped at the `]`
+
+**Severity: medium.** Blocks `turmeric/src/signal.sf:200` (`deps[i].subscribe(...)`),
+which is on the reactive-dependency path, so it blocks the whole framework build.
+
+```saffron
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun show() { IO.println("shown") }
+}
+var xs: List<Box> = [Box(1)]
+xs[0].show()      // [line 8, col 11] expected a literal, name or '(' here
+```
+
+The discriminator that makes this narrow: a **builtin** method on the same
+expression shape parses fine, and so does **field** access.
+
+```saffron
+xs[0].length()          // fine — builtin method on an index expr
+IO.println(xs[0].v.to_string())   // fine — field access on an index expr
+var b: Box = xs[0]
+b.show()                // fine — same call, one temp var later
+```
+
+So `postfix -> [ ] -> . -> name` is not broken as a shape; it resolves for
+builtins and for fields but not for a user-declared method. Independent of the
+index type (`Int` and `Float` both fail) and of the list's element type
+(`List<Any>` and `List<Box>` both fail).
+
+Both #137 and #138 reproduce identically under the **committed gen2**
+(`build/stage2/saffronc`), so neither is fallout from the in-flight type-lattice
+rewrite — they are long-standing. Their practical significance is that
+`turmeric/` and `bazaar/frontend/` have apparently never compiled against this
+compiler: the checked-in `bazaar/static/app.wasm` is a stale artifact, and
+`bazaar/dev.sf` runs its frontend build via `Process.run` without checking the
+result, so the failure was silent and the stale `.wasm` kept being served.
+
+**Workaround:** bind to a typed temp var first, as in the fourth snippet above.
+
+**Fixed (2026-08-03), and the diagnosis above is wrong about the cause.** It is
+not about user-defined versus builtin methods. `parse_stmt` had a special case for
+a statement beginning `ident[`: it consumed the name, the `[`, the index and the
+`]`, then **returned**, never continuing the postfix chain. Whatever followed was
+left in the token stream and re-parsed as a fresh statement starting at `.` or
+`+`.
+
+So the discriminator the entry leans on does not hold. `xs[0].length()` and
+`xs[0].v` are fine as *rvalues* — which is how they were measured — but in
+**statement position** they fail exactly like `xs[0].show()`, as does
+`ns[0] + 1`. The axis is statement-versus-rvalue, not user-versus-builtin. This is
+the same defect as #129 through a sibling branch, and both were fixed together.
+
+Fixed by removing the special case and routing the shape through `parse_expr`,
+which already loops over `[`, `.` and `(`; the `=` classification the special case
+existed for now covers index targets too via `build_assign`.
+`test/pass/index_expr_stmt.sf` covers it.
+
+The closing observation stands and is the more valuable half: `turmeric/` and
+`bazaar/frontend/` had apparently never compiled against this compiler. The
+checked-in `bazaar/static/app.wasm` is a stale artifact, and `bazaar/dev.sf` runs
+its frontend build through `Process.run` without checking the result, so the
+failure was silent and the stale `.wasm` kept being served.
+
+---
+
+### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
+
+**Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
+seven tests — which means it also hides whatever else is wrong on that target.
+
+Minimal repro — a file whose entire contents are:
+
+```saffron
+fun main(): Int { IO.println("inside main"); return 0 }
+```
+
+prints `inside main` natively and **nothing at all** on wasm32. Adding an
+explicit `main()` call at top level makes both agree.
+
+`output_body.sf:1276` emits the `__saffron_boot` shim only when
+`has_top_level`, but `wasm_base_32.ll:2188`'s `_start` calls `@__saffron_boot()`
+unconditionally. A main-only program has no top-level statements, so no shim is
+emitted, `_start`'s call resolves to an undefined symbol, and
+`--import-undefined` turns it into a silent no-op import. Nothing fails; the
+module simply does nothing.
+
+The native path one screen away is correct, which is what makes this a drift
+rather than an oversight: line 1301 guards on
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, i.e.
+it has the explicit `__saffron_main` branch that the wasm path lacks. The fix is
+to give the wasm branch the same case.
+
+Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
+`tools/differential.sh` sweep share this one signature — wasm32 emits nothing —
+and none of them are value-layer bugs. Worth fixing before the remaining
+value-layer drift, since it currently makes wasm32 output unobservable for those
+seven programs.
+
+**Fixed (2026-08-02)** by widening the wasm `__saffron_boot` guard at
+`output_body.sf` to match the native wrapper's:
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, plus a
+second shim body for the main-only case. That body must call `__saffron_main`, not
+`__saffron_entry` — `__saffron_entry` is emitted only under `has_top_level`, so
+calling it here would reintroduce exactly the undefined-symbol-becomes-silent-import
+failure this fixes — and it runs the module inits itself, since with no top-level
+code there is no `__saffron_entry` for them to run inside. The async-main case
+enqueues the coroutine frame (matching the wasm top-level coroutine arm, not native:
+the host event loop cannot be blocked).
+
+The decisive check is running, not linking — the agent's whole framing is that the
+defect *was* that it linked clean. `tools/saffron build test/pass/main_entry_only.sf
+--target wasm32` then `node tools/oracle/wasm_run.mjs`: **before, empty; after,
+`main-only entry ran`**. Three regression tests added
+(`main_entry_only`, `main_entry_and_top_level`, `top_level_entry_only`), each with a
+`.expected`; the main-only file is kept free of any top-level call because a single
+one flips `has_top_level` and tests the branch that was never broken.
+
+Two consequences followed. The `main_entry_only()` capability gate in
+`tools/differential.sh` was dead — the 11 `fun main`-only programs it SKIPped are
+graded again. And the "seven wasm32 mismatches" that motivated this entry were
+partly stale: the 17 remaining differential mismatches are a *different* signature
+(no `fun main` at all). Two adjacent wasm64 defects surfaced while confirming the
+fix and are filed as their own entries: #124 (wasm64's `_start` calls
+`__saffron_entry` directly with no `__saffron_boot` indirection, so the same
+main-only program never runs there either) and #125 (`wasm_base.ll` has no single-arg
+`__io_println` NaN-box dispatcher, so all wasm64 output is dropped regardless).
+
+---
+
 ### 121. FIXED — a variable used only in callee position was falsely reported as an unused variable
 
 **Severity: low** — warning-only, no codegen consequence. Filed because it is a
@@ -615,6 +1174,7 @@ lambda body is never walked, so a capture-only variable draws the same false war
 by a different missing walk) and #127 (`checker.sf` does not parse standalone).
 
 ---
+
 ### 122. FIXED — assigning to a nonexistent module member compiled clean and emitted invalid IR
 
 **Severity: high**, for the same reason #118 was: exit 0, no diagnostic, and the
@@ -698,53 +1258,6 @@ Tests: `test/fail/module_member_write_missing.sf`,
 proves the store landed rather than being reported and skipped). Both `fail/` files
 compiled cleanly on the pre-fix compiler and are rejected after, so they detect the
 defect. Failure set unchanged at 24 names.
-
----
-
-### 123. Three stdlib files bind different modules to the same alias `Internal`, so the alias resolves to whichever wins
-
-**Severity: medium** — it currently breaks exactly one file, and that file has no
-importers. The mechanism is what matters: an import alias is not scoped to the file
-that declares it the way the syntax implies.
-
-```
-src/lib/ast.sf:13     import "../compiler/ast.sf"    as Internal
-src/lib/lexer.sf:9    import "../compiler/lexer.sf"  as Internal
-src/lib/parser.sf:10  import "../compiler/parser.sf" as Internal
-```
-
-`src/lib/lang.sf` imports all three (`@ast`, `@lexer`, `@parser` at lines 13–15).
-The alias collides, so `Internal.Token` inside `lexer.sf` resolves against
-`compiler_ast_Token` rather than `compiler_lexer_Token`, and misses:
-
-```
-[codegen] Error: no member 'Token' in module 'Internal'
-[codegen] Error: no member 'TokenKind' in module 'Internal'
-```
-
-**Not a regression from #118.** Verified on the pre-#118 build, where `lang.sf`
-already emitted invalid IR — `use of undefined value '%Internal'` — for the same
-reason. #118's fix converts a silent invalid-IR failure into a named diagnostic, so
-`lang.sf` moves from exit 0 to exit 1 while being equally broken either way. It was
-never working; it was failing invisibly.
-
-`@lang` has no real importers — the three hits for `"@lang"` in the tree are all
-commented-out documentation lines (`//! import "@lang" as Lang`), including the one
-in `lang.sf` itself. So no test moves, and nothing downstream breaks. That is also
-why this survived: the file is dead weight that nothing compiles.
-
-Two separable questions here, and the second is the important one:
-
-1. The immediate fix is to give the three files distinct aliases (`InternalAst`,
-   `InternalLexer`, `InternalParser`). Cheap, and it makes `lang.sf` compile.
-2. The real defect is that an alias declared in one file can be shadowed by an alias
-   of the same name declared in another, and the collision is silent. An alias should
-   either be file-local (the reading the syntax suggests) or a collision should be
-   diagnosed. Renaming the three aliases fixes this instance and leaves the trap set
-   for the next one. Whichever way it is resolved should be a decision about alias
-   scoping, not a rename.
-
-Found while measuring #118's blast radius across 336 files.
 
 ---
 
@@ -947,176 +1460,6 @@ standalone path (`strip_nil_from_node`'s if-expression branches typing as
 **#130**.
 
 ---
-
-### 128. There is no compound-assignment or increment operator, and `test/pass/increment.sf` tests a feature that does not exist
-
-**Severity: low as a defect, medium as misinformation** — the language reads as if
-it has these, one test asserts it does, and the failure they produce is a bare parse
-error naming no missing feature.
-
-```
-x += 1      // [line 2, col 6] Error: expected a literal, name or '(' here
-b.v += 1    // same
-a++         // same
-```
-
-The lexer has no token for any of them. `TokenKind` (`src/compiler/lexer.sf:3`-77)
-lists `TkPlus`, `TkMinus`, `TkStar`, `TkSlash`, `TkPercent`, `TkEq`, `TkEqEq`,
-`TkBangEq`, `TkLtEq`, `TkGtEq` — and nothing for `+=`, `-=`, `*=`, `/=`, `%=`, `++`
-or `--`. So this is not a parser gap over a lexed token: the characters lex as two
-separate operators and the parser then wants an operand where `=` sits.
-
-`test/pass/increment.sf` asserts otherwise — its first line is `a = a++;` — and it
-is in the 24-name failure baseline as `compile-error`, red long enough to be treated
-as scenery. It is a test for a feature that was never implemented, not a stale
-spelling of one that was. Deleting it and adding the operators are both defensible;
-leaving it as an unexplained red is not.
-
-Found while checking whether the compound forms of #122 reached that bug's
-fall-through. They do not — they never get past the lexer — which is why the #122
-fix neither covered nor needed to cover them.
-
----
-
-### 129. A statement beginning with `this` swallows a following infix operator
-
-**Severity: medium** — a parse error on valid-looking code, and the message points at
-the operator rather than the cause, so it reads as "the `and` is wrong" when the
-problem is that `this.f` already ended the statement.
-
-```saffron
-class C { var f: Float
-          fun init() { this.f = 1 }
-          fun s1(): Float { this.f + 1   return 0 } }
-// [line 4, col 32] Error: expected a literal, name or '(' here
-```
-
-`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
-member/call chain and returns an `ExprStmt` directly, never handing the result back to
-the binary-operator layer. Any infix operator that follows is left trying to start a
-fresh statement. A block expression's value slot is a statement, so the natural
-spelling `{ this.foo() and this.bar() }` hits it — that is what kept `checker.sf` from
-parsing standalone (#127), which was worked around in `checker.sf` rather than fixed
-here. Reproduces on gen2 and gen3 alike.
-
-Two things measured directly, which bound the bug and were not assumed:
-
-- **It is specific to `this`.** The identical shape through a local variable
-  (`var o = this   o.f + 1`) compiles clean, so the defect is in `parse_this_stmt`'s
-  terminal return and not in statement-versus-expression parsing generally.
-- **`super.` is NOT affected.** `super.g() and super.g()` in a value position compiles
-  clean. So the fix is one function, not a family of them — worth stating because the
-  obvious guess is that every keyword-initial statement shares the shape.
-
-The fix presumably wants `parse_this_stmt`'s result to re-enter the expression parser at
-the binary-operator precedence level rather than returning an `ExprStmt` terminally.
-Worth checking the sibling terminal returns in that function (the `IndexSet` and
-`SetField` early returns) the same way.
-
-Found while fixing #127, whose filed reduction had been searching along the wrong axis.
-
----
-
-### 131. wasm64's identity discipline makes every non-String value unprintable
-
-**Severity: high**, and the remaining half of #125 — wasm64 output is no longer
-*entirely* dropped, but only strings survive.
-
-`src/runtime/values.spec:41-44` gives wasm64 `discipline=identity` (raw i64 bits) and
-wasm32 `discipline=nanbox`. Under identity there is no tag to discriminate on, so
-`__io_println_any` in `wasm_base.ll` can only treat its argument as a string pointer.
-
-Measured with `scratch/w64/battery.sf` across all three targets. native and wasm32 both
-print all six lines (`a string / 42 / true / false / 3 / hello world`); wasm64 prints
-the two strings and **four blank lines** for `42`, `true`, `false` and `l.length()`.
-
-Not a local patch. It needs either switching `wasm_base.ll` to the nanbox discipline
-wholesale — which also means adding the GC object headers nanbox tagging assumes — or
-giving identity-mode values a type-carrying header. Until then, **treat wasm64 as
-string-output-only.**
-
-Related and worth reading together: this is the same trap as #125's wrong premise. An
-identity i64 bitcast to double is a denormal, and `fptosi` truncates every denormal to
-0, so a nanbox helper dropped into an identity base fails silently rather than loudly.
-
----
-
-### 132. wasm64's link line accepts every undefined symbol, and nothing in the tree tests wasm64 at all
-
-**Severity: high as a process defect** — this is the mechanism that made #110, #124,
-#125 and four further missing symbols silent instead of link errors. Filed as its own
-entry because fixing the individual symbols does not stop the next one.
-
-Two independent halves, both verified in the source:
-
-**The flag divergence.** `tools/saffron:357` links wasm64 with
-`-Wl,--allow-undefined`, while `tools/saffron:412` deliberately links wasm32 with
-`-Wl,--import-undefined`, carrying a comment that `--allow-undefined` "silently accepts
-EVERY missing symbol." `tools/build_wasm.sh:77` also passes `--allow-undefined`. So on
-wasm64 an undefined symbol becomes a no-op host import: the module builds, runs, and
-does nothing. Also noted while measuring: wasm32 passes `--identity-mode` for the
-runtime compile (`tools/saffron:384`) and wasm64 (`:352`) does not.
-
-Sweeping a linked wasm64 module's `*UND*` list — rather than reading `wasm_base.ll` —
-found **four more** undefined symbols beyond #124's and #125's: `__string_intern`
-(which alone made all string interpolation produce no output), `__print_debug_location`,
-`__val_tag_ptr_nullable`, and `__builtin_trap`, the last `declare`d at
-`wasm_base.ll:557` but never defined, so a trap was a silent return. All four are now
-defined. **The only reliable audit of a wasm64 base's completeness is dumping the
-linked module's undefined symbols, not reading the file.**
-
-**The coverage hole.** `tools/run_tests.sh` never builds for wasm64 — its single
-`wasm` mention is `NOT_A_TEST="goals hello_wasm gc_generational_test"` — and
-`tools/differential.sh` sets `ALL_CONFIGS="native-O0 wasm32"`. No harness in the tree
-builds or runs a wasm64 module, which is how six undefined symbols coexisted with a
-green suite.
-
-Compounding the two: **linking cannot serve as the check here.** A successful wasm64
-build is compatible with the module doing nothing at all, so any wasm64 test must
-execute the module and assert on stdout, treating empty output as failure.
-`scratch/w64/regress_wasm64.sh` is such a check (3 cases, empty stdout is FAIL),
-written to be adoptable by `run_tests.sh` unchanged.
-
-The flag was left as-is deliberately: it may be load-bearing for legitimate host
-imports (`js_log_str` is one), so tightening it is its own measured change rather than
-a one-line edit.
-
----
-
-## Resolved
-
-Full narratives for bugs that are closed. Kept in the file rather than deleted
-because several of these entries are the only written record of *why* a
-subsystem is shaped the way it is, and of the measurement mistakes that let the
-bug survive.
-
-### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
-
-**Severity: high.** `[1,2] == [1,2]` was `false`; `{"a":1} == {"a":1}` was
-`false`; nested and reordered cases likewise. `IO.println` showed the operands
-identical, so the wrongness was invisible until you compared them.
-
-`gen_binary`'s `==` chain (`expr_body.sf`) had arms for String (`__string_eq`),
-Any (`__any_eq`), Float (`fcmp`), and same-enum (`__enum_eq_<Name>`), then fell
-through to a raw `icmp eq i64`. Two Lists or two Maps landed on that fall-through,
-which compares the two malloc addresses — the same "one spelling, two semantics"
-defect the enum arm right above it was added to fix, in a different shape.
-
-`__rt_val_eq` in `runtime.sf` already did the correct deep by-value comparison but
-nothing reached it: no arm routed a statically-typed List/Map to it. The fix adds
-an arm above the integer fall-through that sends both-aggregate operands to
-`__rt_val_eq`. It targets `__rt_val_eq`, not `__any_eq`, because `__any_eq`'s body
-is hand-written IR present only in `base_nanbox.ll` and `wasm_base_32.ll`, so an
-arm keyed on it would emit an unresolvable symbol under `--identity-mode`
-(`base.ll`) and on wasm64 (`wasm_base.ll`). `__rt_val_eq` is compiled from
-`runtime.sf` and links on every target, and is the body `__any_eq` itself
-delegates to, so the two cannot drift apart. A user `eq` overload cannot reach
-this: List and Map are runtime primitives with no Saffron class for the
-operator-overload dispatch to key on, which is why the fix lives in codegen.
-
-The declare needs the same `defined_funcs` guard `__runtime_error` uses:
-`runtime.sf` *defines* `__rt_val_eq`, and clang rejects a `declare`+`define` of one
-name in a single module. Emitting it unconditionally broke the gen4 link.
 
 ### 66. FIXED — binary files could not be read or served: `IO.read_file` truncated at the first NUL, so `static_files` served any wasm module as 0 bytes
 

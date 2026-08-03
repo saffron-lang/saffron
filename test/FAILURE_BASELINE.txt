@@ -1,0 +1,49 @@
+# Current suite failure baseline — one test name per line, sorted.
+#
+# Why this file exists: every BUGS.md entry that reports a suite result quotes a
+# baseline count inline ("the 24-name baseline", "the 21-entry baseline"), and
+# those counts are correct only on the day they were written. Reading a stale one
+# as current is how a regression hides — a diff against the wrong baseline shows
+# a name "already failing" when it started failing with your change.
+#
+# Compare failure SETS by name, never totals. `passed` moves when tests are added
+# or skipped, so equal totals across two runs prove nothing. Extract a set with:
+#
+#   tools/run_tests.sh > /tmp/suite.log 2>&1
+#   awk '/^=== Failures ===/,/^TOTAL/' /tmp/suite.log \
+#     | grep -E '^  [a-z-]+ +[a-zA-Z0-9_/]+' | awk '{print $2}' | sort -u \
+#     > /tmp/fail_now.txt
+#   comm -23 test/FAILURE_BASELINE.txt /tmp/fail_now.txt   # fixed by your change
+#   comm -13 test/FAILURE_BASELINE.txt /tmp/fail_now.txt   # REGRESSIONS
+#
+# Update this file in the same commit that changes the set, and say in the commit
+# message which names moved and why. A shrinking set with no explanation is as
+# suspect as a growing one: `tools/run_tests.sh` skips network tests and known-
+# stale ones by default, so a test can leave this list by being skipped rather
+# than by being fixed.
+#
+# test_glob is nondeterministic — it has flipped in both directions across runs at
+# an unchanged HEAD, so treat its presence or absence as noise, not signal.
+# gc_roots_test and test_reflect used to be in that category and are not any more:
+# both were genuinely fixed on 2026-08-03 (unguarded `ptr - 24` on an Any, and a
+# bare inttoptr in load64/store64), so a failure from either is now real.
+#
+# Recorded 2026-08-03 at 4fb2690 (merge of phase5-internal): 262 passed, 16
+# failed, 14 skipped, 1 known-fail.
+
+async
+docstrings
+enum_cross_simple
+imports
+inheritance
+json
+oracle_enum_println
+pass/data_equality
+pass/deep_deserialize
+pass/expressions
+pass/overloading
+pass/varargs
+test_base64
+test_glob
+test_lib_repro
+test_log

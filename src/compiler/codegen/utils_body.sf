@@ -254,11 +254,21 @@
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
+            // A CONDITION can declare variables too, for the same reason a
+            // container literal's elements can: the parser desugars map literals
+            // and `x++` into a BlockExpr holding a `__map_N` / `__inc_N` VarDecl.
+            // The condition was skipped here until `if (h++ > 0)` emitted a store
+            // to %__inc_11 with no alloca — "use of undefined value", the exact
+            // failure the ListLit note below describes. Every expression position
+            // reachable from a statement has to be walked; there is no such thing
+            // as an expression that cannot contain a declaration.
             If(cond, then_branch, else_branch) => {
+                this.collect_vars_expr(cond, names, types)
                 this.collect_vars(then_branch, names, types)
                 this.collect_vars(else_branch, names, types)
             }
             While(cond, body) => {
+                this.collect_vars_expr(cond, names, types)
                 this.collect_vars(body, names, types)
             }
             Block(stmts) => {
@@ -449,6 +459,10 @@
     }
 
     fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
+        // The SUBJECT is an expression like any other and can carry a desugared
+        // declaration — `match (x++)` or `match ({"a": 1})`. Skipped here for the
+        // same reason the If/While conditions were.
+        this.collect_vars_expr(this.get_match_subject(expr), names, types)
         var arms: List<AST.MatchArm> = this.get_match_arms(expr)
         var i: Float = 0
         while (i < arms.length()) {
@@ -503,6 +517,12 @@
     fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
         return match (expr) { Match(s, a) => a
             _ => ""
+        }
+    }
+
+    fun get_match_subject(expr: AST.Expr): AST.Expr {
+        return match (expr) { Match(s, a) => s
+            _ => AST.Expr.NilLit
         }
     }
 

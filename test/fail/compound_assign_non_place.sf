@@ -1,0 +1,23 @@
+// BUGS #128 guard: the left side of a compound assignment must be a place.
+//
+// `+=` desugars in the parser to `target = target + (rhs)`, so a target that is
+// not assignable produces `5 = 5 + 1` — an Assign node over a literal. Without
+// this guard that shape reaches the checker, which reports it in terms of the
+// synthesized assignment rather than the `+=` the user wrote, or (worse, given
+// `build_assign`'s fallthrough) is quietly turned back into a bare ExprStmt and
+// the whole line vanishes with no diagnostic at all. A statement that silently
+// does nothing is the failure mode this file exists to prevent.
+//
+// The four assignable shapes are a variable, `obj.field`, `this.field` and
+// `obj[i]`; all four are exercised in test/pass/increment.sf. Anything else — a
+// literal, a call result, an arithmetic expression — is rejected here by name.
+//
+// The same check backs postfix `++`, with the wording adjusted for a single
+// operand; see test/fail/prefix_increment.sf.
+//
+// Expected: "the left side of '+=' must be a variable, field or element" and
+// exit 1.
+
+var a: Int = 1
+5 += 1
+IO.println(a)

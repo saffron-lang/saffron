@@ -1,0 +1,124 @@
+// Regression test for BUGS #129: a statement beginning with `this` (or with an
+// indexed local) swallowed a following infix operator.
+//
+// `parse_this_stmt` consumed the member/call chain and returned an ExprStmt
+// terminally, never handing the result back to the binary-operator layer, so any
+// infix operator that followed was left trying to start a fresh statement. The
+// diagnostic pointed at the operator — "expected a literal, name or '(' here" —
+// which reads as if the operator were the mistake rather than as "the statement
+// already ended".
+//
+// The value-position shapes below are the ones that matter in practice: a block
+// expression's value slot is a statement, so `{ this.foo() and this.bar() }` hit
+// this, which is what kept checker.sf from parsing standalone (#127).
+
+import "@test" as Test
+
+class C {
+    var f: Float
+    var flag: Bool
+    var items: List<Float>
+
+    fun init() {
+        this.f = 10
+        this.flag = true
+        this.items = [1, 2, 3]
+    }
+
+    fun truth(): Bool { return this.flag }
+
+    // The exact repro from the bug entry: an arithmetic operator after this.f
+    // in a statement position whose value is discarded.
+    fun discarded_arith(): Float {
+        this.f + 1
+        return this.f
+    }
+
+    // Value position — the block's last statement is its value.
+    fun arith_value(): Float {
+        return { this.f + 5 }
+    }
+
+    fun logical_value(): Bool {
+        return { this.truth() and this.truth() }
+    }
+
+    fun or_value(): Bool {
+        return { this.truth() or this.truth() }
+    }
+
+    fun compare_value(): Bool {
+        return { this.f > 5 }
+    }
+
+    fun equality_value(): Bool {
+        return { this.f == 10 }
+    }
+
+    fun bitwise_value(): Float {
+        return { this.f | 1 }
+    }
+
+    fun shift_value(): Float {
+        return { this.f << 1 }
+    }
+
+    // A method call receiver, not just a field.
+    fun call_then_op(): Bool {
+        return { this.truth() == true }
+    }
+
+    // An indexed field, which reaches parse_this_stmt's IndexGet path.
+    fun indexed_then_op(): Float {
+        return { this.items[1] + 100 }
+    }
+
+    // The forms that always worked must keep working: a `this` statement that
+    // really is just an assignment or a call, with no operator after it.
+    fun plain_assign(): Float {
+        this.f = 42
+        return this.f
+    }
+
+    fun plain_index_set(): Float {
+        this.items[0] = 99
+        return this.items[0]
+    }
+}
+
+var c: C = C()
+
+Test.assert_eq(c.discarded_arith(), 10, "this.f + 1 as a discarded statement leaves f alone")
+Test.assert_eq(c.arith_value(), 15, "this.f + 5 in a value slot")
+Test.assert_eq(c.logical_value(), true, "this.m() and this.m() in a value slot")
+Test.assert_eq(c.or_value(), true, "this.m() or this.m() in a value slot")
+Test.assert_eq(c.compare_value(), true, "this.f > 5 in a value slot")
+Test.assert_eq(c.equality_value(), true, "this.f == 10 in a value slot")
+Test.assert_eq(c.bitwise_value(), 11, "this.f | 1 in a value slot")
+Test.assert_eq(c.shift_value(), 20, "this.f << 1 in a value slot")
+Test.assert_eq(c.call_then_op(), true, "this.m() == true in a value slot")
+Test.assert_eq(c.indexed_then_op(), 102, "this.items[1] + 100 in a value slot")
+Test.assert_eq(c.plain_assign(), 42, "this.f = 42 still parses as an assignment")
+Test.assert_eq(c.plain_index_set(), 99, "this.items[0] = 99 still parses as an index set")
+
+// The same defect through the `ident[...]`-initial statement branch, which has
+// the identical terminal return. BUGS #129 called the bug specific to `this`,
+// measured through `var o = this   o.f + 1` — but that shape reaches the default
+// parse_expr path, not this branch, so the measurement bounded the wrong axis.
+var lst: List<Float> = [1, 2, 3]
+lst[0] + 1
+Test.assert_eq(lst[0], 1, "lst[0] + 1 as a discarded statement leaves the element alone")
+
+var idx_value: Float = { lst[1] + 10 }
+Test.assert_eq(idx_value, 12, "lst[1] + 10 in a value slot")
+
+lst[2] = 7
+Test.assert_eq(lst[2], 7, "lst[2] = 7 still parses as an index set")
+
+// A local variable receiver, which the bug entry measured as working. Kept so a
+// future change to the rewind cannot regress it unnoticed.
+var o: C = c
+o.f + 1
+Test.assert_eq(o.f, 42, "o.f + 1 through a local receiver leaves f alone")
+
+Test.summary()
