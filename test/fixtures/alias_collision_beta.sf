@@ -1,0 +1,6 @@
+// The other half of the alias-collision fixture. Same function name as
+// alias_collision_alpha.sf, different answer — so a mixed-up alias is visible
+// in the output rather than merely suspected.
+fun which(): String {
+    return "beta"
+}

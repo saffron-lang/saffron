@@ -10,16 +10,18 @@
 //! var errors = Lang.check(source)
 //! ```
 
-import "@ast" as AST
+import "@ast" as PubAst
 import "@lexer" as Lex
 import "@parser" as Parse
 
-// Re-export core types for convenience
-var Expr = AST.Expr
-var Stmt = AST.Stmt
-var Type = AST.Type
-var Token = Lex.Token
-var TokenKind = Lex.TokenKind
+// Re-export core types for convenience. `type`, not `var` — see the note in
+// src/lib/ast.sf. These are re-exports of re-exports (@ast already aliases the
+// compiler's own definitions), so the alias has to survive two hops.
+type Expr = PubAst.Expr
+type Stmt = PubAst.Stmt
+type Type = PubAst.Type
+type Token = Lex.Token
+type TokenKind = Lex.TokenKind
 
 // =============================================================================
 // Pipeline Functions
@@ -51,32 +53,32 @@ fun parse_file(path: String): List<Any> {
 
 /// Get the name of a declaration (function, class, enum, var).
 fun name_of(stmt: Any): String {
-    return AST.stmt_name(stmt)
+    return PubAst.stmt_name(stmt)
 }
 
 /// Get the docstring of a declaration.
 fun doc_of(stmt: Any): String {
-    return AST.stmt_doc(stmt)
+    return PubAst.stmt_doc(stmt)
 }
 
 /// Find all function declarations in an AST.
 fun functions(stmts: List<Any>): List<Any> {
-    return AST.find_functions(stmts)
+    return PubAst.find_functions(stmts)
 }
 
 /// Find all class declarations in an AST.
 fun classes(stmts: List<Any>): List<Any> {
-    return AST.find_classes(stmts)
+    return PubAst.find_classes(stmts)
 }
 
 /// Find all enum declarations in an AST.
 fun enums(stmts: List<Any>): List<Any> {
-    return AST.find_enums(stmts)
+    return PubAst.find_enums(stmts)
 }
 
 /// Walk all statements recursively, calling visitor on each.
 fun walk(stmts: List<Any>, visitor: Any) {
-    AST.walk_stmts(stmts, visitor)
+    PubAst.walk_stmts(stmts, visitor)
 }
 
 // =============================================================================
@@ -85,37 +87,42 @@ fun walk(stmts: List<Any>, visitor: Any) {
 
 /// Create a string literal expression.
 fun string_lit(value: String): Any {
-    return AST.Expr.StringLit(value)
+    return PubAst.Expr.StringLit(value)
 }
 
 /// Create an integer literal expression.
 fun int_lit(value: Int): Any {
-    return AST.Expr.IntLit(value)
+    return PubAst.Expr.IntLit(value)
 }
 
 /// Create a boolean literal expression.
 fun bool_lit(value: Bool): Any {
-    return AST.Expr.BoolLit(value)
+    return PubAst.Expr.BoolLit(value)
 }
 
 /// Create a variable reference expression.
+///
+/// The node gets `span_none()`: these builders assemble an AST from scratch
+/// rather than from parsed text, so there is no source region to record. That is
+/// the same rule the parser follows for its own desugarings — a synthetic node
+/// has no span, and inventing one would point an editor at nothing.
 fun variable(name: String): Any {
-    return AST.Expr.Variable(name)
+    return PubAst.Expr.Variable(name, PubAst.span_none())
 }
 
 /// Create a binary operation expression.
 fun binary(left: Any, op: String, right: Any): Any {
-    return AST.Expr.Binary(left, op, right)
+    return PubAst.Expr.Binary(left, op, right)
 }
 
 /// Create a function call expression.
 fun call(callee: Any, args: List<Any>): Any {
-    return AST.Expr.Call(callee, args)
+    return PubAst.Expr.Call(callee, args, PubAst.span_none())
 }
 
 /// Create a method call expression.
 fun method_call(object: Any, method: String, args: List<Any>): Any {
-    return AST.Expr.MethodCall(object, method, args)
+    return PubAst.Expr.MethodCall(object, method, args, PubAst.span_none())
 }
 
 // =============================================================================
@@ -130,12 +137,12 @@ fun expr_to_source(expr: Any): String {
         FloatLit(n) => n.to_string()
         BoolLit(b) => b.to_string()
         NilLit => "nil"
-        Variable(name) => name
+        Variable(name, __vs) => name
         Binary(l, op, r) => expr_to_source(l) + " " + op + " " + expr_to_source(r)
         Unary(op, right) => op + expr_to_source(right)
-        Call(callee, args) => expr_to_source(callee) + "(" + _join_exprs(args) + ")"
-        MethodCall(obj, method, args) => expr_to_source(obj) + "." + method + "(" + _join_exprs(args) + ")"
-        Assign(name, value) => name + " = " + expr_to_source(value)
+        Call(callee, args, __cs) => expr_to_source(callee) + "(" + _join_exprs(args) + ")"
+        MethodCall(obj, method, args, __ks) => expr_to_source(obj) + "." + method + "(" + _join_exprs(args) + ")"
+        Assign(name, value, __as) => name + " = " + expr_to_source(value)
         x => "<expr>"
     }
 }

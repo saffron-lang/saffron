@@ -235,6 +235,10 @@ fun _canon_dir(dir: String): String {
 var _pkg_dir_cache: Map<String, String> = {}
 // loaded file path → tagged package entry
 var _file_to_package: Map<String, String> = {}
+// import alias → "<file that bound it first>|<the path it bound>", so a later
+// module binding the same alias to a different file can name its rival in the
+// error instead of just asserting one exists. See the guard in collect_modules.
+var _alias_origin: Map<String, String> = {}
 
 fun _package_entry_for_dir(dir: String): String {
     if (_pkg_dir_cache.has(dir)) { return _pkg_dir_cache.get(dir) }
@@ -921,8 +925,33 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
                 path_to_prefix.set(ma_full, ma_prefix)
             }
             // Map alias → path-based prefix (alias is just source-level sugar)
-            if (!all_aliases.has(ma)) {
+            //
+            // `all_aliases` is one table for the whole compilation, not one per
+            // file, so two modules that bind the same alias to different files
+            // both land here. The `has` guard means the first walked wins and
+            // every later one is dropped without a word: the program compiles,
+            // links, exits 0, and calls the wrong module's function. That is how
+            // src/lib/{ast,lexer,parser}.sf — each binding `Internal` to a
+            // different compiler file — silently collapsed onto one of them.
+            //
+            // Per-file alias tables are the real fix and a much larger change;
+            // `all_aliases` is threaded all the way into codegen's
+            // `module_prefixes`. Until then, refuse rather than guess. A
+            // same-alias-same-target rebind is fine and common (many files
+            // import `@os` as `OS`); only a genuine disagreement is an error.
+            if (all_aliases.has(ma)) {
+                if (all_aliases.get(ma) != ma_prefix) {
+                    IO.println("Error: import alias '" + ma + "' names two different modules in one compilation")
+                    if (_alias_origin.has(ma)) {
+                        IO.println("  " + _alias_origin.get(ma))
+                    }
+                    IO.println("  " + file_path + " binds it to \"" + ma_path + "\"")
+                    IO.println("  rename one of them — module aliases share a single namespace")
+                    c_exit(1)
+                }
+            } else {
                 all_aliases.set(ma, ma_prefix)
+                _alias_origin.set(ma, file_path + " binds it to \"" + ma_path + "\"")
             }
         }
         mai = mai + 1
