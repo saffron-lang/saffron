@@ -1,0 +1,18 @@
+// `protected init` is `private init` plus subclasses — and this file is neither.
+// A module that merely imports Dial is not a subclass of it, so it may not
+// construct one directly; it must go through the module's own factory.
+//
+// This is the case that pins `protected` as a genuine restriction on
+// constructors rather than a decorative synonym for `public`. Its counterpart —
+// the same-module factory, which `protected` must keep permitting to stay
+// monotone with `private` — is in test/pass/protected_from_subclass.sf.
+//
+// The third case, a SUBCLASS in another module constructing the base, is accepted
+// by the checker but cannot be a runnable pass test: subclassing a named-imported
+// class emits an undefined LLVM symbol for the inherited method, a pre-existing
+// codegen bug independent of any modifier (it reproduces with a plain public
+// init). See docs/design/access-modifiers.md §5b.
+import "../support/visibility_protected_ctor.sf" as DialMod
+
+var d: DialMod.Dial = DialMod.Dial(42)
+IO.println(d.get())

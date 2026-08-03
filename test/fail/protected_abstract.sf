@@ -1,0 +1,20 @@
+// A `protected` abstract method is a contradiction, exactly as a private one is,
+// and for a reason that is NOT obvious: `protected` does reach subclasses, so it
+// looks implementable. It is not. The modifier restricts who may CALL the name,
+// and an abstract method exists to be called by code holding the interface type —
+// which by construction is not a subclass. Kotlin permits `protected abstract` on
+// a class but not as an interface requirement; Saffron has one declaration form
+// for both, so bodyless is the available discriminator (register_member_visibility).
+//
+// Without this test the `protected` branch of that check is unreachable by any
+// test, and a later simplification to `vis == "private"` would look harmless.
+interface Job {
+    protected fun run(): Int
+}
+
+class Batch extends Job {
+    fun init() {}
+    fun run(): Int { return 1 }
+}
+
+IO.println(Batch().run())
