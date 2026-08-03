@@ -1,0 +1,70 @@
+// What `private init` permits: the factory pattern, which is the whole reason the
+// modifier exists.
+//
+// The companion module test/support/visibility_private_ctor.sf declares
+// `private fun init` on Gauge plus a public same-module free function
+// `new_gauge`. The factory must keep working — a class-scoped reading of
+// `private init` would reject it and leave Gauge constructible by nobody at all,
+// so this test is what makes test/fail/private_init_external.sf a boundary rather
+// than a blanket refusal.
+//
+// The stdlib already has exactly this shape in six modules: `fun new(): Stack` in
+// stack.sf, and the same in queue.sf, sorted_set.sf, heap.sf, deque.sf and
+// sorted_map.sf. `private init` + `public fun new()` is a drop-in for all six,
+// which is the design's motivating win (§6a).
+//
+// Worth being precise about WHY the factory passes, rather than claiming more
+// coverage than exists: check_program only walks the main program's bodies —
+// imported statements are registered, never checked — so `new_gauge`'s own call to
+// `Gauge(reading)` is not visited at all here. The local_classes guard in
+// check_constructor_visibility is what carries the same-module case when the class
+// is declared in the file under check (a `private init` used by a free function in
+// the SAME file, which this test does not exercise because the point is the
+// cross-module rejection). Policing a construction inside an imported module's own
+// body needs `Ref.slot` at the use site and is Phase 5.
+import "@test" as Test
+import "../support/visibility_private_ctor.sf" as GaugeMod
+
+// Through the factory: allowed, because new_gauge is in Gauge's own module.
+var g: GaugeMod.Gauge = GaugeMod.new_gauge(42)
+Test.assert_eq(g.get(), 42, "a private constructor is reachable through its module's factory")
+
+var h: GaugeMod.Gauge = GaugeMod.new_gauge(7)
+Test.assert_eq(h.get(), 7, "the factory is not a one-off")
+
+// A class with an ordinary public constructor is unaffected — the check is gated
+// on `init` actually being marked private, so nothing else pays for it.
+class Open {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun get(): Int { return this.n }
+}
+var o: Open = Open(3)
+Test.assert_eq(o.get(), 3, "a public constructor still works")
+
+// A subclass of a class with a PUBLIC init, to pin that constructor_owner walks
+// the primary base rather than erroring on the absence of an own `init`.
+class Derived extends Open {
+    fun doubled(): Int { return this.get() * 2 }
+}
+var d: Derived = Derived(5)
+Test.assert_eq(d.doubled(), 10, "an inherited public constructor still works")
+
+// The same-FILE factory, which is the case check_program actually walks and so
+// the one that exercises the local_classes guard directly. `private init` is
+// module-scoped, so a free function in the declaring file may construct it — a
+// class-scoped reading would reject this and leave Meter unconstructible.
+class Meter {
+    var ticks: Int
+    private fun init(ticks: Int) { this.ticks = ticks }
+    fun get(): Int { return this.ticks }
+}
+
+fun new_meter(ticks: Int): Meter {
+    return Meter(ticks)
+}
+
+var m: Meter = new_meter(11)
+Test.assert_eq(m.get(), 11, "a same-file free function may call a private init")
+
+Test.summary()
