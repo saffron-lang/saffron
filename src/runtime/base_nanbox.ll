@@ -697,83 +697,16 @@ entry:
 ; dispatches to strcmp for pointer-tagged values that are strings.
 ;
 ; Returns 1 (equal) or 0 (not equal) as i64.
+; Delegates to __rt_val_eq (src/runtime/runtime.sf), which owns the deep,
+; by-value comparison — including the List/Map recursion this used to lack. It
+; previously strcmp'd two pointer-tagged operands unconditionally, which on two
+; Lists compared the leading bytes of their 24-byte structs (address identity):
+; `[1,2] == [1,2]` was false. Keeping the whole comparison in one Saffron
+; function means the native and wasm32 stubs cannot drift apart.
 define i64 @__any_eq(i64 %a, i64 %b) {
 entry:
-  ; Fast path: bitwise-identical values are always equal
-  %same = icmp eq i64 %a, %b
-  br i1 %same, label %equal, label %check_tags
-
-check_tags:
-  ; Check if both are pointer-tagged (upper 16 bits == 0x7FF8)
-  %a_upper = lshr i64 %a, 48
-  %b_upper = lshr i64 %b, 48
-  %a_is_ptr = icmp eq i64 %a_upper, 32760
-  %b_is_ptr = icmp eq i64 %b_upper, 32760
-  %both_ptr = and i1 %a_is_ptr, %b_is_ptr
-  br i1 %both_ptr, label %ptr_compare, label %check_numeric
-
-check_numeric:
-  ; Check if both values are numeric (Int or Float) — compare as doubles
-  ; Int tag = 0x7FF9 (upper 16 bits = 32761)
-  ; Float = anything NOT tagged as ptr/int/spec (i.e., a valid IEEE 754 double)
-  %a_is_int = icmp eq i64 %a_upper, 32761
-  %a_is_spec = icmp eq i64 %a_upper, 32762
-  %a_is_tagged = or i1 %a_is_ptr, %a_is_int
-  %a_is_tagged2 = or i1 %a_is_tagged, %a_is_spec
-  %a_is_float = xor i1 %a_is_tagged2, true
-  %a_is_num = or i1 %a_is_int, %a_is_float
-
-  %b_is_int = icmp eq i64 %b_upper, 32761
-  %b_is_spec = icmp eq i64 %b_upper, 32762
-  %b_is_tagged = or i1 %b_is_ptr, %b_is_int
-  %b_is_tagged2 = or i1 %b_is_tagged, %b_is_spec
-  %b_is_float = xor i1 %b_is_tagged2, true
-  %b_is_num = or i1 %b_is_int, %b_is_float
-
-  %both_num = and i1 %a_is_num, %b_is_num
-  br i1 %both_num, label %numeric_compare, label %check_bool
-
-check_bool:
-  ; Check if both are bool-tagged (upper 16 bits == 0x7FFA)
-  %a_is_bool = icmp eq i64 %a_upper, 32762
-  %b_is_bool = icmp eq i64 %b_upper, 32762
-  %both_bool = and i1 %a_is_bool, %b_is_bool
-  br i1 %both_bool, label %bool_compare, label %not_equal
-
-bool_compare:
-  ; Bool values: compare the full i64 directly (true/false have unique bit patterns)
-  %bool_eq = icmp eq i64 %a, %b
-  br i1 %bool_eq, label %equal, label %not_equal
-
-numeric_compare:
-  ; Convert both to double and compare
-  %a_dbl = call double @__val_untag_float(i64 %a)
-  %b_dbl = call double @__val_untag_float(i64 %b)
-  %num_eq = fcmp oeq double %a_dbl, %b_dbl
-  br i1 %num_eq, label %equal, label %not_equal
-
-ptr_compare:
-  ; Both are pointer-tagged — do strcmp (works for strings; for non-string
-  ; heap objects with same content this is a safe conservative comparison
-  ; since different object types will have different byte prefixes)
-  %a_raw = call i8* @__val_untag_ptr(i64 %a)
-  %b_raw = call i8* @__val_untag_ptr(i64 %b)
-  %a_null = icmp eq i8* %a_raw, null
-  br i1 %a_null, label %not_equal, label %check_b_null
-
-check_b_null:
-  %b_null = icmp eq i8* %b_raw, null
-  br i1 %b_null, label %not_equal, label %do_strcmp
-
-do_strcmp:
-  %cmp = call i32 @strcmp(i8* %a_raw, i8* %b_raw)
-  %is_eq = icmp eq i32 %cmp, 0
-  br i1 %is_eq, label %equal, label %not_equal
-
-equal:
-  ret i64 1
-not_equal:
-  ret i64 0
+  %r = call i64 @__rt_val_eq(i64 %a, i64 %b)
+  ret i64 %r
 }
 
 ; __any_ne: Deep inequality for Any-typed values (complement of __any_eq)
@@ -1351,6 +1284,8 @@ declare i64 @__rt_as_list_ptr(i64)
 declare i64 @__list_to_string(i64)
 declare i64 @__rt_as_map_ptr(i64)
 declare i64 @__map_to_string(i64)
+; __any_eq delegates to this deep-equality body defined in runtime.sf.
+declare i64 @__rt_val_eq(i64, i64)
 
 define i64 @__any_to_string(i64 %val) {
 entry:

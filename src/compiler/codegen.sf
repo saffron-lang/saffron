@@ -1434,8 +1434,15 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 _ => ""
             }
             if (gvname.length() > 0) {
+                // A top-level name can be declared more than once (`var b = 6` then
+                // `var b = Doughnut()`); both re-use one slot. module_globals dedupes,
+                // but the globals LIST did not, so a second decl emitted a duplicate
+                // `@__g_b = global i64 0` — `redefinition of global` (BUGS #80). Guard
+                // the emission with has() BEFORE set().
+                if (!gen.module_globals.has(gvname)) {
+                    gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+                }
                 gen.module_globals.set(gvname, true)
-                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
                 // Infer from the initializer when unannotated, exactly as the
@@ -2144,8 +2151,15 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 _ => ""
             }
             if (gvname.length() > 0) {
+                // A top-level name can be declared more than once (`var b = 6` then
+                // `var b = Doughnut()`); both re-use one slot. module_globals dedupes,
+                // but the globals LIST did not, so a second decl emitted a duplicate
+                // `@__g_b = global i64 0` — `redefinition of global` (BUGS #80). Guard
+                // the emission with has() BEFORE set().
+                if (!gen.module_globals.has(gvname)) {
+                    gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+                }
                 gen.module_globals.set(gvname, true)
-                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
                 // Infer from the initializer when unannotated, exactly as the
