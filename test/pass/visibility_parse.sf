@@ -47,7 +47,13 @@ fun shadowing_names(): Int {
     return private + public + internal + protected
 }
 
-var slot: Slot = Slot("a")
+// These four globals are `private` because their types are, and the leak pass is
+// right to insist: an unannotated global at module scope is public, so `var slot:
+// Slot` would be a public name handing out a private type — L1's leak in variable
+// form. This file was written before enforcement landed and originally said `var`;
+// the modifier is the correction, not a workaround. Strip `private` from any of the
+// four and the file is correctly rejected.
+private var slot: Slot = Slot("a")
 Test.assert_eq(slot.public_bump(), 1, "private method reached from a public one")
 Test.assert_eq(slot.public_bump(), 2, "private method mutates private field")
 Test.assert_eq(slot.describe(), "a:2", "public and private fields coexist in order")
@@ -56,14 +62,14 @@ Test.assert_eq(public_helper(), 8, "private free function called from same modul
 Test.assert_eq(exported_total, 3, "public global")
 Test.assert_eq(hidden_total, 4, "private global")
 
-var mode: Mode = Mode.On
+private var mode: Mode = Mode.On
 var mode_name: String = match (mode) {
     On => "on"
     Off => "off"
 }
 Test.assert_eq(mode_name, "on", "private enum matches by variant")
 
-var these: Slots = [1, 2]
+private var these: Slots = [1, 2]
 Test.assert_eq(these.length(), 2, "private type alias resolves")
 
 Test.assert_eq(shadowing_names(), 100, "modifier words remain usable as identifiers")
