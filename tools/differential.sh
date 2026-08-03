@@ -150,25 +150,6 @@ uses_io_print() {   # file
     grep -qE '\bIO\.print[[:space:]]*\(' "$1"
 }
 
-# A program whose entry point is `fun main()` with no top-level statements prints
-# NOTHING on wasm32: output_body.sf emits the __saffron_boot shim only when the
-# file has top-level code, while wasm_base_32.ll's _start calls @__saffron_boot()
-# unconditionally and --import-undefined turns the missing symbol into a silent
-# no-op. That is BUGS #110, a real and filed compiler bug, but it makes every such
-# program a whole-output mismatch that drowns out any other finding, so it is
-# gated by capability and tracked as #110 rather than re-reported per test.
-main_entry_only() {   # file
-    grep -qE '^[[:space:]]*fun[[:space:]]+main[[:space:]]*\(' "$1" || return 1
-    # Any top-level call (e.g. `main()`, `IO.println(...)`) means the shim IS
-    # emitted and the program runs normally on wasm32. Anchored at column 0 with
-    # NO leading-whitespace allowance: an indented call sits inside a function
-    # body, and allowing indentation made every `fun main` program look like it
-    # had top-level code (mini_hello.sf matched on its own `IO.println` at line
-    # 2). `fun main(...)` itself cannot match — the space after `fun` ends the
-    # identifier before the '('.
-    ! grep -qE '^[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*\(' "$1"
-}
-
 # Tests that intentionally exit nonzero because their exit code IS the result
 # (mini_while exits 55 = fib(10)). Their stdout is still comparable; only the
 # exit-status check has to be relaxed.
@@ -355,11 +336,6 @@ check_file() {   # file label
             fi
             if uses_io_print "$f"; then
                 printf 'SKIP     %-40s wasm32: IO.print has no no-newline import\n' "$label"
-                N_SKIP=$((N_SKIP + 1))
-                continue
-            fi
-            if main_entry_only "$f"; then
-                printf 'SKIP     %-40s wasm32: `fun main` entry never runs (BUGS #110)\n' "$label"
                 N_SKIP=$((N_SKIP + 1))
                 continue
             fi

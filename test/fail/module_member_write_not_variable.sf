@@ -1,0 +1,19 @@
+// BUGS #122, second hole: a member that EXISTS under the alias but is not a
+// variable reaches the same `gen_set_field` fall-through as an absent one, and
+// gets the same invalid IR. Reporting only *absence* would have left this open.
+//
+// `Math.abs` is a real function in src/lib/math.sf. Before the fix this gave
+// exit 0 and `%t1 = load i64, i64* %Math`, identical to the absent-member case.
+// Measured the same way for `IO.println = 1`, `GC.collect = 1`, a module class
+// (`Inner.Widget = 1`) and a module enum (`Inner.Colour = 1`).
+//
+// The compiler must now say:
+//   [codegen] Error: cannot assign to 'abs' in module 'Math' — it is not a variable
+//
+// A separate message from the missing-member one on purpose: "you typed a name
+// that does not exist" and "that name exists and is not assignable" are
+// different mistakes, and collapsing them would send the user hunting for a typo
+// in a name they spelled correctly.
+import "@math" as Math
+
+Math.abs = 1

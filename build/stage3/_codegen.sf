@@ -1851,6 +1851,21 @@ class Codegen {
                 this.gen_get_field(object, field)
             }
             SetField(object, field, value) => {
+                // This arm is currently UNREACHABLE, and measured so rather than
+                // argued: with a distinct marker string on each of the two write
+                // sites, 18 syntactic positions were swept (top level, function
+                // body, if/else, while, for-in, C-style for, try, catch, match
+                // arm, class method, `init`, nested `fun`, actor method, bare
+                // block, two writes in a row) and `gen_arg_value`'s `set_field`
+                // branch fired in every one — this arm in none. `gen_expr` has
+                // only four callers, all inside `gen_arg_value`, and
+                // `gen_arg_value` handles `set_field` before reaching any of
+                // them. Kept correct anyway, exactly as #118 kept its own dead
+                // read copy correct: a fix applied only to the readable one would
+                // have changed nothing and still bootstrapped green.
+                if (this.report_missing_module_write(object, field)) {
+                    return "0"
+                }
                 this.gen_set_field(object, field, value)
             }
             ListLit(elements) => {
@@ -3136,6 +3151,12 @@ class Codegen {
             }
             var sf_val: AST.Expr = match (expr) { SetField(o, f, v) => v
                 _ => AST.Expr.NilLit
+            }
+            // The LIVE write site — this is the copy every spelling of
+            // `Alias.member = value` reaches (BUGS #122). See the `SetField` arm
+            // of `gen_expr` for the dead twin and how that was established.
+            if (this.report_missing_module_write(sf_obj, sf_field)) {
+                return "0"
             }
             return this.gen_set_field(sf_obj, sf_field, sf_val)
         }
@@ -4723,6 +4744,73 @@ class Codegen {
         // Cast pointer to i64 for storage
         var as_int: String = this.typed_ptr_to_val(arr_ptr, "[" + num_slots.to_string() + " x i64]*")
         this.last_type = AST.Type.EnumType(enum_name); return as_int
+    }
+
+    /// The write half of the #118 member-read guard: is `object.field = ...` an
+    /// assignment to a member that a module alias does not have?
+    ///
+    /// `gen_set_field` resolves a module write by looking `prefix + field` up in
+    /// `module_globals`, and on a miss falls through to the class-instance path,
+    /// which evaluates the bare alias as if it were a local and emits
+    /// `load i64, i64* %Math` — an SSA name that was never defined. The module
+    /// then fails `opt` verification, and the failure is reported as a compiler
+    /// bug for what is a typo in the user's program (BUGS #122, the write half of
+    /// #118).
+    ///
+    /// The alias is *known to be a module* here and nowhere downstream, so this
+    /// is the only place absence is expressible — same shape as the read guard,
+    /// and the same reason each path reaching the fallback needs its own report
+    /// (can't-express-unknown family: #22/#40/#78/#37/#103/#113/#114/#118).
+    ///
+    /// Returns true when it has reported; the caller must then not lower the
+    /// store. Every early `return false` is a spelling that must keep working:
+    /// a name that merely *looks* like an alias but is shadowed by a local, a
+    /// class or enum of that name, and a member that really does exist.
+    fun report_missing_module_write(object: AST.Expr, field: String): Bool {
+        var obj_name: String = this.get_variable_name(object)
+        if (obj_name.length() == 0) { return false }
+        if (!this.module_prefixes.has(obj_name)) { return false }
+        // A local, parameter or global of the same name shadows the alias: the
+        // write is a field store on that value, not a module write. Checked
+        // before the member lookup because a shadowed alias has no members.
+        if (this.typed_vars.has(obj_name)) { return false }
+        if (this.global_var_types.has(obj_name)) { return false }
+        if (this.module_globals.has(obj_name)) { return false }
+        if (this.current_prefix.length() > 0 and this.module_globals.has(this.current_prefix + obj_name)) { return false }
+        if (this.global_var_types.has(this.current_prefix + obj_name)) { return false }
+        // An enum or class spelled like the alias is not a namespace write.
+        if (this.enum_defs.has(obj_name)) { return false }
+        if (this.class_fields.has(obj_name)) { return false }
+        if (this.enum_variant_tags.has(obj_name + "." + field)) { return false }
+        if (this.named_imports.has(obj_name + "." + field)) { return false }
+        // The member itself: a module global is a legitimate write target
+        // (`Math.pi = 3.0`, `Flag.enabled = true` in test/cross_module_global.sf),
+        // and this is exactly the lookup `gen_set_field` makes before its
+        // fall-through.
+        var resolved: String = this.module_prefixes.get(obj_name) + field
+        if (this.module_globals.has(resolved)) { return false }
+        if (this.global_var_types.has(resolved)) { return false }
+        // A member that EXISTS but is not a variable — a function, a class, an
+        // enum — reaches the same fall-through and gets the same invalid IR, so
+        // reporting only absence would leave the hole open for `Math.abs = 1`.
+        // Measured: `Math.abs = 1`, `IO.println = 1`, `Inner.Widget = 1` and
+        // `Inner.Colour = 1` each gave exit 0 and `load i64, i64* %Math` with the
+        // absence check alone. A second message rather than one, because "you
+        // typed a name that does not exist" and "that name exists and is not
+        // assignable" are different mistakes.
+        var not_assignable: Bool = false
+        if (this.str_in_list(this.known_functions, resolved)) { not_assignable = true }
+        if (this.class_fields.has(resolved)) { not_assignable = true }
+        if (this.class_struct_names.has(resolved)) { not_assignable = true }
+        if (this.enum_defs.has(resolved)) { not_assignable = true }
+        if (not_assignable) {
+            IO.println("[codegen] Error: cannot assign to '" + field + "' in module '" + obj_name + "' — it is not a variable")
+            this.has_errors = true
+            return true
+        }
+        IO.println("[codegen] Error: no member '" + field + "' in module '" + obj_name + "'")
+        this.has_errors = true
+        return true
     }
 
     // @codegen-split: match
