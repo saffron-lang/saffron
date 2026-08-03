@@ -2,8 +2,8 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
-#129, #131, #132. Next free number is **#137**.
+**15 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
+#129, #131, #132, #137, #138, #139. Next free number is **#140**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -1024,6 +1024,155 @@ written to be adoptable by `run_tests.sh` unchanged.
 The flag was left as-is deliberately: it may be load-bearing for legitimate host
 imports (`js_log_str` is one), so tightening it is its own measured change rather than
 a one-line edit.
+
+---
+
+### 137. OPEN — reading `as` as an expression is a parse error, though declaring it is fine
+
+**Severity: medium.** Two-line repro, and it blocks compiling `turmeric/src/prelude.sf`
+(the `link()` element helper takes an HTML `as` attribute).
+
+```saffron
+fun f(as: String) { IO.println(as) }   // [line 1, col 34] expected a literal, name or '(' here
+```
+
+The asymmetry is the useful part of the diagnosis: the **declaration** parses and
+type checks clean, and so does a call. Only the *reference* fails.
+
+```saffron
+fun f(as: String): String { return "x" }   // fine — warns "unused variable 'as'"
+fun main() { IO.println(f("q")) }          // fine, prints x
+```
+
+So `as` is accepted as a binding name and reaches the checker as an ordinary
+parameter; it is only the primary-expression path that has no arm for it.
+`as` is a soft keyword (import aliasing, `import "x" as Y`), and unlike the other
+soft keywords it never got a fallback arm in the `TkIdent`-style dispatch at
+`src/compiler/parser.sf:965`. The error is the `_ =>` catch-all at
+`parser.sf:997`.
+
+Worth checking the other soft keywords (`actor`, `interface`) for the same gap
+while fixing; the fix is presumably one arm, but the *test* should cover
+declare-and-read for every soft keyword rather than just `as`.
+
+**Workaround:** rename to `as_`. Trailing underscore is already the convention
+here — `prelude.sf` spells the HTML `type` attribute `type_` for the same reason.
+
+### 138. OPEN — calling a *user-defined* method directly on an index expression is a parse error
+
+**Severity: medium.** Blocks `turmeric/src/signal.sf:200` (`deps[i].subscribe(...)`),
+which is on the reactive-dependency path, so it blocks the whole framework build.
+
+```saffron
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun show() { IO.println("shown") }
+}
+var xs: List<Box> = [Box(1)]
+xs[0].show()      // [line 8, col 11] expected a literal, name or '(' here
+```
+
+The discriminator that makes this narrow: a **builtin** method on the same
+expression shape parses fine, and so does **field** access.
+
+```saffron
+xs[0].length()          // fine — builtin method on an index expr
+IO.println(xs[0].v.to_string())   // fine — field access on an index expr
+var b: Box = xs[0]
+b.show()                // fine — same call, one temp var later
+```
+
+So `postfix -> [ ] -> . -> name` is not broken as a shape; it resolves for
+builtins and for fields but not for a user-declared method. Independent of the
+index type (`Int` and `Float` both fail) and of the list's element type
+(`List<Any>` and `List<Box>` both fail).
+
+Both #137 and #138 reproduce identically under the **committed gen2**
+(`build/stage2/saffronc`), so neither is fallout from the in-flight type-lattice
+rewrite — they are long-standing. Their practical significance is that
+`turmeric/` and `bazaar/frontend/` have apparently never compiled against this
+compiler: the checked-in `bazaar/static/app.wasm` is a stale artifact, and
+`bazaar/dev.sf` runs its frontend build via `Process.run` without checking the
+result, so the failure was silent and the stale `.wasm` kept being served.
+
+**Workaround:** bind to a typed temp var first, as in the fourth snippet above.
+
+### 139. OPEN — REGRESSION: a value flowing through `Signal<T>.get()` re-infers as `Nil`, and no annotation clears it
+
+**Severity: high.** This is the sole blocker for the `bazaar/frontend` build, and
+it is a **regression against the committed gen2** — see the gen2-vs-gen3 split
+below. Almost certainly fallout from the in-flight type-lattice rewrite
+(`UnknownType`/`NeverType`, uncommitted in `ast.sf`/`checker.sf`).
+
+Repro (needs `basil` on the lib path):
+
+```saffron
+import { Query, query } from "basil/query"
+var q: Query<Any> = query("http://x")
+var data = q.data.get()               // Signal<T>.get(): T, T bound to Any
+if (data != nil and data.has("k")) {
+    var pkgs = data.get("k")
+    if (pkgs != nil) {                 // guard is present and correct
+        IO.println(pkgs.length().to_string())   // ERROR: .length() on nullable 'pkgs' (type Nil)
+    }
+}
+```
+
+The gen split is the diagnosis:
+
+```
+build/stage2/saffronc  (committed gen2)  -> 0 errors
+build/saffronc         (current gen3)    -> 1 error   (.length() on nullable Nil)
+```
+
+Two properties make this nastier than an ordinary narrowing gap:
+
+1. **It ignores explicit annotations.** `var data: Any = q.data.get()` still
+   errors, and so does `var pkgs: Any = data.get("k")`. The RHS type wins over
+   the declared type — the value is stamped `Nil` at the generic boundary and the
+   annotation does not launder it. That is the part that reads as a genuine bug
+   rather than a missing feature: a declared `Any` should never re-narrow to `Nil`.
+
+2. **The `!= nil` guard then narrows `Nil` to nothing.** Because `pkgs` is
+   *already* pure `Nil` (not `Any|Nil`), the guard is vacuous and the method call
+   is reported anyway.
+
+Isolation notes, to save the next person the bisect:
+- `Any.get("k")` on a plain `Any` narrows fine (0 errors). The poison is specific
+  to the value coming back from the generic `Signal<T>.get()`.
+- A hand-rolled `class Sig<T> { fun get(): T ... }` does **not** reproduce it, nor
+  does `Sig` initialized with `sig(nil)`. It only reproduces through basil's real
+  `Query`/`Signal` chain, so the trigger is some combination this minimal clone
+  doesn't capture (candidate: `this.data = Signal.signal(nil)` at `query.sf:27`
+  fixing the field's `T` to `Nil` at construction, independent of the class's `T`).
+
+**Only working workaround found:** launder through a function whose return type is
+declared `Any`, at *every* level the poisoned value is read:
+
+```saffron
+fun as_any(x: Any): Any { return x }
+var data = as_any(q.data.get())
+var pkgs = as_any(data.get("k"))      // both levels, or the inner one still errors
+```
+
+A single `Query.snapshot(): Any` that returns `this.data.value` only launders the
+outer read — the inner `data.get("k")` still errors — so it is not enough on its
+own. Given that, and that the regression is in uncommitted rewrite work, the
+frontend was left un-worked-around pending the checker fix rather than sprayed
+with `as_any` calls.
+
+The reference build path, for whoever fixes this:
+
+```
+cd bazaar/frontend
+../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
+```
+
+Gen2 fails it too, but for an unrelated and already-fixed reason — the
+`{ stmt; stmt() }` arrow-body form at `main.sf:151,306` is BUGS #136, which gen3
+handles. So the frontend genuinely needs *both* the #136 fix (gen3-only) and the
+absence of this regression (gen2-only); no single existing binary compiles it.
 
 ---
 
