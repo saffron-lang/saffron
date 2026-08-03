@@ -11303,24 +11303,77 @@ class Codegen {
         // `__saffron_boot` is emitted for every WASM build, coroutine entry or not, so
         // `_start` has exactly one definition to call and the base needs no
         // weak-linkage fallback whose body would carry the wrong signature anyway.
+        //
+        // The guard must match the native `main` wrapper's below, i.e. it must
+        // include the `__saffron_main`-but-no-top-level case. It did not, and the
+        // consequence was total silence rather than a link error: a file whose
+        // whole contents are `fun main() { ... }` has no top-level statements, so
+        // no shim was emitted, and `--import-undefined` (tools/saffron's wasm32
+        // link line) turned `_start`'s call to the now-missing `@__saffron_boot`
+        // into a no-op HOST IMPORT. The module built, ran, and did nothing —
+        // BUGS #110. The two branches are one screen apart and had drifted.
         if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
-            if (has_top_level) {
+            if (this.str_in_list(this.defined_funcs,"__saffron_main") or has_top_level) {
                 out.append("\ndefine i64 @__saffron_boot() {\n")
                 out.append("entry:\n")
-                if (entry_is_coro) {
-                    out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
-                    out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
-                    out.append("  %__entry_done = call i64 @__sched_coro_done(i64 %__entry_i64)\n")
-                    out.append("  %__entry_is_done = icmp eq i64 %__entry_done, 1\n")
-                    out.append("  br i1 %__entry_is_done, label %__entry_skip, label %__entry_run\n")
-                    out.append("__entry_run:\n")
-                    out.append("  call i64 @stdlib_scheduler_enqueue(i64 %__entry_i64)\n")
-                    out.append("  br label %__entry_skip\n")
-                    out.append("__entry_skip:\n")
-                    out.append("  ret i64 0\n")
+                if (has_top_level) {
+                    // entry_is_coro is only assigned inside the has_top_level
+                    // block above, so it may only be READ under this same guard.
+                    if (entry_is_coro) {
+                        out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
+                        out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
+                        out.append("  %__entry_done = call i64 @__sched_coro_done(i64 %__entry_i64)\n")
+                        out.append("  %__entry_is_done = icmp eq i64 %__entry_done, 1\n")
+                        out.append("  br i1 %__entry_is_done, label %__entry_skip, label %__entry_run\n")
+                        out.append("__entry_run:\n")
+                        out.append("  call i64 @stdlib_scheduler_enqueue(i64 %__entry_i64)\n")
+                        out.append("  br label %__entry_skip\n")
+                        out.append("__entry_skip:\n")
+                        out.append("  ret i64 0\n")
+                    } else {
+                        out.append("  %__entry_ret = call i64 @__saffron_entry()\n")
+                        out.append("  ret i64 %__entry_ret\n")
+                    }
                 } else {
-                    out.append("  %__entry_ret = call i64 @__saffron_entry()\n")
-                    out.append("  ret i64 %__entry_ret\n")
+                    // `main` with no top-level code. There is NO __saffron_entry
+                    // in this module at all (it is only emitted under
+                    // has_top_level), so the shim must call __saffron_main —
+                    // calling __saffron_entry here would reintroduce exactly the
+                    // undefined-symbol-becomes-silent-import failure this fixes.
+                    //
+                    // Module inits are emitted here for the same reason the
+                    // native wrapper emits them in this case: when has_top_level
+                    // they run inside __saffron_entry, and with no entry there is
+                    // nowhere else for them to run.
+                    var mi4: Float = 0
+                    while (mi4 < this.module_init_names.length()) {
+                        out.append("  call i64 @" + this.module_init_names[mi4] + "()\n")
+                        mi4 = mi4 + 1
+                    }
+                    if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) {
+                        // async main: __saffron_main is `ptr ()
+                        // presplitcoroutine`, so it must be called through a ptr
+                        // signature and its frame handed to the scheduler, never
+                        // treated as an i64 result.
+                        //
+                        // Enqueue only, no scheduler_run — same as the wasm
+                        // top-level coroutine arm above and deliberately unlike
+                        // native: the host event loop cannot be blocked, so the
+                        // JS glue drives progress via the exported __sched_pump.
+                        out.append("  %__main_hdl = call ptr @__saffron_main()\n")
+                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  %__main_done = call i64 @__sched_coro_done(i64 %__main_i64)\n")
+                        out.append("  %__main_is_done = icmp eq i64 %__main_done, 1\n")
+                        out.append("  br i1 %__main_is_done, label %__main_skip, label %__main_run\n")
+                        out.append("__main_run:\n")
+                        out.append("  call i64 @stdlib_scheduler_enqueue(i64 %__main_i64)\n")
+                        out.append("  br label %__main_skip\n")
+                        out.append("__main_skip:\n")
+                        out.append("  ret i64 0\n")
+                    } else {
+                        out.append("  %__main_ret = call i64 @__saffron_main()\n")
+                        out.append("  ret i64 %__main_ret\n")
+                    }
                 }
                 out.append("}\n")
             }

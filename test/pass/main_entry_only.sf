@@ -1,0 +1,16 @@
+// BUGS #110 regression: a program whose ENTIRE contents are `fun main()`, with no
+// top-level statements at all, must run `main` on every target.
+//
+// On wasm32 it printed nothing. `_start` (src/runtime/wasm_base_32.ll) calls
+// `@__saffron_boot()` unconditionally, but codegen emitted that shim only when the
+// file had top-level code — so this file produced no shim, and the wasm32 link
+// line's `--import-undefined` turned `_start`'s call to the missing symbol into a
+// silent no-op HOST IMPORT. The module built and ran and did nothing.
+//
+// Keep this file free of top-level statements: a single top-level call (even
+// `main()`) makes has_top_level true and tests the OTHER branch, which was never
+// broken. main_entry_and_top_level.sf covers that one.
+fun main(): Int {
+    IO.println("main-only entry ran")
+    return 0
+}
