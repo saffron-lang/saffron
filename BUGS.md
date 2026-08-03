@@ -3,7 +3,7 @@
 ## Open
 
 **16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #123,
-#124, #125, #126, #127, #128. Next free number is **#129**.
+#128, #129, #130, #131, #132. Next free number is **#133**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -852,7 +852,7 @@ Found while measuring #118's blast radius across 336 files.
 
 ---
 
-### 124. wasm64's `_start` calls `__saffron_entry` directly, so a main-only program never runs there either
+### 124. FIXED — wasm64's `_start` called `__saffron_entry` directly, so a main-only program never ran there either
 
 **Severity: high**, and the same shape as #110 by a different mechanism. #110 was
 the wasm32 half — its `_start` calls `@__saffron_boot()` and the shim was not
@@ -872,9 +872,24 @@ shim, but wasm64 has no such indirection to widen. The fix is to route wasm64's
 Found while confirming the #110 fix on wasm32; the sibling target was checked at the
 same time and had the same disease through a different pipe.
 
+**Fixed (2026-08-02)** by routing wasm64's `_start` through `@__saffron_boot()`, the
+same indirection wasm32 uses (`wasm_base_32.ll:2179`). **No codegen change was
+needed** — `output_body.sf:~1294`'s guard already covers `wasm64`, and its main-only
+branch already emits module inits then calls `__saffron_main`; the shim was being
+emitted all along and simply never called. Chosen over "emit `__saffron_entry` for the
+main-only case" for two reasons: a coroutine `__saffron_entry` returns `ptr`, not
+`i64`, whereas `__saffron_boot` is a stable `i64 ()` shim that already handles async
+main (enqueue without `scheduler_run`); and convergence removes the divergence that
+let this survive the #110 fix in the first place.
+
+Verified by **running** the module, not by linking it — the defect was that linking
+succeeded. `test/pass/main_entry_only.sf` built for wasm64 and run under
+`node tools/oracle/wasm_run.mjs` printed nothing before and prints
+`main-only entry ran` after.
+
 ---
 
-### 125. `wasm_base.ll` has no single-arg `__io_println` dispatcher, so all wasm64 output is silently dropped
+### 125. FIXED — `wasm_base.ll` had no single-arg `__io_println` dispatcher, so all wasm64 output was silently dropped
 
 **Severity: high.** Independent of #124 — even a program that *does* reach its
 print calls emits nothing on wasm64.
@@ -895,9 +910,30 @@ Found while confirming the #110 fix — the wasm64 build of the same regression 
 linked clean and printed nothing even after #124's mechanism was understood, which
 is what surfaced this second missing symbol.
 
+**Fixed (2026-08-02), but this entry's stated fix was WRONG and that is the lesson.**
+It said to port `wasm_base_32.ll:1740` "adjusting only the pointer width." There is
+no pointer width to adjust — `grep i32` over that block returns **nothing**. The two
+bases differ in **value discipline**, not pointer size: `src/runtime/values.spec:41-44`
+declares `wasm64 discipline=identity` and `wasm32 discipline=nanbox`.
+
+The verbatim nanbox port was built and measured rather than reasoned about: it links
+clean and prints `0` for every value. Mechanism — an identity i64 bitcast to double is
+a **denormal**, and `fptosi` truncates every denormal to 0. That is the `untag_int`
+trap in a new location. The identity shape from `base.ll` (the other identity-discipline
+base) was ported instead.
+
+**A "port the working definition from the sibling target" instruction is only safe when
+the two targets share a value discipline.** Check `values.spec` before believing one.
+
+Honest limitation, documented in `wasm_base.ll`: on wasm64 only `String` prints
+correctly. `scratch/w64/battery.sf` run on all three targets shows native and wasm32
+printing all six values while wasm64 prints the two strings and blanks the four
+non-strings — a real improvement over printing nothing at all, but not parity. The
+remaining half is #131.
+
 ---
 
-### 126. A lambda body is never walked, so a capture-only variable is falsely reported unused
+### 126. FIXED — a lambda body was never walked, so a capture-only variable was falsely reported unused
 
 **Severity: low** — warning-only, the same false-diagnostic class as #121, at a
 different missing walk.
@@ -921,9 +957,42 @@ comment in `test/pass/callee_position_is_a_use.sf`.
 
 Found while fixing #121.
 
+**Fixed (2026-08-02)** by `check_lambda_body` in `src/compiler/checker.sf`, called
+from `infer_type`'s `Lambda` arm. It pushes a scope, defines the lambda's parameters
+into it, walks the statements, pops.
+
+Two deliberate non-behaviours. It does **not** run `check_unused_in_scope()` on the
+lambda scope, so an unused lambda *parameter* stays unwarned: a callback that ignores
+an argument is ordinary, and the parser synthesises Lambdas the user never wrote
+(for-in desugaring, trailing closures) whose parameters would draw warnings naming
+code that is not in the source. And it clears `current_func_ret` for the walk, because
+`parse_lambda` defaults an unannotated lambda's return type to the *string* `"Int"` —
+leaving it set would turn `fun () => nil` into a hard error, and a walk that exists to
+record uses must not start enforcing a return type nobody wrote.
+
+Diagnostics-only, verified over 378 files: emitted `.ll` byte-identical for all 282
+that emit IR, zero exit-code changes. 13 files differ in diagnostics — 16 warnings
+removed, every one a capture-only variable (including the `n` this entry predicted in
+`test/pass/callee_position_is_a_use.sf`), and one added: `i: cannot infer type` for a
+`for-in` inside a lambda, which is pre-existing behaviour the walk merely reaches —
+both compilers emit it for the same `for-in` outside a lambda.
+
+`test/pass/unused_var_lambda_capture.sf` shells out to `build/saffronc` because
+`run_tests.sh` strips `[checker] Warning` lines. Against the pre-fix compiler **4 of
+its 10 assertions fail**, so it detects the defect rather than passing alongside the
+fix. Its must-still-warn half includes the case that separates a *wrong* body walk
+from an absent one: a lambda parameter shadowing an untouched local of the same name
+must still warn.
+
+Caveat worth keeping: the one added diagnostic shows the walk reaches code that was
+never type-checked at all before. In a 378-file corpus the single instance was benign,
+but user code with heavier lambda bodies may surface more previously-unreachable
+diagnostics. Those would be real findings, not regressions — but they will look like
+new noise.
+
 ---
 
-### 127. `src/compiler/checker.sf` does not parse as a standalone module
+### 127. FIXED (consequence only) — `src/compiler/checker.sf` did not parse as a standalone module
 
 **Severity: medium** — it makes the checker's public stdlib API (`@check`, `@lang`)
 uncompilable and untestable, and it is invisible to bootstrap.
@@ -947,6 +1016,39 @@ fix. Blocks writing an in-process `@check` test for #121 (which currently has to
 shell out and string-match stderr instead).
 
 Found while trying to write a better test for #121.
+
+**The filed shape above was a red herring, and the reduction that "did not reproduce"
+was reducing along the wrong axis.** The trigger needs no `match`, no `if`, and no
+method call — it is a STATEMENT beginning with `this` followed by an infix operator:
+
+```saffron
+class C { var f: Float
+          fun s1(): Float { this.f + 1   return 0 } }   // same error
+```
+
+`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
+member/call chain and returns an `ExprStmt` **without handing the result back to the
+binary-operator layer**, so the operator is left trying to start a fresh statement. A
+block expression's value slot is a statement, which is how an ordinary-looking `and`
+landed in that position. Reproduces identically on gen2 and gen3 — not a regression.
+The cause is now **#129**.
+
+**Fixed (2026-08-02) at the consequence, not the cause.** `stmts_diverge`
+(`src/compiler/checker.sf:3557`) hoists its two recursive calls into locals, dodging the
+construct. `stmts_diverge` is a pure AST read, so losing `and`'s short-circuit is a cost
+difference only. **The parser defect is untouched and the trap stays set** for the next
+author who writes `this.foo() and this.bar()` in a value position.
+
+Two corrections to this entry as filed, both measured. `src/lib/check.sf` **compiled
+fine before the fix** (exit 0, byte-identical IR either side) — what was blocked was
+*importing* `@check` from a program, which now works;
+`test/pass/check_module_imports.sf` asserts through the in-process API, including the
+#126 case #121 wanted and could not write, and fails pre-fix at checker.sf's parse
+error. Separately, two **pre-existing** checker type errors are newly *visible* on the
+standalone path (`strip_nil_from_node`'s if-expression branches typing as
+`AST.Type vs NilType`); verified pre-existing by applying the hoist alone to main's
+`checker.sf`, which produces them with no #126 walk present. Not fixed — that is
+**#130**.
 
 ---
 
@@ -977,6 +1079,129 @@ leaving it as an unexplained red is not.
 Found while checking whether the compound forms of #122 reached that bug's
 fall-through. They do not — they never get past the lexer — which is why the #122
 fix neither covered nor needed to cover them.
+
+---
+
+### 129. A statement beginning with `this` swallows a following infix operator
+
+**Severity: medium** — a parse error on valid-looking code, and the message points at
+the operator rather than the cause, so it reads as "the `and` is wrong" when the
+problem is that `this.f` already ended the statement.
+
+```saffron
+class C { var f: Float
+          fun init() { this.f = 1 }
+          fun s1(): Float { this.f + 1   return 0 } }
+// [line 4, col 32] Error: expected a literal, name or '(' here
+```
+
+`parse_stmt` routes a `this`-initial statement to `parse_this_stmt`, which consumes the
+member/call chain and returns an `ExprStmt` directly, never handing the result back to
+the binary-operator layer. Any infix operator that follows is left trying to start a
+fresh statement. A block expression's value slot is a statement, so the natural
+spelling `{ this.foo() and this.bar() }` hits it — that is what kept `checker.sf` from
+parsing standalone (#127), which was worked around in `checker.sf` rather than fixed
+here. Reproduces on gen2 and gen3 alike.
+
+Two things measured directly, which bound the bug and were not assumed:
+
+- **It is specific to `this`.** The identical shape through a local variable
+  (`var o = this   o.f + 1`) compiles clean, so the defect is in `parse_this_stmt`'s
+  terminal return and not in statement-versus-expression parsing generally.
+- **`super.` is NOT affected.** `super.g() and super.g()` in a value position compiles
+  clean. So the fix is one function, not a family of them — worth stating because the
+  obvious guess is that every keyword-initial statement shares the shape.
+
+The fix presumably wants `parse_this_stmt`'s result to re-enter the expression parser at
+the binary-operator precedence level rather than returning an `ExprStmt` terminally.
+Worth checking the sibling terminal returns in that function (the `IndexSet` and
+`SetField` early returns) the same way.
+
+Found while fixing #127, whose filed reduction had been searching along the wrong axis.
+
+---
+
+### 130. Two `strip_nil_from_node` branches type as `AST.Type` vs `NilType`
+
+**Severity: low** — pre-existing, and invisible unless `checker.sf` is compiled
+standalone, which only became possible with #127's fix.
+
+`strip_nil_from_node`'s if-expression branches type as `AST.Type` in one arm and
+`NilType` in the other, which the checker rejects on the standalone path. Confirmed
+**pre-existing rather than introduced** by applying #127's hoist alone to main's
+`checker.sf`, with no #126 lambda-body walk present: both errors appear. So they are
+neither #126's nor #127's doing — they were simply unreachable while #127 stopped the
+file from parsing at all.
+
+Filed rather than fixed because it was outside the owning agent's scope. Note the
+shape: an incomplete type on a branch is exactly what "complete types are a
+requirement" is meant to catch, so this is a soundness gap and not only a nuisance.
+
+---
+
+### 131. wasm64's identity discipline makes every non-String value unprintable
+
+**Severity: high**, and the remaining half of #125 — wasm64 output is no longer
+*entirely* dropped, but only strings survive.
+
+`src/runtime/values.spec:41-44` gives wasm64 `discipline=identity` (raw i64 bits) and
+wasm32 `discipline=nanbox`. Under identity there is no tag to discriminate on, so
+`__io_println_any` in `wasm_base.ll` can only treat its argument as a string pointer.
+
+Measured with `scratch/w64/battery.sf` across all three targets. native and wasm32 both
+print all six lines (`a string / 42 / true / false / 3 / hello world`); wasm64 prints
+the two strings and **four blank lines** for `42`, `true`, `false` and `l.length()`.
+
+Not a local patch. It needs either switching `wasm_base.ll` to the nanbox discipline
+wholesale — which also means adding the GC object headers nanbox tagging assumes — or
+giving identity-mode values a type-carrying header. Until then, **treat wasm64 as
+string-output-only.**
+
+Related and worth reading together: this is the same trap as #125's wrong premise. An
+identity i64 bitcast to double is a denormal, and `fptosi` truncates every denormal to
+0, so a nanbox helper dropped into an identity base fails silently rather than loudly.
+
+---
+
+### 132. wasm64's link line accepts every undefined symbol, and nothing in the tree tests wasm64 at all
+
+**Severity: high as a process defect** — this is the mechanism that made #110, #124,
+#125 and four further missing symbols silent instead of link errors. Filed as its own
+entry because fixing the individual symbols does not stop the next one.
+
+Two independent halves, both verified in the source:
+
+**The flag divergence.** `tools/saffron:357` links wasm64 with
+`-Wl,--allow-undefined`, while `tools/saffron:412` deliberately links wasm32 with
+`-Wl,--import-undefined`, carrying a comment that `--allow-undefined` "silently accepts
+EVERY missing symbol." `tools/build_wasm.sh:77` also passes `--allow-undefined`. So on
+wasm64 an undefined symbol becomes a no-op host import: the module builds, runs, and
+does nothing. Also noted while measuring: wasm32 passes `--identity-mode` for the
+runtime compile (`tools/saffron:384`) and wasm64 (`:352`) does not.
+
+Sweeping a linked wasm64 module's `*UND*` list — rather than reading `wasm_base.ll` —
+found **four more** undefined symbols beyond #124's and #125's: `__string_intern`
+(which alone made all string interpolation produce no output), `__print_debug_location`,
+`__val_tag_ptr_nullable`, and `__builtin_trap`, the last `declare`d at
+`wasm_base.ll:557` but never defined, so a trap was a silent return. All four are now
+defined. **The only reliable audit of a wasm64 base's completeness is dumping the
+linked module's undefined symbols, not reading the file.**
+
+**The coverage hole.** `tools/run_tests.sh` never builds for wasm64 — its single
+`wasm` mention is `NOT_A_TEST="goals hello_wasm gc_generational_test"` — and
+`tools/differential.sh` sets `ALL_CONFIGS="native-O0 wasm32"`. No harness in the tree
+builds or runs a wasm64 module, which is how six undefined symbols coexisted with a
+green suite.
+
+Compounding the two: **linking cannot serve as the check here.** A successful wasm64
+build is compatible with the module doing nothing at all, so any wasm64 test must
+execute the module and assert on stdout, treating empty output as failure.
+`scratch/w64/regress_wasm64.sh` is such a check (3 cases, empty stdout is FAIL),
+written to be adoptable by `run_tests.sh` unchanged.
+
+The flag was left as-is deliberately: it may be load-bearing for legitimate host
+imports (`js_log_str` is one), so tightening it is its own measured change rather than
+a one-line edit.
 
 ---
 
