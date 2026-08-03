@@ -1,0 +1,77 @@
+// `private` and `public` parse on every declaration kind that accepts them.
+//
+// This test is about the SYNTAX only — enforcement is a separate commit. What it
+// pins down is that adding a modifier changes nothing about what the program
+// means: every value below is the value the same program without modifiers
+// produces. A visibility annotation that silently altered field order, method
+// dispatch or enum tags would show up here as a wrong number.
+import "@test" as Test
+
+private class Slot {
+    private var count: Int
+    public var label: String
+    fun init(label: String) {
+        this.count = 0
+        this.label = label
+    }
+    // A private method, reached through a public one. Class-private means
+    // "inside the class body", so this call is legal.
+    private fun bump(): Int {
+        this.count = this.count + 1
+        return this.count
+    }
+    fun public_bump(): Int { return this.bump() }
+    fun describe(): String { return this.label + ":" + this.count.to_string() }
+}
+
+private fun module_helper(): Int { return 7 }
+public fun public_helper(): Int { return module_helper() + 1 }
+
+public var exported_total: Int = 3
+private var hidden_total: Int = 4
+
+private enum Mode { On, Off }
+
+private type Slots = List<Int>
+
+// `private`/`public` are soft keywords, not reserved words: the lexer emits them
+// as identifiers and the parser only reads them as modifiers when a declaration
+// keyword follows. So a program that already uses either as a variable name keeps
+// compiling. That is the whole reason for the soft-keyword approach, so it is
+// worth a test rather than a comment.
+fun shadowing_names(): Int {
+    var private: Int = 10
+    var public: Int = 20
+    var internal: Int = 30
+    var protected: Int = 40
+    return private + public + internal + protected
+}
+
+// These four globals are `private` because their types are, and the leak pass is
+// right to insist: an unannotated global at module scope is public, so `var slot:
+// Slot` would be a public name handing out a private type — L1's leak in variable
+// form. This file was written before enforcement landed and originally said `var`;
+// the modifier is the correction, not a workaround. Strip `private` from any of the
+// four and the file is correctly rejected.
+private var slot: Slot = Slot("a")
+Test.assert_eq(slot.public_bump(), 1, "private method reached from a public one")
+Test.assert_eq(slot.public_bump(), 2, "private method mutates private field")
+Test.assert_eq(slot.describe(), "a:2", "public and private fields coexist in order")
+
+Test.assert_eq(public_helper(), 8, "private free function called from same module")
+Test.assert_eq(exported_total, 3, "public global")
+Test.assert_eq(hidden_total, 4, "private global")
+
+private var mode: Mode = Mode.On
+var mode_name: String = match (mode) {
+    On => "on"
+    Off => "off"
+}
+Test.assert_eq(mode_name, "on", "private enum matches by variant")
+
+private var these: Slots = [1, 2]
+Test.assert_eq(these.length(), 2, "private type alias resolves")
+
+Test.assert_eq(shadowing_names(), 100, "modifier words remain usable as identifiers")
+
+Test.summary()

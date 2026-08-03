@@ -1,0 +1,22 @@
+//! A class whose constructor is private, plus the public factory that is the
+//! whole point of the modifier.
+//!
+//! Lives in test/support/ rather than test/fail/ or test/pass/ because both of
+//! those directories are globbed as tests by tools/run_tests.sh, and this file is
+//! an input to two of them rather than a test itself.
+//!
+//! `private init` is MODULE-scoped, not class-scoped: `new_gauge` below is a free
+//! function, not a method, so a class-scoped reading would reject the factory and
+//! leave Gauge constructible by nobody at all. The stdlib already has this exact
+//! shape in six modules (`fun new(): Stack` in stack.sf, queue.sf, sorted_set.sf,
+//! heap.sf, deque.sf, sorted_map.sf).
+class Gauge {
+    var reading: Int
+    private fun init(reading: Int) { this.reading = reading }
+    fun get(): Int { return this.reading }
+}
+
+/// The public constructor. Same module as Gauge, so it may call the private init.
+fun new_gauge(reading: Int): Gauge {
+    return Gauge(reading)
+}

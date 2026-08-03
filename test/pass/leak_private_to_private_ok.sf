@@ -1,0 +1,107 @@
+// Everything the leak pass must NOT reject.
+//
+// A check that rejects too much passes every fail test and is still wrong, so this
+// is the file that makes the L1-L9 rejections a boundary. Four distinct reasons a
+// private type in a signature is fine:
+//
+//   1. the declaration is itself private — nothing outside can reach the signature
+//      at all, so there is nobody to leak to;
+//   2. the member belongs to a private class (L4, a deliberate NO-OP);
+//   3. the member is itself private;
+//   4. the type is public, which is the overwhelmingly common case and the one that
+//      would hurt most to get wrong.
+import "@test" as Test
+
+private class Slot {
+    var value: Int
+    fun init(value: Int) { this.value = value }
+    fun get(): Int { return this.value }
+}
+
+// (1) private → private. Both ends are inside the module.
+private fun make_slot(n: Int): Slot {
+    return Slot(n)
+}
+
+private fun read_slot(s: Slot): Int {
+    return s.get()
+}
+
+// (2) L4: a member of a PRIVATE class, whatever its own modifier. Erroring here
+// would force annotating every member of every private class as private — churn
+// buying nothing, because the enclosing private type already gates every path to
+// them. The same reasoning applies recursively: a public method of a private class
+// exposing another private type is also a no-op.
+private class Registry {
+    var primary: Slot
+    fun init() { this.primary = Slot(1) }
+    fun swap(other: Slot): Slot {
+        var old: Slot = this.primary
+        this.primary = other
+        return old
+    }
+}
+
+// (3) A private member of a PUBLIC class. The class is reachable; this member is
+// not, so its signature leaks nothing.
+class Facade {
+    private var backing: Slot
+    fun init() { this.backing = Slot(7) }
+    private fun peek(): Slot { return this.backing }
+    fun value(): Int { return this.backing.get() }
+}
+
+// (4) Public everything, public types. The common case.
+class Point {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x  this.y = y }
+    fun sum(): Int { return this.x + this.y }
+}
+
+fun add_points(a: Point, b: Point): Point {
+    return Point(a.x + b.x, a.y + b.y)
+}
+
+fun tally(values: List<Int>): Map<String, List<Int>> {
+    var m: Map<String, List<Int>> = {}
+    m.set("all", values)
+    return m
+}
+
+// A public class extending a PUBLIC base — L7 must not fire on this.
+class Base3 {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun get(): Int { return this.n }
+}
+class Derived3 extends Base3 {
+    fun twice(): Int { return this.get() * 2 }
+}
+
+// An explicitly annotated public var of a public type.
+var origin: Point = Point(0, 0)
+
+// A top-level var whose declared type is private must itself be private, and that
+// is the leak pass working rather than a wart: an unannotated `var r: Registry` at
+// module scope is a public global holding a private type, which is L1's leak in
+// variable form. Writing `private` is the honest statement of what was meant, and
+// it is also the case that proves suppression works — strip the modifier from this
+// line and the file is correctly rejected.
+//
+// A private-typed LOCAL inside a function needs no annotation either way: the leak
+// pass reads signatures only and never descends into a body, because a local cannot
+// escape the function that declares it. make_slot/read_slot above rely on that.
+private var r: Registry = Registry()
+private var f: Facade = Facade()
+
+Test.assert_eq(read_slot(make_slot(4)), 4, "private fun taking and returning a private type")
+Test.assert_eq(r.swap(Slot(9)).get(), 1, "a public method of a private class (L4 no-op)")
+Test.assert_eq(r.primary.get(), 9, "a public field of a private class (L4 no-op)")
+Test.assert_eq(f.value(), 7, "a private member of a public class")
+Test.assert_eq(add_points(Point(1, 2), Point(3, 4)).sum(), 10, "public types are untouched")
+Test.assert_eq(tally([1, 2, 3]).keys().length(), 1, "a nested public generic is untouched")
+Test.assert_eq(Derived3(5).twice(), 10, "extending a public base is untouched")
+Test.assert_eq(origin.sum(), 0, "an annotated public var of a public type")
+
+Test.summary()
