@@ -2,8 +2,8 @@
 
 ## Open
 
-**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #122,
-#123, #124, #125, #126, #127. Next free number is **#128**.
+**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #123,
+#124, #125, #126, #127, #128. Next free number is **#129**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -687,7 +687,7 @@ lambda body is never walked, so a capture-only variable draws the same false war
 by a different missing walk) and #127 (`checker.sf` does not parse standalone).
 
 ---
-### 122. Assigning to a nonexistent module member compiles clean and emits invalid IR
+### 122. FIXED — assigning to a nonexistent module member compiled clean and emitted invalid IR
 
 **Severity: high**, for the same reason #118 was: exit 0, no diagnostic, and the
 failure that eventually surfaces blames the compiler for the user's typo.
@@ -723,10 +723,53 @@ every distinct path that reaches the fallback needs its own report, and closing 
 does not close the others.
 
 The fix wants the same treatment as #118: at the point where the alias is known to
-be a module and the member lookup has missed, report rather than fall through. Worth
-checking at the same time whether a third path (compound assignment, `Math.NOPE +=
-1`, and indexed assignment `Math.NOPE[0] = 1`) reaches the fallback too, rather than
-fixing only the spelling in this repro.
+be a module and the member lookup has missed, report rather than fall through.
+
+**Fixed (2026-08-02)** by `report_missing_module_write` (`expr_body.sf:3315`),
+called above the shared `gen_set_field` while the alias is still known to be a
+module. `Math.NOPE = 3` went from exit 0 / no output / `%t1 = load i64, i64* %Math`
+(which `opt` rejects) to `[codegen] Error: no member 'NOPE' in module 'Math'`, exit
+1. `Math.pi = 3.0` and a class field write are unaffected, exit 0 before and after —
+verified on both the pre-fix and post-fix compilers.
+
+**Two write sites, one live — measured, as #118's read pair was.** Each got a
+distinct marker string; the compiler was rebootstrapped and 18 syntactic positions
+swept (top level, function body, if/else, while, for-in, C-style for, try, catch,
+match arm, class method, `init`, nested `fun`, actor method, bare block, two writes
+in a row). `gen_arg_value`'s `set_field` branch (`expr_body.sf:1698`) fired in all
+18; the `SetField` arm of `gen_expr` (`:399`) fired in none — `gen_expr`'s four
+callers are all inside `gen_arg_value`, which handles `set_field` first. Both
+hardened, the dead one annotated. The readable arm being the dead one is the same
+trap as #118.
+
+**A second hole, closed in the same guard.** A member that *exists* but is not a
+variable reached the identical fall-through: `Math.abs = 1`, `Iter.sum = 1`,
+`IO.println = 1`, `GC.collect = 1`, a module class `Inner.Widget = 1`, a module enum
+`Inner.Colour = 1` — each gave exit 0 and invalid IR. Reporting only *absence* would
+have left all six open, since the fallback does not care *why* the lookup produced
+nothing. They now get `cannot assign to '<x>' in module '<y>' — it is not a
+variable`, a distinct message because a typo and a category error send the user to
+different places.
+
+Tenth instance of the can't-express-unknown family (#22, #40, #78, #37, #103, #113,
+#114, #118), and the second within #118's own mechanism: a resolver with no way to
+say "not found" guesses instead of reporting absence. The guess lives in the
+*fallback*, so every distinct path that reaches it needs its own report — closing
+the read path (#118) did not close the write path.
+
+The compound-assignment and increment spellings this entry asked about are **not
+#122 sites**: `Math.NOPE += 1` and `Math.NOPE++` are rejected by the parser because
+the lexer has no compound-assignment or increment token at all, so they never reach
+the fallback. Filed separately as #128. `Math.NOPE[0] = 1` and `Math.NOPE.deeper =
+1` were already caught by #118's read guard, since both evaluate their base as a
+read.
+
+Tests: `test/fail/module_member_write_missing.sf`,
+`test/fail/module_member_write_not_variable.sf`,
+`test/pass/module_member_write_valid.sf` (9 assertions, including a read-back that
+proves the store landed rather than being reported and skipped). Both `fail/` files
+compiled cleanly on the pre-fix compiler and are rejected after, so they detect the
+defect. Failure set unchanged at 24 names.
 
 ---
 
@@ -872,6 +915,36 @@ fix. Blocks writing an in-process `@check` test for #121 (which currently has to
 shell out and string-match stderr instead).
 
 Found while trying to write a better test for #121.
+
+---
+
+### 128. There is no compound-assignment or increment operator, and `test/pass/increment.sf` tests a feature that does not exist
+
+**Severity: low as a defect, medium as misinformation** — the language reads as if
+it has these, one test asserts it does, and the failure they produce is a bare parse
+error naming no missing feature.
+
+```
+x += 1      // [line 2, col 6] Error: expected a literal, name or '(' here
+b.v += 1    // same
+a++         // same
+```
+
+The lexer has no token for any of them. `TokenKind` (`src/compiler/lexer.sf:3`-77)
+lists `TkPlus`, `TkMinus`, `TkStar`, `TkSlash`, `TkPercent`, `TkEq`, `TkEqEq`,
+`TkBangEq`, `TkLtEq`, `TkGtEq` — and nothing for `+=`, `-=`, `*=`, `/=`, `%=`, `++`
+or `--`. So this is not a parser gap over a lexed token: the characters lex as two
+separate operators and the parser then wants an operand where `=` sits.
+
+`test/pass/increment.sf` asserts otherwise — its first line is `a = a++;` — and it
+is in the 24-name failure baseline as `compile-error`, red long enough to be treated
+as scenery. It is a test for a feature that was never implemented, not a stale
+spelling of one that was. Deleting it and adding the operators are both defensible;
+leaving it as an unexplained red is not.
+
+Found while checking whether the compound forms of #122 reached that bug's
+fall-through. They do not — they never get past the lexer — which is why the #122
+fix neither covered nor needed to cover them.
 
 ---
 
