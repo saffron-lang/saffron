@@ -590,22 +590,54 @@ reference; broken paths only negatively.
 ### 116. Enum payload variants compare by address, so two equal values are unequal
 
 ```saffron
-Color.Red == Color.Red              // true  — both are the immediate 0
-Shape.Circle(2) == Shape.Circle(2)  // false — two distinct __sf_malloc's
-Shape.Circle(2) == Shape.Circle(3)  // false — correct, but for the wrong reason
+enum Color { Red, Green }               // no payload variant anywhere
+enum Option { Some(value: Int), None }  // has one
+
+Color.Red == Color.Red              // true  — both are the immediate `tag << 56`
+Option.Some(42) == Option.Some(42)  // false — two distinct __sf_malloc's
+Option.Some(42) == Option.Some(43)  // false — correct, but for the wrong reason
+Option.None == Option.None          // false — and None carries no payload at all
 ```
 
-Verified at HEAD. Note the third line: it answers correctly *by accident*, so a
-test that only checks unequal values passes while equality is broken.
+Verified at HEAD. Two things about the shape of this before you write a repro:
 
-Same root as #115's enum half — a payload variant is a headerless `__sf_malloc`
-array. Giving it a GC header is a prerequisite for structural equality but not
-sufficient: `__any_eq` also needs an enum arm that compares payloads field by
-field.
+- **The third line answers correctly by accident.** A test that only checks
+  *unequal* values passes while equality is entirely broken.
+- **`x == x` on one variable answers true**, because both operands load the same
+  address. A repro must construct the value **twice**.
+
+**The axis is the enum *declaration*, not the variant.** `Option.None` compares
+by address even though it has no fields: once any variant of the enum carries a
+payload, `gen_enum_construct` heap-allocates *every* variant, so a fieldless one
+becomes a one-slot `[tag]` array (`expr_body.sf:3233`) instead of the immediate.
+So adding a field to one variant silently changes `==` for every *other* variant
+of the same enum. `Color.Red == Color.Red` is true only because `Color` declares
+no payload variant anywhere.
+
+**This is codegen-only; there is nothing to fix in the runtime.** Confirmed by
+reading the emitted IR: the sole `__any_eq` in it is the `declare` line — no call
+is ever made. Two operands of static type `EnumType` end at a bare
+`icmp eq i64` on two `ptrtoint`s (`expr_body.sf:958`). The prerequisite chain is
+therefore:
+
+1. `gen_enum_construct` (`expr_body.sf:3243`) must allocate via `__gc_alloc` with
+   a tag — today it uses headerless `__sf_malloc`, so `__rt_gc_tag_of`
+   (`runtime.sf:664`) cannot even identify the value as an enum.
+2. Codegen must route enum `==` to a helper instead of emitting `icmp`. Arity
+   lives only in codegen's `enum_variant_fields`, so the helper needs it passed
+   in or recorded in the header.
+
+Same root as #115's enum half (the missing GC header). A header alone is not
+sufficient — the comparison still has to become a call.
 
 Worth stating plainly because it is a language-semantics wart, not just a bug:
-`==` on an enum currently means **different things** depending on whether the
-variant carries fields — value equality for fieldless, identity for payload.
+`==` on an enum currently means **different things** depending on whether its
+declaration contains a payload variant — value equality if not, identity if so.
+
+Regression test: `test/pass/enum_payload_value_equality.sf`, red on purpose
+(9 failing assertions), listed in `run_tests.sh`'s `KNOWN_FAIL`. It asserts
+invariants rather than expected booleans, so it cannot be satisfied by making
+everything equal.
 
 ---
 
