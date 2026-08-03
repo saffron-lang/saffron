@@ -1,0 +1,20 @@
+// Per-variant visibility is rejected by design, not merely unimplemented.
+//
+// Work it through: with `private B` in module M and a `match` in module N, either
+// exhaustiveness demands N name `B` — which N is forbidden to write, a
+// contradiction — or it exempts private variants, and then the only total form
+// needs a `_` arm. A non-exhaustive match in Saffron yields an indeterminate
+// value rather than an error (BUGS #76), so that second reading makes the safe
+// form unwritable and the unsafe form silently wrong. A feature whose only
+// expressible use is a footgun is not a feature.
+//
+// `private enum Mode` — the whole type — IS supported and has none of this
+// interaction: a module that cannot name the type cannot match on it at all.
+// test/pass/visibility_parse.sf covers that form.
+enum Mode {
+    private On,
+    Off
+}
+
+var m: Mode = Mode.Off
+IO.println("built")
