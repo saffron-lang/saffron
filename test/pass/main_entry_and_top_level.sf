@@ -1,0 +1,14 @@
+// BUGS #110 companion: `fun main()` PLUS top-level code. This is the case that
+// already worked, kept as a test so that widening the __saffron_boot guard to
+// cover the main-only case cannot silently change this one — the shim now has two
+// bodies and this pins the has_top_level one.
+//
+// Top-level code runs first (it is __saffron_entry), and `main` runs only because
+// this file calls it explicitly; there is no implicit second invocation.
+fun main(): Int {
+    IO.println("main ran")
+    return 0
+}
+
+IO.println("top level ran")
+main()

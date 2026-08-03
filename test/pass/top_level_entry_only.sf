@@ -1,0 +1,4 @@
+// BUGS #110 companion: top-level code and NO `fun main` at all. The third of the
+// three entry-point shapes, pinned so that adding the `__saffron_main` case to the
+// wasm `__saffron_boot` guard cannot regress the plain has_top_level path.
+IO.println("top level only ran")
