@@ -1346,6 +1346,11 @@ class Parser {
             UnionType(types) => "Union"
             FuncType(p, r) => "Fun"
             NullableType(inner) => "Nullable"
+            // The parser never *builds* either of these — there is no surface
+            // syntax for them — but the arms must exist, because a missing arm
+            // returns an indeterminate value rather than failing to compile.
+            UnknownType => "Unknown"
+            NeverType => "Never"
         }
     }
 
