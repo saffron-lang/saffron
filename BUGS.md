@@ -5007,7 +5007,7 @@ for the case the lexer change does not cover.
 
 ---
 
-### 113. Over-applying a zero-arity function is silently accepted, because the arity check exempts arity zero
+### 113. FIXED — over-applying a zero-arity function was silently accepted, because the arity check exempted arity zero
 
 `expr_body.sf:2302` and `:2308` both guard with
 `args.length() != expected and expected > 0`, and **`expected > 0` exempts every
@@ -5033,6 +5033,53 @@ This makes `test/functions.sf` hang, which is how it was noticed.
 Same family as #22, #40, #78, #37 and #103 — a check that cannot express "unknown"
 so it conflates unknown with a legitimate value. Here the conflated value is zero,
 which is also the sentinel.
+
+**FIXED (2026-08-02).** Verified: `fun c() {}; c("too","many")` compiled with exit 0
+and no diagnostic before; now `[codegen] Error: 'c' expects 0 arguments, got 2` and
+exit 1. Correct 0-arity calls still work.
+
+The fix consults `func_param_count` **first** and **without** the `expected > 0`
+clause, demoting `called_function_arity` to a fallback that keeps it. The reason the
+clause cannot simply be deleted from both arms is a provenance asymmetry between the
+two maps, and it is the interesting part:
+
+- `func_param_count` is written **only** by declaration sites (`gen_fun_decl` plain
+  and `@inline`, `gen_class_method`, `prescan_fun_decl`, `prescan_class_decl`). A `0`
+  there *is* a declared arity.
+- `called_function_arity` is overloaded. Declarations write it, but so do **call
+  sites**, storing `args.length()` (`methods_body.sf:1861`, `:3113`, `:1399`,
+  `:1795`) purely to size the `declare i64 @f(...)` lines `emit_module` emits for
+  undefined callees (`output_body.sf:1258`). A `0` there cannot have come from a
+  declaration, so it genuinely means *unknown*.
+
+So `expected > 0` was a legitimate unknown-guard for one map and pure damage applied
+to the other. Written as a test on the arity **value** rather than on whether an
+arity was recorded, it exempted every 0-arity function in the language.
+
+Worth recording that the naive fix would have worked *today*: a variant compiler with
+`expected > 0` dropped from both arms produced **byte-identical diagnostics** across
+285 files, so no unrecorded-arity case is currently reachable. The exemption was kept
+anyway, because the call-site writers make a `0` in that map unfalsifiable — if a
+`gen_method_call` path ever reaches this check, the clause is what stops a leftover
+`0` from fabricating "expects 0 arguments" against a 3-arg function. Measured-dead,
+retained deliberately, and now documented in place so the next reader does not have
+to re-derive it.
+
+Diagnostics-only, and this is the load-bearing evidence: over 321 files (`test/`,
+`test/pass/`, `test/fail/`, `src/lib/`, `src/compiler/`, `examples/`, and five more
+fixture trees), **exactly one** behavioural change — the new negative test — and all
+225 emitted `.ll` files byte-identical.
+
+Provenance: added in `efd9f47`/`cc9b466` (2026-05-28) as a *Warning* and later
+promoted to an error without the clause being re-examined. Seventh instance of the
+can't-express-unknown family (#22, #40, #78, #37, #103, #114), and #118 makes eight.
+
+**This bug is also why `test/functions.sf` hung.** The file carried
+`fun c() { c("too","many") }` as a Crafting Interpreters stack-trace test, inherited
+from the C VM where over-application was a *catchable runtime error*. Under the
+native compiler nothing rejected it, so it simply recursed until the 10s timeout
+(`rc=124`). The compile-time half is now `test/fail/arity_zero_overapplied.sf`, with
+`test/pass/arity_zero_ok.sf` covering seven correct 0-arity shapes.
 
 ---
 
@@ -5237,6 +5284,52 @@ wrong, but that is not why it fails: any nonexistent member reproduces this, so
 renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
 remains red pending the diagnostic; fixing the test alone would be papering over
 the real defect.
+
+---
+
+### 119. An output path containing `.sf` is taken as the input, so the real input is never read
+
+**Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
+file appear to accept it, which corrupts measurement rather than just output.
+
+```
+saffronc real.sf decoy.sf     # exit 0 — compiles decoy.sf; real.sf never read
+saffronc real.sf out.sf.ll    # exit 0 — writes out.sf.ll.ll
+```
+
+Verified at HEAD, both cases: after `saffronc /tmp/real.sf /tmp/decoy.sf`, the
+emitted IR contains `DECOY` once and `REAL_INPUT` **zero** times, with exit 0.
+
+`main.sf:1075` picks the input by scanning for `arg.contains(".sf")` and keeping the
+**last** match:
+
+```saffron
+if (arg.contains(".sf") and arg != "--stdlib") {
+    last_sf_idx = i
+}
+```
+
+Two independent defects in one line. `contains` rather than `ends_with` matches
+`.sf` anywhere in the string, so `out.sf.ll` qualifies; and taking the *last* match
+means when both args qualify the **output** wins. Note the rest of `main.sf`
+already knows better — lines 693, 714, 742 and 968 all use `ends_with(".sf")`. Only
+the argument parser sniffs.
+
+The fix is `ends_with(".sf")` plus treating the input as *positional* (first
+non-flag argument) rather than sniffing for it at all. Sniffing cannot distinguish
+an input from an output that merely resembles one; position can.
+
+**Why this matters beyond the obvious.** The failure is silent and exit code 0, so
+any batch sweep whose output filenames embed `.sf` measures nothing while appearing
+to measure everything. This was found by an agent whose first two arity sweeps
+wrote to `$OUT/<name>.sf.ll` and reported zero diagnostics across the corpus —
+including on a file it had just watched the compiler reject. The result looked like
+strong evidence of no regression and was evidence of nothing.
+
+The shipped pipeline is **not** affected, which is why this survived: `tools/saffron`
+writes `$TMPDIR/output.ll` (`tools/saffron:320,441`) and `tools/run_tests.sh` writes
+`neg_<name>.ll`, neither containing `.sf`. So the test suites and every failure-set
+comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
 
 ---
 
