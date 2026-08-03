@@ -380,367 +380,420 @@ declare i64 @__sched_has_stored_result(i64)
 
 define linkonce_odr i64 @TkInt(i64 %f0) {
 entry:
-  %t1 = shl i64 0, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 0, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TkFloat(i64 %f0) {
 entry:
-  %t1 = shl i64 1, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 1, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TkString(i64 %f0) {
 entry:
-  %t1 = shl i64 2, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 2, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TkIdent(i64 %f0) {
 entry:
-  %t1 = shl i64 6, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 6, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TkDocComment(i64 %f0) {
 entry:
-  %t1 = shl i64 62, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 62, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TkModuleDoc(i64 %f0) {
 entry:
-  %t1 = shl i64 63, 56
-  %t2 = or i64 %t1, %f0
-  ret i64 %t2
+  %t1 = call i8* @__sf_malloc(i64 16)
+  %t2 = bitcast i8* %t1 to [2 x i64]*
+  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
+  store i64 63, i64* %t3
+  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
+  store i64 %f0, i64* %t4
+  %t5 = ptrtoint [2 x i64]* %t2 to i64
+  ret i64 %t5
 }
 
 define linkonce_odr i64 @TokenKind__to_string(i64 %self) {
 entry:
-  %t1 = lshr i64 %self, 56
-  switch i64 %t1, label %ets.end1 [ i64 0, label %ets.v2 i64 1, label %ets.v3 i64 2, label %ets.v4 i64 3, label %ets.v5 i64 4, label %ets.v6 i64 5, label %ets.v7 i64 6, label %ets.v8 i64 7, label %ets.v9 i64 8, label %ets.v10 i64 9, label %ets.v11 i64 10, label %ets.v12 i64 11, label %ets.v13 i64 12, label %ets.v14 i64 13, label %ets.v15 i64 14, label %ets.v16 i64 15, label %ets.v17 i64 16, label %ets.v18 i64 17, label %ets.v19 i64 18, label %ets.v20 i64 19, label %ets.v21 i64 20, label %ets.v22 i64 21, label %ets.v23 i64 22, label %ets.v24 i64 23, label %ets.v25 i64 24, label %ets.v26 i64 25, label %ets.v27 i64 26, label %ets.v28 i64 27, label %ets.v29 i64 28, label %ets.v30 i64 29, label %ets.v31 i64 30, label %ets.v32 i64 31, label %ets.v33 i64 32, label %ets.v34 i64 33, label %ets.v35 i64 34, label %ets.v36 i64 35, label %ets.v37 i64 36, label %ets.v38 i64 37, label %ets.v39 i64 38, label %ets.v40 i64 39, label %ets.v41 i64 40, label %ets.v42 i64 41, label %ets.v43 i64 42, label %ets.v44 i64 43, label %ets.v45 i64 44, label %ets.v46 i64 45, label %ets.v47 i64 46, label %ets.v48 i64 47, label %ets.v49 i64 48, label %ets.v50 i64 49, label %ets.v51 i64 50, label %ets.v52 i64 51, label %ets.v53 i64 52, label %ets.v54 i64 53, label %ets.v55 i64 54, label %ets.v56 i64 55, label %ets.v57 i64 56, label %ets.v58 i64 57, label %ets.v59 i64 58, label %ets.v60 i64 59, label %ets.v61 i64 60, label %ets.v62 i64 61, label %ets.v63 i64 62, label %ets.v64 i64 63, label %ets.v65 i64 64, label %ets.v66 i64 65, label %ets.v67 ]
+  %t1 = inttoptr i64 %self to i64*
+  %t2 = load i64, i64* %t1
+  switch i64 %t2, label %ets.end1 [ i64 0, label %ets.v2 i64 1, label %ets.v3 i64 2, label %ets.v4 i64 3, label %ets.v5 i64 4, label %ets.v6 i64 5, label %ets.v7 i64 6, label %ets.v8 i64 7, label %ets.v9 i64 8, label %ets.v10 i64 9, label %ets.v11 i64 10, label %ets.v12 i64 11, label %ets.v13 i64 12, label %ets.v14 i64 13, label %ets.v15 i64 14, label %ets.v16 i64 15, label %ets.v17 i64 16, label %ets.v18 i64 17, label %ets.v19 i64 18, label %ets.v20 i64 19, label %ets.v21 i64 20, label %ets.v22 i64 21, label %ets.v23 i64 22, label %ets.v24 i64 23, label %ets.v25 i64 24, label %ets.v26 i64 25, label %ets.v27 i64 26, label %ets.v28 i64 27, label %ets.v29 i64 28, label %ets.v30 i64 29, label %ets.v31 i64 30, label %ets.v32 i64 31, label %ets.v33 i64 32, label %ets.v34 i64 33, label %ets.v35 i64 34, label %ets.v36 i64 35, label %ets.v37 i64 36, label %ets.v38 i64 37, label %ets.v39 i64 38, label %ets.v40 i64 39, label %ets.v41 i64 40, label %ets.v42 i64 41, label %ets.v43 i64 42, label %ets.v44 i64 43, label %ets.v45 i64 44, label %ets.v46 i64 45, label %ets.v47 i64 46, label %ets.v48 i64 47, label %ets.v49 i64 48, label %ets.v50 i64 49, label %ets.v51 i64 50, label %ets.v52 i64 51, label %ets.v53 i64 52, label %ets.v54 i64 53, label %ets.v55 i64 54, label %ets.v56 i64 55, label %ets.v57 i64 56, label %ets.v58 i64 57, label %ets.v59 i64 58, label %ets.v60 i64 59, label %ets.v61 i64 60, label %ets.v62 i64 61, label %ets.v63 i64 62, label %ets.v64 i64 63, label %ets.v65 i64 64, label %ets.v66 i64 65, label %ets.v67 ]
 ets.v2:
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.0, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t4, i64 %t3)
-  %t5 = and i64 %self, 72057594037927935
-  %t6 = call i64 @__int_to_string(i64 %t5)
-  call i64 @__sb_append(i64 %t4, i64 %t6)
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1, i64 0, i64 0
-  %t8 = ptrtoint i8* %t7 to i64
-  call i64 @__sb_append(i64 %t4, i64 %t8)
-  %t9 = call i64 @__sb_to_string(i64 %t4)
-  ret i64 %t9
-ets.v3:
-  %t10 = getelementptr [9 x i8], [9 x i8]* @.str.2, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.0, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t5, i64 %t4)
+  %t6 = inttoptr i64 %self to [2 x i64]*
+  %t7 = getelementptr [2 x i64], [2 x i64]* %t6, i64 0, i64 1
+  %t8 = load i64, i64* %t7
+  %t9 = call i64 @__float_to_string(i64 %t8)
+  call i64 @__sb_append(i64 %t5, i64 %t9)
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
-  %t12 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t12, i64 %t11)
-  %t13 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t12, i64 %t13)
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
-  %t15 = ptrtoint i8* %t14 to i64
-  call i64 @__sb_append(i64 %t12, i64 %t15)
-  %t16 = call i64 @__sb_to_string(i64 %t12)
-  ret i64 %t16
-ets.v4:
-  %t17 = getelementptr [10 x i8], [10 x i8]* @.str.4, i64 0, i64 0
-  %t18 = ptrtoint i8* %t17 to i64
-  %t19 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t19, i64 %t18)
-  %t20 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t19, i64 %t20)
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.5, i64 0, i64 0
+  call i64 @__sb_append(i64 %t5, i64 %t11)
+  %t12 = call i64 @__sb_to_string(i64 %t5)
+  ret i64 %t12
+ets.v3:
+  %t13 = getelementptr [9 x i8], [9 x i8]* @.str.2, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t15, i64 %t14)
+  %t16 = inttoptr i64 %self to [2 x i64]*
+  %t17 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 1
+  %t18 = load i64, i64* %t17
+  %t19 = inttoptr i64 %t18 to i8*
+  %t20 = ptrtoint i8* %t19 to i64
+  call i64 @__sb_append(i64 %t15, i64 %t20)
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
-  call i64 @__sb_append(i64 %t19, i64 %t22)
-  %t23 = call i64 @__sb_to_string(i64 %t19)
+  call i64 @__sb_append(i64 %t15, i64 %t22)
+  %t23 = call i64 @__sb_to_string(i64 %t15)
   ret i64 %t23
-ets.v5:
-  %t24 = getelementptr [7 x i8], [7 x i8]* @.str.6, i64 0, i64 0
+ets.v4:
+  %t24 = getelementptr [10 x i8], [10 x i8]* @.str.4, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
-  ret i64 %t25
-ets.v6:
-  %t26 = getelementptr [8 x i8], [8 x i8]* @.str.7, i64 0, i64 0
-  %t27 = ptrtoint i8* %t26 to i64
-  ret i64 %t27
-ets.v7:
-  %t28 = getelementptr [6 x i8], [6 x i8]* @.str.8, i64 0, i64 0
-  %t29 = ptrtoint i8* %t28 to i64
-  ret i64 %t29
-ets.v8:
-  %t30 = getelementptr [9 x i8], [9 x i8]* @.str.9, i64 0, i64 0
+  %t26 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t26, i64 %t25)
+  %t27 = inttoptr i64 %self to [2 x i64]*
+  %t28 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 1
+  %t29 = load i64, i64* %t28
+  %t30 = inttoptr i64 %t29 to i8*
   %t31 = ptrtoint i8* %t30 to i64
-  %t32 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t32, i64 %t31)
-  %t33 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t32, i64 %t33)
-  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.10, i64 0, i64 0
-  %t35 = ptrtoint i8* %t34 to i64
-  call i64 @__sb_append(i64 %t32, i64 %t35)
-  %t36 = call i64 @__sb_to_string(i64 %t32)
+  call i64 @__sb_append(i64 %t26, i64 %t31)
+  %t32 = getelementptr [2 x i8], [2 x i8]* @.str.5, i64 0, i64 0
+  %t33 = ptrtoint i8* %t32 to i64
+  call i64 @__sb_append(i64 %t26, i64 %t33)
+  %t34 = call i64 @__sb_to_string(i64 %t26)
+  ret i64 %t34
+ets.v5:
+  %t35 = getelementptr [7 x i8], [7 x i8]* @.str.6, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
   ret i64 %t36
-ets.v9:
-  %t37 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
+ets.v6:
+  %t37 = getelementptr [8 x i8], [8 x i8]* @.str.7, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
   ret i64 %t38
-ets.v10:
-  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.12, i64 0, i64 0
+ets.v7:
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.8, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   ret i64 %t40
-ets.v11:
-  %t41 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
+ets.v8:
+  %t41 = getelementptr [9 x i8], [9 x i8]* @.str.9, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
-  ret i64 %t42
-ets.v12:
-  %t43 = getelementptr [9 x i8], [9 x i8]* @.str.14, i64 0, i64 0
-  %t44 = ptrtoint i8* %t43 to i64
-  ret i64 %t44
-ets.v13:
-  %t45 = getelementptr [5 x i8], [5 x i8]* @.str.15, i64 0, i64 0
-  %t46 = ptrtoint i8* %t45 to i64
-  ret i64 %t46
-ets.v14:
-  %t47 = getelementptr [7 x i8], [7 x i8]* @.str.16, i64 0, i64 0
+  %t43 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t43, i64 %t42)
+  %t44 = inttoptr i64 %self to [2 x i64]*
+  %t45 = getelementptr [2 x i64], [2 x i64]* %t44, i64 0, i64 1
+  %t46 = load i64, i64* %t45
+  %t47 = inttoptr i64 %t46 to i8*
   %t48 = ptrtoint i8* %t47 to i64
-  ret i64 %t48
-ets.v15:
-  %t49 = getelementptr [8 x i8], [8 x i8]* @.str.17, i64 0, i64 0
+  call i64 @__sb_append(i64 %t43, i64 %t48)
+  %t49 = getelementptr [2 x i8], [2 x i8]* @.str.10, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
-  ret i64 %t50
+  call i64 @__sb_append(i64 %t43, i64 %t50)
+  %t51 = call i64 @__sb_to_string(i64 %t43)
+  ret i64 %t51
+ets.v9:
+  %t52 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  ret i64 %t53
+ets.v10:
+  %t54 = getelementptr [6 x i8], [6 x i8]* @.str.12, i64 0, i64 0
+  %t55 = ptrtoint i8* %t54 to i64
+  ret i64 %t55
+ets.v11:
+  %t56 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  ret i64 %t57
+ets.v12:
+  %t58 = getelementptr [9 x i8], [9 x i8]* @.str.14, i64 0, i64 0
+  %t59 = ptrtoint i8* %t58 to i64
+  ret i64 %t59
+ets.v13:
+  %t60 = getelementptr [5 x i8], [5 x i8]* @.str.15, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  ret i64 %t61
+ets.v14:
+  %t62 = getelementptr [7 x i8], [7 x i8]* @.str.16, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  ret i64 %t63
+ets.v15:
+  %t64 = getelementptr [8 x i8], [8 x i8]* @.str.17, i64 0, i64 0
+  %t65 = ptrtoint i8* %t64 to i64
+  ret i64 %t65
 ets.v16:
-  %t51 = getelementptr [6 x i8], [6 x i8]* @.str.18, i64 0, i64 0
-  %t52 = ptrtoint i8* %t51 to i64
-  ret i64 %t52
+  %t66 = getelementptr [6 x i8], [6 x i8]* @.str.18, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i64
+  ret i64 %t67
 ets.v17:
-  %t53 = getelementptr [5 x i8], [5 x i8]* @.str.19, i64 0, i64 0
-  %t54 = ptrtoint i8* %t53 to i64
-  ret i64 %t54
+  %t68 = getelementptr [5 x i8], [5 x i8]* @.str.19, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i64
+  ret i64 %t69
 ets.v18:
-  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.20, i64 0, i64 0
-  %t56 = ptrtoint i8* %t55 to i64
-  ret i64 %t56
+  %t70 = getelementptr [9 x i8], [9 x i8]* @.str.20, i64 0, i64 0
+  %t71 = ptrtoint i8* %t70 to i64
+  ret i64 %t71
 ets.v19:
-  %t57 = getelementptr [5 x i8], [5 x i8]* @.str.21, i64 0, i64 0
-  %t58 = ptrtoint i8* %t57 to i64
-  ret i64 %t58
+  %t72 = getelementptr [5 x i8], [5 x i8]* @.str.21, i64 0, i64 0
+  %t73 = ptrtoint i8* %t72 to i64
+  ret i64 %t73
 ets.v20:
-  %t59 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
-  %t60 = ptrtoint i8* %t59 to i64
-  ret i64 %t60
+  %t74 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  ret i64 %t75
 ets.v21:
-  %t61 = getelementptr [8 x i8], [8 x i8]* @.str.23, i64 0, i64 0
-  %t62 = ptrtoint i8* %t61 to i64
-  ret i64 %t62
+  %t76 = getelementptr [8 x i8], [8 x i8]* @.str.23, i64 0, i64 0
+  %t77 = ptrtoint i8* %t76 to i64
+  ret i64 %t77
 ets.v22:
-  %t63 = getelementptr [8 x i8], [8 x i8]* @.str.24, i64 0, i64 0
-  %t64 = ptrtoint i8* %t63 to i64
-  ret i64 %t64
+  %t78 = getelementptr [8 x i8], [8 x i8]* @.str.24, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  ret i64 %t79
 ets.v23:
-  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.25, i64 0, i64 0
-  %t66 = ptrtoint i8* %t65 to i64
-  ret i64 %t66
+  %t80 = getelementptr [7 x i8], [7 x i8]* @.str.25, i64 0, i64 0
+  %t81 = ptrtoint i8* %t80 to i64
+  ret i64 %t81
 ets.v24:
-  %t67 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
-  %t68 = ptrtoint i8* %t67 to i64
-  ret i64 %t68
+  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
+  %t83 = ptrtoint i8* %t82 to i64
+  ret i64 %t83
 ets.v25:
-  %t69 = getelementptr [5 x i8], [5 x i8]* @.str.27, i64 0, i64 0
-  %t70 = ptrtoint i8* %t69 to i64
-  ret i64 %t70
+  %t84 = getelementptr [5 x i8], [5 x i8]* @.str.27, i64 0, i64 0
+  %t85 = ptrtoint i8* %t84 to i64
+  ret i64 %t85
 ets.v26:
-  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.28, i64 0, i64 0
-  %t72 = ptrtoint i8* %t71 to i64
-  ret i64 %t72
+  %t86 = getelementptr [6 x i8], [6 x i8]* @.str.28, i64 0, i64 0
+  %t87 = ptrtoint i8* %t86 to i64
+  ret i64 %t87
 ets.v27:
-  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.29, i64 0, i64 0
-  %t74 = ptrtoint i8* %t73 to i64
-  ret i64 %t74
+  %t88 = getelementptr [8 x i8], [8 x i8]* @.str.29, i64 0, i64 0
+  %t89 = ptrtoint i8* %t88 to i64
+  ret i64 %t89
 ets.v28:
-  %t75 = getelementptr [8 x i8], [8 x i8]* @.str.30, i64 0, i64 0
-  %t76 = ptrtoint i8* %t75 to i64
-  ret i64 %t76
+  %t90 = getelementptr [8 x i8], [8 x i8]* @.str.30, i64 0, i64 0
+  %t91 = ptrtoint i8* %t90 to i64
+  ret i64 %t91
 ets.v29:
-  %t77 = getelementptr [10 x i8], [10 x i8]* @.str.31, i64 0, i64 0
-  %t78 = ptrtoint i8* %t77 to i64
-  ret i64 %t78
+  %t92 = getelementptr [10 x i8], [10 x i8]* @.str.31, i64 0, i64 0
+  %t93 = ptrtoint i8* %t92 to i64
+  ret i64 %t93
 ets.v30:
-  %t79 = getelementptr [5 x i8], [5 x i8]* @.str.32, i64 0, i64 0
-  %t80 = ptrtoint i8* %t79 to i64
-  ret i64 %t80
+  %t94 = getelementptr [5 x i8], [5 x i8]* @.str.32, i64 0, i64 0
+  %t95 = ptrtoint i8* %t94 to i64
+  ret i64 %t95
 ets.v31:
-  %t81 = getelementptr [8 x i8], [8 x i8]* @.str.33, i64 0, i64 0
-  %t82 = ptrtoint i8* %t81 to i64
-  ret i64 %t82
+  %t96 = getelementptr [8 x i8], [8 x i8]* @.str.33, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  ret i64 %t97
 ets.v32:
-  %t83 = getelementptr [7 x i8], [7 x i8]* @.str.34, i64 0, i64 0
-  %t84 = ptrtoint i8* %t83 to i64
-  ret i64 %t84
+  %t98 = getelementptr [7 x i8], [7 x i8]* @.str.34, i64 0, i64 0
+  %t99 = ptrtoint i8* %t98 to i64
+  ret i64 %t99
 ets.v33:
-  %t85 = getelementptr [8 x i8], [8 x i8]* @.str.35, i64 0, i64 0
-  %t86 = ptrtoint i8* %t85 to i64
-  ret i64 %t86
+  %t100 = getelementptr [8 x i8], [8 x i8]* @.str.35, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  ret i64 %t101
 ets.v34:
-  %t87 = getelementptr [7 x i8], [7 x i8]* @.str.36, i64 0, i64 0
-  %t88 = ptrtoint i8* %t87 to i64
-  ret i64 %t88
+  %t102 = getelementptr [7 x i8], [7 x i8]* @.str.36, i64 0, i64 0
+  %t103 = ptrtoint i8* %t102 to i64
+  ret i64 %t103
 ets.v35:
-  %t89 = getelementptr [8 x i8], [8 x i8]* @.str.37, i64 0, i64 0
-  %t90 = ptrtoint i8* %t89 to i64
-  ret i64 %t90
+  %t104 = getelementptr [8 x i8], [8 x i8]* @.str.37, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  ret i64 %t105
 ets.v36:
-  %t91 = getelementptr [10 x i8], [10 x i8]* @.str.38, i64 0, i64 0
-  %t92 = ptrtoint i8* %t91 to i64
-  ret i64 %t92
+  %t106 = getelementptr [10 x i8], [10 x i8]* @.str.38, i64 0, i64 0
+  %t107 = ptrtoint i8* %t106 to i64
+  ret i64 %t107
 ets.v37:
-  %t93 = getelementptr [12 x i8], [12 x i8]* @.str.39, i64 0, i64 0
-  %t94 = ptrtoint i8* %t93 to i64
-  ret i64 %t94
+  %t108 = getelementptr [12 x i8], [12 x i8]* @.str.39, i64 0, i64 0
+  %t109 = ptrtoint i8* %t108 to i64
+  ret i64 %t109
 ets.v38:
-  %t95 = getelementptr [7 x i8], [7 x i8]* @.str.40, i64 0, i64 0
-  %t96 = ptrtoint i8* %t95 to i64
-  ret i64 %t96
+  %t110 = getelementptr [7 x i8], [7 x i8]* @.str.40, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  ret i64 %t111
 ets.v39:
-  %t97 = getelementptr [8 x i8], [8 x i8]* @.str.41, i64 0, i64 0
-  %t98 = ptrtoint i8* %t97 to i64
-  ret i64 %t98
+  %t112 = getelementptr [8 x i8], [8 x i8]* @.str.41, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  ret i64 %t113
 ets.v40:
-  %t99 = getelementptr [8 x i8], [8 x i8]* @.str.42, i64 0, i64 0
-  %t100 = ptrtoint i8* %t99 to i64
-  ret i64 %t100
+  %t114 = getelementptr [8 x i8], [8 x i8]* @.str.42, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  ret i64 %t115
 ets.v41:
-  %t101 = getelementptr [12 x i8], [12 x i8]* @.str.43, i64 0, i64 0
-  %t102 = ptrtoint i8* %t101 to i64
-  ret i64 %t102
+  %t116 = getelementptr [12 x i8], [12 x i8]* @.str.43, i64 0, i64 0
+  %t117 = ptrtoint i8* %t116 to i64
+  ret i64 %t117
 ets.v42:
-  %t103 = getelementptr [13 x i8], [13 x i8]* @.str.44, i64 0, i64 0
-  %t104 = ptrtoint i8* %t103 to i64
-  ret i64 %t104
+  %t118 = getelementptr [13 x i8], [13 x i8]* @.str.44, i64 0, i64 0
+  %t119 = ptrtoint i8* %t118 to i64
+  ret i64 %t119
 ets.v43:
-  %t105 = getelementptr [7 x i8], [7 x i8]* @.str.45, i64 0, i64 0
-  %t106 = ptrtoint i8* %t105 to i64
-  ret i64 %t106
+  %t120 = getelementptr [7 x i8], [7 x i8]* @.str.45, i64 0, i64 0
+  %t121 = ptrtoint i8* %t120 to i64
+  ret i64 %t121
 ets.v44:
-  %t107 = getelementptr [9 x i8], [9 x i8]* @.str.46, i64 0, i64 0
-  %t108 = ptrtoint i8* %t107 to i64
-  ret i64 %t108
+  %t122 = getelementptr [9 x i8], [9 x i8]* @.str.46, i64 0, i64 0
+  %t123 = ptrtoint i8* %t122 to i64
+  ret i64 %t123
 ets.v45:
-  %t109 = getelementptr [5 x i8], [5 x i8]* @.str.47, i64 0, i64 0
-  %t110 = ptrtoint i8* %t109 to i64
-  ret i64 %t110
+  %t124 = getelementptr [5 x i8], [5 x i8]* @.str.47, i64 0, i64 0
+  %t125 = ptrtoint i8* %t124 to i64
+  ret i64 %t125
 ets.v46:
-  %t111 = getelementptr [7 x i8], [7 x i8]* @.str.48, i64 0, i64 0
-  %t112 = ptrtoint i8* %t111 to i64
-  ret i64 %t112
+  %t126 = getelementptr [7 x i8], [7 x i8]* @.str.48, i64 0, i64 0
+  %t127 = ptrtoint i8* %t126 to i64
+  ret i64 %t127
 ets.v47:
-  %t113 = getelementptr [5 x i8], [5 x i8]* @.str.49, i64 0, i64 0
-  %t114 = ptrtoint i8* %t113 to i64
-  ret i64 %t114
+  %t128 = getelementptr [5 x i8], [5 x i8]* @.str.49, i64 0, i64 0
+  %t129 = ptrtoint i8* %t128 to i64
+  ret i64 %t129
 ets.v48:
-  %t115 = getelementptr [7 x i8], [7 x i8]* @.str.50, i64 0, i64 0
-  %t116 = ptrtoint i8* %t115 to i64
-  ret i64 %t116
+  %t130 = getelementptr [7 x i8], [7 x i8]* @.str.50, i64 0, i64 0
+  %t131 = ptrtoint i8* %t130 to i64
+  ret i64 %t131
 ets.v49:
-  %t117 = getelementptr [5 x i8], [5 x i8]* @.str.51, i64 0, i64 0
-  %t118 = ptrtoint i8* %t117 to i64
-  ret i64 %t118
+  %t132 = getelementptr [5 x i8], [5 x i8]* @.str.51, i64 0, i64 0
+  %t133 = ptrtoint i8* %t132 to i64
+  ret i64 %t133
 ets.v50:
-  %t119 = getelementptr [7 x i8], [7 x i8]* @.str.52, i64 0, i64 0
-  %t120 = ptrtoint i8* %t119 to i64
-  ret i64 %t120
+  %t134 = getelementptr [7 x i8], [7 x i8]* @.str.52, i64 0, i64 0
+  %t135 = ptrtoint i8* %t134 to i64
+  ret i64 %t135
 ets.v51:
-  %t121 = getelementptr [9 x i8], [9 x i8]* @.str.53, i64 0, i64 0
-  %t122 = ptrtoint i8* %t121 to i64
-  ret i64 %t122
+  %t136 = getelementptr [9 x i8], [9 x i8]* @.str.53, i64 0, i64 0
+  %t137 = ptrtoint i8* %t136 to i64
+  ret i64 %t137
 ets.v52:
-  %t123 = getelementptr [9 x i8], [9 x i8]* @.str.54, i64 0, i64 0
-  %t124 = ptrtoint i8* %t123 to i64
-  ret i64 %t124
+  %t138 = getelementptr [9 x i8], [9 x i8]* @.str.54, i64 0, i64 0
+  %t139 = ptrtoint i8* %t138 to i64
+  ret i64 %t139
 ets.v53:
-  %t125 = getelementptr [9 x i8], [9 x i8]* @.str.55, i64 0, i64 0
-  %t126 = ptrtoint i8* %t125 to i64
-  ret i64 %t126
+  %t140 = getelementptr [9 x i8], [9 x i8]* @.str.55, i64 0, i64 0
+  %t141 = ptrtoint i8* %t140 to i64
+  ret i64 %t141
 ets.v54:
-  %t127 = getelementptr [9 x i8], [9 x i8]* @.str.56, i64 0, i64 0
-  %t128 = ptrtoint i8* %t127 to i64
-  ret i64 %t128
+  %t142 = getelementptr [9 x i8], [9 x i8]* @.str.56, i64 0, i64 0
+  %t143 = ptrtoint i8* %t142 to i64
+  ret i64 %t143
 ets.v55:
-  %t129 = getelementptr [11 x i8], [11 x i8]* @.str.57, i64 0, i64 0
-  %t130 = ptrtoint i8* %t129 to i64
-  ret i64 %t130
+  %t144 = getelementptr [11 x i8], [11 x i8]* @.str.57, i64 0, i64 0
+  %t145 = ptrtoint i8* %t144 to i64
+  ret i64 %t145
 ets.v56:
-  %t131 = getelementptr [11 x i8], [11 x i8]* @.str.58, i64 0, i64 0
-  %t132 = ptrtoint i8* %t131 to i64
-  ret i64 %t132
+  %t146 = getelementptr [11 x i8], [11 x i8]* @.str.58, i64 0, i64 0
+  %t147 = ptrtoint i8* %t146 to i64
+  ret i64 %t147
 ets.v57:
-  %t133 = getelementptr [8 x i8], [8 x i8]* @.str.59, i64 0, i64 0
-  %t134 = ptrtoint i8* %t133 to i64
-  ret i64 %t134
+  %t148 = getelementptr [8 x i8], [8 x i8]* @.str.59, i64 0, i64 0
+  %t149 = ptrtoint i8* %t148 to i64
+  ret i64 %t149
 ets.v58:
-  %t135 = getelementptr [6 x i8], [6 x i8]* @.str.60, i64 0, i64 0
-  %t136 = ptrtoint i8* %t135 to i64
-  ret i64 %t136
+  %t150 = getelementptr [6 x i8], [6 x i8]* @.str.60, i64 0, i64 0
+  %t151 = ptrtoint i8* %t150 to i64
+  ret i64 %t151
 ets.v59:
-  %t137 = getelementptr [8 x i8], [8 x i8]* @.str.61, i64 0, i64 0
-  %t138 = ptrtoint i8* %t137 to i64
-  ret i64 %t138
-ets.v60:
-  %t139 = getelementptr [12 x i8], [12 x i8]* @.str.62, i64 0, i64 0
-  %t140 = ptrtoint i8* %t139 to i64
-  ret i64 %t140
-ets.v61:
-  %t141 = getelementptr [8 x i8], [8 x i8]* @.str.63, i64 0, i64 0
-  %t142 = ptrtoint i8* %t141 to i64
-  ret i64 %t142
-ets.v62:
-  %t143 = getelementptr [11 x i8], [11 x i8]* @.str.64, i64 0, i64 0
-  %t144 = ptrtoint i8* %t143 to i64
-  ret i64 %t144
-ets.v63:
-  %t145 = getelementptr [11 x i8], [11 x i8]* @.str.65, i64 0, i64 0
-  %t146 = ptrtoint i8* %t145 to i64
-  ret i64 %t146
-ets.v64:
-  %t147 = getelementptr [14 x i8], [14 x i8]* @.str.66, i64 0, i64 0
-  %t148 = ptrtoint i8* %t147 to i64
-  %t149 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t149, i64 %t148)
-  %t150 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t149, i64 %t150)
-  %t151 = getelementptr [2 x i8], [2 x i8]* @.str.67, i64 0, i64 0
-  %t152 = ptrtoint i8* %t151 to i64
-  call i64 @__sb_append(i64 %t149, i64 %t152)
-  %t153 = call i64 @__sb_to_string(i64 %t149)
+  %t152 = getelementptr [8 x i8], [8 x i8]* @.str.61, i64 0, i64 0
+  %t153 = ptrtoint i8* %t152 to i64
   ret i64 %t153
-ets.v65:
-  %t154 = getelementptr [13 x i8], [13 x i8]* @.str.68, i64 0, i64 0
+ets.v60:
+  %t154 = getelementptr [12 x i8], [12 x i8]* @.str.62, i64 0, i64 0
   %t155 = ptrtoint i8* %t154 to i64
-  %t156 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t156, i64 %t155)
-  %t157 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t156, i64 %t157)
-  %t158 = getelementptr [2 x i8], [2 x i8]* @.str.69, i64 0, i64 0
+  ret i64 %t155
+ets.v61:
+  %t156 = getelementptr [8 x i8], [8 x i8]* @.str.63, i64 0, i64 0
+  %t157 = ptrtoint i8* %t156 to i64
+  ret i64 %t157
+ets.v62:
+  %t158 = getelementptr [11 x i8], [11 x i8]* @.str.64, i64 0, i64 0
   %t159 = ptrtoint i8* %t158 to i64
-  call i64 @__sb_append(i64 %t156, i64 %t159)
-  %t160 = call i64 @__sb_to_string(i64 %t156)
-  ret i64 %t160
+  ret i64 %t159
+ets.v63:
+  %t160 = getelementptr [11 x i8], [11 x i8]* @.str.65, i64 0, i64 0
+  %t161 = ptrtoint i8* %t160 to i64
+  ret i64 %t161
+ets.v64:
+  %t162 = getelementptr [14 x i8], [14 x i8]* @.str.66, i64 0, i64 0
+  %t163 = ptrtoint i8* %t162 to i64
+  %t164 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t164, i64 %t163)
+  %t165 = inttoptr i64 %self to [2 x i64]*
+  %t166 = getelementptr [2 x i64], [2 x i64]* %t165, i64 0, i64 1
+  %t167 = load i64, i64* %t166
+  %t168 = inttoptr i64 %t167 to i8*
+  %t169 = ptrtoint i8* %t168 to i64
+  call i64 @__sb_append(i64 %t164, i64 %t169)
+  %t170 = getelementptr [2 x i8], [2 x i8]* @.str.67, i64 0, i64 0
+  %t171 = ptrtoint i8* %t170 to i64
+  call i64 @__sb_append(i64 %t164, i64 %t171)
+  %t172 = call i64 @__sb_to_string(i64 %t164)
+  ret i64 %t172
+ets.v65:
+  %t173 = getelementptr [13 x i8], [13 x i8]* @.str.68, i64 0, i64 0
+  %t174 = ptrtoint i8* %t173 to i64
+  %t175 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t175, i64 %t174)
+  %t176 = inttoptr i64 %self to [2 x i64]*
+  %t177 = getelementptr [2 x i64], [2 x i64]* %t176, i64 0, i64 1
+  %t178 = load i64, i64* %t177
+  %t179 = inttoptr i64 %t178 to i8*
+  %t180 = ptrtoint i8* %t179 to i64
+  call i64 @__sb_append(i64 %t175, i64 %t180)
+  %t181 = getelementptr [2 x i8], [2 x i8]* @.str.69, i64 0, i64 0
+  %t182 = ptrtoint i8* %t181 to i64
+  call i64 @__sb_append(i64 %t175, i64 %t182)
+  %t183 = call i64 @__sb_to_string(i64 %t175)
+  ret i64 %t183
 ets.v66:
-  %t161 = getelementptr [10 x i8], [10 x i8]* @.str.70, i64 0, i64 0
-  %t162 = ptrtoint i8* %t161 to i64
-  ret i64 %t162
+  %t184 = getelementptr [10 x i8], [10 x i8]* @.str.70, i64 0, i64 0
+  %t185 = ptrtoint i8* %t184 to i64
+  ret i64 %t185
 ets.v67:
-  %t163 = getelementptr [6 x i8], [6 x i8]* @.str.71, i64 0, i64 0
-  %t164 = ptrtoint i8* %t163 to i64
-  ret i64 %t164
+  %t186 = getelementptr [6 x i8], [6 x i8]* @.str.71, i64 0, i64 0
+  %t187 = ptrtoint i8* %t186 to i64
+  ret i64 %t187
 ets.end1:
-  %t165 = getelementptr [8 x i8], [8 x i8]* @.str.72, i64 0, i64 0
-  %t166 = ptrtoint i8* %t165 to i64
-  ret i64 %t166
+  %t188 = getelementptr [8 x i8], [8 x i8]* @.str.72, i64 0, i64 0
+  %t189 = ptrtoint i8* %t188 to i64
+  ret i64 %t189
 }
 
 define linkonce_odr i64 @Token(i64 %f0, i64 %f1, i64 %f2, i64 %f3, i64 %f4) {
@@ -776,7 +829,7 @@ ets.v69:
   %t6 = inttoptr i64 %self to [6 x i64]*
   %t7 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 1
   %t8 = load i64, i64* %t7
-  %t9 = call i64 @__int_to_string(i64 %t8)
+  %t9 = call i64 @TokenKind__to_string(i64 %t8)
   call i64 @__sb_append(i64 %t5, i64 %t9)
   %t10 = getelementptr [3 x i8], [3 x i8]* @.str.74, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
@@ -784,7 +837,7 @@ ets.v69:
   %t12 = inttoptr i64 %self to [6 x i64]*
   %t13 = getelementptr [6 x i64], [6 x i64]* %t12, i64 0, i64 2
   %t14 = load i64, i64* %t13
-  %t15 = call i64 @__int_to_string(i64 %t14)
+  %t15 = call i64 @__float_to_string(i64 %t14)
   call i64 @__sb_append(i64 %t5, i64 %t15)
   %t16 = getelementptr [3 x i8], [3 x i8]* @.str.75, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
@@ -792,7 +845,7 @@ ets.v69:
   %t18 = inttoptr i64 %self to [6 x i64]*
   %t19 = getelementptr [6 x i64], [6 x i64]* %t18, i64 0, i64 3
   %t20 = load i64, i64* %t19
-  %t21 = call i64 @__int_to_string(i64 %t20)
+  %t21 = call i64 @__float_to_string(i64 %t20)
   call i64 @__sb_append(i64 %t5, i64 %t21)
   %t22 = getelementptr [3 x i8], [3 x i8]* @.str.76, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
@@ -800,7 +853,7 @@ ets.v69:
   %t24 = inttoptr i64 %self to [6 x i64]*
   %t25 = getelementptr [6 x i64], [6 x i64]* %t24, i64 0, i64 4
   %t26 = load i64, i64* %t25
-  %t27 = call i64 @__int_to_string(i64 %t26)
+  %t27 = call i64 @__float_to_string(i64 %t26)
   call i64 @__sb_append(i64 %t5, i64 %t27)
   %t28 = getelementptr [3 x i8], [3 x i8]* @.str.77, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
@@ -808,7 +861,7 @@ ets.v69:
   %t30 = inttoptr i64 %self to [6 x i64]*
   %t31 = getelementptr [6 x i64], [6 x i64]* %t30, i64 0, i64 5
   %t32 = load i64, i64* %t31
-  %t33 = call i64 @__int_to_string(i64 %t32)
+  %t33 = call i64 @__float_to_string(i64 %t32)
   call i64 @__sb_append(i64 %t5, i64 %t33)
   %t34 = getelementptr [2 x i8], [2 x i8]* @.str.78, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64

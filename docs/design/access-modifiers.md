@@ -327,8 +327,14 @@ Verified: failure name sets byte-identical, 26 = 26, 171 passed on both sides, b
 
 Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.** The parser writes `"public"` at every site for now; there is no syntax yet.
 
-> ### ⟵ PROMOTION POINT
-> After Phase 3, run the full ceremony:
+> ### ⟵ PROMOTION POINT — ✅ CROSSED (`332aafb`, 2026-08-02)
+> The checked-in gen2 can now read all six widened declaration nodes, which is what makes Phases 3 and 3b landed rather than merely merged. Every criterion was checked rather than assumed: both bootstrap stages with stage 2 confirmed *present in the log* (not inferred from exit 0), `hello_bootstrap.sf`, the #100 class-plus-import check, and a full suite whose failure **name set** is byte-identical to the pre-promotion baseline at `f7f9569` — 171 passed, 26 failed, 14 skipped.
+>
+> Recovery path, recorded because this binary is the sole root of trust and cannot be regenerated: the previous gen2 is blob `ab69bef8`, reachable as `1226958:build/stage2/saffronc`.
+>
+> Everything from Phase 4 on is now unblocked. Compiler source still uses no modifier — that is Phase 7 and stays deferred.
+>
+> The ceremony that was run:
 > ```
 > ./bootstrap.sh                              # both stages, no SKIP_GEN4
 > tools/saffron run test/hello_bootstrap.sf
@@ -364,10 +370,10 @@ Phase 3b  ClassDecl.parents: List<String> DONE  merged dc42fbc   ─┘ 3 worktr
                     │
 Phase 3   widen declaration nodes for visibility  DONE  merged 85f410b
                     │
-            ⟵ GEN2 PROMOTION ⟶   (covers 3b and 3 together)  ← the gate, open
-                    │                                          decision, not yet taken
+            ⟵ GEN2 PROMOTION ⟶   DONE  332aafb  (covered 3b and 3 together)
+                    │
 Phase 4   parser + class-member enforcement + leak pass (public/private)
-          ← in progress; buildable pre-promotion, NOT landable
+          ← in progress, and now landable
 Phase 5   package-level enforcement (internal)   ← needs 2b
 Phase 5b  protected                              ← needs 3b
 Phase 6   annotate the stdlib
@@ -375,9 +381,16 @@ Phase 6   annotate the stdlib
 
 **What can be parallelised, and what cannot.** Phases 2, 2b and 3b were genuinely independent — different files, no shared tables — and were run concurrently in three worktrees, then merged with one hand-resolved hunk (the `ClassDecl` arm of `check_stmt`, where Phase 2's prefix-keyed sets and Phase 3b's list-valued parents are complementary and had to be *combined*, not chosen between). Failure name sets went 32 → 30 with zero regressions.
 
-Everything from Phase 3 onward is **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase can start before it. Parallelising across the gate would produce two incompatible gen2 candidates; do not attempt it. Phase 3 additionally cannot be parallelised *with* anything that writes match arms on these nodes — an agent editing a `FunDecl(` arm while Phase 3 changes its arity is #96's exact mechanism.
+Phase 3 was **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase could start before it. Parallelising across the gate would have produced two incompatible gen2 candidates. Phase 3 additionally could not be parallelised *with* anything that writes match arms on these nodes — an agent editing a `FunDecl(` arm while Phase 3 changes its arity is #96's exact mechanism.
 
-Since 3b and 3 both widen declaration nodes and 3b stopped at the gate, **one promotion covers both.** Promoting after 3b alone would spend the ceremony twice for no benefit.
+Since 3b and 3 both widened declaration nodes and 3b stopped at the gate, **one promotion covered both.** Promoting after 3b alone would have spent the ceremony twice for no benefit.
+
+**With the gate crossed (`332aafb`), the serialisation is lifted.** Phases 4, 5, 5b and 6 need no further promotion — none of them widens a declaration node, and none puts a modifier in compiler source (that is Phase 7, deferred). So they can run concurrently, subject to two real couplings rather than the gate:
+
+- **5b (`protected`) reads what 4 writes.** Both touch the same class-member access check. Runnable in parallel, but expect the hand-resolved hunk to be exactly there, and expect it to need *combining* — that has now been the shape of the one conflict in three successive phase merges.
+- **6 (annotate the stdlib) is the proving ground for 4 and 5, so it cannot precede them meaningfully.** Annotating before enforcement exists means annotations nothing checks, which is the same "did the check run or find nothing?" ambiguity that kept Phase 1's leak pass from landing early. Start 6 only once 4 and 5 enforce.
+
+One caveat that outlives the gate: a phase that *does* end up widening a declaration node re-opens a promotion of its own. Nothing in 4, 5, 5b or 6 is expected to, but if one finds it needs to, that is a stop-and-report, not a judgement call to make mid-phase.
 
 ## 8. Test plan
 
