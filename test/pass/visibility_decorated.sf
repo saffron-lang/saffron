@@ -1,0 +1,17 @@
+// A modifier on a DECORATED declaration, in both accepted orders.
+//
+// The point of the pass side is that annotating a declaration must not change
+// what it does when reached legally. `measure` calls both private externs from
+// inside their own file and gets real answers back; `_abs_internal` is reached
+// from here, a different file in the same (root) package, which is exactly the
+// extent `internal` grants.
+//
+// The fail-side counterpart is test/fail/visibility_decorated_private.sf, which
+// reaches for `_abs_before` from outside. Without it, a modifier that parsed but
+// enforced nothing would pass this file unchanged.
+import "@test" as T
+import "../support/visibility_decorated.sf" as Decorated
+
+T.assert_eq(Decorated.measure(-3), 6, "both private externs work inside their own module")
+T.assert_eq(Decorated._abs_internal(-9), 9, "an internal extern is reachable from the same package")
+T.summary()

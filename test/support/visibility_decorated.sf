@@ -1,0 +1,38 @@
+// Support module for the decorated-declaration visibility tests.
+//
+// Every declaration here carries a decorator AND a modifier, in both of the two
+// orders the parser accepts. Before Phase 6 neither order worked: `@` is lexed as
+// an identifier and was missing from at_visibility_modifier's declaration
+// lookahead, so `private @extern(...) fun` parsed the modifier as an expression
+// statement and failed in codegen with "undefined variable 'private'"; and the
+// decorator branch passed a hardcoded "public" to parse_fun_decl_with_doc, so
+// `@extern(...) private fun` did not even reach a modifier check.
+//
+// That mattered out of proportion to its size: 142 of the stdlib's 292 top-level
+// underscore functions are @extern, so more than half the surface Phase 6 exists
+// to annotate was unannotatable.
+//
+// `llabs` is the extern on purpose: it takes and returns a plain integer, so
+// these tests answer a visibility question and not a NaN-boxing one. An extern
+// over `String` would have to hand over an untagged pointer, and a failure there
+// would look like a visibility failure.
+
+// Modifier before the decorator.
+private @extern("i64 llabs(i64)") fun _abs_before(v: Int): Int
+
+// Decorator before the modifier — Kotlin's own order (annotations, then
+// modifiers), and the one that annotates an existing @extern line by inserting a
+// single word rather than moving the signature.
+@extern("i64 llabs(i64)") private fun _abs_after(v: Int): Int
+
+// `internal` is a package-level restriction, so a same-package caller may reach
+// it. test/ has no pantry.toml of its own and so belongs to the root package —
+// the same one src/lib belongs to.
+@extern("i64 llabs(i64)") internal fun _abs_internal(v: Int): Int
+
+/// A public wrapper, so the tests can prove the private externs still WORK when
+/// reached legally. A modifier that broke the call would otherwise be
+/// indistinguishable from a modifier that correctly hid it.
+fun measure(v: Int): Int {
+    return _abs_before(v) + _abs_after(v)
+}

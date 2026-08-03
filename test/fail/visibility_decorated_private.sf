@@ -1,0 +1,14 @@
+// The enforcement half of the decorated-declaration fix: a `private` on an
+// @extern declaration must actually restrict it, not merely parse.
+//
+// This is the test that would have caught the shape the fix replaced. The
+// decorator branch of parse_stmt passed a hardcoded "public" to
+// parse_fun_decl_with_doc, so a modifier written before the decorator was
+// dropped on the floor — the file compiled clean and exported the name anyway.
+// A parse test alone would have been satisfied by that.
+//
+// `_abs_after` uses the annotation-then-modifier order; test/pass/
+// visibility_decorated.sf covers the other order working legally.
+import "../support/visibility_decorated.sf" as Decorated
+
+IO.println(Decorated._abs_after(-1))

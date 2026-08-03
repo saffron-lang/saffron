@@ -195,8 +195,17 @@ class Parser {
             and word != "internal" and word != "protected") { return false }
         if (this.peek_is("var") or this.peek_is("let") or this.peek_is("fun")
             or this.peek_is("enum") or this.peek_is("class")) { return true }
+        // `@` and `extend` introduce declarations too, and both are lexed as
+        // identifiers rather than keywords, so they have to be named here. Their
+        // absence was not a missing nicety: at_visibility_modifier answering
+        // false makes the modifier parse as an *expression statement* naming a
+        // variable, which is why `private @extern(...) fun _f()` reported
+        // "undefined variable 'private'" from codegen instead of a parse error.
+        // 142 of the stdlib's 292 top-level underscore functions are @extern, so
+        // this one line is what makes most of the stdlib annotatable at all.
         var nxt: String = this.peek_ident_next()
         return nxt == "interface" or nxt == "actor" or nxt == "type"
+            or nxt == "@" or nxt == "extend"
     }
 
     /// Consume a visibility modifier and answer the visibility string it means.
@@ -1678,7 +1687,7 @@ class Parser {
             if (this.match_kind_check("{")) {
                 ext_body = this.parse_block_stmts()
             }
-            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class, "public")
+            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class, visibility)
         }
 
         // Check for decorator: @intrinsic, @extern("..."), or general @name / @name("...")
@@ -1724,10 +1733,30 @@ class Parser {
                     this.consume(")")
                 }
             }
-            if (this.match_kind_check("class")) {
-                return this.parse_class_decl_with_doc(annotation)
+            // A modifier may also follow the decorator, which is the order
+            // Kotlin's style guide uses (annotations, then modifiers) and the
+            // order that leaves the stdlib's 142 `@extern("...") fun _x` lines
+            // annotatable by inserting one word rather than moving the signature.
+            // Both orders are accepted; writing both is not, because the two
+            // would have to agree and the diagnostic for disagreeing is worse
+            // than the diagnostic for saying it twice.
+            if (this.at_visibility_modifier()) {
+                if (visibility != "public") {
+                    this.parse_error("visibility given twice: '" + visibility + "' before the decorator and '" + this.peek_ident() + "' after it")
+                }
+                visibility = this.take_visibility(false)
             }
-            return this.parse_fun_decl_with_doc(annotation)
+
+            // The modifier read at the top of parse_stmt governs the decorated
+            // declaration, so it has to be threaded through rather than left at
+            // the `"public"` these two _with_doc helpers default to. Dropping it
+            // would accept `private @extern(...) fun _f()` and then export _f,
+            // which is the silent-wrong-answer shape the whole feature exists to
+            // avoid.
+            if (this.match_kind_check("class")) {
+                return this.parse_class_decl_vis(annotation, visibility)
+            }
+            return this.parse_fun_decl_vis(annotation, visibility)
         }
 
         if (this.match_kind_check("var")) return this.parse_var_decl_vis(docstring, visibility)
