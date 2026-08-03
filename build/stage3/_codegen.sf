@@ -1782,6 +1782,24 @@ class Codegen {
                             }
                             return mg_local
                         }
+                        // Neither a function nor a global under this module's
+                        // prefix. The alias is *known* to be a module here, so
+                        // "not found" is expressible — and this is the only place
+                        // it is. Falling through instead reached the generic
+                        // receiver path below, which evaluated the bare alias as
+                        // a local and emitted `load i64, i64* %Math` — invalid IR
+                        // blamed on the compiler for what is a typo in the user's
+                        // program (BUGS #118). Same family as #22/#40/#78/#37/
+                        // #103/#113/#114: a resolver with no way to say "not
+                        // found" guesses instead of reporting absence.
+                        //
+                        // This arm is currently unreachable — `gen_arg_value`'s
+                        // parallel copy of this block wins for every spelling
+                        // measured (336 files) — but it is kept correct so it
+                        // reports rather than guesses if it ever goes live.
+                        IO.println("[codegen] Error: no member '" + field + "' in module '" + obj_name + "'")
+                        this.has_errors = true
+                        return "0"
                     }
                 }
                 // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)
@@ -3293,6 +3311,40 @@ class Codegen {
                     }
                     return mg_local
                 }
+                // Neither a function nor a global under this module's prefix.
+                // `mn` is known to be a module alias here, so "not found" is
+                // expressible at this point and nowhere downstream — which is
+                // exactly why the diagnostic belongs here.
+                //
+                // Falling through instead reached the generic receiver fallback
+                // below, which evaluates the *object* — the bare alias `Math` —
+                // as if it were a local, emitting `load i64, i64* %Math` from an
+                // SSA name that was never defined. The compile exited 0 and the
+                // failure surfaced as "the compiler emitted invalid LLVM IR /
+                // this is a compiler bug, not an error in your program" for what
+                // is a plain typo in the user's source (BUGS #118).
+                //
+                // The undefined-variable check at the Variable arm above cannot
+                // catch it: that check deliberately exempts module_prefixes,
+                // because for a *valid* member access the bare alias really is
+                // not a variable. So this is the only honest place to report.
+                //
+                // Eighth instance of one family (#22, #40, #78, #37, #103, #113,
+                // #114): a resolver with no way to express "not found" guesses
+                // instead of reporting absence.
+                //
+                // Measured before making the miss fatal: a probe compiler logged
+                // every arrival here across 336 files (test/, test/pass/,
+                // test/fail/, src/lib/, src/compiler/, examples/, turmeric/,
+                // basil/, bazaar/, parsley/, pantry/). Exactly three arrivals,
+                // and `opt` rejects the IR for all three — no valid spelling
+                // depends on the fall-through. Enum variants, enum/class/actor
+                // constructors, @inline functions, named imports, forward
+                // references and locals shadowing an alias all resolve before
+                // reaching here and were each confirmed unaffected.
+                IO.println("[codegen] Error: no member '" + m_field + "' in module '" + mn + "'")
+                this.has_errors = true
+                return "0"
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
