@@ -1,0 +1,18 @@
+// Same-package access is allowed, and this is the positive counterpart to the
+// visibility_module_* fail tests. This file and the support lib both sit under
+// the repo root's pantry.toml, so they are the same package: `internal` is
+// reachable, and `public` always is.
+//
+// Alias-qualified form (Lib.name) is used deliberately rather than a bare
+// cross-module call: a bare call to a directly-imported .sf file's function
+// lowers to an undefined LLVM symbol (a pre-existing codegen limitation
+// unrelated to visibility), so a pass test — which must LINK and RUN — uses the
+// form that links. The bare and named-import paths are exercised by the fail
+// tests, which stop at the checker before codegen.
+import "../support/visibility_module_lib.sf" as Lib
+import "@test" as T
+
+T.assert_eq(Lib.mod_exported(), 1, "public reachable cross-module")
+T.assert_eq(Lib.mod_packaged(), 3, "internal reachable within same package")
+T.assert_eq(Lib.mod_use_secret(), 12, "public wrapper may call its own module-private helper")
+T.summary()

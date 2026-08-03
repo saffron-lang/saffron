@@ -1,0 +1,10 @@
+// §6a path 1 (named import): a module-private function may not be imported by
+// name into another module. `mod_secret` is `private` in the support lib, so the
+// import binds a name the importing module is not allowed to reference.
+//
+// The compiler stops at the checker error before codegen, so the bare-call
+// linking limitation (a directly-imported .sf's bare name lowers to an undefined
+// symbol) never comes into play here — this file is rejected, not linked.
+import { mod_secret } from "../support/visibility_module_lib.sf"
+
+IO.println(mod_secret())

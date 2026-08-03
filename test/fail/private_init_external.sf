@@ -1,0 +1,22 @@
+// A `private init` may not be called from another module.
+//
+// The user asked for modifiers on constructors specifically, and until this was
+// added `private fun init` was simply ignorable: `Secret(42)` compiled, ran, and
+// printed 42. Construction does not route through the member-access check at all
+// — register_decl registers every class as a function returning its own type, so
+// a construction arrives at infer_call as an ordinary named call and there is no
+// instantiation node to hang a visibility check off. The check therefore lives in
+// infer_call, gated on the name being a declared class so no ordinary call
+// consults the visibility tables.
+//
+// `private init` is MODULE-scoped, not class-scoped, unlike private fields and
+// methods. That is §6a's rule and not an inconsistency: the modifier exists for
+// the factory pattern — `private init` plus a public same-module `fun new()` —
+// and a class-scoped reading would reject the free function the feature exists to
+// enable, leaving the class constructible by nobody. test/support/'s companion
+// module holds the factory, and test/pass/visibility_private_ctor_ok.sf shows
+// that calling it works.
+import "../support/visibility_private_ctor.sf" as GaugeMod
+
+var g: GaugeMod.Gauge = GaugeMod.Gauge(42)
+IO.println(g.get())

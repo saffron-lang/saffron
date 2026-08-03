@@ -143,6 +143,80 @@ class Parser {
         return this.kind_name(kind)
     }
 
+    /// How to name the current token in a diagnostic about an unexpected member.
+    ///
+    /// kind_name answers "ident" for every identifier, which is useless in a
+    /// message the reader has to act on — "unexpected 'ident'" does not say
+    /// which word is wrong. Spell an identifier as itself and fall back to the
+    /// kind name for everything else.
+    fun current_member_desc(): String {
+        var word: String = this.peek_ident()
+        if (word.length() > 0) { return word }
+        return this.current_token_str()
+    }
+
+    // --- Visibility modifiers ---
+    //
+    // `private` and `public` are **soft keywords**, exactly like `interface` and
+    // `actor`: the lexer emits them as TkIdent and the parser recognises them by
+    // name. That is deliberate. Making them reserved words would break any
+    // program that already uses either as a variable, field or parameter name,
+    // and the whole point of a visibility annotation is that adding it to the
+    // language costs existing code nothing.
+
+    /// The identifier one token ahead, or "" if that token is not an identifier.
+    ///
+    /// peek_is answers by *kind*, which collapses every identifier to "ident" —
+    /// so it cannot distinguish `interface` from `actor` from `banana`. The
+    /// soft-keyword declaration forms need the name itself.
+    fun peek_ident_next(): String {
+        if (this.pos + 1 >= this.tokens.length()) return ""
+        var next_tok: Lexer.Token = this.tokens[this.pos + 1]
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c, o, ln) => k }
+        return match (next_kind) { TkIdent(n) => n    _ => "" }
+    }
+
+    /// Is the current token a visibility modifier introducing a declaration?
+    ///
+    /// The lookahead is the load-bearing half. `private` on its own is still a
+    /// perfectly good identifier, so treating every occurrence as a modifier
+    /// would break `var private = 1` and `private.close()`. Requiring that the
+    /// NEXT token begin a declaration keeps both readings available and makes
+    /// the soft keyword genuinely non-breaking.
+    ///
+    /// `internal` and `protected` are recognised as modifiers here too, and
+    /// reject_unimplemented_modifier turns them into an explicit diagnostic
+    /// rather than a confusing parse error about an unexpected identifier.
+    /// They are Phases 5 and 5b; parsing them silently as "public" would be
+    /// worse than refusing them, because it would compile a program whose
+    /// stated intent the compiler is ignoring.
+    fun at_visibility_modifier(): Bool {
+        var word: String = this.peek_ident()
+        if (word != "private" and word != "public"
+            and word != "internal" and word != "protected") { return false }
+        if (this.peek_is("var") or this.peek_is("let") or this.peek_is("fun")
+            or this.peek_is("enum") or this.peek_is("class")) { return true }
+        var nxt: String = this.peek_ident_next()
+        return nxt == "interface" or nxt == "actor" or nxt == "type"
+    }
+
+    /// Consume a visibility modifier and answer the visibility string it means.
+    fun take_visibility(): String {
+        var word: String = this.peek_ident()
+        this.advance()
+        if (word == "protected") {
+            // Recognised syntax, unimplemented semantics (Phase 5b). Saying so is
+            // the only honest answer: silently downgrading to "public" would
+            // accept a declaration the author meant to restrict, and that is a
+            // wrong answer dressed as a clean compile. `internal` used to sit here
+            // too and is now implemented (Phase 5 package scope), so only
+            // `protected` remains a placeholder.
+            this.parse_error("'" + word + "' is not implemented yet; use 'private', 'internal' or 'public'")
+            return "public"
+        }
+        return word
+    }
+
     // --- Spans ---
     //
     // The parser is where a Token's inline position fields become an AST.Span.
@@ -1537,13 +1611,24 @@ class Parser {
         // Collect /// doc comments before declarations
         var docstring: String = this.collect_doc_comments()
 
+        // An optional visibility modifier, read BEFORE any declaration test
+        // below. It has to be first: `private` is a soft keyword, so by the time
+        // one of the `match_kind_check("var")` tests runs the modifier would
+        // already have been read as an expression statement naming a variable
+        // called `private`. at_visibility_modifier's lookahead is what keeps
+        // that reading available for code that genuinely has such a variable.
+        var visibility: String = "public"
+        if (this.at_visibility_modifier()) {
+            visibility = this.take_visibility()
+        }
+
         // Type aliases: type Name = TargetType
         if (this.is_ident_named("type")) {
             this.advance()
             var alias_name: String = this.expect_ident()
             this.consume("=")
             var alias_target: String = this.parse_type()
-            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias", "public")
+            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias", visibility)
         }
 
         // Extension methods: extend fun ClassName.method(params): RetType { body }
@@ -1638,13 +1723,21 @@ class Parser {
             return this.parse_fun_decl_with_doc(annotation)
         }
 
-        if (this.match_kind_check("var")) return this.parse_var_decl_with_doc(docstring)
-        if (this.match_kind_check("let")) return this.parse_var_decl_with_doc(docstring)
-        if (this.match_kind_check("fun") and !this.peek_is("(")) return this.parse_fun_decl_with_doc(docstring)
-        if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
-        if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
-        if (this.is_ident_named("interface")) return this.parse_class_decl_with_doc(docstring)
-        if (this.is_ident_named("actor")) return this.parse_class_decl_with_doc("@actor\n" + docstring)
+        if (this.match_kind_check("var")) return this.parse_var_decl_vis(docstring, visibility)
+        if (this.match_kind_check("let")) return this.parse_var_decl_vis(docstring, visibility)
+        if (this.match_kind_check("fun") and !this.peek_is("(")) return this.parse_fun_decl_vis(docstring, visibility)
+        if (this.match_kind_check("enum")) return this.parse_enum_decl_vis(docstring, visibility)
+        if (this.match_kind_check("class")) return this.parse_class_decl_vis(docstring, visibility)
+        if (this.is_ident_named("interface")) return this.parse_class_decl_vis(docstring, visibility)
+        if (this.is_ident_named("actor")) return this.parse_class_decl_vis("@actor\n" + docstring, visibility)
+        // A modifier was consumed but nothing below this point is a declaration,
+        // so there is nothing for it to modify. Reporting it beats letting the
+        // statement parse as if the word had not been written: at_visibility_modifier
+        // only returns true when a declaration keyword follows, so reaching here
+        // means the two disagree and the disagreement is a bug worth surfacing.
+        if (visibility != "public") {
+            this.parse_error("'" + visibility + "' must be followed by a declaration")
+        }
         if (this.match_kind_check("import")) return this.parse_import()
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
@@ -1733,6 +1826,10 @@ class Parser {
     }
 
     fun parse_var_decl_with_doc(docstring: String): AST.Stmt {
+        return this.parse_var_decl_vis(docstring, "public")
+    }
+
+    fun parse_var_decl_vis(docstring: String, visibility: String): AST.Stmt {
         this.advance() // consume var/let
         // Check for array destructuring: let [a, b, c] = expr
         if (this.match_kind_check("[")) {
@@ -1784,7 +1881,7 @@ class Parser {
         }
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        return AST.Stmt.VarDecl(name, type_ann, init, docstring, "public")
+        return AST.Stmt.VarDecl(name, type_ann, init, docstring, visibility)
     }
 
     fun parse_destructure(): AST.Stmt {
@@ -1840,6 +1937,10 @@ class Parser {
     }
 
     fun parse_fun_decl_with_doc(docstring: String): AST.Stmt {
+        return this.parse_fun_decl_vis(docstring, "public")
+    }
+
+    fun parse_fun_decl_vis(docstring: String, visibility: String): AST.Stmt {
         this.advance() // consume fun
         var name: String = this.expect_ident()
         // Parse generic type parameters: fun foo<T>(...) or fun bar<K, V: Constraint>(...)
@@ -1962,7 +2063,7 @@ class Parser {
             while (ppi < body.length()) { new_body.push(body[ppi]); ppi = ppi + 1 }
             body = new_body
         }
-        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring, "public")
+        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring, visibility)
     }
 
     fun parse_one_param(params: List<AST.Param>, pattern_prepend: List<AST.Stmt>, idx: Float) {
@@ -2002,6 +2103,10 @@ class Parser {
     }
 
     fun parse_enum_decl_with_doc(docstring: String): AST.Stmt {
+        return this.parse_enum_decl_vis(docstring, "public")
+    }
+
+    fun parse_enum_decl_vis(docstring: String, visibility: String): AST.Stmt {
         this.advance() // consume enum
         var name: String = this.expect_ident()
         // Skip generic type parameters: enum Option<T> or enum Result<T, E>
@@ -2025,6 +2130,23 @@ class Parser {
             // Skip doc comments inside enum body
             this.collect_doc_comments()
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            // Per-variant visibility is rejected by design, not unimplemented.
+            // Either exhaustiveness demands another module name a variant it may
+            // not write, or it exempts private variants and the only total form
+            // needs a `_` arm — and a non-exhaustive match in Saffron yields an
+            // indeterminate value rather than an error (BUGS #76). Both readings
+            // are worse than refusing the syntax. `private enum E` — the whole
+            // type — is supported and has none of this interaction.
+            var vis_word: String = this.peek_ident()
+            if (vis_word == "private" or vis_word == "public"
+                or vis_word == "internal" or vis_word == "protected") {
+                var after_vis: String = this.peek_ident_next()
+                if (after_vis.length() > 0) {
+                    this.parse_error("enum variants cannot have a visibility modifier; mark the whole enum '"
+                        + name + "' instead")
+                    this.advance()
+                }
+            }
             var vname: String = this.expect_ident()
             var fields: String = ""
             if (this.match_kind("(")) {
@@ -2050,9 +2172,7 @@ class Parser {
             this.match_kind(",")
         }
         this.consume("}")
-        // No visibility syntax exists yet (access-modifiers.md Phase 4 adds it), so
-        // every declaration is parsed as "public" — the documented default.
-        return AST.Stmt.EnumDecl(name, variants, docstring, "public")
+        return AST.Stmt.EnumDecl(name, variants, docstring, visibility)
     }
 
     fun parse_this_stmt(): AST.Stmt {
@@ -2162,6 +2282,10 @@ class Parser {
     }
 
     fun parse_class_decl_with_doc(docstring: String): AST.Stmt {
+        return this.parse_class_decl_vis(docstring, "public")
+    }
+
+    fun parse_class_decl_vis(docstring: String, visibility: String): AST.Stmt {
         this.advance() // consume class
         var name: String = this.expect_ident()
         // Generic type parameters: class Foo<T> or interface Bar<K, V>.
@@ -2215,6 +2339,14 @@ class Parser {
             // Consume doc comments inside class body (attach to next member)
             var member_doc: String = this.collect_doc_comments()
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            // A member's own visibility, read before the branches below for the
+            // same reason as in parse_stmt: `private` is an identifier until the
+            // lookahead says otherwise, and the branches below only test the
+            // declaration keyword.
+            var member_vis: String = "public"
+            if (this.at_visibility_modifier()) {
+                member_vis = this.take_visibility()
+            }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type  or  var name = default
                 this.advance()
@@ -2242,7 +2374,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit, "public"))
+                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit, member_vis))
             } else if (this.is_ident_named("@")) {
                 // Decorator on method: @inline, @intrinsic, etc.
                 this.advance()
@@ -2259,11 +2391,37 @@ class Parser {
                     this.consume(")")
                 }
                 if (this.match_kind_check("fun")) {
-                    methods.push(this.parse_fun_decl_with_doc(method_annotation))
+                    methods.push(this.parse_fun_decl_vis(method_annotation, member_vis))
                 }
             } else if (this.match_kind_check("fun")) {
-                // Method declaration (doc comment passed via parse_fun_decl_with_doc)
-                methods.push(this.parse_fun_decl_with_doc(member_doc))
+                // Method declaration (doc comment passed via parse_fun_decl_vis)
+                methods.push(this.parse_fun_decl_vis(member_doc, member_vis))
+            } else {
+                // An unrecognised member token. This arm is not optional
+                // bookkeeping — without it the loop HANGS. The condition above
+                // tests only `}` and `eof`, and all three branches above advance
+                // only when they match, so a token matching none of them left
+                // this.pos where it was and the loop spun forever. `class C {
+                // private var x: Int }` reproduced it exactly: rc=124 under
+                // timeout, with no output at all.
+                //
+                // A hang is the worst failure mode available here, because there
+                // is no error string to grep for and nothing to point a user at.
+                // Any future member syntax hits this same arm, so the fix is an
+                // unconditional advance plus a diagnostic rather than one more
+                // specific test.
+                this.parse_error("unexpected '" + this.current_member_desc()
+                    + "' in the body of class '" + name + "'; expected 'var', 'fun' or '}'")
+                // Advance unconditionally FIRST — that single step is what makes
+                // progress guaranteed regardless of what the resync loop below
+                // decides — then skip ahead to the next plausible member start so
+                // one malformed member produces one diagnostic instead of one per
+                // token. `let x: Int = 1` otherwise reported six.
+                this.advance()
+                while (!this.match_kind_check("var") and !this.match_kind_check("fun")
+                    and !this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                    this.advance()
+                }
             }
         }
         this.consume("}")
@@ -2271,7 +2429,7 @@ class Parser {
         if (field_defaults.length() > 0) {
             this.inject_field_defaults(methods, field_defaults)
         }
-        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring, "public")
+        return AST.Stmt.ClassDecl(name, type_params, parents, fields, methods, docstring, visibility)
     }
 
     fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {

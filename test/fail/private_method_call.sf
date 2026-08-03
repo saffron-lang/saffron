@@ -1,0 +1,22 @@
+// A private method called from outside the declaring class must be rejected.
+//
+// Statically known receiver, for the reason spelled out in
+// private_field_access.sf: the soft-fail path would otherwise make this test
+// vacuous.
+//
+// `describe` is public and calls `_render` internally, which is the shape the
+// feature exists to support — the private method is reachable through the public
+// one, and only the direct outside call is refused.
+class Report {
+    var title: String
+    fun init(title: String) { this.title = title }
+    private fun _render(): String { return "<" + this.title + ">" }
+    fun describe(): String { return this._render() }
+}
+
+fun main_body(): String {
+    var r: Report = Report("q3")
+    return r._render()
+}
+
+IO.println(main_body())

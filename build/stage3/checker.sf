@@ -285,6 +285,68 @@ class NullChecker {
     // ones, so register_class_identity can tell a local declaration from a rival.
     var registering_local: Bool
 
+    // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
+    //
+    // Which class members are private, keyed "<class key>#<member name>". The
+    // class name is part of the key on purpose: two classes can declare the same
+    // member name with different visibility — one `private fun bump`, one public
+    // — and a table keyed by member name alone would reject the public one. Both
+    // the qualified key (prefix + name) and the bare key are written, mirroring
+    // env.class_fields, so a lookup through qualified_class_key finds the entry
+    // whichever way the receiver's type was spelled.
+    //
+    // Class-private here means Kotlin's rule: the class BODY, not the file. A
+    // same-module free function reading a private field is rejected. That
+    // asymmetry with module-level `private` is deliberate (§6a) and is why the
+    // stdlib's 24 leading-underscore fields must stay unannotated until they can
+    // be marked `internal`.
+    var private_members: Map<String, String>
+    // Every member name that is private on *some* class. This is the gate on the
+    // unresolvable-receiver warning (§3), and it is what keeps that warning from
+    // being useless noise: an `Any`-typed receiver is pervasive and honest, so
+    // warning about every member access through one would bury the signal. A
+    // warning is only worth printing when the name being read is private
+    // somewhere — i.e. when there is genuinely a check that could not be made.
+    var private_member_names: Map<String, Bool>
+    // Type names declared `private` — classes, interfaces, actors, enums and type
+    // aliases. This is the input to the leak pass (§6b), and it is the FIRST
+    // reader of a top-level declaration's visibility: module-level enforcement
+    // itself is Phase 5, so until now nothing consulted `private` on a class.
+    //
+    // Keyed by the bare name ONLY for declarations of the module under check, and
+    // always by the qualified name. Registering every module's private types
+    // under their bare names would make a private `class Slot` in one module
+    // rename every OTHER module's public `Slot` into a leak — a false error, and
+    // false errors are the failure mode BUGS #56 records as worse than the silence
+    // they replace. Confining the bare key to local declarations removes that
+    // class of mistake outright, at the cost of not seeing a leak of a type
+    // imported from elsewhere; that case needs Phase 5's cross-module resolution
+    // to know the reference even lands there.
+    var private_types: Map<String, Bool>
+    // The module-level visibility of every top-level declaration — `fun`, `var`,
+    // `let`, `class`, `enum`, `interface`, `actor`, `type` — that is NOT public,
+    // keyed by the qualified name (defining prefix + bare name). Public is the
+    // default and is deliberately never stored: the table's presence is the
+    // signal that a cross-module reference must be checked, so an absent key
+    // means "public, nothing to enforce" and the common case costs one `has`.
+    //
+    // This is Phase 5's registration half (§6a): module-level enforcement needs
+    // to know, at a use site, both *which* module declared the name (already in
+    // decl_module_file / decl_module_package) and *how restricted* it is. Only
+    // ClassDecl recorded module identity before this phase; the four other
+    // top-level kinds recorded nothing, so there was no entry for a `fun`, `var`,
+    // `enum` or `type` to compare a use site against. register_module_decl fills
+    // all three tables for every kind through one path.
+    var decl_visibility: Map<String, String>
+    // The entry file's `import "..." as Alias` map, alias → the defining module's
+    // prefix, as main.sf already computes it for codegen (resolved_aliases). It is
+    // what turns §6a path 2 — an alias-qualified `Mod.name` — into the same
+    // prefix+name key the other two paths use: the checker has no type for a
+    // module alias (it infers `Any`), so without this map it cannot recover which
+    // module `Mod` names. Empty for the flat/no-module entry points, which have no
+    // aliases to resolve and so never reach the path-2 branch.
+    var entry_aliases: Map<String, String>
+
     fun init() {
         this.env = TypeEnv()
         this.errors = []
@@ -306,6 +368,11 @@ class NullChecker {
         this.ambiguous_classes = []
         this.local_classes = []
         this.registering_local = false
+        this.private_members = {}
+        this.private_member_names = {}
+        this.private_types = {}
+        this.decl_visibility = {}
+        this.entry_aliases = {}
     }
 
     fun error(msg: String) {
@@ -812,6 +879,13 @@ class NullChecker {
         }
         // Third pass: check interface conformance
         this.check_conformance()
+        // Fourth pass: a public declaration must not expose a private type in its
+        // signature (§6b). Its own pass, and after registration, because it needs
+        // EVERY declaration's visibility resolved before it can validate ANY
+        // signature — a forward reference to a type declared later in the file is
+        // ordinary, so neither earlier walk has the information when it passes the
+        // declaration. Signatures only; it never descends into a body.
+        this.check_leaks(stmts)
     }
 
     fun check_conformance() {
@@ -958,6 +1032,11 @@ class NullChecker {
                 // silently defeated exhaustiveness on `match (some_call())`.
                 this.env.define_func_str(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
+                // Module-level identity + visibility, so a cross-module reference
+                // to this function can be checked (§6a path 1/2/3). Public is not
+                // stored; register_module_decl records the module either way so
+                // decl_module_file is complete for every top-level kind.
+                this.register_module_decl(name, f_vis)
                 // Extract generic type params from docstring: @generic:T,U:Constraint\n
                 this.extract_and_register_generics(name, doc)
                 // Detect receiver-typed parameters: Fun[Type](...):Ret
@@ -981,6 +1060,8 @@ class NullChecker {
             }
             EnumDecl(name, variants, doc, e_vis) => {
                 this.register_enum(name, variants)
+                this.register_type_visibility(name, e_vis)
+                this.register_module_decl(name, e_vis)
             }
             ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
                 if (doc.starts_with("@actor")) {
@@ -993,6 +1074,17 @@ class NullChecker {
                 // modules declaring the same class stay distinguishable
                 // (register_class_identity; the `Response` collision).
                 this.register_class_identity(name, this.params_list_to_string(fields))
+                this.register_private_members(name, fields, methods)
+                this.register_type_visibility(name, c_vis)
+                // register_class_identity already wrote decl_module_file /
+                // decl_module_package under the qualified key; record only the
+                // module-level visibility here so a cross-module reference to the
+                // class (including a `private init`'d constructor call) can be
+                // decided. Not routed through register_module_decl to avoid
+                // re-writing the two identity maps register_class_identity owns.
+                if (c_vis != "public") {
+                    this.decl_visibility.set(this.current_prefix + name, c_vis)
+                }
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
                 if (parents.length() > 0) {
@@ -1093,7 +1185,25 @@ class NullChecker {
                     }
                 }
             }
-            VarDecl(n, t, i, d, v_vis) => {}
+            VarDecl(n, t, i, d, v_vis) => {
+                // `type Name = T` reaches the checker as a VarDecl carrying the
+                // docstring "@type_alias", not as a TypeAlias node — the parser
+                // desugars it (parser.sf's parse_stmt). So the alias's visibility
+                // has to be read here; the TypeAlias arm below is dead for
+                // parser-produced trees and registering only there would silently
+                // miss every `private type`.
+                if (d == "@type_alias") {
+                    this.register_type_visibility(n, v_vis)
+                }
+                // A top-level `var`/`let` (and a desugared `type` alias) is a
+                // module-level name a cross-module reference can bind to via
+                // resolve's globals prescan, so it needs an identity + visibility
+                // entry just like a `fun`. register_decl runs over the imported
+                // modules as well as the program under check, and only top-level
+                // statements reach it, so this never fires for a local variable
+                // inside a body.
+                this.register_module_decl(n, v_vis)
+            }
             ExprStmt(e) => {}
             Return(v) => {}
             If(c, t, e) => {}
@@ -1104,7 +1214,14 @@ class NullChecker {
             TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(ta_n, ta_t, ta_vis) => {}
+            // Covered for completeness. The parser desugars `type Name = T` into
+            // a VarDecl with doc "@type_alias" and never emits this node, so the
+            // real registration is in the VarDecl arm above; this one fires only
+            // for a tree built some other way.
+            TypeAlias(ta_n, ta_t, ta_vis) => {
+                this.register_type_visibility(ta_n, ta_vis)
+                this.register_module_decl(ta_n, ta_vis)
+            }
         }
     }
 
@@ -1228,6 +1345,79 @@ class NullChecker {
         this.env.class_fields.set(name, fields_str)
     }
 
+    // Record a top-level declaration's owning module and its module-level
+    // visibility, for every kind of top-level declaration. This is Phase 5's
+    // single registration path (§6a). ClassDecl also calls register_class_identity
+    // for its field table and ambiguity handling; this fills the identity and
+    // visibility tables the module-level check reads, and it is the ONLY writer of
+    // decl_visibility so the three tables stay keyed identically.
+    //
+    // Keyed by the qualified name (defining prefix + bare name) exactly like
+    // decl_module_file, so a use site that has reconstructed the defining prefix
+    // — the bare cross-module path carries it on Ref.slot — finds the same entry
+    // the registration wrote. Public is never stored (see the decl_visibility
+    // field comment): the presence of a key is the "must check" signal.
+    fun register_module_decl(name: String, visibility: String) {
+        var qualified: String = this.current_prefix + name
+        this.decl_module_file.set(qualified, this.current_prefix)
+        this.decl_module_package.set(qualified, this.current_package)
+        if (visibility != "public") {
+            this.decl_visibility.set(qualified, visibility)
+        }
+    }
+
+    // May the code being checked reference a top-level `name` that resolved to
+    // the module whose prefix is `slot`? This is Phase 5's module-level
+    // enforcement (§6a), and it decides all three access paths at once because
+    // they converge on the same fact: a resolved reference carrying the DEFINING
+    // module's prefix.
+    //
+    //   path 3 (bare cross-module) — resolve.sf binds `helper()` to a module's
+    //     function and stamps Ref.slot with that module's prefix. The checker
+    //     sees Ref, not Variable, so `slot` is exactly the defining prefix.
+    //   path 2 (alias-qualified `Mod.name`) — arrives as MethodCall/MemberAccess;
+    //     its constructor/member forms are handled where those are inferred and
+    //     also route their qualified name through here.
+    //
+    // `slot` is the qualifying key. An empty slot is a local/main-program name
+    // (resolve leaves it "" for locals, params and the entry module), so there is
+    // no boundary to cross and nothing to check — return early. That early return
+    // is also what keeps the entry program's own private declarations legal to
+    // use within the entry program.
+    fun check_module_ref_visibility(name: String, slot: String) {
+        var qualified: String = slot + name
+        if (!this.decl_visibility.has(qualified)) { return nil }
+        var vis: String = this.decl_visibility.get(qualified)
+        if (vis == "private") {
+            // Module-private: legal only from within the SAME module (file). The
+            // use site's module is current_prefix; the defining module is `slot`.
+            // Equal prefixes mean the same file, which is what module-private
+            // permits — including a same-file free function, the deliberate
+            // difference from class-private (§6a).
+            if (slot == this.current_prefix) { return nil }
+            this.error("private '" + name + "' is not accessible outside the module that declares it")
+            return nil
+        }
+        if (vis == "internal") {
+            // Package-internal: legal from any module in the SAME package. The
+            // authority for package membership is main.sf's manifest reading,
+            // handed across the seam into decl_module_package (defining side) and
+            // current_package (use site). A packageless marker on either side
+            // denies rather than grants — same conservative posture as
+            // same_package in main.sf — so `internal` never leaks to a file that
+            // provably belongs to no package.
+            var def_pkg: String = no_package_marker()
+            if (this.decl_module_package.has(qualified)) {
+                def_pkg = this.decl_module_package.get(qualified)
+            }
+            if (def_pkg != no_package_marker()
+                and this.current_package != no_package_marker()
+                and def_pkg == this.current_package) { return nil }
+            this.error("internal '" + name + "' is not accessible outside the package that declares it")
+            return nil
+        }
+    }
+
     // True when `class_name` names more than one distinct declaration. A caller
     // holding only the bare name cannot tell the two apart, so anything keyed on
     // it is untrustworthy. See register_class_identity.
@@ -1254,6 +1444,570 @@ class NullChecker {
         return base
     }
 
+    // --- Type visibility + the leak pass (§6b of docs/design/access-modifiers.md) ---
+
+    /// Record that a declared TYPE is private. Called for classes, interfaces,
+    /// actors, enums and type aliases.
+    ///
+    /// The bare key is written only for a declaration of the module under check.
+    /// Doing it for every module would turn a private `class Slot` in one module
+    /// into a rename of every other module's public `Slot`, reporting leaks that
+    /// do not exist — and a false error is worse than the silence it replaces
+    /// (BUGS #56). See the field comment on private_types.
+    fun register_type_visibility(name: String, visibility: String) {
+        if (visibility != "private") { return nil }
+        this.private_types.set(this.current_prefix + name, true)
+        if (this.registering_local) {
+            this.private_types.set(name, true)
+        }
+    }
+
+    /// Is the type `name` spells private, as seen from the module under check?
+    fun is_private_type(name: String): Bool {
+        var base: String = this.generic_base(name)
+        if (this.private_types.has(base)) { return true }
+        return this.private_types.has(this.current_prefix + base)
+    }
+
+    /// Every bare type name a type spelling mentions, at any depth.
+    ///
+    ///   "Slot"                      → ["Slot"]
+    ///   "List<Slot>"                → ["List", "Slot"]
+    ///   "Map<String,List<Slot>>"    → ["Map", "String", "List", "Slot"]
+    ///   "Slot|Nil"                  → ["Slot", "Nil"]
+    ///
+    /// One splitter over `<`, `>`, `,` and `|`, which is all the leak pass needs:
+    /// it asks "does this spelling mention a private name", never "what is the
+    /// structure". Deliberately NOT a second `<>` parser — I10, and BUGS #27 is
+    /// what a second one costs. The existing split_type_args stays the tool for
+    /// anything that needs the arguments themselves.
+    ///
+    /// Purely lexical, and that matters for L6: the union case decomposes on `|`
+    /// as text and never emits a runtime type test, so nothing here lowers to
+    /// `is` and BUGS #69 (`is` broken on unions) is untouched by design. Do not
+    /// "improve" this into a runtime check.
+    fun mentioned_type_names(spelling: String): List<String> {
+        var names: List<String> = []
+        var current: String = ""
+        var i: Float = 0
+        while (i < spelling.length()) {
+            var ch: String = spelling.char_at(i)
+            if (ch == "<" or ch == ">" or ch == "," or ch == "|"
+                or ch == " " or ch == "?" or ch == "(" or ch == ")") {
+                if (current.length() > 0) {
+                    names.push(current)
+                    current = ""
+                }
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) { names.push(current) }
+        return names
+    }
+
+    /// The first private type `spelling` mentions, or "".
+    fun private_type_in(spelling: String): String {
+        var names: List<String> = this.mentioned_type_names(spelling)
+        var i: Float = 0
+        while (i < names.length()) {
+            if (this.is_private_type(names[i])) { return names[i] }
+            i = i + 1
+        }
+        return ""
+    }
+
+    /// One leak diagnostic. `via` carries the full spelling when it differs from
+    /// the leaked name, so the transitive cases (L5, L6) show the path — that is
+    /// part of the message, not decoration: "exposes private type 'Slot'" on a
+    /// return type spelled `Map<String,List<Slot>>` does not tell the reader
+    /// where to look.
+    fun report_leak(subject: String, position: String, leaked: String, spelling: String) {
+        var via: String = ""
+        if (spelling != leaked) { via = " (via " + spelling + ")" }
+        this.error(subject + " exposes private type '" + leaked + "' in " + position + via)
+    }
+
+    /// Check one type spelling in a public position and report if it leaks.
+    fun check_leak(subject: String, position: String, spelling: String) {
+        if (spelling.length() == 0) { return nil }
+        var leaked: String = this.private_type_in(spelling)
+        if (leaked.length() == 0) { return nil }
+        this.report_leak(subject, position, leaked, spelling)
+    }
+
+    /// The leak pass: a public declaration must not expose a private type in its
+    /// signature (§6b). A fourth pass, sibling to check_conformance, run after
+    /// registration — it needs EVERY declaration's visibility resolved before it
+    /// can validate ANY signature, so it cannot be folded into either earlier
+    /// walk. Signatures only; it never descends into a body.
+    ///
+    /// Cheap exit: with no private type declared anywhere there is nothing any
+    /// signature could leak, so the walk is skipped entirely rather than
+    /// splitting every type spelling in the program to find nothing.
+    fun check_leaks(stmts: List<AST.Stmt>) {
+        if (this.private_types.keys().length() == 0) { return nil }
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.check_leaks_in_decl(stmts[i])
+            i = i + 1
+        }
+    }
+
+    fun check_leaks_in_decl(stmt: AST.Stmt) {
+        match (stmt) {
+            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+                if (f_vis != "private") {
+                    this.check_fun_leaks("public fun '" + name + "'", params, ret_type)
+                }
+            }
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+                // L4: a member of a private class is a no-op, and so is the class's
+                // own parent list. Every path to any of it is already gated by the
+                // enclosing private type, so erroring would force annotating every
+                // member of every private class — churn buying nothing. This is the
+                // "reachable from outside" rule stated as one early return.
+                if (c_vis == "private") { return nil }
+                // L7: loops EVERY parent, and the diagnostic names which one. Only
+                // parents[0] contributes fields, but every base contributes methods
+                // and answers `is`, so a private type in ANY position leaks its
+                // members through the public child. Before BUGS #111 the parser
+                // discarded parents 2..n, which would have made this a silent hole
+                // in exactly the multiple-inheritance case; it is now a positive
+                // requirement rather than a caveat.
+                var pi: Float = 0
+                while (pi < parents.length()) {
+                    var parent_leak: String = this.private_type_in(parents[pi])
+                    if (parent_leak.length() > 0) {
+                        this.error("public class '" + name + "' extends private type '"
+                            + parent_leak + "'; '" + parent_leak
+                            + "'s members become reachable through '" + name + "'")
+                    }
+                    pi = pi + 1
+                }
+                // L1: public fields.
+                var fi: Float = 0
+                while (fi < fields.length()) {
+                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
+                    var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
+                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pt }
+                    if (f_vis != "private") {
+                        this.check_leak("public field '" + name + "." + f_name + "'",
+                            "its declared type", this.type_to_str(f_type))
+                    }
+                    fi = fi + 1
+                }
+                // L2/L3 for methods.
+                var mi: Float = 0
+                while (mi < methods.length()) {
+                    var m_name: String = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md, mv) => mn
+                        _ => ""
+                    }
+                    var m_vis: String = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md, mv) => mv
+                        _ => "public"
+                    }
+                    var m_params: List<AST.Param> = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md, mv) => mp
+                        _ => []
+                    }
+                    var m_ret: String = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md, mv) => mr
+                        _ => ""
+                    }
+                    if (m_name.length() > 0 and m_vis != "private") {
+                        this.check_fun_leaks("public method '" + name + "." + m_name + "'",
+                            m_params, m_ret)
+                    }
+                    mi = mi + 1
+                }
+            }
+            VarDecl(n, t, i, d, v_vis) => {
+                if (v_vis != "private" and d != "@type_alias") {
+                    this.check_var_leaks(n, t, i)
+                }
+            }
+            EnumDecl(name, variants, doc, e_vis) => {
+                // A variant's payload spelling is a String on the Variant node
+                // ("field:Type,field:Type"), and mentioned_type_names splits on
+                // the punctuation that separates them, so a private type anywhere
+                // in a payload is found without parsing the payload.
+                if (e_vis != "private") {
+                    var vi: Float = 0
+                    while (vi < variants.length()) {
+                        var v_name: String = match (variants[vi]) { Variant(vn, vf) => vn }
+                        var v_fields: String = match (variants[vi]) { Variant(vn, vf) => vf }
+                        this.check_leak("public enum '" + name + "." + v_name + "'",
+                            "its payload", v_fields)
+                        vi = vi + 1
+                    }
+                }
+            }
+            ExprStmt(e) => {}
+            Return(v) => {}
+            If(c, t, e) => {}
+            While(c, b) => {}
+            Block(s) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(tb, cn, cb, fb) => {}
+            Throw(v) => {}
+            LetPattern(p, v) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {
+                if (ta_vis != "private") {
+                    this.check_leak("public type alias '" + ta_n + "'", "its target", ta_t)
+                }
+            }
+        }
+    }
+
+    /// L2 and L3: a public function or method's parameter and return types.
+    ///
+    /// L8, stated rather than papered over: a `Fun`-typed position is
+    /// DELIBERATELY unchecked, and it is not merely hard. The surface `Fun` erases
+    /// to a signature-free type — BUGS #56: "the static type of an indirect call's
+    /// result is not recovered (`Fun` carries no return type)", and #86 is the same
+    /// root for block parameters — so `fun subscribe(cb: Fun)` where `cb` receives
+    /// a private type carries no information to check against. Closing it means
+    /// giving `Fun` a signature, which is a language change tracked by #56. The
+    /// spelling "Fun" mentions no type name, so it simply finds nothing here;
+    /// nothing suppresses it and nothing pretends to cover it.
+    fun check_fun_leaks(subject: String, params: List<AST.Param>, ret_type: String) {
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis) => pn }
+            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis) => pt }
+            // AST.Param is the node for both a class field and a function
+            // parameter, so type_to_str is the one renderer for both — the raw
+            // String / AST.Type split that forces two entry points here is I3's
+            // complaint, and this feature consumes that debt rather than fixing it.
+            this.check_leak(subject, "parameter " + (pi + 1).floor().to_string()
+                + " ('" + p_name + "')", this.type_to_str(p_type))
+            pi = pi + 1
+        }
+        this.check_leak(subject, "its return type", ret_type)
+    }
+
+    /// L9: a public top-level `var`.
+    ///
+    /// The verdict splits on whether there is an anchor to point at. An explicit
+    /// annotation is an anchor and is an error. An INFERRED type is an error only
+    /// when the initializer is syntactically a constructor call of a private class
+    /// — the call is the anchor, and the diagnostic can name it. Inferred through
+    /// several steps, the anchor is the compiler's guess, and this codebase's
+    /// history is unambiguous about erroring on guesses: #56's over-erroring
+    /// "traded one silent wrong answer for a batch of false rejections". So that
+    /// case warns. The asymmetry is deliberate — say what you know, and say when
+    /// you do not know.
+    fun check_var_leaks(name: String, type_ann: String, initializer: AST.Expr) {
+        if (type_ann != "Any" and type_ann.length() > 0) {
+            this.check_leak("public var '" + name + "'", "its declared type", type_ann)
+            return nil
+        }
+        // No annotation: look for a constructor call in the initializer.
+        var ctor: String = this.constructor_call_name(initializer)
+        if (ctor.length() > 0 and this.is_private_type(ctor)) {
+            this.error("public var '" + name + "' exposes private type '" + ctor
+                + "' in its inferred type (from initializer '" + ctor + "()')")
+            return nil
+        }
+        if (ctor.length() > 0) { return nil }
+        var inferred: String = this.type_to_str(this.infer_type_readonly(initializer))
+        var leaked: String = this.private_type_in(inferred)
+        if (leaked.length() > 0) {
+            this.warn("public var '" + name + "' may expose private type '" + leaked
+                + "' in its inferred type '" + inferred
+                + "'; add an explicit annotation to say which you mean")
+        }
+    }
+
+    /// The class name a constructor call names, or "" if the expression is not
+    /// syntactically one. Both spellings: `Slot()` and `Mod.Slot()`.
+    fun constructor_call_name(expr: AST.Expr): String {
+        var name: String = match (expr) {
+            Call(callee, args) => match (callee) {
+                Variable(n) => n
+                Ref(rk, rn, rs) => rn
+                MemberAccess(o, f) => f
+                _ => ""
+            }
+            // `Mod.Slot()` parses as a MethodCall with the module alias as the
+            // receiver, not as a Call — the same asymmetry that made `private init`
+            // enforceable only through bare references until it was covered in both
+            // places.
+            MethodCall(obj, method, args) => method
+            _ => ""
+        }
+        if (name.length() == 0) { return "" }
+        if (!this.env.class_fields.has(this.qualified_class_key(name))) { return "" }
+        return name
+    }
+
+    /// The initializer's type WITHOUT the side effects infer_type has.
+    ///
+    /// infer_type marks variables used, defines scope entries, and emits its own
+    /// diagnostics. The leak pass runs after registration but before/independently
+    /// of the body walk, so calling it here would double every diagnostic the
+    /// initializer produces and corrupt the unused-variable bookkeeping. Only the
+    /// shapes that can name a type without evaluating anything are answered; the
+    /// rest are Any, which the caller reads as "nothing to say".
+    fun infer_type_readonly(expr: AST.Expr): AST.Type {
+        return match (expr) {
+            ListLit(elements) => {
+                if (elements.length() == 0) {
+                    AST.Type.GenericType("List", [AST.Type.AnyType])
+                } else {
+                    AST.Type.GenericType("List", [this.infer_type_readonly(elements[0])])
+                }
+            }
+            Call(callee, args) => {
+                var cname: String = match (callee) {
+                    Variable(n) => n
+                    Ref(rk, rn, rs) => rn
+                    MemberAccess(o, f) => f
+                    _ => ""
+                }
+                if (cname.length() == 0) {
+                    AST.Type.AnyType
+                } else {
+                    this.parse_type_node(this.env.get_func_ret(cname))
+                }
+            }
+            _ => AST.Type.AnyType
+        }
+    }
+
+    // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
+
+    /// Record every `private` field and method of a class, and reject the one
+    /// combination that cannot mean anything.
+    fun register_private_members(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        var qualified: String = this.current_prefix + name
+        var fi: Float = 0
+        while (fi < fields.length()) {
+            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
+            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
+            if (f_vis == "private") {
+                this.mark_private_member(name, qualified, f_name)
+            }
+            fi = fi + 1
+        }
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var m_name: String = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, m_vis) => mn
+                _ => ""
+            }
+            var m_vis: String = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, mv) => mv
+                _ => "public"
+            }
+            var m_body: List<AST.Stmt> = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md, mv) => mb
+                _ => []
+            }
+            if (m_name.length() > 0 and m_vis == "private") {
+                // A private *abstract* method is a contradiction, not a
+                // restriction. The distinction is the one class_abstract_methods
+                // already draws: bodyless means "a requirement on subclasses".
+                // An implementor in another module must be able to name the
+                // method to implement it, and check_conformance would then demand
+                // an implementation that implementor is forbidden to write — so
+                // the declaration makes the type unimplementable. A private
+                // *default* method (one with a body) is a perfectly good private
+                // helper and is allowed.
+                if (m_body.length() == 0) {
+                    this.error("'" + name + "." + m_name + "' is declared private and has no body; a private abstract method cannot be implemented")
+                }
+                this.mark_private_member(name, qualified, m_name)
+            }
+            mi = mi + 1
+        }
+    }
+
+    /// Write one private-member entry under both the bare and qualified keys.
+    fun mark_private_member(bare: String, qualified: String, member: String) {
+        this.private_members.set(bare + "#" + member, "private")
+        this.private_members.set(qualified + "#" + member, "private")
+        this.private_member_names.set(member, true)
+    }
+
+    /// Is `member` private as declared directly on the class `class_name` names?
+    fun is_private_member(class_name: String, member: String): Bool {
+        var key: String = this.qualified_class_key(class_name) + "#" + member
+        if (this.private_members.has(key)) return true
+        // The bare key as a fallback, for a receiver type that resolved to a
+        // class the current module did not declare and did not import under a
+        // prefix the lookup above could reconstruct.
+        return this.private_members.has(this.generic_base(class_name) + "#" + member)
+    }
+
+    /// Which class in `class_name`'s ancestry declares `member` private, or "".
+    ///
+    /// The ancestry has to be searched, not just the receiver's own class: a
+    /// member is inherited by name, so `this.secret` inside a subclass of the
+    /// class that declared `secret` private reads a private member without ever
+    /// naming the declaring class. Kotlin rejects exactly that — its `private`
+    /// does not extend to subclasses; `protected` is the modifier that does, and
+    /// it is Phase 5b. Checking only the receiver's own class would let any
+    /// `class Child extends Base {}` launder every private field Base has.
+    ///
+    /// Breadth-first with a visited set, matching inherited_method_names, so a
+    /// diamond visits a shared ancestor once and a cyclic `extends` terminates
+    /// rather than hanging the checker.
+    fun private_declaring_class(class_name: String, member: String): String {
+        var base: String = this.generic_base(class_name)
+        if (this.is_private_member(base, member)) { return base }
+        var visited: List<String> = [base]
+        var work: List<String> = []
+        if (this.class_parents.has(base)) {
+            var seed: List<String> = this.class_parents.get(base)
+            var si: Float = 0
+            while (si < seed.length()) {
+                work.push(seed[si])
+                si = si + 1
+            }
+        }
+        while (work.length() > 0) {
+            var cur: String = work.pop()
+            if (!this.list_has_string(visited, cur)) {
+                visited.push(cur)
+                if (this.is_private_member(cur, member)) { return cur }
+                if (this.class_parents.has(cur)) {
+                    var ups: List<String> = this.class_parents.get(cur)
+                    var ui: Float = 0
+                    while (ui < ups.length()) {
+                        if (!this.list_has_string(visited, ups[ui])) { work.push(ups[ui]) }
+                        ui = ui + 1
+                    }
+                }
+            }
+        }
+        return ""
+    }
+
+    /// May code at the current position read or call `member` on `obj_type`?
+    ///
+    /// Class-private means the class BODY (Kotlin's rule for members, §6a), so
+    /// the single question is whether the code being checked is inside the class
+    /// that declared the member. `this.x`, a sibling instance of the same class,
+    /// and one method calling another all satisfy that; a free function in the
+    /// same file does not, which is the deliberate asymmetry with module-level
+    /// `private`.
+    fun check_member_visibility(obj_type: String, member: String, what: String) {
+        var base: String = this.generic_base(obj_type)
+        // An unresolved receiver: allow the access and say that it was not
+        // checked (§3). Neither silent answer is honest — silently allowing
+        // spells unknown as "public", silently denying spells it as "private" —
+        // and denying has direct precedent for how badly it goes: BUGS #56
+        // records that erroring on this same fallback "broke pass/math and
+        // test_reflect". A missed denial is a missed lint; a false denial rejects
+        // correct programs.
+        //
+        // Gated on the member name being private *somewhere*, because `Any`-typed
+        // receivers are pervasive and honest: warning on every member access
+        // through one would bury the signal in noise and teach readers to ignore
+        // the category.
+        if (base.length() == 0 or base == "Any" or !this.env.class_fields.has(this.qualified_class_key(base))) {
+            if (this.private_member_names.has(member)) {
+                this.warn("cannot determine the class of the receiver; visibility of '" + member + "' not checked")
+            }
+            return nil
+        }
+        var owner: String = this.private_declaring_class(base, member)
+        if (owner.length() == 0) { return nil }
+        // Inside the declaring class body — the whole extent of class-private.
+        if (this.current_class.length() > 0
+            and this.generic_base(this.current_class) == owner) { return nil }
+        var where: String = " from outside the class"
+        if (this.current_class.length() > 0) {
+            where = " from class '" + this.current_class + "'"
+        }
+        this.error("private " + what + " '" + owner + "." + member + "' is not accessible" + where)
+    }
+
+    /// Which class declares the `init` that constructing `class_name` will
+    /// actually run, or "" if none does.
+    ///
+    /// Deliberately NOT private_declaring_class's breadth-first search over every
+    /// base. Only `parents[0]` forwards its `init` (the field-layout invariant in
+    /// ast.sf's ClassDecl note), and a class that declares its own `init` runs
+    /// that one and never reaches a base's. A DAG-wide search would reject
+    /// `Child()` whenever *any* ancestor had a private constructor, even with
+    /// Child declaring a perfectly public one of its own — a false denial, which
+    /// is the failure mode BUGS #56 warns about.
+    ///
+    /// Depth-capped rather than visited-set-guarded because the walk is a single
+    /// chain, not a fan-out: a cyclic `extends` terminates instead of hanging.
+    fun constructor_owner(class_name: String): String {
+        var base: String = this.generic_base(class_name)
+        var depth: Float = 0
+        while (depth < 32) {
+            if (this.get_receiver_methods(base).contains("init")) { return base }
+            if (!this.class_parents.has(base)) { return "" }
+            var bases: List<String> = this.class_parents.get(base)
+            if (bases.length() == 0) { return "" }
+            base = this.generic_base(bases[0])
+            depth = depth + 1
+        }
+        return ""
+    }
+
+    /// May code at the current position construct `class_name`?
+    ///
+    /// `private init` is MODULE-scoped, not class-scoped, and that is §6a's rule
+    /// rather than an inconsistency with fields and methods. The whole point of
+    /// the modifier is the factory pattern — `private init` plus a public
+    /// same-module `fun new()` — which the stdlib already has the shape for in
+    /// six modules (stack.sf, queue.sf, sorted_set.sf, heap.sf, deque.sf,
+    /// sorted_map.sf). A class-scoped reading would reject exactly the free
+    /// function the feature exists to enable, leaving the class constructible by
+    /// nobody at all.
+    ///
+    /// Locality is read from local_classes — the recorded answer to "did the
+    /// statement list under check declare this?" — and not re-derived from the
+    /// key shape, which cannot answer it: the module under check is unprefixed,
+    /// so its qualified and bare keys are the same string (Phase 2's finding).
+    /// Phase 5 should prefer `Ref.slot`, which carries the defining module's
+    /// prefix at the use site and so can also police a construction inside an
+    /// imported module's own body; this pass only ever checks the main program's
+    /// bodies, so the two agree here.
+    fun check_constructor_visibility(class_name: String) {
+        var owner: String = this.constructor_owner(class_name)
+        if (owner.length() == 0) { return nil }
+        if (!this.is_private_member(owner, "init")) { return nil }
+        // Declared by the module being checked: same module, so allowed —
+        // including from a free function, which is the factory.
+        if (this.local_classes.contains(owner)) { return nil }
+        // Inside the class body itself, whichever module that body is in.
+        if (this.current_class.length() > 0
+            and this.generic_base(this.current_class) == owner) { return nil }
+        this.error("private constructor '" + owner + ".init' is not accessible outside the module that declares '" + owner + "'")
+    }
+
+    /// The assignment-target half of check_member_visibility: `obj.field = v`.
+    ///
+    /// Reads and writes are separate paths in this checker — a read is a
+    /// MemberAccess routed through infer_member_access, a write is a SetField
+    /// whose arm in infer_type inferred only the right-hand side. So enforcing
+    /// the read path alone left `private` meaning "you may not observe this
+    /// field, but you may change it", which is a worse answer than no
+    /// enforcement: the natural way to test the feature is to read the field, so
+    /// it looks enforced. `s.count = s.count + 1` WAS rejected, but only because
+    /// the right-hand side contains a read, which is why the hole hid.
+    ///
+    /// `what` is spelled "field" here rather than shared with the read path
+    /// because a write is the only thing that can reach it: SetField's field is
+    /// never a method.
+    fun check_setfield_visibility(obj: AST.Expr, field: String) {
+        // `this.x = v` inside the class is the ordinary case and must not warn or
+        // error. It routes through the same owner comparison as a read, so it is
+        // not special-cased — current_class matches the declaring class.
+        var obj_type: String = this.infer_expr(obj)
+        this.check_member_visibility(obj_type, field, "field")
+    }
 
     fun check_spawn_captures(expr: AST.Expr) {
         var spawn_method: String = match (expr) {
@@ -1703,6 +2457,16 @@ class NullChecker {
             }
             Ref(rkind, rname, rslot) => {
                 this.env.mark_used(rname)
+                // A global or func Ref carries the DEFINING module's prefix in
+                // rslot (resolve.sf resolve_variable), so a bare cross-module
+                // read of a module-private/internal name is decided here — §6a
+                // path 3, the one most easily forgotten. A local/self/type Ref
+                // has an empty slot and check_module_ref_visibility returns at
+                // once. Gated on kind so only the two module-level kinds pay for
+                // the lookup.
+                if (rkind == "global" or rkind == "func") {
+                    this.check_module_ref_visibility(rname, rslot)
+                }
                 this.env.get_var_type(rname)
             }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
@@ -1715,7 +2479,16 @@ class NullChecker {
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
             Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
             GetField(obj, field) => AST.Type.AnyType
-            SetField(obj, field, value) => this.infer_type(value)
+            SetField(obj, field, value) => {
+                // A write is an access. This arm used to infer only `value` and
+                // never look at `obj` at all, so `private` stopped a field from
+                // being READ while still permitting it to be MUTATED — which is
+                // worse than no enforcement, because anyone who probes it with a
+                // read concludes it is protected. `s.count = s.count + 1` was
+                // rejected, but only incidentally, via the read on the RHS.
+                this.check_setfield_visibility(obj, field)
+                this.infer_type(value)
+            }
             This => AST.Type.ClassType(this.current_class)
             ListLit(elements) => AST.Type.GenericType("List", [AST.Type.AnyType])
             // A tuple is a List at runtime (expr_body.sf gen_tuple), typed
@@ -1824,6 +2597,14 @@ class NullChecker {
         // this.field → look up field type from current class
         if (obj_type == this.current_class or obj_type == "This") {
             if (this.env.class_fields.has(this.current_class)) {
+                // `this.x` is checked too, and it is not a redundant check: a
+                // subclass reads an inherited member by name without ever naming
+                // the class that declared it private, so `this.secret` inside
+                // `class Child extends Base` is the case that needs catching.
+                // Access from within the declaring class is what
+                // check_member_visibility permits, so the ordinary use is
+                // unaffected.
+                this.check_member_visibility(this.current_class, field, "field")
                 return this.get_class_field_type(this.current_class, field)
             }
         }
@@ -1832,6 +2613,11 @@ class NullChecker {
         // declared type: `var v: T` on a `Box<String>` is a String (BUGS #95).
         var ma_base: String = this.generic_base(obj_type)
         if (this.env.class_fields.has(ma_base)) {
+            // A class receiver whose type resolved: this is the one path where a
+            // field's visibility can actually be decided. The `this.field` branch
+            // above returns before reaching here, which is correct — reading your
+            // own class's private field is exactly what private permits.
+            this.check_member_visibility(obj_type, field, "field")
             return this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type)
         }
         // Known module members
@@ -1852,6 +2638,11 @@ class NullChecker {
                 return obj_name
             }
         }
+        // The fallback: no class resolved, so no visibility decision is possible.
+        // check_member_visibility takes the soft-fail branch and warns only if
+        // this member name is private on some class. This is also the working
+        // route for `Math.PI`, which is why it must not become an error (§3).
+        this.check_member_visibility(obj_type, field, "field")
         return field
     }
 
@@ -2169,28 +2960,21 @@ class NullChecker {
             // caller below already treats as "unknown callee".
             _ => ""
         }
-        // The callee is an expression like any other, so infer it. The match
-        // above reads a *name* out of it for the return-type lookup, and a name
-        // is not a visit: before this line the callee subtree was never walked
-        // at all, so a variable whose only appearance is in callee position was
-        // never marked used and got a false "unused variable" warning
-        // (BUGS #121) — `fs[0](7)` is the whole use of `fs`.
-        //
-        // Walking the callee rather than calling mark_used(name) on the string
-        // above, for two reasons. (1) `name` does not exist for the shapes that
-        // actually trigger the bug: IndexGet, Call, MethodCall and a
-        // parenthesized expression all take the `_ => ""` arm, so a name-based
-        // fix could not see `fs[0](7)` at all. (2) For a MemberAccess callee
-        // `name` is the *field* name, and mark_used searches lexical scopes by
-        // string — so `b.cb(1)` would have marked an unrelated local named `cb`
-        // used and silently swallowed a warning that should fire.
-        //
-        // This is not double inference: infer_type's Call arm is the only walker
-        // of a Call, and it delegates here, which until now inferred the args
-        // and skipped the callee entirely. So a nested callee's own arguments
-        // (`f(a)(b)`, `o.m(a)(b)`) were not being checked either, and now are —
-        // exactly once.
-        this.infer_expr(callee)
+        // A called bare cross-module function is a Ref in callee position and is
+        // NOT routed through infer_type's Ref arm (infer_call reads the name off
+        // the callee directly and never infers the callee expression), so §6a
+        // path 3 for a *call* must be decided here. The slot carries the defining
+        // module's prefix; a func-kind Ref with a non-empty slot is exactly a
+        // cross-module call. Placed before arg inference so the diagnostic points
+        // at the call, not at something inside its arguments.
+        match (callee) {
+            Ref(rk, rn, rs) => {
+                if (rk == "func" or rk == "global") {
+                    this.check_module_ref_visibility(rn, rs)
+                }
+            }
+            _ => nil
+        }
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
         var di: Float = 0
         while (di < args.length()) {
@@ -2213,6 +2997,18 @@ class NullChecker {
         while (ai < args.length()) {
             this.infer_expr(args[ai])
             ai = ai + 1
+        }
+        // A construction is a call: `Secret(42)` reaches here with name="Secret",
+        // and so does `Mod.Secret(42)` (the MemberAccess arm above yields the
+        // field name). register_decl registers every class as a function
+        // returning its own type, so there is no separate instantiation node to
+        // hang this off — which is why `private init` was ignorable until now.
+        //
+        // Gated on the name actually being a declared class so an ordinary call
+        // never consults the visibility tables. A method call does not come
+        // through here at all (infer_method_call handles those).
+        if (name.length() > 0 and this.env.class_fields.has(this.qualified_class_key(name))) {
+            this.check_constructor_visibility(name)
         }
         // Look up declared return type
         if (name.length() > 0) {
@@ -2334,6 +3130,34 @@ class NullChecker {
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
                 return obj_name
             }
+            // Alias-qualified construction: `Mod.Gauge(42)`. This is the SECOND
+            // spelling of a construction and it does not reach infer_call at all
+            // — the parser builds a MethodCall here, with the module alias as the
+            // receiver, so the bare `Gauge(42)` check in infer_call never sees
+            // it. Missing this arm is what made `private init` enforceable only
+            // through the importing file's own bare references, i.e. not at all
+            // across the boundary it exists to police.
+            //
+            // Sits in the `obj_type == "Any"` branch beside the enum-variant
+            // lookup because a module alias is exactly that: a receiver the
+            // checker has no type for. Gated on the method name being a declared
+            // class, so an ordinary method call on an Any-typed receiver never
+            // consults the visibility tables.
+            if (this.env.class_fields.has(this.qualified_class_key(method))) {
+                this.check_constructor_visibility(method)
+            }
+            // §6a path 2: alias-qualified `Mod.name`. The receiver is a module
+            // alias — an Any-typed name to the checker — so it is resolved to the
+            // defining module's prefix through entry_aliases (main.sf's
+            // resolved_aliases) and the module-level visibility of `prefix+method`
+            // is decided exactly as the bare and named-import paths are. Gated on
+            // obj_name actually being a known alias, so an ordinary method call on
+            // an Any-typed receiver never consults the map. Uses the alias's
+            // prefix as the defining side; check_module_ref_visibility compares it
+            // against current_prefix / current_package as usual.
+            if (obj_name.length() > 0 and this.entry_aliases.has(obj_name)) {
+                this.check_module_ref_visibility(method, this.entry_aliases.get(obj_name))
+            }
         }
 
         // Map.get returns nullable — unless inside a has() guard
@@ -2417,6 +3241,13 @@ class NullChecker {
             // not dropped, though — they are exactly what resolves the method's
             // type parameters below (BUGS #95).
             var full_name: String = this.generic_base(obj_type) + "__" + method
+            // The receiver's class is known here, so a private method call can be
+            // decided. Placed inside this branch rather than at the top of the
+            // function on purpose: the builtin-type arms above return before
+            // reaching here, so `m.get(k)` and `list.length()` never consult the
+            // visibility tables and cannot be perturbed by a user class that
+            // happens to declare a private method of the same name.
+            this.check_member_visibility(obj_type, method, "method")
             // Check generic constraints for class methods
             if (this.is_generic_func(full_name)) {
                 this.check_generic_constraints(full_name, args)
@@ -3405,7 +4236,7 @@ fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>):
 // With an empty boundary list this degrades to the old flat behaviour rather
 // than failing, which is what makes check_errors_with_imports above still valid.
 fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): String {
-    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker())
+    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker(), {})
 }
 
 // The `internal` (package-scope) half of module identity: same walk as
@@ -3426,8 +4257,9 @@ fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, 
 // gets the packageless marker, which denies `internal` access rather than
 // granting it. That is what keeps check_errors_with_modules above — and every
 // caller that has no manifest information at all — valid and conservative.
-fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String): String {
+fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String, entry_aliases: Map<String, String>): String {
     var checker: NullChecker = NullChecker()
+    checker.entry_aliases = entry_aliases
     var prefixes: List<String> = prefixes_joined.split("|")
     var pkg_roots: List<String> = []
     if (package_roots_joined.length() > 0) {
