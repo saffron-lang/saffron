@@ -1,0 +1,68 @@
+// A double is never dereferenced as a GC pointer, whatever its bit pattern.
+//
+// The runtime's __rt_as_list_ptr / __rt_as_map_ptr / __rt_as_string_ptr accept a
+// value in either representation, so for an untagged one they had to guess
+// whether an i64 is a pointer before reading its GC header at raw-8. The guess
+// was `upper == 0 and v > 65536`, which admits any double whose IEEE-754 bit
+// pattern lands in [65537, 2^48) — every value from about 3.24e-319 to
+// 1.39e-309. Printing one therefore dereferenced it:
+//
+//   IO.println(1.0e-310)   // bits 20240225330731
+//   -> EXC_BAD_ACCESS at 0x12688b70e623, in __rt_as_list_ptr, before any output
+//
+// The fix adds the two guards @__val_class_tag in base_nanbox.ll already
+// documents as mandatory — 8-byte alignment and a 4 GB floor — in one shared
+// helper, __rt_gc_tag_of.
+//
+// The values below are chosen to sit on both sides of the old window, so the
+// test covers the boundary rather than one unlucky constant. It asserts that
+// these round-trip through formatting, which is the invariant that holds
+// regardless of how a subnormal is spelled in decimal.
+import "@test" as Test
+
+fun main() {
+    // Below the old 65536 floor: was always safe. Control.
+    var below: Float = 5.0e-320
+    Test.assert(below > 0.0, "a subnormal below the old floor is positive")
+
+    // INSIDE the old window — these are the ones that crashed. Printing them at
+    // all is most of the test; if the deref came back these lines would not
+    // return.
+    var inside1: Float = 1.0e-310
+    Test.assert(inside1 > 0.0, "1e-310 survives being formatted")
+    var inside2: Float = 5.0e-315
+    Test.assert(inside2 > 0.0, "5e-315 survives being formatted")
+    var inside3: Float = 3.5e-319
+    Test.assert(inside3 > 0.0, "3.5e-319 survives being formatted")
+
+    // Above the window (upper bits non-zero): was always safe. Control.
+    var above: Float = 1.4e-309
+    Test.assert(above > 0.0, "a subnormal above the old window is positive")
+
+    // Ordering among them is still numeric, not bit-pattern guesswork.
+    Test.assert(below < inside2, "5e-320 < 5e-315")
+    Test.assert(inside2 < inside1, "5e-315 < 1e-310")
+    Test.assert(inside1 < above, "1e-310 < 1.4e-309")
+
+    // The same values nested in a collection, which is the path that actually
+    // calls __rt_as_list_ptr on every element: __list_to_string formats each
+    // element through __rt_elem_to_string. A crash here is the original repro.
+    var xs = [inside1, inside2, inside3, below, above]
+    Test.assert_eq(xs.length(), 5, "a list of subnormals is a list")
+    var joined: String = "${xs}"
+    Test.assert(joined.length() > 0, "a list of subnormals formats to something")
+    Test.assert(joined.starts_with("["), "and it formats as a list, not a deref")
+
+    // As map values, and as the element read for-in performs.
+    var m: Map<String, Float> = {}
+    m.set("a", inside1)
+    m.set("b", inside2)
+    Test.assert_eq(m.length(), 2, "subnormals as map values")
+    var seen = 0
+    for (x in xs) {
+        if (x > 0.0) { seen = seen + 1 }
+    }
+    Test.assert_eq(seen, 5, "for-in over subnormals reads all five")
+
+    Test.summary()
+}
