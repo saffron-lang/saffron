@@ -119,4 +119,12 @@ export function isBuiltinModule(name: string): boolean {
   return builtins.some((m) => m.name === name);
 }
 
+/// The functions a builtin module exposes, or [] if the module is unknown.
+/// Used by completion to offer `Module.<member>` candidates without shelling
+/// out to the compiler (native modules have no .sf source to check).
+export function getBuiltinFunctions(moduleName: string): BuiltinFn[] {
+  const mod = builtins.find((m) => m.name === moduleName);
+  return mod ? mod.functions : [];
+}
+
 export const builtinModuleNames = builtins.map((m) => m.name);

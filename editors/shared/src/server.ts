@@ -13,13 +13,25 @@ import {
   Hover,
   Location,
   MarkupKind,
+  DocumentSymbolParams,
+  DocumentSymbol,
+  SymbolKind,
+  CompletionParams,
+  CompletionItem,
+  CompletionItemKind,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
-import { getBuiltinStub, getBuiltinFunctionLine, isBuiltinModule } from "./builtins";
+import {
+  getBuiltinStub,
+  getBuiltinFunctionLine,
+  isBuiltinModule,
+  getBuiltinFunctions,
+  builtinModuleNames,
+} from "./builtins";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,23 +74,41 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       textDocumentSync: TextDocumentSyncKind.Full,
       hoverProvider: true,
       definitionProvider: true,
+      documentSymbolProvider: true,
+      completionProvider: {
+        // `.` for member completion (Module.member), plus the default identifier
+        // trigger the client applies on typing.
+        triggerCharacters: ["."],
+      },
     },
   };
 });
 
+// The compiler's --json diagnostic shape (see src/compiler/diag.sf
+// diagnostic_to_json). line/column/offset/length are present ONLY when
+// `located` is true; an unlocated diagnostic (most checker errors today) omits
+// them rather than emitting 0, so the client must never place a squiggle for
+// one — see mapDiagnostics.
 interface SaffronDiagnostic {
-  line: number;
-  column: number;
-  length: number;
-  severity: "error" | "warning";
+  severity: "error" | "warning" | "internal compiler error";
+  phase: string;
+  file: string;
   message: string;
+  located: boolean;
+  line?: number;
+  column?: number;
+  offset?: number;
+  length?: number;
 }
 
+// The --json symbol shape (see src/compiler/diag.sf symbol_json). Only located
+// symbols are emitted, so line/column/offset/length are always present here.
 interface SaffronSymbol {
   name: string;
   kind: "variable" | "function" | "class" | "parameter" | "module" | "enum" | "variant" | "interface" | "method";
   line: number;
   column: number;
+  offset: number;
   length: number;
 }
 
@@ -195,62 +225,110 @@ function getDepPath(pkgName: string): string | null {
 }
 
 function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
-  return raw.map((d) => ({
-    range: {
-      start: { line: d.line - 1, character: d.column - 1 },
-      end: { line: d.line - 1, character: d.column - 1 + Math.max(d.length, 1) },
-    },
-    severity:
-      d.severity === "error"
-        ? DiagnosticSeverity.Error
-        : DiagnosticSeverity.Warning,
-    message: d.message,
-    source: "saffron",
-  }));
+  // Only located diagnostics become in-file squiggles. An unlocated one (the
+  // compiler emits `located:false` for the many checker errors that have no
+  // source region yet) has no defensible place to point — putting it at 0:0
+  // would blame the top of the file for an error elsewhere. Those surface via
+  // the message pane path instead (see publishDiagnostics), never as a range.
+  return raw
+    .filter((d) => d.located && d.line !== undefined && d.column !== undefined)
+    .map((d) => {
+      const line = d.line! - 1;
+      const col = d.column! - 1;
+      const len = Math.max(d.length ?? 1, 1);
+      return {
+        range: {
+          start: { line, character: col },
+          end: { line, character: col + len },
+        },
+        severity:
+          d.severity === "warning"
+            ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Error,
+        message: d.message,
+        source: "saffron",
+      };
+    });
 }
 
-async function runCheck(uri: string): Promise<CheckOutput | null> {
-  const filePath = decodeURIComponent(uri.replace("file://", ""));
+// Compile a file (or the given in-memory text) in --json mode and parse the
+// single JSON object the compiler prints. `text`, when supplied, is the unsaved
+// editor buffer: it is written to a temp file so the compiler sees live edits
+// before the user saves. Returns null only if the compiler produced no
+// parseable JSON at all (a crash), which callers treat as "no info", not "clean".
+async function runCheck(uri: string, text?: string): Promise<CheckOutput | null> {
+  const realPath = decodeURIComponent(uri.replace("file://", ""));
 
-  const args = ["--check"];
+  let checkPath = realPath;
+  let tempPath: string | null = null;
+  if (text !== undefined) {
+    // Keep the .sf extension and basename so import resolution relative to the
+    // file's own directory is unaffected; write alongside the real file.
+    tempPath = path.join(
+      path.dirname(realPath),
+      `.${path.basename(realPath)}.lsp-${process.pid}.tmp.sf`,
+    );
+    try {
+      fs.writeFileSync(tempPath, text);
+      checkPath = tempPath;
+    } catch {
+      // Fall back to the on-disk file if the temp write fails (read-only dir).
+      tempPath = null;
+    }
+  }
+
+  const args = ["--json"];
   if (projectRoot) {
     const stdlibPath = path.join(projectRoot, "src", "lib");
     if (fs.existsSync(stdlibPath)) {
       args.push("--stdlib", stdlibPath);
     }
   }
-  args.push(filePath, "/dev/null");
+  args.push(checkPath, "/dev/null");
 
   try {
-    const { stdout, stderr } = await execFileAsync(compilerPath, args, {
-      timeout: 10000,
-    });
-    const output = stdout + stderr;
-    const result = parseCheckOutput(filePath, output);
-    fileCache.set(uri, result);
+    let output: string;
+    try {
+      const { stdout } = await execFileAsync(compilerPath, args, {
+        timeout: 10000,
+      });
+      output = stdout;
+    } catch (err: any) {
+      // --json exits non-zero when the file has errors; the JSON is still on
+      // stdout. Only stdout is JSON — stderr, if any, is not.
+      output = err.stdout || "";
+    }
+    const result = parseCheckOutput(realPath, output);
+    if (result) fileCache.set(uri, result);
     return result;
-  } catch (err: any) {
-    const output = (err.stdout || "") + (err.stderr || "");
-    const result = parseCheckOutput(filePath, output);
-    fileCache.set(uri, result);
-    return result;
+  } finally {
+    if (tempPath) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        /* best effort */
+      }
+    }
   }
 }
 
-function parseCheckOutput(filePath: string, output: string): CheckOutput {
-  const diagnostics: SaffronDiagnostic[] = [];
-  const errorRegex = /\[line (\d+), col (\d+)\] (Error|Warning): (.+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = errorRegex.exec(output)) !== null) {
-    diagnostics.push({
-      line: parseInt(match[1]),
-      column: parseInt(match[2]),
-      length: 1,
-      severity: match[3].toLowerCase() === "warning" ? "warning" : "error",
-      message: match[4],
-    });
+// Parse the compiler's --json object. The compiler reports diagnostics against
+// the temp path when one is used, so `file` in the payload is overwritten with
+// the real path the client knows. Returns null on unparseable output.
+function parseCheckOutput(filePath: string, output: string): CheckOutput | null {
+  const trimmed = output.trim();
+  if (!trimmed) return null;
+  let data: any;
+  try {
+    data = JSON.parse(trimmed);
+  } catch {
+    return null;
   }
-  return { file: filePath, diagnostics, symbols: [] };
+  const diagnostics: SaffronDiagnostic[] = Array.isArray(data.diagnostics)
+    ? data.diagnostics
+    : [];
+  const symbols: SaffronSymbol[] = Array.isArray(data.symbols) ? data.symbols : [];
+  return { file: filePath, diagnostics, symbols };
 }
 
 interface WordContext {
@@ -518,22 +596,182 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
   };
 });
 
-documents.onDidSave(async (event) => {
-  const result = await runCheck(event.document.uri);
+// Check the given document and publish its diagnostics. `text` passes the live
+// (possibly unsaved) buffer through to the compiler via a temp file.
+async function checkAndPublish(doc: TextDocument): Promise<void> {
+  const result = await runCheck(doc.uri, doc.getText());
+  // Only replace a prior clean/located result on a parseable payload. A null
+  // (compiler crash) leaves the last good diagnostics in place rather than
+  // flickering the squiggles off.
   const diagnostics = result ? mapDiagnostics(result.diagnostics) : [];
-  connection.sendDiagnostics({ uri: event.document.uri, diagnostics });
+  if (result) {
+    connection.sendDiagnostics({ uri: doc.uri, diagnostics });
+  }
+}
+
+// Debounce live checks so a burst of keystrokes triggers one compile, not one
+// per character. 400ms is long enough to coalesce typing, short enough to feel
+// live. Keyed by uri so edits to different files don't cancel each other.
+const debounceTimers = new Map<string, NodeJS.Timeout>();
+const DEBOUNCE_MS = 400;
+
+function scheduleCheck(doc: TextDocument): void {
+  const existing = debounceTimers.get(doc.uri);
+  if (existing) clearTimeout(existing);
+  debounceTimers.set(
+    doc.uri,
+    setTimeout(() => {
+      debounceTimers.delete(doc.uri);
+      void checkAndPublish(doc);
+    }, DEBOUNCE_MS),
+  );
+}
+
+documents.onDidChangeContent((event) => {
+  // Fires on open and on every edit (TextDocumentSyncKind.Full). Debounced so
+  // live typing produces one compile per pause, giving live diagnostics that
+  // onDidSave alone could not.
+  scheduleCheck(event.document);
 });
 
-documents.onDidOpen(async (event) => {
-  const result = await runCheck(event.document.uri);
-  const diagnostics = result ? mapDiagnostics(result.diagnostics) : [];
-  connection.sendDiagnostics({ uri: event.document.uri, diagnostics });
+documents.onDidSave(async (event) => {
+  const existing = debounceTimers.get(event.document.uri);
+  if (existing) {
+    clearTimeout(existing);
+    debounceTimers.delete(event.document.uri);
+  }
+  await checkAndPublish(event.document);
 });
 
 documents.onDidClose((event) => {
+  const existing = debounceTimers.get(event.document.uri);
+  if (existing) {
+    clearTimeout(existing);
+    debounceTimers.delete(event.document.uri);
+  }
   fileCache.delete(event.document.uri);
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
 });
+
+// --- Document outline (documentSymbol) ---
+
+const symbolKinds: Record<string, SymbolKind> = {
+  variable: SymbolKind.Variable,
+  function: SymbolKind.Function,
+  class: SymbolKind.Class,
+  parameter: SymbolKind.Variable,
+  module: SymbolKind.Module,
+  enum: SymbolKind.Enum,
+  variant: SymbolKind.EnumMember,
+  interface: SymbolKind.Interface,
+  method: SymbolKind.Method,
+};
+
+function symbolRange(sym: SaffronSymbol) {
+  const line = sym.line - 1;
+  const col = sym.column - 1;
+  return {
+    start: { line, character: col },
+    end: { line, character: col + sym.length },
+  };
+}
+
+connection.onDocumentSymbol(
+  async (params: DocumentSymbolParams): Promise<DocumentSymbol[]> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    let cached = fileCache.get(params.textDocument.uri);
+    if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+    if (!cached) return [];
+
+    // The compiler emits a flat symbol list (declarations plus enum variants and
+    // class methods). Present it flat; a nesting pass would need container info
+    // the payload does not yet carry. Each symbol's range and selectionRange are
+    // the same name-span — precise enough for outline navigation and highlight.
+    return cached.symbols.map((sym) => {
+      const range = symbolRange(sym);
+      return {
+        name: sym.name,
+        kind: symbolKinds[sym.kind] ?? SymbolKind.Variable,
+        range,
+        selectionRange: range,
+      };
+    });
+  },
+);
+
+// --- Completion ---
+
+const completionKinds: Record<string, CompletionItemKind> = {
+  variable: CompletionItemKind.Variable,
+  function: CompletionItemKind.Function,
+  class: CompletionItemKind.Class,
+  parameter: CompletionItemKind.Variable,
+  module: CompletionItemKind.Module,
+  enum: CompletionItemKind.Enum,
+  variant: CompletionItemKind.EnumMember,
+  interface: CompletionItemKind.Interface,
+  method: CompletionItemKind.Method,
+};
+
+connection.onCompletion(
+  async (params: CompletionParams): Promise<CompletionItem[]> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const ctx = getWordAtPosition(doc, params.position.line, params.position.character);
+
+    // Member completion: `Module.<here>` or `alias.<here>`. Offer the members of
+    // the referenced module — a builtin's known functions, or the symbols of an
+    // imported .sf file.
+    if (ctx?.qualifier) {
+      if (isBuiltinModule(ctx.qualifier)) {
+        return getBuiltinFunctions(ctx.qualifier).map((fn) => ({
+          label: fn.name,
+          kind: CompletionItemKind.Function,
+          detail: `fun ${fn.name}(${fn.params}): ${fn.returnType}`,
+        }));
+      }
+      const imports = resolveImports(doc);
+      const targetFile = imports.get(ctx.qualifier);
+      if (targetFile) {
+        const targetUri = "file://" + targetFile;
+        let targetCheck = fileCache.get(targetUri);
+        if (!targetCheck) targetCheck = (await runCheck(targetUri)) ?? undefined;
+        if (targetCheck) {
+          // Only top-level, public-facing kinds are meaningful as module members.
+          return targetCheck.symbols
+            .filter((s) => s.kind === "function" || s.kind === "class" || s.kind === "enum" || s.kind === "interface" || s.kind === "variable")
+            .map((s) => ({
+              label: s.name,
+              kind: completionKinds[s.kind] ?? CompletionItemKind.Field,
+            }));
+        }
+      }
+      return [];
+    }
+
+    // Bare identifier completion: this file's own declarations plus the builtin
+    // module names (so typing `IO` offers the module to dot into).
+    let cached = fileCache.get(params.textDocument.uri);
+    if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+
+    const items: CompletionItem[] = [];
+    if (cached) {
+      const seen = new Set<string>();
+      for (const s of cached.symbols) {
+        if (seen.has(s.name)) continue;
+        seen.add(s.name);
+        items.push({ label: s.name, kind: completionKinds[s.kind] ?? CompletionItemKind.Variable });
+      }
+    }
+    for (const name of builtinModuleNames) {
+      items.push({ label: name, kind: CompletionItemKind.Module });
+    }
+    return items;
+  },
+);
 
 documents.listen(connection);
 connection.listen();
