@@ -1,0 +1,7 @@
+fun main() {
+    IO.println("literal")
+    var name = "world"
+    IO.println("interp ${name}")
+    IO.println(42)
+    IO.println(true)
+}

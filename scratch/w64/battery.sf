@@ -1,0 +1,10 @@
+fun main() {
+    IO.println("a string")
+    IO.println(42)
+    IO.println(true)
+    IO.println(false)
+    var l = [1, 2, 3]
+    IO.println(l.length())
+    var name = "world"
+    IO.println("hello ${name}")
+}
