@@ -5333,6 +5333,126 @@ comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
 
 ---
 
+### 120. FIXED — calling a `Fun`-typed field through `this` emitted a call to a nonexistent method symbol
+
+A class field holding a closure could not be called as `this.field(args)`. The
+program failed to **link**, with an undefined symbol `Class__field` — the mangling
+for a *method* named `field`, which no definition exists for:
+
+```saffron
+class Holder { var f: Fun
+               fun init(f: Fun) { this.f = f }
+               fun call_it(x: Int): Int { return this.f(x) } }
+Holder(fun (x: Int): Int => x * 2).call_it(21)
+```
+
+```
+Undefined symbols for architecture arm64:
+  "_Holder__f", referenced from:
+      _Holder__call_it in output-038fc0.o
+```
+
+`src/lib/heap.sf` was a casualty: it declares `var _cmp: Fun` and calls
+`this._cmp(...)` at heap.sf:101,121,124, so the shipped `@heap` module **could not
+be linked at all**.
+
+`gen_namespace_call` (`methods_body.sf:1001`) already had an arm that rewrites a
+function-typed-field call into an indirect call through the stored closure pair.
+Its guard tested the rendered field type with `starts_with("Fun(")` plus two
+arrow-shaped spellings. The trap is that the three ways to declare a
+function-typed field parse to three **different AST nodes** and therefore render as
+three unrelated strings:
+
+| Spelling | AST node | Rendered |
+|---|---|---|
+| `(A, B) => R` | `FuncType` | `"Fun(A,B):R"` |
+| `Fun<A, B, R>` | `GenericType("Fun", ...)` | `"Fun<A,B,R>"` |
+| `Fun` | **`ClassType("Fun")`** — not a function-type node at all | `"Fun"` |
+
+Only the arrow spelling matched. Bare `Fun` is the one that should be surprising:
+it never becomes a `FuncType`, so `type_to_string` returns it through the
+`ClassType(n)` arm as the plain string `"Fun"`, with no bracket of any kind to
+match on. The other two fell through to the ordinary method path below, which
+mangles `ns + "__" + method` and emits a direct call.
+
+Because the mistake produced a *reference to a symbol* rather than wrong
+arithmetic, it surfaced at link time instead of as a silent miscompile — which is
+the only reason it was not much worse.
+
+Verified directly, and the negative evidence is the good part: a three-class probe
+gave `_BareFun__f` and `_GenericFun__f` undefined while **`_ArrowFun__f` was
+absent** from the linker's list — exactly the spelling the old guard handled. After
+the fix all three print correctly.
+
+**Copying the field to a local first worked**, and was the de-facto workaround:
+
+```saffron
+fun call_it(x: Int): Int { var g: Fun = this.f
+                           return g(x) }        // prints 42
+```
+
+A local in callee position goes through `gen_call`'s indirect path, which unpacks
+the closure pair directly and never consults a field type at all. That the
+workaround existed is why this read as a dispatch bug rather than a broken
+closure-invocation path — the invocation machinery was fine throughout.
+
+Fixed by adding `Fun<` and exact `"Fun"` to the guard (`methods_body.sf:1021`), so
+all three spellings take the indirect-call arm. The new arm was verified to
+actually *execute* rather than inferred from a passing test — `Holder__call_it` now
+emits `inttoptr` + `call i64 %t11(i64 %t9, i64 %t10)`, unpacking both slots of the
+closure pair, and `Holder__f` appears 0 times in the IR. That check matters in this
+file specifically: the universal prefixed-alias arm makes any specialized arm below
+it dead code, which is what caused #38 and #91.
+
+`test/pass/fun_field_call.sf` covers all three spellings in both the
+`this.field(args)` and local-copy forms, plus a capturing closure (so slot 1's env
+pointer must be loaded, not just the code pointer), a class with two function fields
+and one non-function field (so the `getelementptr` index must be right rather than
+incidentally zero), a class where a real method of the same shape must still
+dispatch statically, and `@heap` driven through its actual import.
+
+---
+
+### 121. A variable used only in callee position is falsely reported as an unused variable
+
+**Severity: low** — warning-only, no codegen consequence. Filed because it is a
+*false* diagnostic, and a warning that fires on correct code is how people learn to
+ignore warnings.
+
+```saffron
+fun run(): Int {
+    var fs: List<Fun> = [fun (x: Int): Int => x]
+    return fs[0](7)            // fs IS used, right here
+}
+```
+
+```
+[checker] Warning: unused variable 'fs'
+```
+
+`infer_call` (`checker.sf:2161`) pattern-matches the callee only to extract a *name
+string* for the return-type lookup, and never calls `infer_expr` on it. Since
+`mark_used` is reachable only from the `Variable`/`Ref` arms of `infer_type`
+(`checker.sf:1701,1705`), a variable appearing **only** in callee position is never
+marked used.
+
+The axis is "appears only as a callee", **not** "has a function type" — which is
+what makes this its own bug rather than part of #120. Two observations pin that
+down: a `List<Fun>` variable, which is not a function type at all, warns when its
+only appearance is `fs[0](7)`; and the same variable used as a plain value
+(`var alias: Fun = h`) is correctly marked used.
+
+One wrinkle worth recording so a future reproduction attempt does not conclude the
+bug is absent: at **top level** the same `List<Fun>` spelling does *not* warn — only
+inside a function body. So a repro must put the variable in a `fun`.
+
+Found while fixing #120, and deliberately not fixed alongside it: the correction
+(calling `infer_expr(callee)`, or `mark_used` on the extracted name) touches a
+use-marking path shared by every call site in the compiler, so it wants its own
+change with its own test rather than riding along on an unrelated codegen fix.
+
+---
+
 ## Fixed
 
 - ~~#53: `UUID.v4()` always returned the all-zero UUID~~ — `src/lib/uuid.sf`
