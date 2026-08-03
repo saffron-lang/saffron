@@ -292,7 +292,15 @@ class Lexer {
         }
 
         var has_dot: Bool = false
-        if (this.pos < this.source.length() and this.peek() == ".") {
+        // A `.` immediately followed by a second `.` is not a decimal point.
+        // Without this guard `0..5` scanned as TkFloat("0.") TkDot TkInt(5), and
+        // the parser's tuple-access branch built IndexGet(0., 5) — a float handed
+        // to __list_length/__list_get, which segfaulted with no diagnostic from
+        // any stage (BUGS #112). Leaving both dots alone makes `0..5` come out as
+        // TkInt(0) TkDot TkDot TkInt(5), which the parser rejects by name, and is
+        // also the token stream a real range operator would want.
+        var dot_is_decimal: Bool = this.peek() == "." and this.peek_next() != "."
+        if (this.pos < this.source.length() and dot_is_decimal) {
             has_dot = true
             this.advance()
             while (this.pos < this.source.length() and this.is_digit(this.peek())) {
