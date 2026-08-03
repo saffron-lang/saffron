@@ -1,0 +1,5 @@
+var counter: Int = 0
+fun tick(): Int { return 1 }
+class Widget { var w: Int
+  fun init() { this.w = 0 } }
+enum Colour { Red, Green }

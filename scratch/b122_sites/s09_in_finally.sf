@@ -1,0 +1,2 @@
+import "@math" as Math
+try { IO.println(1) } finally { Math.NOPE = 3 }

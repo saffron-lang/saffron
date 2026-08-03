@@ -1,0 +1,6 @@
+import "@math" as Math
+fun outer(): Int {
+  fun inner() { Math.NOPE = 3 }
+  inner()
+  return 0 }
+IO.println(outer())

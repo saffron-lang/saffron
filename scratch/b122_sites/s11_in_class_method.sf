@@ -1,0 +1,6 @@
+import "@math" as Math
+class C { var v: Int
+  fun init() { this.v = 0 }
+  fun go() { Math.NOPE = 3 } }
+var c = C()
+c.go()

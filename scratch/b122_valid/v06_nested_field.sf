@@ -1,0 +1,7 @@
+class In { var n: Int
+  fun init() { this.n = 0 } }
+class Out { var i: In
+  fun init() { this.i = In() } }
+var o = Out()
+o.i.n = 5
+IO.println(o.i.n)

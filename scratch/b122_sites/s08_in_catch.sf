@@ -1,0 +1,2 @@
+import "@math" as Math
+try { throw "x" } catch (e) { Math.NOPE = 3 }

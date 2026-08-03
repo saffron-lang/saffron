@@ -1,0 +1,6 @@
+import "@math" as Math
+actor A { var v: Int
+  fun init() { this.v = 0 }
+  fun go() { Math.NOPE = 3 } }
+var a = A()
+a.go()

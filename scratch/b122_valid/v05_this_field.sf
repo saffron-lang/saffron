@@ -1,0 +1,6 @@
+class Box { var v: Int
+  fun init() { this.v = 1 }
+  fun set(n: Int) { this.v = n } }
+var b = Box()
+b.set(9)
+IO.println(b.v)

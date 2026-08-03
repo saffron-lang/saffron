@@ -1,0 +1,3 @@
+import "./mod/inner.sf" as Inner
+Inner.counter = 5
+IO.println(Inner.counter)

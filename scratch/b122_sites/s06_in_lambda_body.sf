@@ -1,0 +1,4 @@
+import "@math" as Math
+var g = fun () => 0
+fun f() { Math.NOPE = 3 }
+f()

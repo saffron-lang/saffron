@@ -1,0 +1,6 @@
+import "@math" as Math
+fun f(): Int {
+  var Math: Int = 1
+  Math = 2
+  return Math }
+IO.println(f())

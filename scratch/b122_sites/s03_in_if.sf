@@ -1,0 +1,2 @@
+import "@math" as Math
+if (true) { Math.NOPE = 3 }

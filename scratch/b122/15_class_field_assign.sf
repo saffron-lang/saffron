@@ -1,0 +1,5 @@
+class Box { var v: Int
+  fun init() { this.v = 0 } }
+var b = Box()
+b.v = 7
+IO.println(b.v)

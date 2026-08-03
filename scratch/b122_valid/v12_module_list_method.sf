@@ -1,0 +1,4 @@
+import "@math" as Math
+var l: List<Int> = []
+l.push(1)
+IO.println(l.length() + Math.floor(1.2))

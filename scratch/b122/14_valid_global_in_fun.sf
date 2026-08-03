@@ -1,0 +1,4 @@
+import "@math" as Math
+fun f(): Float { Math.pi = 3.0
+  return Math.pi }
+IO.println(f())

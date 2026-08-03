@@ -1,0 +1,4 @@
+var g: Int = 1
+fun bump() { g = g + 1 }
+bump()
+IO.println(g)

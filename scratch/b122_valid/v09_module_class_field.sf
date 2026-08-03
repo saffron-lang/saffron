@@ -1,0 +1,7 @@
+import "@test" as Test
+class Box { var v: Int
+  fun init() { this.v = 0 } }
+var b = Box()
+b.v = 3
+Test.assert_eq(b.v, 3, "field write survives")
+Test.summary()

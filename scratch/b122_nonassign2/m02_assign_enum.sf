@@ -1,0 +1,2 @@
+import "./mod/inner.sf" as Inner
+Inner.Colour = 1

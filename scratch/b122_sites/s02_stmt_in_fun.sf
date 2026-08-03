@@ -1,0 +1,3 @@
+import "@math" as Math
+fun f() { Math.NOPE = 3 }
+f()

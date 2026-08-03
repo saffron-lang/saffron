@@ -1,0 +1,2 @@
+import "@iter" as Iter
+Iter.sum = 1

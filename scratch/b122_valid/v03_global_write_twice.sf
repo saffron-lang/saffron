@@ -1,0 +1,4 @@
+import "@math" as Math
+Math.pi = 3.0
+Math.tau = 6.0
+IO.println(Math.pi + Math.tau)

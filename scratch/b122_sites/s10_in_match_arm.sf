@@ -1,0 +1,4 @@
+import "@math" as Math
+var v: Int = 1
+var r = match (v) { _ => { Math.NOPE = 3 } }
+IO.println(r)

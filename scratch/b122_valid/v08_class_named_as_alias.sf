@@ -1,0 +1,6 @@
+import "@math" as Math
+class Local { var v: Int
+  fun init() { this.v = 0 } }
+var Math2 = Local()
+Math2.v = 4
+IO.println(Math2.v)

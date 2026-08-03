@@ -1,0 +1,2 @@
+import "@math" as Math
+for (x in [1]) { Math.NOPE = 3 }

@@ -1,0 +1,2 @@
+import "@math" as Math
+Math.pi[0] = 1
