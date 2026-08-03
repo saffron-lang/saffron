@@ -1,0 +1,132 @@
+// Calling a function-typed FIELD through `this` must emit an INDIRECT call
+// through the closure stored in that field, not a call to a method symbol
+// `Class__field` that no definition exists for.
+//
+// Before the fix, only the "Fun(A,B):R" rendering of a FuncType was recognised
+// as a function type in gen_namespace_call. A bare `Fun` annotation parses to
+// ClassType("Fun") and renders as the plain string "Fun", so it fell through to
+// the method path and the program failed to LINK with an undefined symbol
+// `_Holder__f`. That is the spelling src/lib/heap.sf uses for its comparator,
+// so `@heap` could not link at all.
+//
+// The invariant asserted here is that all three spellings of a function-typed
+// field are callable through `this`, and that the local-copy spelling (which
+// always worked, and was the workaround) keeps working.
+import "@test" as Test
+import "@heap" as Heap
+
+// --- bare `Fun` — the spelling that used to fail to link ---
+class BareFun {
+    var f: Fun
+    fun init(f: Fun) { this.f = f }
+    fun direct(x: Int): Int { return this.f(x) }
+    fun via_local(x: Int): Int {
+        var g: Fun = this.f
+        return g(x)
+    }
+}
+
+// --- arrow spelling `(Int) => Int` ---
+class ArrowFun {
+    var f: (Int) => Int
+    fun init(f: (Int) => Int) { this.f = f }
+    fun direct(x: Int): Int { return this.f(x) }
+    fun via_local(x: Int): Int {
+        var g: (Int) => Int = this.f
+        return g(x)
+    }
+}
+
+// --- generic spelling `Fun<Int, Int>` ---
+class GenericFun {
+    var f: Fun<Int, Int>
+    fun init(f: Fun<Int, Int>) { this.f = f }
+    fun direct(x: Int): Int { return this.f(x) }
+    fun via_local(x: Int): Int {
+        var g: Fun<Int, Int> = this.f
+        return g(x)
+    }
+}
+
+// A capturing closure in the field, to prove the env pointer of the closure
+// pair is loaded too and not just the code pointer.
+class Capturing {
+    var f: Fun
+    fun init(f: Fun) { this.f = f }
+    fun direct(x: Int): Int { return this.f(x) }
+}
+
+// Two function-typed fields plus a non-function field, so the field INDEX used
+// by the getelementptr has to be right and not merely zero.
+class TwoFuns {
+    var label: String
+    var first: Fun
+    var second: Fun
+    fun init(first: Fun, second: Fun) {
+        this.label = "two"
+        this.first = first
+        this.second = second
+    }
+    fun call_first(x: Int): Int { return this.first(x) }
+    fun call_second(x: Int): Int { return this.second(x) }
+    fun get_label(): String { return this.label }
+}
+
+// A real method must still win over a same-named field lookup path: `run` is a
+// genuine method here and must dispatch statically.
+class HasRealMethod {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun run(x: Int): Int { return x + this.n }
+    fun call_run(x: Int): Int { return this.run(x) }
+}
+
+var doubler = fun (x: Int): Int => x * 2
+
+var bare = BareFun(doubler)
+Test.assert_eq(bare.direct(21), 42, "bare Fun field called through this")
+Test.assert_eq(bare.via_local(21), 42, "bare Fun field via local copy")
+
+var arrow = ArrowFun(fun (x: Int): Int => x * 3)
+Test.assert_eq(arrow.direct(14), 42, "arrow-typed field called through this")
+Test.assert_eq(arrow.via_local(14), 42, "arrow-typed field via local copy")
+
+var generic = GenericFun(fun (x: Int): Int => x * 4)
+Test.assert_eq(generic.direct(10), 40, "Fun<Int,Int> field called through this")
+Test.assert_eq(generic.via_local(10), 40, "Fun<Int,Int> field via local copy")
+
+// The closure captures `offset`, so calling it correctly requires the env
+// pointer from slot 1 of the closure pair.
+var offset: Int = 100
+var cap = Capturing(fun (x: Int): Int => x + offset)
+Test.assert_eq(cap.direct(5), 105, "capturing closure in a Fun field")
+
+var two = TwoFuns(fun (x: Int): Int => x + 1, fun (x: Int): Int => x + 2)
+Test.assert_eq(two.call_first(10), 11, "first of two Fun fields")
+Test.assert_eq(two.call_second(10), 12, "second of two Fun fields")
+Test.assert_eq(two.get_label(), "two", "non-function field still readable")
+
+var real = HasRealMethod(7)
+Test.assert_eq(real.call_run(35), 42, "a real method still dispatches statically")
+
+// --- the shipped stdlib module that this bug made unlinkable ---------------
+// heap.sf declares `var _cmp: Fun` and calls `this._cmp(...)` at heap.sf:101,
+// 121 and 124, so the whole module failed to link with an undefined
+// `_stdlib_heap_Heap___cmp`. Importing it here at all is part of the assertion:
+// if the bug comes back, this file stops linking.
+var hp = Heap.Heap(fun (a: Int, b: Int): Bool => a < b)
+hp.push(5)
+hp.push(1)
+hp.push(3)
+Test.assert_eq(hp.pop(), 1, "@heap pops the min through a Fun-typed comparator")
+Test.assert_eq(hp.pop(), 3, "@heap second pop")
+Test.assert_eq(hp.pop(), 5, "@heap third pop")
+
+// heap.sf's own constructor helper takes a bare `Fun` parameter too.
+var custom = Heap.new(fun (a: Int, b: Int): Bool => a > b)
+custom.push(5)
+custom.push(1)
+custom.push(3)
+Test.assert_eq(custom.pop(), 5, "@heap custom max comparator")
+
+Test.summary()
