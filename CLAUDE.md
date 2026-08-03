@@ -514,11 +514,13 @@ The two long-standing design limitations:
 - **#6**: no `break`/`continue` type checking — the runtime nodes exist, the
   checker ignores them
 
-Two more worth knowing before you trust a measurement or a clean compile:
-- **#118**: a nonexistent member of an imported module compiles cleanly and emits
-  invalid IR, so a typo'd `Module.thing` is not an error
-- **#119**: `saffronc` picks its input by looking for `.sf` in the *last* matching
-  argument, so an output path containing `.sf` is taken as the input and the real
-  input is never read — silently, with exit 0. Any ad-hoc sweep whose output names
-  embed `.sf` measures nothing. `tools/saffron` and `tools/run_tests.sh` are
-  unaffected; they write `output.ll` and `neg_<name>.ll`.
+One open trap worth knowing before you trust a clean compile:
+- **#122**: *assigning* to a nonexistent module member (`Module.nope = 3`) still
+  compiles clean, exits 0, and emits IR that `opt` rejects. The read half of this
+  (#118) is fixed and now reports the missing member; the write half is not.
+
+Both #118 and #119 are fixed, but the habit they should leave behind is worth
+keeping: a compiler that exits 0 is not evidence it read your file. #119 in
+particular made `saffronc in.sf out.sf.ll` compile the *output* path and exit 0,
+so ad-hoc sweeps reported nothing while appearing to report everything. When you
+measure, verify the thing you think you measured actually happened.
