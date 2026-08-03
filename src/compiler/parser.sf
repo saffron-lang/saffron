@@ -143,6 +143,18 @@ class Parser {
         return this.kind_name(kind)
     }
 
+    /// How to name the current token in a diagnostic about an unexpected member.
+    ///
+    /// kind_name answers "ident" for every identifier, which is useless in a
+    /// message the reader has to act on — "unexpected 'ident'" does not say
+    /// which word is wrong. Spell an identifier as itself and fall back to the
+    /// kind name for everything else.
+    fun current_member_desc(): String {
+        var word: String = this.peek_ident()
+        if (word.length() > 0) { return word }
+        return this.current_token_str()
+    }
+
     // --- Spans ---
     //
     // The parser is where a Token's inline position fields become an AST.Span.
@@ -2236,6 +2248,32 @@ class Parser {
             } else if (this.match_kind_check("fun")) {
                 // Method declaration (doc comment passed via parse_fun_decl_with_doc)
                 methods.push(this.parse_fun_decl_with_doc(member_doc))
+            } else {
+                // An unrecognised member token. This arm is not optional
+                // bookkeeping — without it the loop HANGS. The condition above
+                // tests only `}` and `eof`, and all three branches above advance
+                // only when they match, so a token matching none of them left
+                // this.pos where it was and the loop spun forever. `class C {
+                // private var x: Int }` reproduced it exactly: rc=124 under
+                // timeout, with no output at all.
+                //
+                // A hang is the worst failure mode available here, because there
+                // is no error string to grep for and nothing to point a user at.
+                // Any future member syntax hits this same arm, so the fix is an
+                // unconditional advance plus a diagnostic rather than one more
+                // specific test.
+                this.parse_error("unexpected '" + this.current_member_desc()
+                    + "' in the body of class '" + name + "'; expected 'var', 'fun' or '}'")
+                // Advance unconditionally FIRST — that single step is what makes
+                // progress guaranteed regardless of what the resync loop below
+                // decides — then skip ahead to the next plausible member start so
+                // one malformed member produces one diagnostic instead of one per
+                // token. `let x: Int = 1` otherwise reported six.
+                this.advance()
+                while (!this.match_kind_check("var") and !this.match_kind_check("fun")
+                    and !this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                    this.advance()
+                }
             }
         }
         this.consume("}")
