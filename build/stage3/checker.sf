@@ -520,6 +520,12 @@ class NullChecker {
             UnionType(ts) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            // Unknown is NOT Any. Conflating them is exactly what invariant I2
+            // forbids: Any means "dispatch at runtime", Unknown means "inference
+            // failed", and answering true here would route an inference gap into
+            // the dynamic-dispatch helpers instead of reporting it.
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -546,6 +552,8 @@ class NullChecker {
             EnumType(n) => false
             GenericType(b, a) => false
             FuncType(p, r) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -563,6 +571,8 @@ class NullChecker {
             UnionType(ts) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
         }
     }
 
@@ -656,6 +666,9 @@ class NullChecker {
             EnumType(n) => AST.Type.EnumType(n)
             GenericType(b, a) => AST.Type.GenericType(b, a)
             FuncType(p, r) => AST.Type.FuncType(p, r)
+            // Neither carries a Nil to strip, so both are identities here.
+            UnknownType => AST.Type.UnknownType
+            NeverType => AST.Type.NeverType
         }
     }
 
@@ -675,6 +688,8 @@ class NullChecker {
             UnionType(ts) => []
             FuncType(p, r) => []
             NullableType(inner) => []
+            UnknownType => []
+            NeverType => []
         }
     }
 
@@ -744,6 +759,8 @@ class NullChecker {
                 }
                 result
             }
+            UnknownType => "Unknown"
+            NeverType => "Never"
         }
     }
 
@@ -2280,8 +2297,21 @@ class NullChecker {
                     // Inferred from initializer
                     this.env.define_var(name, init_type_node)
                 } else {
-                    // Cannot infer type — warning (not blocking)
-                    this.warn(name + ": cannot infer type, add explicit annotation")
+                    // Cannot infer type — warning (not blocking).
+                    //
+                    // Except for the parser's own temporaries. `x++` desugars to
+                    // a block holding `var __inc_N = <the place>`, and a field or
+                    // element read does not infer, so a correct `this.n++`
+                    // produced "__inc_1: cannot infer type, add explicit
+                    // annotation" — a warning naming a variable that appears
+                    // nowhere in the user's source and that they cannot annotate.
+                    // The `__` prefix is the parser's marker for a synthesized
+                    // binding (`__for_item`, `__map_N`, `__inc_N`); those are
+                    // already exempt from the unused-variable warning at line 399
+                    // for the same reason.
+                    if (!name.starts_with("__")) {
+                        this.warn(name + ": cannot infer type, add explicit annotation")
+                    }
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
@@ -4071,6 +4101,8 @@ class NullChecker {
             GenericType(b, a) => this.fun_param_types_of(this.type_to_str(pt))
             UnionType(ts) => this.fun_param_types_of(this.type_to_str(pt))
             NullableType(inner) => this.fun_param_types_of(this.type_to_str(pt))
+            UnknownType => this.fun_param_types_of(this.type_to_str(pt))
+            NeverType => this.fun_param_types_of(this.type_to_str(pt))
         }
     }
 

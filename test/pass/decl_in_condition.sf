@@ -1,0 +1,81 @@
+// Regression test for the alloca-hoisting gap in `collect_vars_stmt`.
+//
+// Codegen hoists every local's `alloca` into the function's entry block by
+// walking the statement tree first (`collect_vars`). That walk visited the
+// BODIES of `if` and `while` but not their CONDITIONS, and visited a `match`'s
+// arms but not its SUBJECT. Any declaration desugared into one of those three
+// positions therefore got a `store` with no `alloca`, which is invalid LLVM IR:
+// "use of undefined value '%__map_1'".
+//
+// It stayed invisible because a condition looks like it cannot declare anything.
+// It can, twice over: the parser desugars a map literal into a BlockExpr holding
+// a `var __map_N`, and (since BUGS #128) desugars `x++` into a BlockExpr holding
+// a `var __inc_N`. `if (h++ > 0)` is the shape that surfaced it, but the map form
+// predates that and fails identically under the pre-#128 compiler — this is not
+// an increment bug, it is a tree-walk with three holes in it.
+//
+// The ListLit arm of `collect_vars_expr` already carries a comment about this
+// exact failure for `[{"a": 1}]`, which is the same omission one level down. The
+// lesson both share: there is no expression position that cannot contain a
+// declaration, so the walk has to be total.
+
+import "@test" as Test
+
+// --- Map literal in an `if` condition ---
+if ({"a": 1}.has("a")) {
+    Test.assert(true, "map literal in an if condition")
+} else {
+    Test.assert(false, "map literal in an if condition took the else branch")
+}
+
+// --- Map literal in a `while` condition ---
+var loops: Int = 0
+while ({"b": 2}.has("b")) {
+    loops = loops + 1
+    if (loops > 2) { break }
+}
+Test.assert_eq(loops, 3, "map literal in a while condition")
+
+// --- Map literal as a `match` subject ---
+var subject_result: Any = match ({"c": 3}.has("c")) {
+    true => "found"
+    _ => "missing"
+}
+Test.assert_eq(subject_result, "found", "map literal as a match subject")
+
+// --- Postfix increment in the same three positions ---
+var h: Int = 0
+if (h++ > 0) {
+    Test.assert(false, "h++ compared the post-increment value")
+} else {
+    Test.assert(true, "h++ in an if condition compares the old value")
+}
+Test.assert_eq(h, 1, "h++ in an if condition still increments")
+
+var w: Int = 0
+var iters: Int = 0
+while (w++ < 3) {
+    iters = iters + 1
+}
+Test.assert_eq(iters, 3, "w++ in a while condition runs three times")
+Test.assert_eq(w, 4, "w++ in a while condition increments once past the bound")
+
+var m: Int = 5
+var m_result: Any = match (m++) {
+    5 => "old"
+    6 => "new"
+    _ => "neither"
+}
+Test.assert_eq(m_result, "old", "m++ as a match subject yields the old value")
+Test.assert_eq(m, 6, "m++ as a match subject still increments")
+
+// --- Nested: a condition inside a loop body, so the temps must not collide ---
+var total: Int = 0
+var k: Int = 0
+while (k < 3) {
+    if ({"d": k}.has("d")) { total = total + 1 }
+    k = k + 1
+}
+Test.assert_eq(total, 3, "a map literal in a nested condition works each iteration")
+
+Test.summary()

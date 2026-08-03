@@ -21,6 +21,14 @@ GEN2="$BUILD_DIR/stage2/saffronc"
 FULL=false
 VERBOSE=false
 
+# Wall-clock ceiling for one compiler invocation. Deliberately generous: it is a
+# hang detector, not a performance budget. gen3 compiling the assembled main.sf
+# measured 172s wall / 61s user on 2026-08-03 — the process spends two thirds of
+# its wall time descheduled, so the margin tracks machine load rather than the
+# work done, and any value tuned to an unloaded run will fail under a parallel
+# test suite. Two rounds of false-RED diagnosis came from this being 120.
+COMPILE_TIMEOUT="${SAFFRON_COMPILE_TIMEOUT:-600}"
+
 for arg in "$@"; do
     case "$arg" in
         --full) FULL=true ;;
@@ -39,38 +47,36 @@ info()  { printf "${CYAN}[%s]${NC} %s\n" "$1" "$2"; }
 pass()  { printf "${GREEN}[%s]${NC} %s\n" "$1" "$2"; }
 fail()  { printf "${RED}[%s]${NC} %s\n" "$1" "$2"; exit 1; }
 
-# One timeout for every compiler-compiles-the-compiler step, so no single step
-# sits closer to the limit than the others. main.sf alone takes ~116s on an idle
-# M-series host; two gen3 steps used to be capped at 120 while every sibling got
-# 180, leaving a 4-second margin that any background CPU load erased. When
-# `timeout` fires it SIGTERMs before the compiler can print anything, so the
-# failure surfaced as "gen3 failed to compile main.sf" with zero diagnostics —
-# indistinguishable from a real defect. Raise this if the compiler gets slower;
-# don't set per-step values.
-COMPILE_TIMEOUT="${COMPILE_TIMEOUT:-300}"
-
-# Run a compile step, distinguishing a timeout from a genuine compile error.
-# `timeout` exits 124 on expiry, which says nothing about whether the source is
-# valid — reporting it as a compile failure sends people hunting for a codegen
-# bug that isn't there.
+# Run one compiler invocation under $COMPILE_TIMEOUT, naming a timeout kill for
+# what it is. `timeout` kills silently, so before this a killed compile produced
+# RC=1 with no `Error:` line anywhere and a log ending in checker warnings —
+# indistinguishable from a codegen crash, and `grep -c ERROR` reads 0 on it. The
+# caller still decides what a nonzero RC means (gen2 failing is an expected path
+# that falls back; gen3 failing is fatal), so this only annotates, never exits.
+#
+# Usage: run_compile <STAGE label> <what> <cmd...>
 run_compile() {
-    local stage="$1" what="$2"; shift 2
-    timeout "$COMPILE_TIMEOUT" "$@" && return 0
-    local rc=$?
+    local stage="$1"; shift
+    local what="$1"; shift
+    local rc=0
+    timeout "$COMPILE_TIMEOUT" "$@" || rc=$?
     if [[ $rc -eq 124 ]]; then
-        fail "$stage" "timed out after ${COMPILE_TIMEOUT}s compiling $what (no diagnostics: the process was killed, NOT a compile error). Re-run on an idle machine or raise COMPILE_TIMEOUT."
+        printf "${RED}[%s]${NC} %s\n" "$stage" \
+            "TIMEOUT: killed after ${COMPILE_TIMEOUT}s compiling $what. This is NOT a compile error — no diagnostic was produced. Re-time the step alone before suspecting your change, and raise SAFFRON_COMPILE_TIMEOUT if the machine is loaded."
     fi
-    fail "$stage" "failed to compile $what"
+    return $rc
 }
 
 # Serialize bootstraps across ALL worktrees. Each worktree has its own build/, so
 # concurrent runs never corrupt each other's artifacts — but they do contend for
-# CPU, and a compiler-compiles-the-compiler step that takes ~2min idle can slow
-# enough under load to hit COMPILE_TIMEOUT. `timeout` then SIGTERMs before any
-# diagnostic is printed, so the run fails with an empty error that reads exactly
-# like a codegen bug. Two such runs were misdiagnosed that way before this lock
-# existed. The lock is machine-wide (not per-worktree) because the contention is
-# for the machine's CPUs. Set SAFFRON_NO_BOOTSTRAP_LOCK=1 to opt out.
+# CPU, and that contention is the whole reason COMPILE_TIMEOUT above had to be set
+# so generously: the same main.sf compile measures 61s of user time and 172s of
+# wall time, i.e. two thirds of it descheduled. Queueing instead of racing makes
+# the wall time mean something again, so a timeout that does fire is evidence of a
+# hang rather than of a busy machine.
+#
+# The lock is machine-wide, not per-worktree, because the contended resource is
+# the machine's CPUs. Set SAFFRON_NO_BOOTSTRAP_LOCK=1 to opt out.
 BOOTSTRAP_LOCK="${TMPDIR:-/tmp}/saffron-bootstrap.lock"
 
 acquire_bootstrap_lock() {
@@ -177,7 +183,7 @@ done
 GEN2_OK=true
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    if ! timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
+    if ! run_compile "STAGE 1" "$src.sf (gen2)" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
         GEN2_OK=false
         break
     fi
@@ -185,7 +191,7 @@ done
 
 if [[ "$GEN2_OK" == true ]]; then
     [[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
-    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+    run_compile "STAGE 1" "codegen.sf (gen2)" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
         || GEN2_OK=false
 fi
 
@@ -200,14 +206,14 @@ if [[ "$GEN2_OK" == true ]]; then
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     # Rewrite the codegen import to use the assembled file
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
-    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+    run_compile "STAGE 1" "main.sf (gen2)" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
         || GEN2_OK=false
 fi
 
 if [[ "$GEN2_OK" == true ]]; then
     # Compile runtime.sf
     [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-    timeout "$COMPILE_TIMEOUT" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+    run_compile "STAGE 1" "runtime.sf (gen2)" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
         || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 fi
 
@@ -226,13 +232,20 @@ if [[ "$GEN2_OK" == false ]]; then
     # Now use gen3 to recompile itself from current source
     for src in "${SOURCES[@]}"; do
         [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
-        run_compile "STAGE 1" "$src.sf (gen3)" \
-            "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll"
+        run_compile "STAGE 1" "$src.sf (gen3)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
+            || fail "STAGE 1" "gen3 failed to compile $src.sf"
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
-    run_compile "STAGE 1" "codegen.sf (gen3)" \
-        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll"
+    # 180, not 120, to match every other gen3 compile in this script. These two
+    # steps (codegen.sf and main.sf below) are the largest inputs the compiler
+    # ever sees, and main.sf measured 116s unloaded on 2026-08-03 — a 4s margin.
+    # Under any CPU contention `timeout` killed it, and the failure is
+    # indistinguishable from a crash: RC=1, no `Error:` line, so `grep -c ERROR`
+    # reads 0 and the log just ends in warnings. A timeout that trips on a
+    # healthy compile costs more than it protects against.
+    run_compile "STAGE 1" "codegen.sf (gen3)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+        || fail "STAGE 1" "gen3 failed to compile codegen.sf"
 
     cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
     cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
@@ -242,12 +255,12 @@ if [[ "$GEN2_OK" == false ]]; then
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
-    run_compile "STAGE 1" "main.sf (gen3)" \
-        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll"
+    run_compile "STAGE 1" "main.sf (gen3)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+        || fail "STAGE 1" "gen3 failed to compile main.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
-    run_compile "STAGE 1" "runtime.sf (gen3)" \
-        "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll"
+    run_compile "STAGE 1" "runtime.sf (gen3)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+        || fail "STAGE 1" "gen3 failed to compile runtime.sf"
 fi
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
@@ -296,13 +309,13 @@ else
 
     for src in "${SOURCES[@]}"; do
         [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
-        timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+        run_compile "STAGE 2" "$src.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
             "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage4/${src}.ll" \
             || fail "STAGE 2" "gen3 rejects $src.sf — it cannot compile itself. Diagnostics go to stdout, so run it directly: $GEN3 --identity-mode --stdlib $ROOT/src/lib $COMPILER_DIR/$src.sf /tmp/out.ll"
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
-    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    run_compile "STAGE 2" "codegen.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/codegen.ll" \
         || fail "STAGE 2" "gen3 rejects the assembled codegen.sf — it cannot compile itself"
 
@@ -318,12 +331,12 @@ else
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage4/_main.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
-    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    run_compile "STAGE 2" "main.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$BUILD_DIR/stage4/_main.sf" "$BUILD_DIR/stage4/main.ll" \
         || fail "STAGE 2" "gen3 rejects main.sf — it cannot compile itself"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
-    timeout "$COMPILE_TIMEOUT" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+    run_compile "STAGE 2" "runtime.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
         "$RUNTIME_SRC" "$BUILD_DIR/stage4/runtime.ll" \
         || fail "STAGE 2" "gen3 rejects runtime.sf"
 
@@ -341,7 +354,7 @@ else
 var xs = [1, 2, 3]
 IO.println("gen4 works: ${xs.length()}")
 EOF
-    timeout "$COMPILE_TIMEOUT" "$BUILD_DIR/stage4/saffronc" "$BUILD_DIR/stage4/probe.sf" "$BUILD_DIR/stage4/probe.ll" \
+    run_compile "STAGE 2" "the gen4 probe" "$BUILD_DIR/stage4/saffronc" "$BUILD_DIR/stage4/probe.sf" "$BUILD_DIR/stage4/probe.ll" \
         || fail "STAGE 2" "gen4 links but cannot compile a program"
 
     pass "STAGE 2" "gen3 compiles itself; gen4 links and compiles: $BUILD_DIR/stage4/saffronc"

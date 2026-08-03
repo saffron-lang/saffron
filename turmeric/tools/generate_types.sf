@@ -87,6 +87,19 @@ fun is_saffron_keyword(name: String): Bool {
     if (name == "enum") return true
     if (name == "let") return true
     if (name == "type") return true
+    // Soft keywords. These parse as ordinary identifiers in most positions,
+    // which is why they were missed here, but `as` cannot be *read* as an
+    // expression (BUGS #137) — so `link(as: "style")` generated a function whose
+    // body could not compile. Reserving them costs a trailing underscore and
+    // removes a whole class of "generated code doesn't build" failures.
+    if (name == "as") return true
+    if (name == "actor") return true
+    if (name == "interface") return true
+    if (name == "extends") return true
+    if (name == "extend") return true
+    if (name == "finally") return true
+    if (name == "break") return true
+    if (name == "continue") return true
     return false
 }
 

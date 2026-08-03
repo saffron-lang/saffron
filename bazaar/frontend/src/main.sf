@@ -89,16 +89,18 @@ fun update_suggestions(q: String) {
     var data = packages_query.data.get()
     if (data != nil and data.has("packages")) {
         var pkgs = data.get("packages")
-        var matches = []
-        var i: Float = 0
-        while (i < pkgs.length()) {
-            var pkg_name: String = pkgs[i].get("name")
-            if (pkg_name.contains(q)) {
-                matches.push(pkg_name)
+        if (pkgs != nil) {
+            var matches = []
+            var i: Int = 0
+            while (i < pkgs.length()) {
+                var pkg_name: String = pkgs[i].get("name")
+                if (pkg_name.contains(q)) {
+                    matches.push(pkg_name)
+                }
+                i = i + 1
             }
-            i = i + 1
+            search_suggestions.set(matches)
         }
-        search_suggestions.set(matches)
     }
 }
 
@@ -274,12 +276,12 @@ fun PackageRow(pkg: Map<String, String>) {
 
 fun _render_pkg_grid(grid_el: Float, data: Any) {
     render_into(grid_el, fun () => {
-        if (data != nil and data.has("packages")) {
+        if (data != nil and data.has("packages") and data.get("packages") != nil) {
             var pkgs = data.get("packages")
             if (pkgs.length() == 0) {
                 <div cls="empty-state">No packages published yet. Be the first!</div>
             } else {
-                var i: Float = 0
+                var i: Int = 0
                 while (i < pkgs.length()) {
                     {PackageCard(pkgs[i])}
                     i = i + 1
@@ -415,9 +417,9 @@ fun SearchSidebar() {
 fun _render_search_results(list_el: Float, count_el: Float, data: Any) {
     // Update results count
     var total: Float = 0
-    if (data != nil and data.has("total")) {
+    if (data != nil and data.has("total") and data.get("total") != nil) {
         total = data.get("total")
-    } else if (data != nil and data.has("packages")) {
+    } else if (data != nil and data.has("packages") and data.get("packages") != nil) {
         total = data.get("packages").length()
     }
     render_into(count_el, fun () => {
@@ -425,12 +427,12 @@ fun _render_search_results(list_el: Float, count_el: Float, data: Any) {
     })
     // Update results list
     render_into(list_el, fun () => {
-        if (data != nil and data.has("packages")) {
+        if (data != nil and data.has("packages") and data.get("packages") != nil) {
             var pkgs = data.get("packages")
             if (pkgs.length() == 0) {
                 <div cls="empty-state">No packages found matching your query.</div>
             } else {
-                var i: Float = 0
+                var i: Int = 0
                 while (i < pkgs.length()) {
                     {PackageRow(pkgs[i])}
                     i = i + 1
@@ -507,9 +509,9 @@ fun PackageDetailContent(pkg_name: String, data: Any, description: String, lates
     var display_name: String = pkg_name
     if (display_name.length() == 0) { display_name = "unknown-pkg" }
     var license_str: String = ""
-    if (data.has("license")) { license_str = data.get("license").to_string() }
+    if (data.has("license") and data.get("license") != nil) { license_str = data.get("license").to_string() }
     var downloads_str: String = ""
-    if (data.has("total_downloads")) { downloads_str = data.get("total_downloads").to_string() }
+    if (data.has("total_downloads") and data.get("total_downloads") != nil) { downloads_str = data.get("total_downloads").to_string() }
     var ver_count_str: String = versions.length().to_string()
 
     <div cls="pkg-header">
@@ -622,11 +624,11 @@ fun _render_detail_content(container_el: Float, pkg_name: String, data: Any) {
     render_into(container_el, fun () => {
         if (data != nil) {
             var description: String = ""
-            if (data.has("description")) { description = data.get("description").to_string() }
+            if (data.has("description") and data.get("description") != nil) { description = data.get("description").to_string() }
             var latest: String = ""
-            if (data.has("latest")) { latest = data.get("latest").to_string() }
+            if (data.has("latest") and data.get("latest") != nil) { latest = data.get("latest").to_string() }
             var versions: List<Any> = []
-            if (data.has("versions")) { versions = data.get("versions") }
+            if (data.has("versions") and data.get("versions") != nil) { versions = data.get("versions") }
             {PackageDetailContent(pkg_name, data, description, latest, versions)}
         } else {
             <div cls="pkg-header">
