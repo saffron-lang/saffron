@@ -2354,14 +2354,52 @@
             // (not imported via named imports), to avoid false positives from pipe |>
             var is_named_import: Bool = this.named_imports.has(callee_name)
             if (!is_named_import) {
-                if (this.called_function_arity.has(resolved_callee)) {
-                    var expected: Float = this.called_function_arity.get(resolved_callee)
-                    if (args.length() != expected and expected > 0 and !has_real_defs) {
+                // The arity comes from one of two maps, and only ONE of them is a
+                // trustworthy record of a *declared* arity.
+                //
+                //   func_param_count is written only where a declaration is
+                //   processed -- gen_fun_decl (both the plain and @inline arms),
+                //   gen_class_method, prescan_fun_decl, prescan_class_decl. A 0
+                //   there therefore means "this function is declared to take no
+                //   arguments", which is a real arity and must be checked.
+                //
+                //   called_function_arity is overloaded. Declarations write it for
+                //   class methods and inheritance forwarders, where the value is
+                //   always >= 1 because of the implicit `self`; but CALL SITES
+                //   also write args.length() into it (gen_method_call, the package
+                //   re-export arms) purely to size the `declare i64 @f(...)` lines
+                //   emit_module writes for undefined callees. A 0 in that map thus
+                //   cannot have come from a declaration -- it is a 0-argument call
+                //   site's leftover, or the key is simply absent.
+                //
+                // So `expected > 0` is a legitimate "we never recorded a real
+                // arity" guard for called_function_arity and pure damage for
+                // func_param_count. It used to be applied to both, which exempted
+                // every genuinely 0-arity function from arity checking altogether:
+                // `fun c() {}` then `c("too", "many")` compiled clean (BUGS #113).
+                // Consult the declaration-derived map first; where a key lives in
+                // both they agree, so the order only decides who answers.
+                //
+                // Measured, not assumed: a variant that drops `expected > 0` from
+                // BOTH arms and keeps the original order was built and run over the
+                // compiler's own source, the stdlib and the whole test corpus (285
+                // files). It produced byte-identical diagnostics to this version --
+                // no unrecorded-arity case is reachable today, so the exemption
+                // below is currently dead weight. It is kept because the call-site
+                // writers make 0 unfalsifiable in that map: the moment a
+                // gen_method_call path starts feeding this check, `expected > 0`
+                // is the only thing standing between a 0-arg call-site leftover
+                // and a fabricated "expects 0 arguments" on a function that takes
+                // three. Do NOT "simplify" it away without re-running that
+                // comparison.
+                if (this.func_param_count.has(resolved_callee)) {
+                    var expected: Float = this.func_param_count.get(resolved_callee)
+                    if (args.length() != expected and !has_real_defs) {
                         IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                         this.has_errors = true
                     }
-                } else if (this.func_param_count.has(resolved_callee)) {
-                    var expected: Float = this.func_param_count.get(resolved_callee)
+                } else if (this.called_function_arity.has(resolved_callee)) {
+                    var expected: Float = this.called_function_arity.get(resolved_callee)
                     if (args.length() != expected and expected > 0 and !has_real_defs) {
                         IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                         this.has_errors = true
