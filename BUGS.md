@@ -2,8 +2,8 @@
 
 ## Open
 
-**14 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
-#121, #122, #123. Next free number is **#124**.
+**16 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #116, #117, #122,
+#123, #124, #125, #126, #127. Next free number is **#128**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -23,7 +23,7 @@ each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
 
-### 110. wasm32 never auto-invokes `fun main()`, so a main-only program silently prints nothing
+### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
 
 **Severity: high.** Silent, total, and it masks the wasm32 behaviour of at least
 seven tests — which means it also hides whatever else is wrong on that target.
@@ -55,6 +55,35 @@ Found while A/B-ing the #109 fix: all seven wasm32 mismatches in a full
 and none of them are value-layer bugs. Worth fixing before the remaining
 value-layer drift, since it currently makes wasm32 output unobservable for those
 seven programs.
+
+**Fixed (2026-08-02)** by widening the wasm `__saffron_boot` guard at
+`output_body.sf` to match the native wrapper's:
+`this.str_in_list(this.defined_funcs, "__saffron_main") or has_top_level`, plus a
+second shim body for the main-only case. That body must call `__saffron_main`, not
+`__saffron_entry` — `__saffron_entry` is emitted only under `has_top_level`, so
+calling it here would reintroduce exactly the undefined-symbol-becomes-silent-import
+failure this fixes — and it runs the module inits itself, since with no top-level
+code there is no `__saffron_entry` for them to run inside. The async-main case
+enqueues the coroutine frame (matching the wasm top-level coroutine arm, not native:
+the host event loop cannot be blocked).
+
+The decisive check is running, not linking — the agent's whole framing is that the
+defect *was* that it linked clean. `tools/saffron build test/pass/main_entry_only.sf
+--target wasm32` then `node tools/oracle/wasm_run.mjs`: **before, empty; after,
+`main-only entry ran`**. Three regression tests added
+(`main_entry_only`, `main_entry_and_top_level`, `top_level_entry_only`), each with a
+`.expected`; the main-only file is kept free of any top-level call because a single
+one flips `has_top_level` and tests the branch that was never broken.
+
+Two consequences followed. The `main_entry_only()` capability gate in
+`tools/differential.sh` was dead — the 11 `fun main`-only programs it SKIPped are
+graded again. And the "seven wasm32 mismatches" that motivated this entry were
+partly stale: the 17 remaining differential mismatches are a *different* signature
+(no `fun main` at all). Two adjacent wasm64 defects surfaced while confirming the
+fix and are filed as their own entries: #124 (wasm64's `_start` calls
+`__saffron_entry` directly with no `__saffron_boot` indirection, so the same
+main-only program never runs there either) and #125 (`wasm_base.ll` has no single-arg
+`__io_println` NaN-box dispatcher, so all wasm64 output is dropped regardless).
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -601,7 +630,7 @@ lists. It also means #115's "only nested elements are wrong" framing holds for
 
 ---
 
-### 121. A variable used only in callee position is falsely reported as an unused variable
+### 121. FIXED — a variable used only in callee position was falsely reported as an unused variable
 
 **Severity: low** — warning-only, no codegen consequence. Filed because it is a
 *false* diagnostic, and a warning that fires on correct code is how people learn to
@@ -618,10 +647,10 @@ fun run(): Int {
 [checker] Warning: unused variable 'fs'
 ```
 
-`infer_call` (`checker.sf:2161`) pattern-matches the callee only to extract a *name
-string* for the return-type lookup, and never calls `infer_expr` on it. Since
+`infer_call` (`checker.sf:2161`) pattern-matched the callee only to extract a *name
+string* for the return-type lookup, and never called `infer_expr` on it. Since
 `mark_used` is reachable only from the `Variable`/`Ref` arms of `infer_type`
-(`checker.sf:1701,1705`), a variable appearing **only** in callee position is never
+(`checker.sf:1701,1705`), a variable appearing **only** in callee position was never
 marked used.
 
 The axis is "appears only as a callee", **not** "has a function type" — which is
@@ -630,14 +659,32 @@ down: a `List<Fun>` variable, which is not a function type at all, warns when it
 only appearance is `fs[0](7)`; and the same variable used as a plain value
 (`var alias: Fun = h`) is correctly marked used.
 
-One wrinkle worth recording so a future reproduction attempt does not conclude the
-bug is absent: at **top level** the same `List<Fun>` spelling does *not* warn — only
-inside a function body. So a repro must put the variable in a `fun`.
+**Fixed (2026-08-02)** by `this.infer_expr(callee)` in `infer_call`. The narrower
+`mark_used(name)` route was rejected on measurement, not preference: (a) the shapes
+that actually trigger the bug — `IndexGet` (`fs[0](7)`), `Call` (`maker(3)(4)`),
+`MethodCall`, parenthesized — all take `infer_call`'s `_ => ""` arm, so there is no
+name to mark and the headline repro would have stayed broken; (b) for a
+`MemberAccess` callee the extracted name is the *field*, and `mark_used` searches
+scopes by string, so `(b.cb)(1)` would have marked an unrelated local `cb` used and
+swallowed a warning that must fire — now a must-still-warn assertion. The walk also
+closes a silent gap: a nested callee's own arguments (`f(a)(b)`) were not checked at
+all before, and now are, exactly once.
 
-Found while fixing #120, and deliberately not fixed alongside it: the correction
-(calling `infer_expr(callee)`, or `mark_used` on the extracted name) touches a
-use-marking path shared by every call site in the compiler, so it wants its own
-change with its own test rather than riding along on an unrelated codegen fix.
+Diagnostics-only, verified over 332 files: emitted `.ll` byte-identical for all 332;
+24 diagnostic files differ — 21 removals each traced to a callback whose only use is
+`func(item)`-shaped, 3 line-number shifts of a pre-existing parse error, zero new
+warnings. Failure set unchanged (24 names before and after). The tests shell out to
+`build/saffronc` because `run_tests.sh` strips `[checker] Warning` lines, so a pass
+test cannot observe a warning about itself; against the pre-fix compiler 5 of the 8
+must-not-warn assertions fail, so they detect the defect rather than merely passing
+alongside the fix.
+
+The "top level does not warn" wrinkle turned out to be orthogonal: every
+`check_unused_in_scope()` call sits inside a `push_scope`/`pop_scope` pair and
+`check_program` never runs one for scope 0, so top-level variables are never checked
+for unusedness at all. Two adjacent defects were left as their own entries: #126 (a
+lambda body is never walked, so a capture-only variable draws the same false warning
+by a different missing walk) and #127 (`checker.sf` does not parse standalone).
 
 ---
 ### 122. Assigning to a nonexistent module member compiles clean and emits invalid IR
@@ -727,6 +774,104 @@ Two separable questions here, and the second is the important one:
    scoping, not a rename.
 
 Found while measuring #118's blast radius across 336 files.
+
+---
+
+### 124. wasm64's `_start` calls `__saffron_entry` directly, so a main-only program never runs there either
+
+**Severity: high**, and the same shape as #110 by a different mechanism. #110 was
+the wasm32 half — its `_start` calls `@__saffron_boot()` and the shim was not
+emitted for a main-only file. wasm64 does not go through `__saffron_boot` at all:
+`wasm_base.ll:1028` declares and `:1039` calls `@__saffron_entry` directly, and
+`__saffron_entry` is emitted by codegen only under `has_top_level`. So a file whose
+entire contents are `fun main()` links against an undefined `__saffron_entry` on
+wasm64, which `--import-undefined` turns into a silent no-op host import — the module
+builds, runs, and does nothing.
+
+`grep -c __saffron_boot src/runtime/wasm_base.ll` is **0** (wasm32 has 3), which is
+the structural difference: the #110 fix widened the guard on the `__saffron_boot`
+shim, but wasm64 has no such indirection to widen. The fix is to route wasm64's
+`_start` through the same `__saffron_boot` shim the #110 fix now emits, or to emit a
+`__saffron_entry` for the main-only case on this target too.
+
+Found while confirming the #110 fix on wasm32; the sibling target was checked at the
+same time and had the same disease through a different pipe.
+
+---
+
+### 125. `wasm_base.ll` has no single-arg `__io_println` dispatcher, so all wasm64 output is silently dropped
+
+**Severity: high.** Independent of #124 — even a program that *does* reach its
+print calls emits nothing on wasm64.
+
+`grep -n 'define i64 @__io_println(i64' src/runtime/*.ll` finds it in
+`base.ll:99`, `base_nanbox.ll:106` and `wasm_base_32.ll:1740`, and **not** in
+`wasm_base.ll`. That single-argument entry is the NaN-box dispatcher every
+`IO.println(x)` call lowers to; with no definition on wasm64 the symbol is undefined
+and `--import-undefined` makes the call a no-op host import. So wasm64 output is
+dropped whether or not #124 lets `main` run at all.
+
+The fix is to port the `wasm_base_32.ll:1740` definition into `wasm_base.ll`,
+adjusting only the pointer width. Filed separately from #124 because they are
+distinct missing symbols with distinct fixes, and #124 alone would leave output
+still silently dropped.
+
+Found while confirming the #110 fix — the wasm64 build of the same regression test
+linked clean and printed nothing even after #124's mechanism was understood, which
+is what surfaced this second missing symbol.
+
+---
+
+### 126. A lambda body is never walked, so a capture-only variable is falsely reported unused
+
+**Severity: low** — warning-only, the same false-diagnostic class as #121, at a
+different missing walk.
+
+```saffron
+fun f() {
+    var base: Int = 10
+    var g: Fun = fun (x: Int): Int => x + base   // warns for 'base'
+    return g(1)
+}
+```
+
+`infer_type`'s `Lambda(p, r, b)` arm returns a `FuncType` without ever visiting `b`,
+so a variable captured *only* inside a lambda body is never marked used. Reproduces
+identically before and after the #121 fix and independently of callee position —
+#121 walked the callee of a `Call`; this is a different node's un-walked subtree.
+
+The fix wants its own test: walking a lambda body means pushing the lambda's
+parameter scope first, or the parameters themselves read as unused. Noted in a
+comment in `test/pass/callee_position_is_a_use.sf`.
+
+Found while fixing #121.
+
+---
+
+### 127. `src/compiler/checker.sf` does not parse as a standalone module
+
+**Severity: medium** — it makes the checker's public stdlib API (`@check`, `@lang`)
+uncompilable and untestable, and it is invisible to bootstrap.
+
+`checker.sf` fails to parse on its own with `expected a literal, name or '(' here`,
+pointing at the `and` in a match-arm block body shaped like:
+
+```saffron
+if (cond) { false } else { A and B }
+```
+
+Consequences: `src/lib/check.sf`, `src/lib/lang.sf`, and any direct
+`import "../compiler/checker.sf"` all fail to compile, so the checker cannot be
+exercised in-process by a test. Invisible to bootstrap because bootstrap compiles
+`checker.sf` only as an import of `_main.sf`, where the surrounding context makes it
+parse fine.
+
+Reduced attempts of the same one-liner in a standalone file did *not* reproduce, so
+the trigger is narrower than the shape above suggests and needs isolation before a
+fix. Blocks writing an in-process `@check` test for #121 (which currently has to
+shell out and string-match stderr instead).
+
+Found while trying to write a better test for #121.
 
 ---
 
