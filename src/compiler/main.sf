@@ -361,6 +361,27 @@ fun package_roots_joined(module_file_paths: List<String>): String {
     return joined
 }
 
+/// Print the module → package correspondence exactly as it crosses the seam:
+/// one line per module index, with the prefix and the package root that
+/// `package_roots_joined` will encode at that same index. Re-decoded from the
+/// joined string rather than read from the list, so what is printed is what the
+/// checker will actually see — a printer reading the pre-encoding list could show
+/// a correct table while the encoding itself was wrong.
+fun print_module_package_table(module_prefixes_list: List<String>, module_file_paths: List<String>) {
+    var roots: List<String> = package_roots_joined(module_file_paths).split("\n")
+    IO.println("--- module → package (seam encoding) ---")
+    var i: Float = 0
+    while (i < module_file_paths.length()) {
+        var prefix: String = "<main>"
+        if (module_prefixes_list[i].length() > 0) { prefix = module_prefixes_list[i] }
+        var root: String = "<MISSING>"
+        if (i < roots.length()) { root = roots[i] }
+        IO.println("MOD\t" + i.to_string() + "\t" + prefix + "\t" + module_file_paths[i] + "\t" + root)
+        i = i + 1
+    }
+    IO.println("COUNT\tmodules=" + module_file_paths.length().to_string() + "\tprefixes=" + module_prefixes_list.length().to_string() + "\troots=" + roots.length().to_string())
+}
+
 fun print_package_map() {
     var paths: List<String> = loaded_file_paths()
     var i: Float = 0
@@ -1295,6 +1316,11 @@ fun main(): Int {
 
     if (dump_packages) {
         print_package_map()
+        print_module_package_table(module_prefixes_list, module_file_paths)
+        // The entry program crosses the seam separately from the boundary list,
+        // so it is printed separately too — it is the one module whose package a
+        // reader of the joined string cannot see.
+        IO.println("ENTRY\t" + input_path + "\t" + _entry_package_root(input_path))
         return 0
     }
 

@@ -140,6 +140,118 @@ expect_rel "packageless entry vs itself" "$REL_ORPHAN" "$TMP/orphan.sf" true fal
 # ...and it is not in the root package either, though it imports from it.
 expect_rel "packageless entry vs stdlib" "$REL_ORPHAN" "src/lib/prelude.sf" false false
 
+# ---------------------------------------------------------------------------
+# The seam: module index → owning package, as the checker receives it
+# ---------------------------------------------------------------------------
+#
+# Everything above tests the producer (main.sf's file → package mapping). These
+# test the ENCODING that carries it to the checker, which is a separate thing
+# that can be wrong on its own: package_roots_joined() newline-joins the roots
+# indexed by the same i as prefixes_joined, and a checker that decodes a
+# misaligned or short list would silently answer "different package" for every
+# `internal` check — a denial that looks exactly like correct enforcement.
+#
+# The MOD rows are re-decoded from the joined string by the compiler itself, not
+# read from the pre-encoding list, so an assertion here covers the encode/decode
+# round trip and not just the map.
+
+echo "--- seam: module index → package root ---"
+
+dump_seam() {
+    local src="$1"
+    "$SAFFRONC" --dump-packages --stdlib "$ROOT/src/lib" "$src" "$TMP/out.ll" 2>/dev/null \
+        | grep -E '^(MOD|COUNT|ENTRY)	'
+}
+
+# Lockstep is the invariant that matters most: module_file_paths is pushed
+# alongside module_prefixes_list at three separate sites, and one missed push
+# shifts every later module onto the wrong package.
+check_counts() {
+    local label="$1" seam="$2"
+    local row mods prefixes roots
+    row="$(printf '%s\n' "$seam" | grep '^COUNT' | head -1)"
+    mods="$(printf '%s' "$row" | cut -f2 | cut -d= -f2)"
+    prefixes="$(printf '%s' "$row" | cut -f3 | cut -d= -f2)"
+    roots="$(printf '%s' "$row" | cut -f4 | cut -d= -f2)"
+    if [[ -n "$mods" && "$mods" == "$prefixes" && "$mods" == "$roots" ]]; then
+        echo "ok    $label (all three lists $mods long)"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL  $label — lists out of lockstep"
+        echo "        modules=$mods prefixes=$prefixes roots=$roots"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# No module may encode as <MISSING>: that is the printer's marker for an index
+# present in the prefix list but absent from the root list.
+check_no_missing() {
+    local label="$1" seam="$2"
+    if printf '%s\n' "$seam" | grep -q '<MISSING>'; then
+        echo "FAIL  $label — a module has no package entry"
+        printf '%s\n' "$seam" | grep '<MISSING>' | sed 's/^/        /'
+        FAIL=$((FAIL + 1))
+    else
+        echo "ok    $label"
+        PASS=$((PASS + 1))
+    fi
+}
+
+check_entry() {
+    local label="$1" seam="$2" want="$3"
+    local got
+    got="$(printf '%s\n' "$seam" | grep '^ENTRY' | head -1 | cut -f3)"
+    if [[ "$got" == "$want" ]]; then
+        echo "ok    $label"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL  $label"
+        echo "        want '$want'  got '$got'"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# Case A: an in-tree entry importing the stdlib. Every module is under the repo
+# root's manifest, so every root is the repo root.
+printf 'import "@iter" as Iter\nIO.println("seam")\n' > "$ROOT/test/_seam_root.sf"
+SEAM_ROOT="$(dump_seam "$ROOT/test/_seam_root.sf")"
+check_counts     "root-package program: lists in lockstep" "$SEAM_ROOT"
+check_no_missing "root-package program: every module has a package" "$SEAM_ROOT"
+check_entry      "root-package program: entry is the repo root" "$SEAM_ROOT" "$ROOT"
+rm -f "$ROOT/test/_seam_root.sf"
+
+# Case B: nearest-above governs per MODULE, not per program. An entry inside
+# test/testpkg/ pulls in that package's own modules AND the stdlib, so the same
+# compile must report two different roots — this is the case a per-program
+# "which package am I building?" shortcut would get wrong.
+printf 'import "@iter" as Iter\nimport "./mod.sf" as Mod\nIO.println("seam")\n' \
+    > "$ROOT/test/testpkg/src/_seam_nested.sf"
+SEAM_NESTED="$(dump_seam "$ROOT/test/testpkg/src/_seam_nested.sf")"
+check_counts     "nested-package program: lists in lockstep" "$SEAM_NESTED"
+check_no_missing "nested-package program: every module has a package" "$SEAM_NESTED"
+check_entry      "nested-package program: entry is the inner package" \
+    "$SEAM_NESTED" "$ROOT/test/testpkg"
+if printf '%s\n' "$SEAM_NESTED" | grep -q "^MOD.*src/lib/iter.sf.*$ROOT\$" \
+   && printf '%s\n' "$SEAM_NESTED" | grep -q "^MOD.*testpkg/src/mod.sf.*$ROOT/test/testpkg\$"; then
+    echo "ok    nested-package program: stdlib and package modules get different roots"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL  nested-package program: modules collapsed onto one root"
+    printf '%s\n' "$SEAM_NESTED" | grep '^MOD' | sed 's/^/        /'
+    FAIL=$((FAIL + 1))
+fi
+rm -f "$ROOT/test/testpkg/src/_seam_nested.sf"
+
+# Case C: a packageless entry still crosses the seam, as the marker. It must not
+# inherit the stdlib's package just because it imports from it — that would grant
+# `internal` access to every stdlib declaration from any script on the filesystem.
+printf 'import "@iter" as Iter\nIO.println("seam")\n' > "$TMP/seam_orphan.sf"
+SEAM_ORPHAN="$(dump_seam "$TMP/seam_orphan.sf")"
+check_counts     "packageless program: lists in lockstep" "$SEAM_ORPHAN"
+check_no_missing "packageless program: every module has an entry" "$SEAM_ORPHAN"
+check_entry      "packageless entry encodes as the marker, not a package" \
+    "$SEAM_ORPHAN" "nopkg"
+
 echo ""
 echo "TOTAL: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]] || exit 1
