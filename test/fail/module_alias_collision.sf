@@ -1,0 +1,25 @@
+// Two sibling modules bind the alias `Shared` to two different files. The
+// compiler must reject this rather than silently pick one.
+//
+// `all_aliases` in main.sf is a single table for the whole compilation, not one
+// per file, and the write was guarded by `if (!all_aliases.has(ma))`. First
+// module walked won; every later binding was dropped without a word. The
+// program compiled, linked, exited 0 — and called the wrong module's function.
+// A wrong answer with a green exit code is worse than a crash, because nothing
+// prompts you to look.
+//
+// This was not hypothetical: src/lib/ast.sf, src/lib/lexer.sf and
+// src/lib/parser.sf each bound `Internal` to a different compiler file, so
+// `Internal.Parser(...)` in parser.sf resolved against compiler/ast.sf and died
+// at link time with an undefined symbol.
+//
+// Per-file alias tables are the real fix — `all_aliases` is threaded all the
+// way into codegen's `module_prefixes` — so for now the compiler refuses
+// instead of guessing. Rebinding the same alias to the *same* file stays legal;
+// many files import "@os" as OS. Only a genuine disagreement is an error.
+import "../fixtures/alias_collision_use_alpha.sf" as UseAlpha
+import "../fixtures/alias_collision_use_beta.sf" as UseBeta
+
+// If this ever compiles again, both lines print "alpha".
+IO.println(UseAlpha.ask())
+IO.println(UseBeta.ask())

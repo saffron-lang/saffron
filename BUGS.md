@@ -2,8 +2,8 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
-#129, #131, #132. Next free number is **#137**.
+**13 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
+#129, #131, #132, #137. Next free number is **#139**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -1025,6 +1025,58 @@ The flag was left as-is deliberately: it may be load-bearing for legitimate host
 imports (`js_log_str` is one), so tightening it is its own measured change rather than
 a one-line edit.
 
+### 137. Import aliases share one namespace across the whole compilation, so two modules binding the same alias silently collapse onto one
+
+**Severity: high.** Compiles clean, links, exits 0, and calls the wrong module's
+function. A wrong answer under a green exit code is worse than a crash, because
+nothing prompts you to look.
+
+**Reproduction.** `test/fail/module_alias_collision.sf` with the fixtures beside
+it. Two sibling modules each bind the alias `Shared`, one to a file whose
+`which()` returns `"alpha"` and one to a file whose `which()` returns `"beta"`.
+Each file is internally consistent and neither is wrong on its own:
+
+```saffron
+// use_alpha.sf
+import "./alias_collision_alpha.sf" as Shared
+fun ask(): String { return Shared.which() }
+
+// use_beta.sf
+import "./alias_collision_beta.sf" as Shared
+fun ask(): String { return Shared.which() }
+```
+
+Printing `UseAlpha.ask()` then `UseBeta.ask()` gives `alpha` / `alpha`.
+
+**Cause.** `main.sf`'s `collect_modules` writes every alias into a single
+`all_aliases` map for the whole compilation, guarded by
+`if (!all_aliases.has(ma))`. First module walked wins; every later binding is
+dropped without a word. The map is threaded all the way into codegen's
+`module_prefixes`, so the losing module's every qualified call resolves against
+the winner's symbol prefix.
+
+**This was not hypothetical.** `src/lib/ast.sf`, `src/lib/lexer.sf` and
+`src/lib/parser.sf` each bound `Internal` to a different compiler file. That
+made `InternalParser.Parser(...)` in `parser.sf` resolve against
+`compiler/ast.sf` and fail at link time with `Undefined symbols: _compiler_ast_Parser`.
+A separate collision on `AST` — `src/compiler/ast.sf` via the compiler's own
+imports versus `src/lib/ast.sf` via `@ast` — meant `@ast` was unreachable from
+`tools/gen_docs.sf` and `src/lib/lang.sf`, the only two consumers it has.
+
+**Status: mitigated, not fixed.** Per-file alias tables are the real fix and a
+much larger change. For now the compiler refuses rather than guesses: a rebind of
+the same alias to the *same* target stays legal (many files import `@os` as
+`OS`), and only a genuine disagreement is an error, naming both binding sites.
+The three real collisions in the tree were resolved by renaming the consumer's
+alias (`InternalAst`, `InternalLexer`, `InternalParser`, `PubAst`).
+`tools/alias_conflicts.py` walks the real import graph per entry point and
+reports zero.
+
+**Why a tree-wide grep over-reports:** `Parser` means `src/compiler/parser.sf` in
+`main.sf` and `src/lib/parser.sf` in `gen_docs.sf`, but those are separate
+programs that never share an alias table. Only aliases reachable from one entry
+point can collide.
+
 ---
 
 ## Resolved
@@ -1033,6 +1085,60 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 138. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
+
+**Severity: high.** Broke `@ast`, `@lexer` and `@lang` completely — any program
+that so much as imported one died — and the workaround it forced switched off
+exhaustive match checking for their callers.
+
+**Reproduction** — two lines:
+
+```saffron
+import "@ast" as AST
+fun main() { IO.println("never gets here") }
+```
+
+fails with:
+
+```
+saffron: the compiler emitted invalid LLVM IR
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:472:17: error: use of undefined value '@compiler_ast_Expr'
+    %r = call i64 @compiler_ast_Expr()
+```
+
+Note the program never mentions `Expr`. The bad IR comes from `src/lib/ast.sf`
+itself, which is why the failure looked like a compiler bug rather than a
+library one.
+
+**Cause.** `src/lib/ast.sf` re-exported the compiler's AST types with
+`var Expr = Internal.Expr`. `var` binds a name in the **value** namespace, so
+codegen resolved it as a function reference, wrapped it in a closure
+(`@__wrap_201_compiler_ast_Expr`) and emitted a call to `@compiler_ast_Expr` — a
+symbol nothing defines, because `Expr` is a type. `type X = Y` is the real alias
+form; the parser has supported it all along (`parse_stmt`, desugared to a
+`VarDecl` carrying the docstring `@type_alias`).
+
+**The second-order cost was larger than the crash.** Because no annotation could
+name a `var`-bound type, every signature in `src/lib/ast.sf` fell back to `Any`
+— 29 occurrences. `Any` disables exhaustive match checking for callers, and that
+is precisely how five non-exhaustive matches sat unnoticed in
+`tools/gen_docs.sf`, one of which had a stale arity that survived the WS1a span
+sweep. Switching to `type` and restoring real annotations made the checker report
+all five immediately.
+
+**Fix.** `type` instead of `var` in `src/lib/{ast,lexer,lang}.sf`, real
+`Stmt`/`Span`/`Expr`/`Param` annotations throughout `src/lib/ast.sf` (only the
+two `visitor` callbacks remain `Any`, correctly — they are function values), and
+explicit `_ => {}` arms in `tools/gen_docs.sf` for the matches that intentionally
+handle one variant. Regression test: `test/pass/module_type_reexport.sf`, which
+asserts the aliases work as annotations at both hops — `@ast` aliases the
+compiler's definitions and `@lang` aliases `@ast`'s aliases.
+
+**The lesson worth keeping:** the failure announced itself as "this is a compiler
+bug, not an error in your program", and it was a two-word error in a library.
+A diagnostic that confidently assigns blame can still be pointing the wrong way.
 
 ### 66. FIXED — binary files could not be read or served: `IO.read_file` truncated at the first NUL, so `static_files` served any wasm module as 0 bytes
 

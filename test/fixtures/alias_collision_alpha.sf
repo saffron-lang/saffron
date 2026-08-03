@@ -1,0 +1,5 @@
+// One half of the alias-collision fixture. See
+// test/pass/module_alias_not_global.sf for what this is pinning down.
+fun which(): String {
+    return "alpha"
+}

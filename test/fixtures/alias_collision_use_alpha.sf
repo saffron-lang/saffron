@@ -1,0 +1,8 @@
+// Binds the alias `Shared` to alias_collision_alpha.sf. Unambiguous in this
+// file; the point is that a sibling module binds the same alias to a different
+// file.
+import "./alias_collision_alpha.sf" as Shared
+
+fun ask(): String {
+    return Shared.which()
+}
