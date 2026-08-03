@@ -1,0 +1,26 @@
+// BUGS #123 fixture 1 of 3. See test/pass/alias_scope_file_local.sf.
+//
+// This file binds the alias `Shared` to alias_scope_target_a.sf. Its sibling
+// alias_scope_beta.sf binds the SAME alias to a DIFFERENT module. Before #123
+// the alias table was one flat map keyed by alias name with first-writer-wins,
+// so whichever of the two the module walk reached first won for both, and the
+// loser silently resolved its `Shared.*` against the winner's prefix.
+import "./alias_scope_target_a.sf" as Shared
+
+// A function call through the alias.
+fun alpha_calls_through_alias(): String {
+    return Shared.who()
+}
+
+// A module global read through the alias — a different resolution path in
+// codegen than the call above, so both are exercised from both files.
+fun alpha_reads_global(): String {
+    return Shared.label
+}
+
+// A class constructed through the alias, so the type-resolution path is
+// covered too.
+fun alpha_builds_marker(): String {
+    var m = Shared.Marker("alpha")
+    return m.describe()
+}

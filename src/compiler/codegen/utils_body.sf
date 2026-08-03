@@ -582,8 +582,8 @@
             MethodCall(o, m, a) => {
                 // Extract module-qualified call: Async.sleep → stdlib_async_sleep
                 var obj_name: String = this.get_variable_name(o)
-                if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-                    var prefix: String = this.module_prefixes.get(obj_name)
+                if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
+                    var prefix: String = this.module_alias_prefix(obj_name)
                     calls.push(prefix + m)
                 }
                 calls.push(m)
@@ -823,6 +823,62 @@
             __sil_i = __sil_i + 1
         }
         return false
+    }
+
+    // --- Import-alias resolution (BUGS #123) ---
+    //
+    // An import alias is file-local: `import "../compiler/lexer.sf" as Internal`
+    // binds `Internal` for the file that wrote that line and for no other file.
+    // `module_prefixes` cannot express that — it is one flat map keyed by alias
+    // name, filled by a whole-program walk with first-writer-wins — so when
+    // src/lib/ast.sf, src/lib/lexer.sf and src/lib/parser.sf each bound
+    // `Internal` to a *different* module, one binding won for all three and the
+    // other two silently resolved against the winner's prefix. `Internal.Token`
+    // inside lexer.sf looked up `compiler_ast_Token`, which does not exist, and
+    // the failure surfaced (post-#118) as "no member 'Token' in module
+    // 'Internal'" — a diagnostic blaming the file that was right.
+    //
+    // `scoped_module_prefixes` fixes the scoping rather than the instance: it is
+    // keyed `<declaring module prefix>|<alias>`, so each file keeps its own
+    // binding and `this.current_prefix` selects the right one. These two helpers
+    // are the only readers; every `module_prefixes.has(...)` /
+    // `module_prefixes.get(...)` pair on a *source-level alias* goes through them
+    // so the scoped answer and the fallback can never disagree at a call site.
+    //
+    // The flat map stays as the fallback, and that is deliberate. Aliases reach
+    // `module_prefixes` from several paths that do not record a declaring file —
+    // the hard-wired `IO`/`GC`/`Reflect` entries in
+    // generate_with_modules_flat_opts3, and the older non-flat entry points that
+    // never build a scoped map at all. For those the flat answer is the only
+    // answer, and it is the pre-#123 behaviour, so nothing that worked before
+    // stops working: the scoped map only ever *overrides* a name whose declaring
+    // file is known.
+    fun has_module_alias(name: String): Bool {
+        if (this.scoped_module_prefixes.has(this.alias_key(name))) { return true }
+        return this.module_prefixes.has(name)
+    }
+
+    // Both reads are guarded by the matching `has`, which is what narrows
+    // Map.get's `String|Nil` to `String` for the checker. The final `return ""`
+    // is unreachable for any caller that asked has_module_alias first — and
+    // every caller does — but an unguarded `.get` would not type check.
+    fun module_alias_prefix(name: String): String {
+        var scoped_key: String = this.alias_key(name)
+        if (this.scoped_module_prefixes.has(scoped_key)) {
+            return this.scoped_module_prefixes.get(scoped_key)
+        }
+        if (this.module_prefixes.has(name)) {
+            return this.module_prefixes.get(name)
+        }
+        return ""
+    }
+
+    // Must agree with main.sf's alias_scope_key, which writes these keys. A
+    // module prefix matches [A-Za-z0-9_]* and an alias is an identifier, so the
+    // bar cannot occur in either half; the entry file's prefix is empty, giving
+    // keys like |Lexer.
+    fun alias_key(name: String): String {
+        return this.current_prefix + "|" + name
     }
 
     fun is_known_name(name: String): Bool {
