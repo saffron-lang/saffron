@@ -2,8 +2,8 @@
 
 ## Open
 
-**15 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
-#119, #121, #122, #123. Next free number is **#124**.
+**14 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
+#121, #122, #123. Next free number is **#124**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -601,52 +601,6 @@ lists. It also means #115's "only nested elements are wrong" framing holds for
 
 ---
 
-### 119. An output path containing `.sf` is taken as the input, so the real input is never read
-
-**Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
-file appear to accept it, which corrupts measurement rather than just output.
-
-```
-saffronc real.sf decoy.sf     # exit 0 — compiles decoy.sf; real.sf never read
-saffronc real.sf out.sf.ll    # exit 0 — writes out.sf.ll.ll
-```
-
-Verified at HEAD, both cases: after `saffronc /tmp/real.sf /tmp/decoy.sf`, the
-emitted IR contains `DECOY` once and `REAL_INPUT` **zero** times, with exit 0.
-
-`main.sf:1075` picks the input by scanning for `arg.contains(".sf")` and keeping the
-**last** match:
-
-```saffron
-if (arg.contains(".sf") and arg != "--stdlib") {
-    last_sf_idx = i
-}
-```
-
-Two independent defects in one line. `contains` rather than `ends_with` matches
-`.sf` anywhere in the string, so `out.sf.ll` qualifies; and taking the *last* match
-means when both args qualify the **output** wins. Note the rest of `main.sf`
-already knows better — lines 693, 714, 742 and 968 all use `ends_with(".sf")`. Only
-the argument parser sniffs.
-
-The fix is `ends_with(".sf")` plus treating the input as *positional* (first
-non-flag argument) rather than sniffing for it at all. Sniffing cannot distinguish
-an input from an output that merely resembles one; position can.
-
-**Why this matters beyond the obvious.** The failure is silent and exit code 0, so
-any batch sweep whose output filenames embed `.sf` measures nothing while appearing
-to measure everything. This was found by an agent whose first two arity sweeps
-wrote to `$OUT/<name>.sf.ll` and reported zero diagnostics across the corpus —
-including on a file it had just watched the compiler reject. The result looked like
-strong evidence of no regression and was evidence of nothing.
-
-The shipped pipeline is **not** affected, which is why this survived: `tools/saffron`
-writes `$TMPDIR/output.ll` (`tools/saffron:320,441`) and `tools/run_tests.sh` writes
-`neg_<name>.ll`, neither containing `.sf`. So the test suites and every failure-set
-comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
-
----
-
 ### 121. A variable used only in callee position is falsely reported as an unused variable
 
 **Severity: low** — warning-only, no codegen consequence. Filed because it is a
@@ -782,6 +736,106 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 119. FIXED — an output path containing `.sf` was taken as the input, so the real input was never read
+
+**Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
+file appear to accept it, which corrupts measurement rather than just output.
+
+```
+saffronc real.sf decoy.sf     # exit 0 — compiles decoy.sf; real.sf never read
+saffronc real.sf out.sf.ll    # exit 0 — writes out.sf.ll.ll
+```
+
+Verified at HEAD, both cases: after `saffronc /tmp/real.sf /tmp/decoy.sf`, the
+emitted IR contains `DECOY` once and `REAL_INPUT` **zero** times, with exit 0.
+
+`main.sf:1075` picks the input by scanning for `arg.contains(".sf")` and keeping the
+**last** match:
+
+```saffron
+if (arg.contains(".sf") and arg != "--stdlib") {
+    last_sf_idx = i
+}
+```
+
+Two independent defects in one line. `contains` rather than `ends_with` matches
+`.sf` anywhere in the string, so `out.sf.ll` qualifies; and taking the *last* match
+means when both args qualify the **output** wins. Note the rest of `main.sf`
+already knows better — lines 693, 714, 742 and 968 all use `ends_with(".sf")`. Only
+the argument parser sniffs.
+
+The fix is `ends_with(".sf")` plus treating the input as *positional* (first
+non-flag argument) rather than sniffing for it at all. Sniffing cannot distinguish
+an input from an output that merely resembles one; position can.
+
+**Why this matters beyond the obvious.** The failure is silent and exit code 0, so
+any batch sweep whose output filenames embed `.sf` measures nothing while appearing
+to measure everything. This was found by an agent whose first two arity sweeps
+wrote to `$OUT/<name>.sf.ll` and reported zero diagnostics across the corpus —
+including on a file it had just watched the compiler reject. The result looked like
+strong evidence of no regression and was evidence of nothing.
+
+The shipped pipeline is **not** affected, which is why this survived: `tools/saffron`
+writes `$TMPDIR/output.ll` (`tools/saffron:320,441`) and `tools/run_tests.sh` writes
+`neg_<name>.ll`, neither containing `.sf`. So the test suites and every failure-set
+comparison made through them remain valid. It is ad-hoc sweeps that are at risk.
+
+**FIXED (2026-08-02).** The input is now **positional** (`main.sf:1070`): the first
+non-flag argument is the input, the second is the output. `ends_with(".sf")`
+deliberately appears nowhere in that decision. Switching `contains` to `ends_with`
+would *not* have fixed this — an output path is allowed to resemble an input path,
+so no test on the name can separate the two. Only position can.
+
+Flag values are skipped so they cannot be promoted to the input: `--stdlib`,
+`--lib-path` and `--target` each consume the argument after them, which is why
+`--lib-path vendor.sf` does not become the input. That list mirrors the flag loop
+immediately above; every other flag is a bare switch.
+
+One subtlety the fix depends on, worth recording because the two loops now look
+inconsistent: the positional loop starts at `i = 1` while the flag loop above starts
+at `i = 0`. That is correct, and necessary — `OS.args()[0]` is the binary's own
+path, which does not start with `-` and would otherwise be taken as the input.
+Verified by probe rather than assumed.
+
+Two further silent-success paths in the same function went with it, both the
+identical shape and each independently enough to defeat a sweep:
+
+* **No input at all exited 0.** It printed the usage text and returned 1 — but
+  `return 1` from `main()` does not set the process status, only `c_exit` does, so
+  the shell saw success. Now exits 1.
+* **A nonexistent input exited 0 with valid IR.** `IO.read_file` on a missing path
+  returns `""`, which lexes and parses as an empty program, so `saffronc missing.sf
+  out.ll` emitted a 6.5 KB `.ll` and exited 0. A typo'd path in a sweep read as a
+  clean compile. Now `saffronc: cannot open input file: <path>`, exit 1, and no
+  output file is written.
+
+These were folded into #119 rather than filed separately: same function, same
+silent-success mechanism, and the analysis above already frames the bug as being
+about measurement rather than output.
+
+**`test/pass/cli_positional_input.sf` is the regression test, and the negative
+evidence is the part that matters.** Argument parsing has no in-language surface, so
+the test drives the real `build/saffronc` binary. Run against a pre-fix compiler
+staged into a throwaway root, **exactly 9 of its 26 assertions fail** — naming the
+first-positional rule, the doubled `.ll`, the `--lib-path`-value case, and both exit
+codes. 26/26 against the fixed compiler. So it detects the defect rather than merely
+passing alongside the fix, which is the distinction #107 exists to enforce.
+
+It locates the repo root by walking up for a directory holding **both**
+`build/saffronc` and `src/lib/prelude.sf`, and **fails rather than skips** when it
+finds none. A guard test that quietly passes without running is the exact failure
+mode this bug is about. An earlier draft reconstructed the root by slicing a fixed
+character count off `<root>/build/saffronc` and was off by one, silently yielding a
+neighbouring directory; the two-marker walk has no magic constant to get wrong.
+
+Every invocation form in the shipped scripts was enumerated and verified —
+`tools/saffron` lines 225/328/352/384, `tools/run_tests.sh:375`, `bootstrap.sh`
+115/164/235/279/302/335, and `test/package_map_test.sh` (18 passed, 0 failed).
+`tools/saffron` never forwards extra positionals to `saffronc`; it always passes
+exactly input + output, so nothing depended on the old last-match behaviour.
+
+---
 
 ### 118. FIXED — a nonexistent module member compiled clean, then emitted invalid IR blaming the compiler
 
