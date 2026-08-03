@@ -47,8 +47,20 @@
     "comments": {
       "patterns": [
         {
+          "name": "comment.line.documentation.saffron",
+          "match": "//[/!].*$"
+        },
+        {
           "name": "comment.line.double-slash.saffron",
           "match": "//.*$"
+        },
+        {
+          "name": "comment.block.saffron",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            { "include": "#comments" }
+          ]
         }
       ]
     },
@@ -101,7 +113,7 @@
       "patterns": [
         {
           "name": "keyword.control.saffron",
-          "match": "\\b(if|else|for|while|return|break|continue|match|yield|await|resume|throw|try|catch|finally|import|as|in|is)\\b"
+          "match": "\\b(if|else|for|while|return|break|continue|match|yield|throw|try|catch|finally|import|as|in|is)\\b"
         },
         {
           "name": "keyword.operator.logical.saffron",
@@ -112,8 +124,13 @@
     "storage": {
       "patterns": [
         {
+          "comment": "Access modifiers are SOFT keywords: a modifier only when a declaration introducer follows, so `var private = 1` and `private.close()` still read as identifiers. Mirrors parser.sf::at_visibility_modifier (var/let/fun/enum/class/interface/actor/type/@/extend).",
+          "name": "storage.modifier.saffron",
+          "match": "\\b(private|public|protected|internal)\\b(?=\\s+(var|let|fun|enum|class|interface|actor|type|extend|@))"
+        },
+        {
           "name": "storage.type.saffron",
-          "match": "\\b(var|let|fun|class|data|enum|interface|type|extends)\\b"
+          "match": "\\b(var|let|fun|class|enum|interface|actor|type|extends|extend)\\b"
         }
       ]
     },
