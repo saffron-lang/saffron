@@ -1,0 +1,4 @@
+fun main() {
+    IO.println("hello from main")
+    IO.println(42)
+}

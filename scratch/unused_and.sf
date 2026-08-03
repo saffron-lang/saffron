@@ -1,0 +1,10 @@
+fun main() {
+    var a: Int = 1
+    var b: Int = 1
+    var c: Int = 1
+    if (a == b and b == c) { IO.println("all equal") }
+    var d: Int = 2
+    var e: Int = 2
+    if (d == e) { IO.println("d==e") }
+}
+main()

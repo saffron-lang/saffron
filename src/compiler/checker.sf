@@ -2633,7 +2633,16 @@ class NullChecker {
             MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
-            Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
+            // A lambda's body is code, so walk it. Returning the FuncType without
+            // visiting `b` meant a variable captured *only* inside a lambda was
+            // never marked used and drew a false "unused variable" (BUGS #126) —
+            // the same false-diagnostic class as #121, at a different un-walked
+            // subtree. The type is still the same erased FuncType: this arm is a
+            // walk, not new inference.
+            Lambda(p, r, b) => {
+                this.check_lambda_body(p, b)
+                AST.Type.FuncType([], AST.Type.AnyType)
+            }
             GetField(obj, field) => AST.Type.AnyType
             SetField(obj, field, value) => {
                 // A write is an access. This arm used to infer only `value` and
@@ -2740,6 +2749,45 @@ class NullChecker {
                 }
             }
         }
+    }
+
+    /// Walk a lambda's body so the variables it captures are marked used
+    /// (BUGS #126). The lambda's own parameters go into a pushed scope first, or
+    /// every use inside the body would resolve past them to an enclosing
+    /// variable of the same name — and the parameters themselves would read as
+    /// declarations that nothing touches.
+    ///
+    /// Two things this deliberately does NOT do.
+    ///
+    /// It does not call check_unused_in_scope() on the lambda scope, so an
+    /// unused lambda *parameter* stays unwarned. A callback that ignores an
+    /// argument it is handed is ordinary — `list.sort(fun (a: Int, b: Int) => 0)`
+    /// — and the parser also synthesises Lambdas the user never wrote (for-in
+    /// desugaring, trailing closures, `@suspend` bodies), whose parameters would
+    /// draw warnings naming code that does not exist in the source. Marking uses
+    /// is the fix; adding a new warning class is not.
+    ///
+    /// It clears current_func_ret to Any for the duration. The Return arm of
+    /// check_stmt compares against it, and a lambda's declared return type is
+    /// unreliable: parse_lambda defaults it to the *string* "Int" when there is
+    /// no annotation, so `fun () => nil` would be checked as returning nil from
+    /// an Int function and would fail. This walk exists to record uses, so it
+    /// must not start enforcing a return type nobody wrote.
+    fun check_lambda_body(params: List<AST.Param>, body: List<AST.Stmt>) {
+        var saved_ret: AST.Type = this.current_func_ret
+        this.current_func_ret = AST.Type.AnyType
+        this.env.push_scope()
+        var li: Float = 0
+        while (li < params.length()) {
+            var lp: AST.Param = params[li]
+            var lp_name: String = match (lp) { Param(n, t, d, p_vis) => n }
+            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis) => t }
+            this.env.define_var(lp_name, lp_type)
+            li = li + 1
+        }
+        this.check_stmts(body)
+        this.env.pop_scope()
+        this.current_func_ret = saved_ret
     }
 
     // String wrapper for backward compat — delegates to infer_type
@@ -3127,21 +3175,40 @@ class NullChecker {
             // caller below already treats as "unknown callee".
             _ => ""
         }
-        // A called bare cross-module function is a Ref in callee position and is
-        // NOT routed through infer_type's Ref arm (infer_call reads the name off
-        // the callee directly and never infers the callee expression), so §6a
-        // path 3 for a *call* must be decided here. The slot carries the defining
-        // module's prefix; a func-kind Ref with a non-empty slot is exactly a
-        // cross-module call. Placed before arg inference so the diagnostic points
-        // at the call, not at something inside its arguments.
-        match (callee) {
-            Ref(rk, rn, rs) => {
-                if (rk == "func" or rk == "global") {
-                    this.check_module_ref_visibility(rn, rs)
-                }
-            }
-            _ => nil
-        }
+        // The callee is an expression like any other, so infer it. The match
+        // above reads a *name* out of it for the return-type lookup, and a name
+        // is not a visit: before this line the callee subtree was never walked
+        // at all, so a variable whose only appearance is in callee position was
+        // never marked used and got a false "unused variable" warning
+        // (BUGS #121) — `fs[0](7)` is the whole use of `fs`.
+        //
+        // Walking the callee rather than calling mark_used(name) on the string
+        // above, for two reasons. (1) `name` does not exist for the shapes that
+        // actually trigger the bug: IndexGet, Call, MethodCall and a
+        // parenthesized expression all take the `_ => ""` arm, so a name-based
+        // fix could not see `fs[0](7)` at all. (2) For a MemberAccess callee
+        // `name` is the *field* name, and mark_used searches lexical scopes by
+        // string — so `b.cb(1)` would have marked an unrelated local named `cb`
+        // used and silently swallowed a warning that should fire.
+        //
+        // This is not double inference: infer_type's Call arm is the only walker
+        // of a Call, and it delegates here, which until now inferred the args
+        // and skipped the callee entirely. So a nested callee's own arguments
+        // (`f(a)(b)`, `o.m(a)(b)`) were not being checked either, and now are —
+        // exactly once.
+        //
+        // This line also carries §6a path 3 — a called bare cross-module
+        // function. That check used to need its own `match (callee)` block here,
+        // on the stated premise that "infer_call reads the name off the callee
+        // directly and never infers the callee expression". This line falsifies
+        // that premise: a Ref callee now reaches infer_type's Ref arm, which
+        // calls check_module_ref_visibility under the same `rk == "func" or
+        // rk == "global"` guard the separate block used. Keeping both would
+        // report a private cross-module call TWICE, so the block was dropped in
+        // favour of the walk. The visibility diagnostic is unchanged in reach;
+        // only its route is. If this walk is ever narrowed, path 3 must be
+        // re-established explicitly.
+        this.infer_expr(callee)
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
         var di: Float = 0
         while (di < args.length()) {
@@ -3475,8 +3542,33 @@ class NullChecker {
                 Throw(v) => true
                 // Both branches must leave for the `if` itself to leave. An empty
                 // else_branch is a missing else, which falls through.
+                // The two recursive calls are hoisted into locals rather than
+                // written `this.stmts_diverge(tb) and this.stmts_diverge(eb)`,
+                // which is what this line used to say and what kept this whole
+                // file from parsing standalone (BUGS #127). A STATEMENT that
+                // begins with `this` goes to the parser's parse_this_stmt, which
+                // consumes the member/call chain and returns an ExprStmt without
+                // handing the result back to the binary-operator layer — so the
+                // `and` was left trying to start a fresh statement and the file
+                // died at "expected a literal, name or '(' here". A block
+                // expression's value is a statement, so this position hit it.
+                //
+                // Semantically equivalent, not merely equivalent-enough: the
+                // hoist gives up `and`'s short-circuit, and stmts_diverge is a
+                // pure read over the AST, so evaluating both sides always is a
+                // cost difference and nothing else.
+                //
+                // This is a WORKAROUND, not the fix. The defect is in
+                // parse_this_stmt and the trap stays set for the next author who
+                // writes the natural spelling.
                 If(c, tb, eb) => {
-                    if (eb.length() == 0) { false } else { this.stmts_diverge(tb) and this.stmts_diverge(eb) }
+                    if (eb.length() == 0) {
+                        false
+                    } else {
+                        var then_diverges: Bool = this.stmts_diverge(tb)
+                        var else_diverges: Bool = this.stmts_diverge(eb)
+                        then_diverges and else_diverges
+                    }
                 }
                 Block(s) => this.stmts_diverge(s)
                 ExprStmt(e) => this.expr_diverges(e)

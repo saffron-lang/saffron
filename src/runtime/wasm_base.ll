@@ -554,12 +554,57 @@ entry:
 
 ; --- exit ---
 
-declare void @__builtin_trap()
+; wasm has a real trap instruction, so this needs no host support. It was
+; previously only DECLARED here, which left it undefined at link time and, under
+; the wasm64 link line's `--allow-undefined`, turned `exit()` into a no-op host
+; import that then fell through to `unreachable`. wasm_base_32.ll defines it for
+; the same reason.
+define void @__builtin_trap() {
+entry:
+  call void @llvm.trap()
+  unreachable
+}
+
+declare void @llvm.trap()
 
 define void @exit(i32 %code) {
 entry:
   call void @__builtin_trap()
   unreachable
+}
+
+; --- Helpers the codegen/runtime reference that this base was missing ---
+;
+; Each of these was undefined on wasm64 and therefore a silent no-op host import
+; under `--allow-undefined` — the same disease as BUGS #124/#125, found by
+; sweeping the *UND* symbol list of a linked module rather than by reading code.
+; `__string_intern` in particular is reached by ordinary string interpolation, so
+; `IO.println("hello ${name}")` produced NO output before this.
+
+; The native runtime interns strings so identical literals share one allocation.
+; Returning the input unchanged is safe: string comparison goes through a real
+; content-wise strcmp rather than relying on pointer identity, so skipping the
+; intern table costs memory, never correctness. Same body as wasm_base_32.ll.
+define i64 @__string_intern(i64 %str) {
+entry:
+  ret i64 %str
+}
+
+; Native builds print the source location alongside a runtime error. There is no
+; stderr in a bare wasm module, so this is a no-op; errors surface through the JS
+; glue's js_log_str instead.
+define void @__print_debug_location() {
+entry:
+  ret void
+}
+
+; Identity discipline: there is no tag, so a null pointer and nil are the same
+; bits (__val_nil() is 0 in this base). The nanbox version selects the nil
+; constant for a null input; here the pass-through IS that behaviour.
+define i64 @__val_tag_ptr_nullable(i8* %ptr) {
+entry:
+  %r = ptrtoint i8* %ptr to i64
+  ret i64 %r
 }
 
 ; =============================================================================
@@ -783,6 +828,101 @@ entry:
   %ptr = inttoptr i64 %raw to i8*
   %tagged = call i64 @__val_tag_ptr(i8* %ptr)
   ret i64 %tagged
+}
+
+; =============================================================================
+; Any-value I/O dispatch -- IDENTITY discipline
+; =============================================================================
+; Every `IO.println(x)` lowers to a call to the single-argument `__io_println`.
+; This base defined only the type-suffixed variants (__io_println_str/_int/...),
+; so `__io_println`, `__io_println_any` and `__any_to_string` were all undefined
+; on wasm64, and `--allow-undefined` on the wasm64 link line turned each into a
+; no-op host import: ALL wasm64 output was silently dropped -- BUGS #125.
+;
+; WHY THIS IS NOT THE wasm_base_32.ll DEFINITION, ADJUSTED FOR POINTER WIDTH.
+;
+; #125 described the fix as porting wasm_base_32.ll:1740 and "adjusting only the
+; pointer width". That premise is wrong, and following it produces a build that
+; links clean and prints `0` for every value -- a new silent-wrong-output bug in
+; place of the silent-no-output one.
+;
+; The two bases have different VALUE DISCIPLINES, not different pointer widths.
+; src/runtime/values.spec is explicit:
+;
+;     @target wasm64   discipline=identity  file=wasm_base.ll
+;     @target wasm32   discipline=nanbox    file=wasm_base_32.ll
+;
+; On wasm32 values are NaN-boxed, so `__any_to_string` can recover a type from
+; the tag. On wasm64 `__val_tag_int`/`__val_tag_ptr` are the identity function,
+; so the value arriving here is RAW: measured with a logging probe, `IO.println("a
+; string")` delivers 65536 (a bare data pointer) and `IO.println(42)` delivers 42.
+; Nothing carries a tag to dispatch on.
+;
+; Feeding those raw values to the nanbox dispatcher takes the `do_float` arm --
+; a small integer has a zero exponent, so it is not any of 0x7FF8/9/A -- which
+; bitcasts to a denormal (42 as a double is 2.08e-322) and `fptosi` truncates
+; every denormal to 0. That is the measured all-zeros output, and it is the same
+; family of mistake as the untag_int/denormal trap recorded for #77 and #39:
+; a helper copied across a discipline boundary type checks, links, and lies.
+;
+; So these follow base.ll, the OTHER identity-discipline base (base.ll:99), which
+; treats the value as a raw string pointer. The honest consequence is that on
+; wasm64 only String arguments print correctly; a non-string prints garbage,
+; because in identity mode the type genuinely is not recoverable at runtime.
+; base.ll has exactly the same limitation and says so. Making `IO.println(42)`
+; correct on wasm64 requires switching this base to the nanbox discipline (the
+; whole file, via values.spec, plus GC headers -- see the `__val_class_tag`
+; capability-gap note above), which is a much larger change than #125 and is
+; reported back as a separate finding rather than smuggled in here.
+;
+; No pointer-width adjustment was needed for what is actually shared with
+; wasm_base_32.ll: the block is all i64 values and `inttoptr i64 ... to i8*`,
+; which is already correct for 64-bit pointers.
+
+; __any_to_string -- identity discipline: the type is not recoverable, so the
+; value is passed through as a raw pointer. Mirrors base.ll's stub, except that
+; base.ll routes through __int_to_string; that is wrong for the common case
+; here, because the argument that reaches println on this target is a string
+; pointer far more often than an integer, and formatting a pointer as a decimal
+; integer loses the string outright.
+define i64 @__any_to_string(i64 %val) {
+entry:
+  ret i64 %val
+}
+
+; __io_println_any -- print a value followed by a newline. The host's js_log_str
+; supplies the newline (see tools/oracle/wasm_run.mjs's line-discipline note).
+define void @__io_println_any(i64 %val) {
+entry:
+  %ptr = inttoptr i64 %val to i8*
+  call void @js_log_str(i8* %ptr)
+  ret void
+}
+
+; __io_print_any -- codegen emits a call to this for IO.print in non-identity
+; mode, so it must exist here too or IO.print becomes the same silent no-op.
+define void @__io_print_any(i64 %val) {
+entry:
+  %ptr = inttoptr i64 %val to i8*
+  call void @js_log_str(i8* %ptr)
+  ret void
+}
+
+; __io_println -- the single-argument dispatcher every IO.println(x) lowers to.
+define i64 @__io_println(i64 %val) {
+entry:
+  call void @__io_println_any(i64 %val)
+  ret i64 0
+}
+
+; __io_print -- the no-newline counterpart. NOTE: this base has only the one
+; js_log_str host import, so the host cannot tell print from println and appends
+; a newline to both. That limit is wasm_run.mjs's documented residual, not
+; something this definition can fix.
+define i64 @__io_print(i64 %val) {
+entry:
+  call void @__io_print_any(i64 %val)
+  ret i64 0
 }
 
 ; =============================================================================
@@ -1022,10 +1162,35 @@ entry:
 
 ; =============================================================================
 ; Entry point wrapper
-; WASM entry point — initializes heap, then calls __saffron_entry.
+; WASM entry point -- initializes heap, then calls the codegen-emitted boot shim.
 ; =============================================================================
 
-declare i64 @__saffron_entry()
+; Calls __saffron_boot, not __saffron_entry directly -- the same indirection
+; wasm_base_32.ll uses, and for the same two reasons.
+;
+; 1. SIGNATURE. Once a program contains a suspend point its entry point is
+;    emitted as `ptr @__saffron_entry() presplitcoroutine` -- it returns a
+;    coroutine frame, not a value -- and calling it through an `i64` signature
+;    traps. `__saffron_boot` has a stable `i64 ()` signature either way and, for
+;    the coroutine case, enqueues the frame on the scheduler instead of treating
+;    it as a result.
+;
+; 2. EXISTENCE. `__saffron_entry` is emitted by codegen ONLY under
+;    has_top_level, so a file whose entire contents are `fun main() { ... }`
+;    has no `__saffron_entry` in the module at all. This base declared and
+;    called it unconditionally, and the wasm64 link line passes
+;    `--allow-undefined`, which turned that call into a silent no-op host
+;    import: the module built, ran, and did nothing -- BUGS #124. `__saffron_boot`
+;    is emitted for every wasm build with either a `main` or top-level code
+;    (see the #110 fix in src/compiler/codegen/output_body.sf), and for the
+;    main-only case its body calls `__saffron_main` and runs the module inits
+;    itself. So this base has exactly one definition to call in both shapes and
+;    needs no weak-linkage fallback -- whose body would carry the wrong
+;    signature for the coroutine case anyway.
+;
+; wasm64 had no such indirection to widen when #110 was fixed for wasm32, which
+; is precisely why the same disease survived here through a different pipe.
+declare i64 @__saffron_boot()
 
 define void @_start() {
 entry:
@@ -1036,6 +1201,6 @@ entry:
   %aligned = add i64 %hb_ptr, 7
   %heap_start = and i64 %aligned, -8
   store i64 %heap_start, i64* @__heap_ptr
-  call i64 @__saffron_entry()
+  call i64 @__saffron_boot()
   ret void
 }

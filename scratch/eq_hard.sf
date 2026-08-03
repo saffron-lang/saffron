@@ -1,0 +1,84 @@
+import "@test" as Test
+
+enum Inner { A(n: Int), B }
+enum Outer { Wrap(i: Inner), Plain }
+
+enum Mixed {
+    S(name: String),
+    F(x: Float),
+    Bl(b: Bool),
+    Nested(o: Outer),
+    Empty
+}
+
+enum Res<T, E> { Ok(value: T), Err(error: E) }
+
+// A recursive enum: ensure_enum_eq must self-call, not recurse forever.
+enum Chain { Link(next: Chain), End }
+
+class Pt { var x: Int  fun init(x: Int) { this.x = x } }
+enum Holder { H(p: Pt), Nothing }
+
+fun main() {
+    // Nested heap enums compare deeply
+    Test.assert(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.A(3)), "nested equal")
+    Test.assert(!(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.A(4))), "nested payload differs")
+    Test.assert(!(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.B)), "nested variant differs")
+    Test.assert(Outer.Wrap(Inner.B) == Outer.Wrap(Inner.B), "nested fieldless equal")
+    Test.assert(Outer.Plain == Outer.Plain, "outer fieldless equal")
+
+    // String payloads compare by content, not pointer
+    var s1: String = "he" + "llo"
+    var s2: String = "hell" + "o"
+    Test.assert(Mixed.S(s1) == Mixed.S(s2), "string payload by content")
+    Test.assert(!(Mixed.S("a") == Mixed.S("b")), "different strings differ")
+
+    // Float payloads
+    Test.assert(Mixed.F(1.5) == Mixed.F(1.5), "float payload equal")
+    Test.assert(!(Mixed.F(1.5) == Mixed.F(2.5)), "float payload differs")
+    Test.assert(Mixed.F(0.0) == Mixed.F(-0.0), "0.0 == -0.0 at double level")
+
+    // Bool payloads
+    Test.assert(Mixed.Bl(true) == Mixed.Bl(true), "bool payload equal")
+    Test.assert(!(Mixed.Bl(true) == Mixed.Bl(false)), "bool payload differs")
+
+    // Enum-typed payload nested one more level
+    Test.assert(Mixed.Nested(Outer.Plain) == Mixed.Nested(Outer.Plain), "two-deep equal")
+    Test.assert(!(Mixed.Nested(Outer.Plain) == Mixed.Nested(Outer.Wrap(Inner.B))), "two-deep differs")
+    Test.assert(Mixed.Empty == Mixed.Empty, "mixed fieldless equal")
+    Test.assert(!(Mixed.Empty == Mixed.S("x")), "fieldless vs payload differ")
+
+    // Generic enum: T/E name nothing at IR level, so the field defers to __any_eq
+    Test.assert(Res.Ok(5) == Res.Ok(5), "generic Ok equal")
+    Test.assert(!(Res.Ok(5) == Res.Ok(6)), "generic Ok differs")
+    Test.assert(Res.Err("bad") == Res.Err("bad"), "generic Err string equal")
+    Test.assert(!(Res.Ok(5) == Res.Err("bad")), "generic variants differ")
+
+    // Recursive enum
+    Test.assert(Chain.End == Chain.End, "chain end equal")
+    Test.assert(Chain.Link(Chain.End) == Chain.Link(Chain.End), "chain one deep equal")
+    Test.assert(!(Chain.Link(Chain.End) == Chain.End), "chain depth differs")
+
+    // Class payload: identity, deliberately
+    var p: Pt = Pt(1)
+    Test.assert(Holder.H(p) == Holder.H(p), "same class instance equal")
+    Test.assert(!(Holder.H(Pt(1)) == Holder.H(Pt(1))), "distinct class instances not equal")
+    Test.assert(Holder.Nothing == Holder.Nothing, "holder fieldless equal")
+
+    // match must still work on all of these
+    var m: Outer = Outer.Wrap(Inner.A(7))
+    var got: Int = match (m) {
+        Wrap(i) => match (i) { A(n) => n   B => -1 }
+        Plain => -2
+    }
+    Test.assert_eq(got, 7, "match still destructures")
+
+    // Transitivity spot check
+    var x: Mixed = Mixed.F(3.25)
+    var y: Mixed = Mixed.F(3.25)
+    var z: Mixed = Mixed.F(3.25)
+    Test.assert(x == y and y == z and x == z, "transitive")
+
+    Test.summary()
+}
+main()

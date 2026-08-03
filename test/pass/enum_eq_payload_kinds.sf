@@ -1,0 +1,142 @@
+// BUGS #116, second half: enum `==` must compare EVERY kind of payload
+// correctly, not just the `Int` one.
+//
+// test/pass/enum_payload_value_equality.sf pins the headline property — that two
+// separately constructed, structurally identical values are equal — using a
+// single-Int payload. This file covers the payload kinds whose comparison is a
+// *different lowering*, because the fix routes `==` on a heap-encoded enum to a
+// generated `__enum_eq_<Name>` that picks a comparison per field from the field's
+// DECLARED type. Each block below is one of those choices, and each would fail
+// silently and independently if its arm were wrong:
+//
+//   String  — must compare content. Two equal strings need not share a pointer,
+//             so a bit compare answers false for `S("hel"+"lo") == S("hell"+"o")`.
+//   Float   — must compare at double level, which is also what makes 0.0 == -0.0.
+//   Bool    — a tagged bool has one bit pattern per value, so bits suffice; here
+//             to catch an arm that untags it as a number instead.
+//   Enum    — must RECURSE, or equality is shallow: `Wrap(A(3)) == Wrap(A(4))`
+//             would compare two inner pointers and answer false.
+//   Generic — `Res<T,E>`'s T names nothing at the IR level, so no static choice
+//             is available and the comparison defers to the runtime's __any_eq.
+//   Class   — deliberately identity, matching how class instances compare
+//             everywhere else. Asserted so a later change to value equality for
+//             references is a deliberate decision and not a silent side effect.
+//
+// Also covered: a recursive enum (`Chain`), which is the case that makes the
+// generated function need to be registered BEFORE its body is emitted — without
+// that, emitting Link's payload compare recurses forever.
+//
+// Every assertion is a property (equal-to-itself, or differs-in-one-place), not
+// a frozen boolean, and the "differs" half of each pair is what stops a fix from
+// passing by making everything equal.
+import "@test" as Test
+
+enum Inner { A(n: Int), B }
+enum Outer { Wrap(i: Inner), Plain }
+
+enum Mixed {
+    S(name: String),
+    F(x: Float),
+    Bl(b: Bool),
+    Nested(o: Outer),
+    Empty
+}
+
+enum Res<T, E> { Ok(value: T), Err(error: E) }
+
+enum Chain { Link(next: Chain), End }
+
+class Pt {
+    var x: Int
+    fun init(x: Int) { this.x = x }
+}
+enum Holder { H(p: Pt), Nothing }
+
+fun main() {
+    // --- Enum payload: equality must be deep, not one level.
+    Test.assert(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.A(3)),
+        "a nested enum payload compares structurally")
+    Test.assert(!(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.A(4))),
+        "a difference in the INNER payload is detected")
+    Test.assert(!(Outer.Wrap(Inner.A(3)) == Outer.Wrap(Inner.B)),
+        "a difference in the INNER variant is detected")
+    Test.assert(Outer.Wrap(Inner.B) == Outer.Wrap(Inner.B),
+        "a fieldless inner variant compares equal")
+    Test.assert(Outer.Plain == Outer.Plain, "the outer fieldless variant too")
+
+    // --- String payload: content, not pointer. Both operands are built by
+    // concatenation so neither is the same constant.
+    var s1: String = "he" + "llo"
+    var s2: String = "hell" + "o"
+    Test.assert(Mixed.S(s1) == Mixed.S(s2), "a String payload compares by content")
+    Test.assert(!(Mixed.S("a") == Mixed.S("b")), "different Strings differ")
+
+    // --- Float payload.
+    Test.assert(Mixed.F(1.5) == Mixed.F(1.5), "a Float payload compares equal")
+    Test.assert(!(Mixed.F(1.5) == Mixed.F(2.5)), "different Floats differ")
+    Test.assert(Mixed.F(0.0) == Mixed.F(-0.0),
+        "0.0 equals -0.0, as a double-level compare gives")
+
+    // --- Bool payload.
+    Test.assert(Mixed.Bl(true) == Mixed.Bl(true), "a Bool payload compares equal")
+    Test.assert(!(Mixed.Bl(true) == Mixed.Bl(false)), "true differs from false")
+
+    // --- Two levels of nesting, and a fieldless variant of the same enum.
+    Test.assert(Mixed.Nested(Outer.Plain) == Mixed.Nested(Outer.Plain),
+        "two levels of enum nesting compare equal")
+    Test.assert(!(Mixed.Nested(Outer.Plain) == Mixed.Nested(Outer.Wrap(Inner.B))),
+        "and differ when the inner value does")
+    Test.assert(Mixed.Empty == Mixed.Empty, "a fieldless variant equals itself")
+    Test.assert(!(Mixed.Empty == Mixed.S("x")),
+        "a fieldless variant does not equal a payload variant")
+
+    // --- Generic enum: the field type is a type parameter, so the comparison
+    // cannot be chosen statically and defers to the runtime.
+    Test.assert(Res.Ok(5) == Res.Ok(5), "a generic payload compares equal")
+    Test.assert(!(Res.Ok(5) == Res.Ok(6)), "and differs when the payload does")
+    Test.assert(Res.Err("bad") == Res.Err("bad"), "a generic String payload too")
+    Test.assert(!(Res.Ok(5) == Res.Err("bad")), "different generic variants differ")
+
+    // --- Recursive enum.
+    Test.assert(Chain.End == Chain.End, "the base case equals itself")
+    Test.assert(Chain.Link(Chain.End) == Chain.Link(Chain.End),
+        "one level of recursion compares equal")
+    Test.assert(!(Chain.Link(Chain.End) == Chain.End),
+        "different recursion depths differ")
+
+    // --- Class payload: identity, deliberately. The SAME instance is equal to
+    // itself; two distinct instances with equal contents are not.
+    var p: Pt = Pt(1)
+    Test.assert(Holder.H(p) == Holder.H(p),
+        "the same class instance in two enum values compares equal")
+    Test.assert(!(Holder.H(Pt(1)) == Holder.H(Pt(1))),
+        "two distinct instances do not — a class payload is identity")
+    Test.assert(Holder.Nothing == Holder.Nothing, "and its fieldless variant is fine")
+
+    // --- `match` must keep destructuring. The fix adds a comparison path; it
+    // must not disturb the read path that shares the same heap layout.
+    var m: Outer = Outer.Wrap(Inner.A(7))
+    var got: Int = match (m) {
+        Wrap(i) => match (i) { A(n) => n   B => 0 - 1 }
+        Plain => 0 - 2
+    }
+    Test.assert_eq(got, 7, "match still destructures a nested enum")
+
+    // --- Transitivity across three separately built values.
+    var x: Mixed = Mixed.F(3.25)
+    var y: Mixed = Mixed.F(3.25)
+    var z: Mixed = Mixed.F(3.25)
+    Test.assert(x == y, "x equals y")
+    Test.assert(y == z, "y equals z")
+    Test.assert(x == z, "so x equals z — equality is transitive")
+
+    // --- `!=` is the negation of `==` for every shape above, so the two
+    // operators cannot drift apart.
+    Test.assert(Outer.Wrap(Inner.A(3)) != Outer.Wrap(Inner.A(4)), "!= on payloads")
+    Test.assert(!(Outer.Plain != Outer.Plain), "!= on a fieldless variant")
+    Test.assert(Mixed.S("a") != Mixed.S("b"), "!= on Strings")
+
+    Test.summary()
+}
+
+main()

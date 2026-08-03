@@ -1,0 +1,24 @@
+// BUGS #122: ASSIGNING to a nonexistent member of an imported module must be
+// REJECTED. This is the write half of #118, which hardened only the read.
+//
+// Before the fix this compiled with exit 0 and then emitted invalid LLVM IR.
+// `gen_set_field` resolves a module write by looking `prefix + field` up in
+// `module_globals`; on a miss it fell through to the class-instance path, which
+// evaluated the bare alias `Math` as if it were a local and emitted
+//   %t1 = load i64, i64* %Math
+// from an SSA name that was never defined. `opt` then rejected the module with
+// `invalid getelementptr indices`, so the user saw "the compiler emitted invalid
+// LLVM IR / this is a compiler bug, not an error in your program" for a typo.
+//
+// The compiler must now say:
+//   [codegen] Error: no member 'NOPE' in module 'Math'
+//
+// The live lowering site is `gen_arg_value`'s `set_field` branch, NOT the
+// `SetField` arm of `gen_expr` — established the way #118 established its own
+// duplicate pair, by giving the two sites distinct marker strings and sweeping
+// 18 syntactic positions. The gen_expr arm fired in none of them: `gen_expr` has
+// only four callers, all inside `gen_arg_value`, and `gen_arg_value` handles
+// `set_field` before it reaches any of them.
+import "@math" as Math
+
+Math.NOPE = 3
