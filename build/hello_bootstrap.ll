@@ -166,6 +166,7 @@ declare i64 @__gc_closure_new(i64, i64)
 declare i64 @__gc_env_alloc(i64)
 declare i64 @__gc_instance_alloc(i64)
 declare i64 @__gc_get_type_tag(i64)
+declare i8* @__sf_malloc(i64)
 
 ; --- Scheduler runtime ---
 declare double @sf_time_now()
@@ -205,7 +206,7 @@ entry:
   %t13 = call i64 @strlen(i8* %t11)
   %t14 = add i64 %t12, %t13
   %t15 = add i64 %t14, 1
-  %t16 = call i8* @malloc(i64 %t15)
+  %t16 = call i8* @__sf_malloc(i64 %t15)
   call i8* @strcpy(i8* %t16, i8* %t10)
   call i8* @strcat(i8* %t16, i8* %t11)
   %t17 = ptrtoint i8* %t16 to i64
@@ -220,7 +221,7 @@ entry:
   %t26 = call i64 @strlen(i8* %t24)
   %t27 = add i64 %t25, %t26
   %t28 = add i64 %t27, 1
-  %t29 = call i8* @malloc(i64 %t28)
+  %t29 = call i8* @__sf_malloc(i64 %t28)
   call i8* @strcpy(i8* %t29, i8* %t23)
   call i8* @strcat(i8* %t29, i8* %t24)
   %t30 = ptrtoint i8* %t29 to i64
@@ -234,7 +235,7 @@ entry:
   %t38 = call i64 @strlen(i8* %t36)
   %t39 = add i64 %t37, %t38
   %t40 = add i64 %t39, 1
-  %t41 = call i8* @malloc(i64 %t40)
+  %t41 = call i8* @__sf_malloc(i64 %t40)
   call i8* @strcpy(i8* %t41, i8* %t35)
   call i8* @strcat(i8* %t41, i8* %t36)
   %t42 = ptrtoint i8* %t41 to i64
@@ -249,7 +250,7 @@ entry:
   %t51 = call i64 @strlen(i8* %t49)
   %t52 = add i64 %t50, %t51
   %t53 = add i64 %t52, 1
-  %t54 = call i8* @malloc(i64 %t53)
+  %t54 = call i8* @__sf_malloc(i64 %t53)
   call i8* @strcpy(i8* %t54, i8* %t48)
   call i8* @strcat(i8* %t54, i8* %t49)
   %t55 = ptrtoint i8* %t54 to i64
