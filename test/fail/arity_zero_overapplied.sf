@@ -1,0 +1,11 @@
+// BUGS #113: over-applying a zero-arity function must be a compile error.
+//
+// The arity check used to be guarded with `expected > 0`, written as a test on
+// the arity VALUE in order to mean "we never recorded an arity". That exempted
+// every genuinely 0-arity function from arity checking entirely, so this file
+// compiled clean with rc=0 and no diagnostic.
+fun c() {
+    IO.println("in c")
+}
+
+c("too", "many")
