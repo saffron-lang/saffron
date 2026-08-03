@@ -1,0 +1,11 @@
+// A module-private module-level VARIABLE may not be read through `Mod.name`.
+//
+// This is the read-path twin of visibility_module_private_alias.sf, and the test
+// that would have been green against the broken compiler: `Lib.mod_secret_var`
+// is a MemberAccess, not a MethodCall, so it bypassed the check_module_ref_visibility
+// call in the MethodCall arm entirely. infer_member_access's module-alias branch
+// now routes a bare read through the same check. If this file ever compiles clean,
+// module-level `private var`/`let` has stopped being enforced again.
+import "../support/visibility_module_lib.sf" as Lib
+
+IO.println(Lib.mod_secret_var)
