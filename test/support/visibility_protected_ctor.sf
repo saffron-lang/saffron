@@ -1,0 +1,23 @@
+//! A class whose constructor is `protected`, for the cross-module half of the
+//! §5b constructor rule.
+//!
+//! Lives in test/support/ rather than test/fail/ because both test/fail/ and
+//! test/pass/ are globbed as tests by tools/run_tests.sh, and this is an input to
+//! one of them rather than a test itself.
+//!
+//! `protected init` is `private init` plus subclasses, which keeps the two
+//! modifiers MONOTONE on constructors: everything `private init` permits,
+//! `protected init` permits too. So the same-module factory below must keep
+//! working — an author widening `private init` to `protected init` to reach
+//! subclasses would otherwise silently lose the factory that was the reason to
+//! restrict the constructor at all (check_constructor_visibility).
+class Dial {
+    var reading: Int
+    protected fun init(reading: Int) { this.reading = reading }
+    fun get(): Int { return this.reading }
+}
+
+/// The public constructor, same module as Dial, so it may call the protected init.
+fun new_dial(reading: Int): Dial {
+    return Dial(reading)
+}

@@ -1,0 +1,65 @@
+// §11 decision 2: when two bases declare the same member name, visibility must be
+// answered by the class the DISPATCH picks — not by whichever ancestor happens to
+// carry a modifier.
+//
+// This is a regression test for a real defect, measured rather than imagined. The
+// first cut of private_declaring_class searched the ancestry for a *restricting*
+// ancestor and returned the first one found. Given the shape below, `C().tag()`
+// runs `B.tag` and returns 2 (codegen resolves in declaration order), yet that
+// search refused the call citing `A.tag` — a diagnostic about a modifier on a
+// declaration whose body never executes, and one no edit at the call site could
+// silence. It also made adding `protected` to a widely-inherited interface a
+// breaking change for every existing multiple-inheritance user, which is exactly
+// the outcome §11 decision 2 rejects erroring-at-the-collision for.
+//
+// So the walk stops at the first ancestor that DECLARES the name and reports
+// whether that one restricts it. Both halves of the answer now come from the same
+// class (M1), and the assertion below fails if they ever diverge again.
+//
+// Holder is first because only parents[0] contributes fields.
+import "@test" as T
+
+class Holder {
+    var n: Int
+    fun init() { this.n = 0 }
+}
+
+interface A {
+    protected fun tag(): Int { return 1 }
+}
+
+interface B {
+    fun tag(): Int { return 2 }
+}
+
+// B before A: B declares `tag` publicly and wins dispatch, so the call is legal
+// from outside and A's `protected` is irrelevant to it.
+class C extends Holder, B, A {
+    fun init() { this.n = 0 }
+}
+
+// The reverse order is NOT tested here as a pass: with A first, A.tag wins
+// dispatch and IS protected, so an outside call is correctly refused. That half
+// belongs in test/fail/ — see protected_tie_earlier_base.sf.
+var c: C = C()
+T.assert_eq(c.tag(), 2, "the earlier base wins dispatch, and visibility is answered from it")
+
+// Depth matters too, and it pins the search ORDER rather than just the tie: with
+// `D extends Holder, Deep, B` where Deep inherits `tag` from DeepBase, codegen
+// picks DeepBase's body (depth-first pre-order), not B's. If the visibility walk
+// were breadth-first it would answer from B instead — same tie, different class,
+// and the two would disagree again the moment either carried a modifier.
+interface DeepBase {
+    fun tag(): Int { return 30 }
+}
+
+interface Deep extends DeepBase { }
+
+class D extends Holder, Deep, B {
+    fun init() { this.n = 0 }
+}
+
+var d: D = D()
+T.assert_eq(d.tag(), 30, "dispatch is depth-first pre-order, so the visibility walk must be too")
+
+T.summary()
