@@ -2,8 +2,8 @@
 
 ## Open
 
-**14 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
-#118, #119, #121. Next free number is **#122**.
+**15 open entries:** #2, #6, #49, #65, #66, #75, #107, #110, #115, #116, #117,
+#119, #121, #122, #123. Next free number is **#124**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -601,55 +601,6 @@ lists. It also means #115's "only nested elements are wrong" framing holds for
 
 ---
 
-### 118. A nonexistent member of an imported module compiles cleanly and emits invalid IR
-
-**Severity: high.** Not a wrong answer — a compiler crash *reported as a compiler
-bug*, blaming itself for a plain typo in the user's program.
-
-```saffron
-import "@math" as Math
-IO.println(Math.NOPE)     // compiler exits 0; the IR is then rejected
-IO.println(Math.pi)       // 3.14159 — a real member is fine
-```
-
-```
-saffron: the compiler emitted invalid LLVM IR for test/pass/math.sf
-saffron: this is a compiler bug, not an error in your program.
-  opt: output.ll:1288:24: error: use of undefined value '%Math'
-    %t1 = load i64, i64* %Math
-```
-
-The last line is the whole story: having failed to resolve the *member*, codegen
-falls back to evaluating the **namespace itself** as if it were a local variable,
-and emits a load from an SSA name that was never defined. The message is actively
-misleading — it tells the user their correct compiler is broken when in fact their
-program has a typo, so the diagnostic points at the wrong party.
-
-Mechanism, and it is the recurring pattern again (**eighth instance**, after #22,
-#40, #78, #37, #103, #113, #114): a resolver with no way to say *not found*.
-`expr_body.sf:311` handles a module-prefixed member by trying two lookups —
-`known_functions` for `Module.fun`, then `module_globals` for `Module.global`. When
-both miss it does not report absence; it simply falls out of the block, and control
-reaches the generic receiver path at `expr_body.sf:332`, which evaluates `object`
-— the bare alias `Math`. The undefined-variable check that would have caught that
-(`expr_body.sf:91`) explicitly exempts `module_prefixes.has(name)`, and rightly so
-for a *valid* member access, so nothing else stops it.
-
-The fix belongs in the `module_prefixes` block: after both lookups miss, report
-`no member 'NOPE' in module 'Math'` and set `has_errors`, rather than falling
-through to a path that can only produce a load from a namespace. The alias is known
-to be a module at that point, so "not found" is expressible there and nowhere
-downstream.
-
-Found while checking a claim that `test/pass/math.sf` was merely a stale test
-calling `Math.PI` when `src/lib/math.sf:21` defines lowercase `pi`. The test *is*
-wrong, but that is not why it fails: any nonexistent member reproduces this, so
-renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
-remains red pending the diagnostic; fixing the test alone would be papering over
-the real defect.
-
----
-
 ### 119. An output path containing `.sf` is taken as the input, so the real input is never read
 
 **Severity: high**, and higher than it looks: it makes a compiler that *rejects* a
@@ -735,12 +686,216 @@ use-marking path shared by every call site in the compiler, so it wants its own
 change with its own test rather than riding along on an unrelated codegen fix.
 
 ---
+### 122. Assigning to a nonexistent module member compiles clean and emits invalid IR
+
+**Severity: high**, for the same reason #118 was: exit 0, no diagnostic, and the
+failure that eventually surfaces blames the compiler for the user's typo.
+
+```saffron
+import "@math" as Math
+Math.NOPE = 3          // exit 0, no diagnostic
+```
+
+```
+%t1 = load i64, i64* %Math
+```
+`opt` then rejects the module (`invalid getelementptr indices` on the `%Iterable`
+GEP built from that undefined load).
+
+This is the write half of #118, left behind by that fix. #118 hardened the
+member-*read* path in `gen_arg_value`, where a module alias with no matching member
+now reports absence. Assignment never reaches that block, so it still falls through
+to the generic receiver path, which evaluates the bare alias `Math` as though it
+were a local and loads from an SSA name that was never defined.
+
+Verified as **pre-existing, not a regression**: the same file gives exit 0 and the
+same single `load i64, i64* %Math` on both the pre-#118 and post-#118 compilers.
+Found by sweeping 14 syntactic positions while checking which of #118's two
+candidate sites actually fires — every position emitted the new diagnostic except
+this one, which is what made the gap visible.
+
+Ninth instance of the can't-express-unknown family (#22, #40, #78, #37, #103, #113,
+#114, #118): a resolver with no way to say "not found" guesses instead of reporting
+absence. That #118's fix closed the read path and not the write path is the
+recurring shape of this family in miniature — the guess lives in the *fallback*, so
+every distinct path that reaches the fallback needs its own report, and closing one
+does not close the others.
+
+The fix wants the same treatment as #118: at the point where the alias is known to
+be a module and the member lookup has missed, report rather than fall through. Worth
+checking at the same time whether a third path (compound assignment, `Math.NOPE +=
+1`, and indexed assignment `Math.NOPE[0] = 1`) reaches the fallback too, rather than
+fixing only the spelling in this repro.
+
+---
+
+### 123. Three stdlib files bind different modules to the same alias `Internal`, so the alias resolves to whichever wins
+
+**Severity: medium** — it currently breaks exactly one file, and that file has no
+importers. The mechanism is what matters: an import alias is not scoped to the file
+that declares it the way the syntax implies.
+
+```
+src/lib/ast.sf:13     import "../compiler/ast.sf"    as Internal
+src/lib/lexer.sf:9    import "../compiler/lexer.sf"  as Internal
+src/lib/parser.sf:10  import "../compiler/parser.sf" as Internal
+```
+
+`src/lib/lang.sf` imports all three (`@ast`, `@lexer`, `@parser` at lines 13–15).
+The alias collides, so `Internal.Token` inside `lexer.sf` resolves against
+`compiler_ast_Token` rather than `compiler_lexer_Token`, and misses:
+
+```
+[codegen] Error: no member 'Token' in module 'Internal'
+[codegen] Error: no member 'TokenKind' in module 'Internal'
+```
+
+**Not a regression from #118.** Verified on the pre-#118 build, where `lang.sf`
+already emitted invalid IR — `use of undefined value '%Internal'` — for the same
+reason. #118's fix converts a silent invalid-IR failure into a named diagnostic, so
+`lang.sf` moves from exit 0 to exit 1 while being equally broken either way. It was
+never working; it was failing invisibly.
+
+`@lang` has no real importers — the three hits for `"@lang"` in the tree are all
+commented-out documentation lines (`//! import "@lang" as Lang`), including the one
+in `lang.sf` itself. So no test moves, and nothing downstream breaks. That is also
+why this survived: the file is dead weight that nothing compiles.
+
+Two separable questions here, and the second is the important one:
+
+1. The immediate fix is to give the three files distinct aliases (`InternalAst`,
+   `InternalLexer`, `InternalParser`). Cheap, and it makes `lang.sf` compile.
+2. The real defect is that an alias declared in one file can be shadowed by an alias
+   of the same name declared in another, and the collision is silent. An alias should
+   either be file-local (the reading the syntax suggests) or a collision should be
+   diagnosed. Renaming the three aliases fixes this instance and leaves the trap set
+   for the next one. Whichever way it is resolved should be a decision about alias
+   scoping, not a rename.
+
+Found while measuring #118's blast radius across 336 files.
+
+---
+
 ## Resolved
 
 Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 118. FIXED — a nonexistent module member compiled clean, then emitted invalid IR blaming the compiler
+
+**Severity: high.** Not a wrong answer — a compiler crash *reported as a compiler
+bug*, blaming itself for a plain typo in the user's program.
+
+```saffron
+import "@math" as Math
+IO.println(Math.NOPE)     // compiler exits 0; the IR is then rejected
+IO.println(Math.pi)       // 3.14159 — a real member is fine
+```
+
+```
+saffron: the compiler emitted invalid LLVM IR for test/pass/math.sf
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:1288:24: error: use of undefined value '%Math'
+    %t1 = load i64, i64* %Math
+```
+
+The last line is the whole story: having failed to resolve the *member*, codegen
+falls back to evaluating the **namespace itself** as if it were a local variable,
+and emits a load from an SSA name that was never defined. The message is actively
+misleading — it tells the user their correct compiler is broken when in fact their
+program has a typo, so the diagnostic points at the wrong party.
+
+Mechanism, and it is the recurring pattern again (**eighth instance**, after #22,
+#40, #78, #37, #103, #113, #114): a resolver with no way to say *not found*.
+`expr_body.sf:311` handles a module-prefixed member by trying two lookups —
+`known_functions` for `Module.fun`, then `module_globals` for `Module.global`. When
+both miss it does not report absence; it simply falls out of the block, and control
+reaches the generic receiver path at `expr_body.sf:332`, which evaluates `object`
+— the bare alias `Math`. The undefined-variable check that would have caught that
+(`expr_body.sf:91`) explicitly exempts `module_prefixes.has(name)`, and rightly so
+for a *valid* member access, so nothing else stops it.
+
+The fix belongs in the `module_prefixes` block: after both lookups miss, report
+`no member 'NOPE' in module 'Math'` and set `has_errors`, rather than falling
+through to a path that can only produce a load from a namespace. The alias is known
+to be a module at that point, so "not found" is expressible there and nowhere
+downstream.
+
+Found while checking a claim that `test/pass/math.sf` was merely a stale test
+calling `Math.PI` when `src/lib/math.sf:21` defines lowercase `pi`. The test *is*
+wrong, but that is not why it fails: any nonexistent member reproduces this, so
+renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
+remains red pending the diagnostic; fixing the test alone would be papering over
+the real defect.
+
+**FIXED (2026-08-02).** The fix reports absence where absence is expressible: after
+both lookups miss, `[codegen] Error: no member '<member>' in module '<alias>'` plus
+`has_errors`. The alias is *known to be a module* at that point and nowhere
+downstream, which is why the diagnostic belongs there rather than in the generic
+receiver path. Verified: `Math.NOPE` went from no output / exit 0 / `%t1 = load i64,
+i64* %Math` in the emitted IR, to the named diagnostic and exit 1. `Math.pi` is
+unaffected, exit 0 before and after.
+
+Eighth instance of the can't-express-unknown family (#22, #40, #78, #37, #103,
+#113, #114): a resolver with no way to say "not found" guesses instead of reporting
+absence.
+
+**The block exists in two copies, and the one that fires is not the one the
+original trace named.** This entry first pointed at the `MemberAccess` arm
+(`expr_body.sf:311`). That arm is **dead**: `gen_arg_value`'s parallel copy of the
+same block (`:1843`) wins for every spelling. Established rather than argued — the
+two arms were given textually distinct messages, the compiler rebootstrapped, and
+14 syntactic positions swept: bare `var`, call argument, operand of `+`, `==`
+condition, list element, inside a function body, bare statement position, chained
+`.length()`, map value, string interpolation, lambda body, `for-in` subject, and
+index base. The `gen_arg_value` copy fired in every position that fires at all; the
+`MemberAccess` copy fired in none. Both were hardened anyway, the dead one carrying
+a comment recording that it is currently unreachable.
+
+That two live copies of one resolution block exist at all is the more durable
+lesson: a fix applied to the readable one would have changed nothing, bootstrapped
+green, and passed a hand-written test only if the test happened to use a spelling
+that reaches it.
+
+**Completeness was measured, not assumed.** A probe compiler logged every arrival
+at the miss point across 336 files (`test/`, `test/pass/`, `test/fail/`, `src/lib/`,
+`src/compiler/`, `src/runtime/`, `examples/`, `turmeric/`, `basil/`, `bazaar/`,
+`parsley/`, `pantry/`) — exactly three arrivals, and `opt` rejects the IR for all
+three, so no valid spelling depended on the fall-through. Each of these was then
+confirmed by direct fixture to resolve *before* the block: module globals, module
+functions called and used as values, zero-arg and argument-bearing enum variants
+through an alias, class **and actor** constructors through an alias, `@inline`
+functions, forward-referenced module globals read inside a function, enum/class
+types aliased through an alias (`var A = Inner.Color`, lowered as a `ptrtoint`
+wrapper), locals shadowing a module alias, named imports, and the builtin
+`IO`/`GC`/`Reflect` namespaces.
+
+Tests: `test/fail/module_member_missing.sf` and `test/pass/module_member_valid.sf`
+(9 assertions over the valid spellings). Per #107 discipline, no `.expected` file
+freezes the wrong output.
+
+`test/pass/math.sf` is **left wrong on purpose**, as evidence. It calls `Math.PI`
+while `src/lib/math.sf:21` declares lowercase `pi`. It was reported as merely a
+stale test; it is stale, but that is not why it was failing, and renaming the
+constant would have hidden this bug. It now fails as `compile-error` with the clean
+diagnostic instead of `invalid-ir` blaming the compiler.
+
+**Not fixed here, filed as #122:** *assignment* to a nonexistent member
+(`Math.NOPE = 3`) still exits 0 and still emits `load i64, i64* %Math`. The
+assignment path never reaches the member-read block, so it kept the original #118
+signature — verified identical before and after this fix.
+
+**Also found while measuring, filed as #123:** a module-alias collision.
+`src/lib/ast.sf:13`, `src/lib/lexer.sf:9` and `src/lib/parser.sf:10` each bind a
+*different* module to the alias `Internal`, and `src/lib/lang.sf` imports all
+three. `src/lib/lang.sf` moves from exit 0 to exit 1 under this fix, which is not a
+regression: it was **already** emitting invalid IR (`use of undefined value
+'%Internal'`, verified on the pre-change build) and now fails with a named
+diagnostic instead. `@lang` has no importers in the repo, so no test moves.
+
+---
 
 ### 109. FIXED — `is String` / `is List` / `is Map` were unconditionally false on wasm32
 
