@@ -1,0 +1,9 @@
+enum Option { Some(value: Int), None }
+fun main() {
+    var a: Option = Option.Some(42)
+    var b: Option = Option.Some(42)
+    if (a == b) { IO.println("eq") } else { IO.println("ne") }
+    if (Option.None == Option.None) { IO.println("neq") } else { IO.println("nne") }
+    if (a != b) { IO.println("a!=b") } else { IO.println("a==b") }
+}
+main()

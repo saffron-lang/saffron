@@ -1,0 +1,15 @@
+// An enum value reaching == through an Any-typed slot goes to __any_eq, not to
+// the generated helper: the static type is Any, so codegen cannot know which
+// enum it is. Documents current behaviour rather than asserting it is right.
+enum Option { Some(value: Int), None }
+fun main() {
+    var a: Any = Option.Some(1)
+    var b: Any = Option.Some(1)
+    if (a == b) { IO.println("any: eq") } else { IO.println("any: ne") }
+    var c: Option = Option.Some(1)
+    var d: Option = Option.Some(1)
+    if (c == d) { IO.println("typed: eq") } else { IO.println("typed: ne") }
+    // Fieldless-only enum must be untouched by the fix.
+    IO.println("done")
+}
+main()
