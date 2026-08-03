@@ -1486,7 +1486,7 @@ fun main(): Int {
             // which module anything came from, so two modules declaring the
             // same class name are one entry (docs/design/access-modifiers.md
             // Phase 2; `Response` in http/client.sf and http/server.sf).
-            checker_errors = Checker.check_errors_with_module_packages(program, all_import_stmts, module_boundaries, prefixes_joined, package_roots_joined(module_file_paths), _entry_package_root(input_path))
+            checker_errors = Checker.check_errors_with_module_packages(program, all_import_stmts, module_boundaries, prefixes_joined, package_roots_joined(module_file_paths), _entry_package_root(input_path), resolved_aliases)
         } else {
             checker_errors = Checker.check_errors_only(program)
         }

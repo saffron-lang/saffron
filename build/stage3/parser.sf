@@ -204,12 +204,14 @@ class Parser {
     fun take_visibility(): String {
         var word: String = this.peek_ident()
         this.advance()
-        if (word == "internal" or word == "protected") {
-            // Recognised syntax, unimplemented semantics. Saying so is the only
-            // honest answer: silently downgrading to "public" would accept a
-            // declaration the author meant to restrict, and that is a wrong
-            // answer dressed as a clean compile.
-            this.parse_error("'" + word + "' is not implemented yet; use 'private' or 'public'")
+        if (word == "protected") {
+            // Recognised syntax, unimplemented semantics (Phase 5b). Saying so is
+            // the only honest answer: silently downgrading to "public" would
+            // accept a declaration the author meant to restrict, and that is a
+            // wrong answer dressed as a clean compile. `internal` used to sit here
+            // too and is now implemented (Phase 5 package scope), so only
+            // `protected` remains a placeholder.
+            this.parse_error("'" + word + "' is not implemented yet; use 'private', 'internal' or 'public'")
             return "public"
         }
         return word

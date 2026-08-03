@@ -1,0 +1,10 @@
+// §6a path 3 (bare cross-module reference): resolve.sf's prescan registers every
+// imported module's functions into one resolver, so a bare `mod_secret()` in this
+// file binds to the support lib's function even though it was imported only under
+// an alias. This is the path most easily forgotten — the reference names nothing
+// module-qualified — and it is checked through Ref.slot, which carries the
+// DEFINING module's prefix (resolve_variable), compared against the use site's
+// empty prefix.
+import "../support/visibility_module_lib.sf" as Lib
+
+IO.println(mod_secret())

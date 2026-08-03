@@ -1,0 +1,15 @@
+// A module may freely use its OWN private and internal declarations — the
+// enforcement is about crossing a boundary, and there is none here. `_helper` is
+// module-private and called from a public function in the same file; `_shared`
+// is internal and likewise. This is the case an over-eager check would break, so
+// it is worth pinning: same prefix on both sides means check_module_ref_visibility
+// returns before erroring.
+import "@test" as T
+
+private fun _helper(x: Int): Int { return x * 2 }
+internal fun _shared(x: Int): Int { return x + 100 }
+
+public fun compute(n: Int): Int { return _helper(n) + _shared(n) }
+
+T.assert_eq(compute(5), 115, "same-file private and internal are usable in-module")
+T.summary()
