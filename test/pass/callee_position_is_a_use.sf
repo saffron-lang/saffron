@@ -1,0 +1,64 @@
+// BUGS #121, runtime half — the callee-position expressions whose variables must
+// be marked used must also still EVALUATE correctly.
+//
+// The diagnostic claim (no false "unused variable", and genuine ones still fire)
+// lives in test/pass/unused_var_callee_position.sf, which shells out to the
+// compiler because tools/run_tests.sh strips `[checker] Warning` lines out of a
+// test's output. This file is the other half: the fix adds an `infer_expr(callee)`
+// call to infer_call, so the callee subtree is now walked where it previously was
+// not, and this file is what would catch that walk changing a type, emitting a
+// spurious error, or perturbing codegen.
+//
+// Deliberately restricted to callee shapes that link on this branch. A field-held
+// function called as `(holder.cb)(9)` does NOT link today — `_Holder__cb`
+// undefined, the indirect-call-through-a-field codegen of BUGS #120 — so it is
+// covered in unused_var_callee_position.sf, which only needs it to compile far
+// enough for the checker to run, and is left out here.
+
+import "@test" as Test
+
+// The headline shape: an element of a list of functions. Its callee is an
+// IndexGet, which takes infer_call's `_ => ""` arm — there is no name to mark, so
+// a mark_used(name)-shaped fix could not have covered it.
+fun via_list_index(): Int {
+    var fs: List<Fun> = [fun (x: Int): Int => x * 2]
+    return fs[0](7)
+}
+
+// A plain variable holding a function: callee is Variable (Ref after resolve).
+fun doubler(x: Int): Int { return x * 2 }
+fun via_bare_variable(): Int {
+    var f: Fun = doubler
+    return f(8)
+}
+
+// A parenthesized callee — the parser yields the inner expression, so this is
+// the Variable case reached by a different syntactic route.
+fun via_parenthesized(): Int {
+    var f: Fun = doubler
+    return (f)(11)
+}
+
+// Callee is itself a Call: `maker(3)(4)`. This is the shape whose INNER call's
+// arguments were not being checked at all before the fix, since infer_call
+// skipped the callee subtree entirely.
+// `n` here still draws a false "unused variable 'n'" — a SEPARATE bug from #121,
+// not a leftover of it: a lambda's body is never walked by the checker, so a
+// variable captured only inside a lambda is never marked used. Reproduces
+// identically before and after this fix and on either side of callee position
+// (`var base = 10; var f = fun (x: Int): Int => x + base` warns for `base` too).
+// Reported alongside #121 rather than fixed here — it is a different missing
+// walk, in infer_type's Lambda arm, and wants its own change and test.
+fun make_adder(n: Int): Fun {
+    return fun (x: Int): Int => x + n
+}
+fun via_call_returning_fun(): Int {
+    var maker: Fun = make_adder
+    return maker(3)(4)
+}
+
+Test.assert_eq(via_list_index(), 14, "callee via list index")
+Test.assert_eq(via_bare_variable(), 16, "callee via bare variable")
+Test.assert_eq(via_parenthesized(), 22, "callee via parenthesized variable")
+Test.assert_eq(via_call_returning_fun(), 7, "callee via call returning fun")
+Test.summary()

@@ -1,0 +1,125 @@
+// BUGS #121 — "unused variable" must not fire for a variable whose only
+// appearance is in callee position, and must still fire for one that is
+// genuinely never touched.
+//
+// Both halves are asserted, because the fix's whole risk is that it becomes a
+// blanket suppression: making the warning go away is easy, making it go away
+// *only* where it was wrong is the actual claim.
+//
+// WHY THIS SHELLS OUT TO THE COMPILER. The thing under test IS a diagnostic, and
+// a pass test cannot observe one from the inside:
+//
+//   - tools/run_tests.sh's filter_noise() strips every `[checker] Warning` line
+//     out of a test's captured output before comparing it, so a warning printed
+//     while compiling THIS file is invisible to the runner by construction. A
+//     "no warning" test written that way would pass no matter what.
+//   - The in-process route — `import "@check"`, which wraps
+//     src/compiler/checker.sf's own check() and returns the report as a string —
+//     would be the better test, and does not compile today: @check transitively
+//     imports checker.sf, and checker.sf standalone fails to parse at
+//     `if (eb.length() == 0) { false } else { A and B }` inside a match arm
+//     (a pre-existing defect, on this branch and on main, and independent of
+//     this fix; the same line is why src/lib/check.sf, src/lib/lang.sf and a
+//     direct `import "../src/compiler/checker.sf"` all fail to compile).
+//     Switch this file to @check once that parse defect is fixed — it is a
+//     strictly better mechanism than string-matching a subprocess's stderr.
+//
+// So each case below writes a tiny program to a temp file, runs the compiler on
+// it with stderr folded into stdout, and asserts on the warning text.
+
+import "@test" as Test
+import "@os" as OS
+
+// The compiler under test is the one that built this file. tools/saffron always
+// invokes build/saffronc from the repo root, and the tests run from the repo
+// root, so a relative path is what is actually being exercised.
+fun compiler_path(): String { return "build/saffronc" }
+
+// Compile `src` and return the compiler's combined stdout+stderr.
+//
+// The output path must NOT contain ".sf": saffronc selects its input by
+// contains(".sf") on the last matching argument, so `out.sf.ll` would silently
+// become the input, the real input would never be read, and every case here
+// would report "no warning" and pass vacuously (BUGS #119).
+fun diagnostics_for(src: String, tag: String): String {
+    var src_path: String = "/tmp/saffron_b121_" + tag + ".sf"
+    var out_path: String = "/tmp/saffron_b121_" + tag + "_out.ll"
+    IO.write_file(src_path, src)
+    return OS.exec(compiler_path() + " " + src_path + " " + out_path + " 2>&1")
+}
+
+fun warns_unused(src: String, var_name: String, tag: String): Bool {
+    var out: String = diagnostics_for(src, tag)
+    return out.contains("unused variable '" + var_name + "'")
+}
+
+// A guard on the harness itself. If the compiler path were wrong, or the input
+// were never read (BUGS #119), every warns_unused() below would answer false —
+// which would make the five "must not warn" cases pass for the wrong reason.
+// This case must warn, so a false here means the harness is broken, not that the
+// checker is right.
+Test.assert(warns_unused(
+    "fun run(): Int {\n  var never_touched: Int = 5\n  return 1\n}\n",
+    "never_touched", "harness"), "HARNESS: a variable never mentioned still warns")
+
+// --- The false positive (must NOT warn) ---------------------------------------
+
+// The headline repro. `fs` is a List<Fun>, not a function type — the axis is
+// "appears only as a callee", not "has a function type". Its callee is an
+// IndexGet, which takes infer_call's `_ => ""` arm: there is no name to mark,
+// so a mark_used(name)-shaped fix could not have reached this case at all.
+Test.assert(!warns_unused(
+    "fun run(): Int {\n  var fs: List<Fun> = [fun (x: Int): Int => x]\n  return fs[0](7)\n}\n",
+    "fs", "listidx"), "list-index callee marks the list used")
+
+// A bare variable holding a function: callee is Variable (Ref after resolve).
+Test.assert(!warns_unused(
+    "fun d(x: Int): Int { return x }\nfun run(): Int {\n  var f: Fun = d\n  return f(8)\n}\n",
+    "f", "barevar"), "bare-variable callee marks it used")
+
+// A field holding a function, PARENTHESIZED. The parens matter: `holder.cb(9)`
+// without them is parsed as a MethodCall, which goes to infer_method_call — a
+// different function that already inferred its object — so that spelling never
+// had the bug and is not evidence of anything here. `(holder.cb)(9)` is the one
+// that is genuinely Call(MemberAccess(...)), and it warned before this fix.
+//
+// infer_call's `name` for this shape is the FIELD ("cb"), not the object, which
+// is the second reason a mark_used(name) fix was wrong — see the aliasing case
+// at the bottom of this file.
+Test.assert(!warns_unused(
+    "class H {\n  var cb: Fun\n  fun init() { this.cb = fun (x: Int): Int => x }\n}\nfun run(): Int {\n  var holder: H = H()\n  return (holder.cb)(9)\n}\n",
+    "holder", "member"), "parenthesized member-access callee marks the object used")
+
+// Callee is itself a Call: `maker(3)(4)`.
+Test.assert(!warns_unused(
+    "fun mk(n: Int): Fun { return fun (x: Int): Int => x + n }\nfun run(): Int {\n  var maker: Fun = mk\n  return maker(3)(4)\n}\n",
+    "maker", "callcallee"), "call-returning-fun callee marks the inner callee used")
+
+// A parenthesized callee. The parser yields the inner expression itself, so this
+// lands on whatever shape is inside the parens — here a Variable.
+Test.assert(!warns_unused(
+    "fun d(x: Int): Int { return x }\nfun run(): Int {\n  var f: Fun = d\n  return (f)(8)\n}\n",
+    "f", "paren"), "parenthesized callee marks it used")
+
+// --- Genuine unused variables (must STILL warn) -------------------------------
+// What would break if callee-marking were implemented by marking a *name*
+// instead of by inferring the callee expression.
+
+// The aliasing trap that rules out the mark_used(name) route outright. The
+// callee `(b.cb)(1)` yields the FIELD name "cb" from infer_call's MemberAccess
+// arm, and mark_used searches lexical scopes by string — so marking that name
+// would mark the unrelated local `cb` used and swallow this warning. Written
+// parenthesized so it really does reach infer_call rather than
+// infer_method_call.
+Test.assert(warns_unused(
+    "class H {\n  var cb: Fun\n  fun init() { this.cb = fun (x: Int): Int => x }\n}\nfun run(): Int {\n  var b: H = H()\n  var cb: Int = 99\n  return (b.cb)(1)\n}\n",
+    "cb", "fieldalias"), "a local sharing a callee field's name still warns")
+
+// A genuinely-unused local sitting right next to a legitimate callee use, so
+// "the callee marked something" cannot be mistaken for "the scope stopped being
+// checked at all".
+Test.assert(warns_unused(
+    "fun d(x: Int): Int { return x }\nfun run(): Int {\n  var f: Fun = d\n  var spare: Int = 2\n  return f(8)\n}\n",
+    "spare", "spare"), "an unused local beside a used callee still warns")
+
+Test.summary()
