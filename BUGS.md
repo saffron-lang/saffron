@@ -433,6 +433,16 @@ Also: `test/gc_deep_test.sf` was stable over **25 consecutive runs**, so the
 "nondeterministic" label it carries elsewhere in this file is doubtful and should
 not be used to dismiss a failure there.
 
+**Merge hazard worth recording here, because it makes a fix look like it did not
+work:** `tools/saffron` links the **checked-in** `build/stage3/runtime.ll`
+(`tools/saffron:16`), not `src/runtime/runtime.sf`. So a merge that brings a
+`runtime.sf` fix without regenerating that artifact leaves the fix **inert** —
+`test/pass/subnormal_not_a_pointer.sf` still segfaulted (exit 139) on a tree that
+already contained its fix in source. Regenerating `build/stage3/runtime.ll` made
+all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
+before its tests mean anything, and a green test run against a stale artifact is
+evidence of nothing.
+
 
 ### 108. FIXED — enum `to_string()` printed heap addresses for List, Map and nested-enum payloads
 
@@ -5037,6 +5047,110 @@ produce byte-identical output before and after, and separately checked 1-, 2- an
 3-parameter arrow types each followed by further parameters. Regression tests:
 `test/pass/iter_arrow_param_split.sf` and
 `test/pass/checker_block_param_arrow_type.sf`.
+
+---
+
+### 115. A class instance reaching a formatter prints its raw bit pattern
+
+**Severity: high.** Silent wrong answer. The class-shaped sibling of #105, with a
+*different* mechanism, so #105's fix does not reach it.
+
+```saffron
+class Pt { var x: Number
+           fun init(x: Number) { this.x = x }
+           fun to_string(): String { return "Pt(${this.x})" } }
+var p: Pt = Pt(3)
+IO.println(p)          // 5.21502e-310   — WRONG, and this is TOP LEVEL
+IO.println("${p}")     // Pt(3)          — correct
+var ps: List<Pt> = [Pt(1), Pt(2)]
+IO.println("${ps}")    // [5.21502e-310, 5.21502e-310]
+```
+
+Verified directly at HEAD, not merely reported: `IO.println(p)` prints
+`5.21502e-310` while `"${p}"` prints `Pt(3)`.
+
+#105 was cured by `methods_body.sf:1543` inserting `<Enum>__to_string()` when the
+argument's **static** type is a known enum (`enum_defs.has(type)`). That is
+static-type-driven, so it covers exactly what the checker can see through and
+nothing else — no list element, and **no class arm at all**.
+
+**The runtime cannot fix this alone, and the class case is what proves the
+prerequisite is insufficient.** A class instance *does* carry a GC header
+(`__gc_alloc(size, class_tag)`, tags allocated from 10) and `__val_class_tag`
+reads it safely — so unlike a fieldless enum, the value **is** identifiable. It
+still prints as bits. What is missing is the mapping from tag to that class's
+`to_string()`, which only codegen holds (`class_type_ids`, `class_own_methods`).
+So "give payload enums a GC header" is necessary but *not* sufficient for the
+enum half either.
+
+Proposed fix: emit a tag-switch `__val_to_string(i64)` in
+`emit_class_hierarchy_helpers()` (`stmts_body.sf:1740`), beside the
+`__class_parent_tag` / `__class_is_a` switches it already generates from exactly
+these tables, and call it from `__any_to_string` (`base_nanbox.ll:1355`) before
+the `do_float` fallthrough. Payload enums join by allocating via `__gc_alloc` in
+`gen_enum_construct` (`expr_body.sf:3101`) instead of `__sf_malloc`, with tags
+from the same allocator as `next_class_type_id` (`codegen.sf:198`) to avoid
+collision. `__val_to_string` must return a raw `char*` like its siblings — no
+tag/untag step, which is what would re-create #102's segfault.
+
+**Fieldless enums cannot join this scheme.** `tag << 56` is a bare immediate with
+no allocation and no identity; there is nothing to key on. A bit-pattern heuristic
+was deliberately not written, because a wrong guess is worse than visible garbage.
+
+Two caveats to accept explicitly if this is implemented: `__any_to_string` is
+**absent from `wasm_base.ll`** (0 definitions; the other three bases have it), so
+**wasm64 silently loses the behaviour**; and the emit site is gated
+`if (!this.identity_mode)`, so **bootstrap can never validate it** — the
+identity-mode blind spot again.
+
+Regression test `test/oracle_println_class_not_bits.sf` is **6/8, failing on
+purpose**. The garbage is an address reinterpreted as a subnormal, so it varies
+per run and per `-O` level; recording it would make the eventual fix look like a
+regression (#107 discipline). Working paths are asserted positively as the
+reference; broken paths only negatively.
+
+---
+
+### 116. Enum payload variants compare by address, so two equal values are unequal
+
+```saffron
+Color.Red == Color.Red              // true  — both are the immediate 0
+Shape.Circle(2) == Shape.Circle(2)  // false — two distinct __sf_malloc's
+Shape.Circle(2) == Shape.Circle(3)  // false — correct, but for the wrong reason
+```
+
+Verified at HEAD. Note the third line: it answers correctly *by accident*, so a
+test that only checks unequal values passes while equality is broken.
+
+Same root as #115's enum half — a payload variant is a headerless `__sf_malloc`
+array. Giving it a GC header is a prerequisite for structural equality but not
+sufficient: `__any_eq` also needs an enum arm that compares payloads field by
+field.
+
+Worth stating plainly because it is a language-semantics wart, not just a bug:
+`==` on an enum currently means **different things** depending on whether the
+variant carries fields — value equality for fieldless, identity for payload.
+
+---
+
+### 117. An unannotated list literal of class instances loses its element type
+
+```saffron
+var ann: List<Pt> = [Pt(1), Pt(2)]
+IO.println(ann[0].to_string())   // Pt(1)          — correct
+var un = [Pt(1), Pt(2)]
+IO.println(un[0].to_string())    // 5.21502e-310   — WRONG
+```
+
+Verified at HEAD: the same expression answers correctly with an annotation and
+returns the raw pointer without one. **Minor severity only because the annotation
+is a workaround** — the wrong answer is silent.
+
+Distinct from #115: this is the untyped-receiver dispatch hazard (a call on a
+value whose type inference failed is dropped or misdispatched rather than
+diagnosed), and it is *why* `test/oracle_println_class_not_bits.sf` annotates its
+lists. It also means #115's "only nested elements are wrong" framing holds for
+**annotated** collections only.
 
 ---
 

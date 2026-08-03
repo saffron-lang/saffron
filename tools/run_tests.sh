@@ -16,6 +16,10 @@
 #   tools/run_tests.sh --stale         also run the known-stale tests
 #   tools/run_tests.sh -v              print the captured log for every failure
 #
+# A test named in KNOWN_FAIL still RUNS; its failure is reported as `xfail`
+# against a BUGS number and does not fail the suite, but its unexpected SUCCESS
+# (`xpass`) does — see that list for why.
+#
 # NOTE: compilation and linking are delegated to tools/saffron (`saffron build`)
 # rather than reimplemented here. The link line needs build/stage3/runtime.ll,
 # src/runtime/gc.ll, src/runtime/base_nanbox.ll, four native .c files and
@@ -59,6 +63,36 @@ STALE_TESTS="loops builtin_types for_in types runner decorators any_bug_repro"
 # nursery is off; the file is kept because it is exactly the test to re-enable
 # alongside a non-moving young generation.
 NOT_A_TEST="goals hello_wasm gc_generational_test"
+
+# Tests that fail ON PURPOSE because the bug they pin is still open.
+#
+# A test listed here is NOT skipped: it is compiled and run exactly like every
+# other test, and its failure is reported as `xfail` without turning the suite
+# red. What that buys over adding it to STALE_TESTS — which skips — is the other
+# direction. If a known-fail test starts PASSING it is reported as `xpass` and
+# DOES turn the suite red, so the entry must be removed in the same change that
+# fixes the bug. A skip can never notice a fix, and a permanently-red test
+# trains people to ignore the suite; this notices both ways.
+#
+# This is for a test that is red because the BUG is open, not because the test
+# is wrong. Do not park a broken test here — write it so it asserts the
+# invariant the fix must satisfy, then list it.
+#
+# Format: one "<label> <BUGS number>" per line. The label is exactly what the
+# suite prints: a bare name for test/*.sf, "pass/<name>" for test/pass/*.sf.
+# An entry must land in the same commit as the test it names, or the staleness
+# check below will (correctly) flag it.
+KNOWN_FAIL="
+"
+
+known_fail_bug() {   # label -> echoes the BUGS number, or nothing
+    local label="$1" l bug
+    while read -r l bug; do
+        [[ -z "$l" ]] && continue
+        if [[ "$l" == "$label" ]]; then echo "$bug"; echo "$label" >>"$KF_SEEN"; return 0; fi
+    done <<<"$KNOWN_FAIL"
+    return 1
+}
 
 # Tests that intentionally return their computed result as the process exit
 # code (mini_while exits 55 = fib(10)). A nonzero exit is CORRECT for these,
@@ -120,31 +154,60 @@ fi
 # --- Counters ----------------------------------------------------------------
 
 FAILURES=()
+XFAILS=()
 STALE_SEEN=()
 
 SUITE_PASS=0
 SUITE_FAIL=0
 SUITE_SKIP=0
+SUITE_XFAIL=0
 TOTAL_PASS=0
 TOTAL_FAIL=0
 TOTAL_SKIP=0
+TOTAL_XFAIL=0
 
 # bash 3.2 has no associative arrays: keep category tallies in a newline-
 # delimited "category" log and count with grep at the end.
 CATEGORY_LOG="$TMPDIR/categories"
 : >"$CATEGORY_LOG"
 bump() { echo "$1" >>"$CATEGORY_LOG"; }
+
+# Which KNOWN_FAIL labels were actually reached. An entry naming a test that no
+# longer exists (renamed, deleted, or moved between suites) would otherwise rot
+# invisibly — and a stale entry is exactly what suppresses a real failure later.
+KF_SEEN="$TMPDIR/known_fail_seen"
+: >"$KF_SEEN"
 # grep -c always prints a count (and exits 1 when it is zero), so read it via
 # command substitution rather than relying on the exit status.
 count_category() { grep -cx "$1" "$CATEGORY_LOG" 2>/dev/null; true; }
 
-record_pass() {   # name category
+record_pass() {   # category label
+    # A KNOWN_FAIL test that passes is an XPASS: the bug is fixed and the entry
+    # is now lying. That is a suite failure, deliberately, so the list cannot
+    # rot into a set of tests nobody rechecks.
+    local plabel="${2%% (*}" bug
+    if bug=$(known_fail_bug "$plabel"); then
+        printf 'XPASS %-18s %s  — BUGS #%s looks FIXED: remove it from KNOWN_FAIL\n' \
+               "unexpected-pass" "$plabel" "$bug"
+        bump "xpass"
+        SUITE_FAIL=$((SUITE_FAIL + 1))
+        FAILURES+=("xpass|$plabel|BUGS #$bug looks fixed — drop the KNOWN_FAIL entry")
+        return
+    fi
     printf 'PASS         %s\n' "$2"
     bump "$1"
     SUITE_PASS=$((SUITE_PASS + 1))
 }
 
-record_fail() {   # category name detail logfile
+record_fail() {   # category label detail logfile
+    local bug
+    if bug=$(known_fail_bug "$2"); then
+        printf 'XFAIL %-18s %s  — BUGS #%s%s\n' "$1" "$2" "$bug" "${3:+, $3}"
+        bump "xfail"
+        SUITE_XFAIL=$((SUITE_XFAIL + 1))
+        XFAILS+=("$2|$bug|$1${3:+: $3}")
+        return
+    fi
     printf 'FAIL  %-18s %s%s\n' "$1" "$2" "${3:+  — $3}"
     bump "$1"
     SUITE_FAIL=$((SUITE_FAIL + 1))
@@ -332,16 +395,19 @@ run_negative_test() {   # file label
 # --- Suite drivers -----------------------------------------------------------
 
 suite_header() {
-    SUITE_PASS=0; SUITE_FAIL=0; SUITE_SKIP=0
+    SUITE_PASS=0; SUITE_FAIL=0; SUITE_SKIP=0; SUITE_XFAIL=0
     echo ""
     echo "=== $1 ==="
 }
 
 suite_footer() {
-    echo "--- $1: $SUITE_PASS passed, $SUITE_FAIL failed, $SUITE_SKIP skipped"
+    local xf=""
+    [[ $SUITE_XFAIL -gt 0 ]] && xf=", $SUITE_XFAIL known-fail"
+    echo "--- $1: $SUITE_PASS passed, $SUITE_FAIL failed, $SUITE_SKIP skipped$xf"
     TOTAL_PASS=$((TOTAL_PASS + SUITE_PASS))
     TOTAL_FAIL=$((TOTAL_FAIL + SUITE_FAIL))
     TOTAL_SKIP=$((TOTAL_SKIP + SUITE_SKIP))
+    TOTAL_XFAIL=$((TOTAL_XFAIL + SUITE_XFAIL))
 }
 
 if [[ "$RUN_MAIN" == true ]]; then
@@ -395,7 +461,8 @@ echo ""
 echo "=== Category breakdown ==="
 for cat in pass compile-error link-error invalid-ir segfault crash-signal \
            assertion-failure runtime-error nonzero-exit exit-mismatch \
-           output-mismatch timeout not-rejected network stale not-a-test; do
+           output-mismatch timeout not-rejected network stale not-a-test \
+           xfail xpass; do
     n=$(count_category "$cat")
     [[ ${n:-0} -gt 0 ]] && printf '  %-18s %d\n' "$cat" "$n"
 done
@@ -404,6 +471,35 @@ if [[ ${#STALE_SEEN[@]} -gt 0 ]]; then
     echo ""
     echo "=== Stale tests (human decision needed: modernise or delete) ==="
     for s in "${STALE_SEEN[@]}"; do echo "  test/$s.sf"; done
+fi
+
+# A KNOWN_FAIL entry no test ever matched is stale. Only checkable on a full
+# run: `run_tests.sh pass` legitimately never reaches a test/*.sf entry.
+if [[ "$RUN_MAIN" == true && "$RUN_PASS" == true && "$RUN_FAIL" == true ]]; then
+    KF_STALE=()
+    while read -r l bug; do
+        [[ -z "$l" ]] && continue
+        grep -qxF "$l" "$KF_SEEN" || KF_STALE+=("$l|$bug")
+    done <<<"$KNOWN_FAIL"
+    if [[ ${#KF_STALE[@]} -gt 0 ]]; then
+        echo ""
+        echo "=== Stale KNOWN_FAIL entries (no such test ran — fix or drop them) ==="
+        for entry in "${KF_STALE[@]}"; do
+            IFS='|' read -r l bug <<<"$entry"
+            printf '  BUGS #%-4s %s  — never matched a test; renamed, deleted, or skipped?\n' "$bug" "$l"
+            FAILURES+=("stale-known-fail|$l|BUGS #$bug entry matched no test")
+            TOTAL_FAIL=$((TOTAL_FAIL + 1))
+        done
+    fi
+fi
+
+if [[ ${#XFAILS[@]} -gt 0 ]]; then
+    echo ""
+    echo "=== Known failures (open bugs — expected red, not counted as failures) ==="
+    for entry in "${XFAILS[@]}"; do
+        IFS='|' read -r name bug detail <<<"$entry"
+        printf '  BUGS #%-4s %s%s\n' "$bug" "$name" "${detail:+  — $detail}"
+    done
 fi
 
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
@@ -416,5 +512,7 @@ if [[ ${#FAILURES[@]} -gt 0 ]]; then
 fi
 
 echo ""
-echo "TOTAL: $TOTAL_PASS passed, $TOTAL_FAIL failed, $TOTAL_SKIP skipped"
+XF_NOTE=""
+[[ $TOTAL_XFAIL -gt 0 ]] && XF_NOTE=", $TOTAL_XFAIL known-fail"
+echo "TOTAL: $TOTAL_PASS passed, $TOTAL_FAIL failed, $TOTAL_SKIP skipped$XF_NOTE"
 [[ $TOTAL_FAIL -eq 0 ]]
