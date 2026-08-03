@@ -970,6 +970,17 @@ class Parser {
             TkNil => AST.Expr.NilLit
             TkString(s) => AST.Expr.StringLit(s)
             TkIdent(name) => AST.Expr.Variable(name)
+            // Soft keywords are legal binding names, so they must also be legal
+            // *references*. `as`, `in` and `is` get their own token kinds from the
+            // lexer, so a `TkIdent` arm alone never sees them: `fun f(as: String)`
+            // parsed and type checked (expect_ident maps all three back to their
+            // spelling), but reading `as` in the body hit the `_ =>` catch-all
+            // below and died with "expected a literal, name or '('" (BUGS #137).
+            // `actor` and `interface` are soft keywords too but stay `TkIdent`, so
+            // they were never affected and need no arm here.
+            TkAs => AST.Expr.Variable("as")
+            TkIn => AST.Expr.Variable("in")
+            TkIs => AST.Expr.Variable("is")
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
                 if (this.match_kind(",")) {
@@ -1810,22 +1821,19 @@ class Parser {
         if (this.match_kind_check("this")) {
             return this.parse_this_stmt()
         }
-        // Check for index assignment: ident[expr] = value
-        if (this.match_kind_check("ident") and this.peek_is("[")) {
-            var obj_name: String = this.expect_ident()
-            this.advance() // consume [
-            var idx: AST.Expr = this.parse_expr()
-            this.consume("]")
-            if (this.match_kind("=")) {
-                var value: AST.Expr = this.parse_expr()
-                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
-                    AST.Expr.Variable(obj_name), idx, value))
-            }
-            // Not an assignment — just index access as expression
-            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
-            return AST.Stmt.ExprStmt(get_expr)
-        }
-        // Default: expression statement (may be field assignment if followed by =)
+        // Default: expression statement (may be an index or field assignment if
+        // followed by =).
+        //
+        // `ident [ expr ]` used to be special-cased above this point, and that
+        // special case parsed exactly one index and *returned* — it never
+        // continued the postfix chain. So a statement that began `xs[0]` and kept
+        // going (`xs[0].show()`, `xs[0].v = 3`, `ns[0] + 1`) had its tail left in
+        // the token stream to be re-parsed as a fresh statement, which started at
+        // `.` or `+` and died with "expected a literal, name or '('" (BUGS #138).
+        // parse_call already handles `[`, `.` and `(` in a loop, so routing the
+        // whole shape through parse_expr is both shorter and complete; the `=`
+        // classification below is what the special case existed for, and it now
+        // covers index targets as well as fields.
         var expr: AST.Expr = this.parse_expr()
         if (this.match_kind("=")) {
             var value: AST.Expr = this.parse_expr()
@@ -1839,6 +1847,31 @@ class Parser {
                 }
                 return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value))
             }
+            if (ek == "index") {
+                var iobj: AST.Expr = match (expr) { IndexGet(o, i) => o
+                    _ => AST.Expr.NilLit
+                }
+                var iidx: AST.Expr = match (expr) { IndexGet(o, i) => i
+                    _ => AST.Expr.NilLit
+                }
+                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(iobj, iidx, value))
+            }
+            // A bare name on the left is an assignment. The `ident =` fast path
+            // above catches the common case, but it tests for TkIdent, and the
+            // soft keywords `as`/`in`/`is` are their own token kinds — so
+            // `as = "x"` reached here, matched no arm, and the value was dropped
+            // with no diagnostic at all (found while fixing BUGS #137: the
+            // declare-and-read arms made the *read* work, which is what exposed
+            // the silently discarded write).
+            if (ek == "variable") {
+                var vname: String = match (expr) { Variable(n) => n
+                    _ => ""
+                }
+                return AST.Stmt.ExprStmt(AST.Expr.Assign(vname, value))
+            }
+            // Some other shape on the left of `=`. Silently discarding the value
+            // is worse than saying so.
+            this.parse_error("cannot assign to this expression")
         }
         return AST.Stmt.ExprStmt(expr)
     }
@@ -1846,6 +1879,8 @@ class Parser {
     fun classify_expr_for_assign(expr: AST.Expr): String {
         return match (expr) {
             MemberAccess(o, f) => "member"
+            IndexGet(o, i) => "index"
+            Variable(n) => "variable"
             _ => "other"
         }
     }
