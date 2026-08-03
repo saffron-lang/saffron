@@ -12411,10 +12411,28 @@ class Codegen {
     fun gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
     // Check if 'method' is actually a function-type field (not a real method).
     // e.g. this.compute() where compute is `var compute: () => T`
-    // Function types can be: "Fun(Nil)", "(T) => R", "() => Nil", etc.
+    //
+    // Every spelling of a function type has to be listed here, because the three
+    // of them reach this point as three unrelated strings:
+    //
+    //   `(A, B) => R`   parses to FuncType, and func_type_string renders it
+    //                   "Fun(A,B):R"          → starts_with("Fun(")
+    //   `Fun<A, B, R>`  parses to GenericType("Fun", ...), and
+    //                   generic_type_string renders it "Fun<A,B,R>"
+    //   bare `Fun`      parses to ClassType("Fun") — NOT a FuncType — so
+    //                   type_to_string returns it via the ClassType(n) arm as
+    //                   the plain string "Fun", with no bracket of any kind
+    //
+    // Only the first was tested, so a `var f: Fun` field fell through to the
+    // ordinary method path below and emitted a call to the symbol `Ns__f`, which
+    // no definition exists for: the program failed to LINK rather than
+    // miscompiling. Copying the field to a local first worked around it because
+    // a local goes through gen_call's indirect path, which never consults a
+    // field type at all. Bare `Fun` is the spelling `src/lib/heap.sf` uses for
+    // its comparator, which is why that stdlib module could not link.
     if (has_self and this.class_fields.has(ns)) {
         var ft: String = this.get_field_type(ns, method)
-        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
+        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("Fun<") or ft == "Fun" or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
         if (is_fn_type) {
             // Check there's no actual method with this name
             var full_check: String = ns + "__" + method
