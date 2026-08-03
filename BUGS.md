@@ -2,7 +2,7 @@
 
 ## Open
 
-**15 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+**14 open entries:** #2, #49, #65, #66, #75, #107, #115, #117, #123, #128,
 #129, #130, #131, #132. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
@@ -521,10 +521,6 @@ test()
 
 **Impact:** Can't write mutually recursive helper functions inside a parent scope.
 **Note:** Design choice — compile-time local resolution. Same as Lua/Python.
-
-### 6. No `break`/`continue` type checking
-
-The compiler has break/continue infrastructure (breakJumps, continueJumps arrays) but the type checker doesn't handle NODE_BREAK/NODE_CONTINUE. Runtime works; type checker just ignores them.
 
 ### 115. A class instance reaching a formatter prints its raw bit pattern
 
@@ -1157,6 +1153,44 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 6. FIXED — `break`/`continue` outside a loop is now a checker error
+
+**Severity: medium** — a soundness gap, not just a nuisance: the checker
+accepted a `break`/`continue` with no enclosing loop, and codegen emitted a jump
+to a label that was never created.
+
+The checker's `Break`/`Continue` arms in `check_stmt` were empty — the runtime
+nodes existed and the checker ignored them (this was the original filing's whole
+content: "Runtime works; type checker just ignores them"). So `fun main() {
+break }` compiled clean.
+
+Fix: a `loop_depth: Float` counter on `Checker` (`checker.sf`), initialised to 0.
+It is incremented around every `While` body and decremented after — and because
+the parser desugars all three loop forms (`while`, C-style `for`, `for-in`) to
+`While`, that one site covers every loop. `Break`/`Continue` at depth 0 is
+reported as `'break'/'continue' outside of a loop`.
+
+The subtle half is the boundary reset: `loop_depth` is saved and set to 0 at the
+top of the `FunDecl` arm and `check_lambda_body`, then restored, because a loop
+does not carry into a function or lambda declared in its body. So `while (c) {
+fun f() { break } }` correctly rejects the `break` — it is lexically inside the
+loop but semantically inside a function that has no loop of its own.
+
+Tests: `test/fail/break_outside_loop.sf` (including the function-boundary case)
+and `test/fail/continue_outside_loop.sf` must be rejected;
+`test/pass/loop_control_valid.sf` exercises every legal placement — each loop
+form, `continue`, nested loops where an inner `break` exits only the inner loop,
+and a loop inside a function nested in another loop — and its 6 assertions pass.
+Red→green was verified against the pre-fix build (it accepted the fail cases,
+RC=0; the fixed build rejects them, RC=1). Suite failure set unchanged at the
+24-name baseline, zero regressions.
+
+This is stage 2 of `docs/design/compiler-rewrite.md`, which predicted exactly
+this shape: "`Break`/`Continue` … the checker cannot 'just ignore them' because
+the exhaustive match requires an arm." The exhaustive match already forced an
+arm to exist; it was just empty. No new syntax, so gen2 was untouched and no
+promotion was needed.
 
 ### 134. FIXED — a method call on a concrete builtin receiver dispatched to an unrelated user class
 
