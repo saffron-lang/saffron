@@ -67,11 +67,54 @@ run_compile() {
     return $rc
 }
 
+# Serialize bootstraps across ALL worktrees. Each worktree has its own build/, so
+# concurrent runs never corrupt each other's artifacts — but they do contend for
+# CPU, and that contention is the whole reason COMPILE_TIMEOUT above had to be set
+# so generously: the same main.sf compile measures 61s of user time and 172s of
+# wall time, i.e. two thirds of it descheduled. Queueing instead of racing makes
+# the wall time mean something again, so a timeout that does fire is evidence of a
+# hang rather than of a busy machine.
+#
+# The lock is machine-wide, not per-worktree, because the contended resource is
+# the machine's CPUs. Set SAFFRON_NO_BOOTSTRAP_LOCK=1 to opt out.
+BOOTSTRAP_LOCK="${TMPDIR:-/tmp}/saffron-bootstrap.lock"
+
+acquire_bootstrap_lock() {
+    [[ -n "${SAFFRON_NO_BOOTSTRAP_LOCK:-}" ]] && return 0
+    local waited=0 announced=false
+    while ! mkdir "$BOOTSTRAP_LOCK" 2>/dev/null; do
+        # Reclaim a lock whose owner died (crash, or a killed parent shell taking
+        # the bootstrap down with it — which is how these get orphaned).
+        local owner
+        owner="$(cat "$BOOTSTRAP_LOCK/pid" 2>/dev/null || true)"
+        if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
+            rm -rf "$BOOTSTRAP_LOCK"
+            continue
+        fi
+        if [[ "$announced" == false ]]; then
+            info "LOCK" "another bootstrap is running (pid ${owner:-?}); waiting so we don't contend for CPU..."
+            announced=true
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge 1800 ]]; then
+            fail "LOCK" "waited 30min for $BOOTSTRAP_LOCK. If no bootstrap is running, remove it: rm -rf $BOOTSTRAP_LOCK"
+        fi
+    done
+    echo "$$" > "$BOOTSTRAP_LOCK/pid"
+    # Release on any exit, including failure and Ctrl-C.
+    trap 'rm -rf "$BOOTSTRAP_LOCK"' EXIT
+    [[ "$announced" == true ]] && info "LOCK" "acquired after ${waited}s"
+    return 0
+}
+
 # --- Preflight ---
 
 if ! command -v clang &>/dev/null; then
     fail "ERROR" "clang not found. Install LLVM/Clang."
 fi
+
+acquire_bootstrap_lock
 
 mkdir -p "$BUILD_DIR/stage2" "$BUILD_DIR/stage3"
 

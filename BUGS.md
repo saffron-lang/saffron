@@ -3,11 +3,24 @@
 ## Open
 
 **10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139. Next free number is **#143**.
+#139. Next free number is **#144**.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
 a gap is cheaper than two entries sharing a number in the git history.
+
+**Read the next-free number from `main`, never from a worktree.** On 2026-08-03
+three separate worktrees each numbered a different bug #137, and two of them also
+claimed #138: the `as`-as-expression bug (this file's #137), ph5's List/Map `==`
+bug (re-filed as #142), and ide-stage0-spans' `var X = Module.Type` alias bug
+(still unmerged and still mis-numbered). ph5's had *already* been renumbered once,
+from an internal task ID that collided with the resolved #28. The alias bug has
+since merged and been renumbered to #143 to settle the collision. A worktree branched
+before a filing carries the pre-filing note forward and reads it as authoritative,
+so the collision is the default outcome rather than an accident, and it is only
+visible at merge time — by which point the number is in commit messages, code
+comments and test names. If you are filing from a worktree, `git show
+main:BUGS.md | head -10` first.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -609,7 +622,7 @@ because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
 
-### 142. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
+### 143. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
 
 **Severity: high.** Broke `@ast`, `@lexer` and `@lang` completely — any program
 that so much as imported one died — and the workaround it forced switched off
@@ -674,6 +687,48 @@ kept, since a reader of `src/lib/lexer.sf` should not have to know which
 **The lesson worth keeping:** the failure announced itself as "this is a compiler
 bug, not an error in your program", and it was a two-word error in a library.
 A diagnostic that confidently assigns blame can still be pointing the wrong way.
+
+**Renumbered #142 → #143 at merge.** This entry was written on the
+ide-stage0-spans worktree as #142; the reconciliation note at the top of `## Open`
+had already recorded that ph5's List/Map `==` fix owns #142 and that this one was
+"still unmerged and still mis-numbered." It landed second, so it takes the next
+free number. Exactly the per-worktree collision that note warns about — read the
+next-free number from `main`, not from a worktree.
+
+### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
+
+**Severity: high.** `[1,2] == [1,2]` was `false`; `{"a":1} == {"a":1}` was
+`false`; nested and reordered cases likewise. `IO.println` showed the operands
+identical, so the wrongness was invisible until you compared them.
+
+`gen_binary`'s `==` chain (`expr_body.sf`) had arms for String (`__string_eq`),
+Any (`__any_eq`), Float (`fcmp`), and same-enum (`__enum_eq_<Name>`), then fell
+through to a raw `icmp eq i64`. Two Lists or two Maps landed on that fall-through,
+which compares the two malloc addresses — the same "one spelling, two semantics"
+defect the enum arm right above it was added to fix, in a different shape.
+
+`__rt_val_eq` in `runtime.sf` already did the correct deep by-value comparison but
+nothing reached it: no arm routed a statically-typed List/Map to it. The fix adds
+an arm above the integer fall-through that sends both-aggregate operands to
+`__rt_val_eq`. It targets `__rt_val_eq`, not `__any_eq`, because `__any_eq`'s body
+is hand-written IR present only in `base_nanbox.ll` and `wasm_base_32.ll`, so an
+arm keyed on it would emit an unresolvable symbol under `--identity-mode`
+(`base.ll`) and on wasm64 (`wasm_base.ll`). `__rt_val_eq` is compiled from
+`runtime.sf` and links on every target, and is the body `__any_eq` itself
+delegates to, so the two cannot drift apart. A user `eq` overload cannot reach
+this: List and Map are runtime primitives with no Saffron class for the
+operator-overload dispatch to key on, which is why the fix lives in codegen.
+
+The declare needs the same `defined_funcs` guard `__runtime_error` uses:
+`runtime.sf` *defines* `__rt_val_eq`, and clang rejects a `declare`+`define` of one
+name in a single module. Emitting it unconditionally broke the gen4 link.
+**Filed as #142, not #137.** The fix landed on the `phase5-internal` worktree,
+which branched before #137/#138/#139 existed and numbered this entry #137 off its
+own stale next-free note. #137 is the soft-keyword `as` bug, already resolved
+below. The worktree's own commit message flags that it had earlier been called
+"BUGS #28" — an internal task-list ID colliding with the resolved #28 (Int->Float
+literal). Two renumberings for one bug is what a per-worktree next-free counter
+buys; the number is only free if you read the number from `main`.
 
 ### 141. FIXED — `return;` was a parse error, while `return` and `return 1;` both parsed
 
