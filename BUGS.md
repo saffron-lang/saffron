@@ -2,8 +2,8 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139. Next free number is **#143**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#146, #147. Next free number is **#148**.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -20,6 +20,15 @@ so the collision is the default outcome rather than an accident, and it is only
 visible at merge time — by which point the number is in commit messages, code
 comments and test names. If you are filing from a worktree, `git show
 main:BUGS.md | head -10` first.
+
+**The rule cuts both ways, and `main` is not automatically right.** Later the same
+day this file filed #143/#144 from `main` while three worktrees had *already*
+agreed on #143 (non-`Bool` condition lowering) and #144 (unused-variable noise),
+and one had taken #145 — none of them merged yet, so `main` was the stale copy.
+These two entries were renumbered to #146/#147 rather than making three worktrees
+renumber, which is the general tie-break: the side with fewer commits, comments and
+test names carrying the number moves. Before filing, check the worktrees too:
+`grep -h "Next free number" .claude/worktrees/*/BUGS.md BUGS.md`.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -536,85 +545,149 @@ a one-line edit.
 
 ---
 
-### 139. OPEN — REGRESSION: a value flowing through `Signal<T>.get()` re-infers as `Nil`, and no annotation clears it
+### 146. OPEN — an inferred global read from inside a function is typed `Int`, so every method on it is rejected
 
-**Severity: high.** This is the sole blocker for the `bazaar/frontend` build, and
-it is a **regression against the committed gen2** — see the gen2-vs-gen3 split
-below. Almost certainly fallout from the in-flight type-lattice rewrite
-(`UnknownType`/`NeverType`, uncommitted in `ast.sf`/`checker.sf`).
+**Severity: high.** This is now the blocker for the `bazaar/frontend` build, and it
+was hidden behind #139: the checker aborted before codegen ran, so fixing #139 is
+what made it visible. It is not new — the same error reproduces on the pre-#139
+gen3 binary.
 
-Repro (needs `basil` on the lib path):
+Repro, no modules or generics needed (9 lines):
 
 ```saffron
-import { Query, query } from "basil/query"
-var q: Query<Any> = query("http://x")
-var data = q.data.get()               // Signal<T>.get(): T, T bound to Any
-if (data != nil and data.has("k")) {
-    var pkgs = data.get("k")
-    if (pkgs != nil) {                 // guard is present and correct
-        IO.println(pkgs.length().to_string())   // ERROR: .length() on nullable 'pkgs' (type Nil)
-    }
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun bump() { this.n = this.n + 1 }
 }
+fun make(): Box { return Box(1) }
+var b = make()                  // global, type INFERRED (not annotated)
+fun go() { b.bump() }           // [codegen] Error: type 'Int' has no method 'bump'
+go()
 ```
 
-The gen split is the diagnosis:
+Three variants isolate it exactly. All were measured, not reasoned:
 
-```
-build/stage2/saffronc  (committed gen2)  -> 0 errors
-build/saffronc         (current gen3)    -> 1 error   (.length() on nullable Nil)
-```
+| variant | result |
+|---|---|
+| `b.bump()` at top level, not inside a function | OK |
+| `var b = make()` declared *local* to the function | OK |
+| `var b: Box = make()` — same global, annotated | OK |
+| `var b = make()` global, read inside a function | **`type 'Int' has no method 'bump'`** |
 
-Two properties make this nastier than an ordinary narrowing gap:
+So it is the combination "inferred global" + "read from a function body", and the
+annotation is a complete workaround. `Int` is the tell: it is codegen's fallback
+for a type it could not determine (`types_body.sf` `str_to_type` has no Unknown
+arm, and `IntType` is the first arm), which is exactly the class of silent-wrong-
+answer that rewrite stage 1 exists to convert into a diagnostic. See
+`project_nonexhaustive_match_indeterminate` and the M2 fallback list.
 
-1. **It ignores explicit annotations.** `var data: Any = q.data.get()` still
-   errors, and so does `var pkgs: Any = data.get("k")`. The RHS type wins over
-   the declared type — the value is stamped `Nil` at the generic boundary and the
-   annotation does not launder it. That is the part that reads as a genuine bug
-   rather than a missing feature: a declared `Any` should never re-narrow to `Nil`.
+The bazaar frontend hits it 16 times through `var packages_query = Api.getPackages()`
+read inside `do_search`/`on_data`/render bodies, reported as no method `refetch`,
+`go`, `on_data`, `current`, `mutate`, `on_success`, `render`.
 
-2. **The `!= nil` guard then narrows `Nil` to nothing.** Because `pkgs` is
-   *already* pure `Nil` (not `Any|Nil`), the guard is vacuous and the method call
-   is reported anyway.
-
-Isolation notes, to save the next person the bisect:
-- `Any.get("k")` on a plain `Any` narrows fine (0 errors). The poison is specific
-  to the value coming back from the generic `Signal<T>.get()`.
-- A hand-rolled `class Sig<T> { fun get(): T ... }` does **not** reproduce it, nor
-  does `Sig` initialized with `sig(nil)`. It only reproduces through basil's real
-  `Query`/`Signal` chain, so the trigger is some combination this minimal clone
-  doesn't capture (candidate: `this.data = Signal.signal(nil)` at `query.sf:27`
-  fixing the field's `T` to `Nil` at construction, independent of the class's `T`).
-
-**Only working workaround found:** launder through a function whose return type is
-declared `Any`, at *every* level the poisoned value is read:
-
-```saffron
-fun as_any(x: Any): Any { return x }
-var data = as_any(q.data.get())
-var pkgs = as_any(data.get("k"))      // both levels, or the inner one still errors
-```
-
-A single `Query.snapshot(): Any` that returns `this.data.value` only launders the
-outer read — the inner `data.get("k")` still errors — so it is not enough on its
-own. Given that, and that the regression is in uncommitted rewrite work, the
-frontend was left un-worked-around pending the checker fix rather than sprayed
-with `as_any` calls.
-
-The reference build path, for whoever fixes this:
+The reference build path:
 
 ```
 cd bazaar/frontend
 ../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
 ```
 
-Gen2 fails it too, but for an unrelated and already-fixed reason — the
-`{ stmt; stmt() }` arrow-body form at `main.sf:151,306` is BUGS #136, which gen3
-handles. So the frontend genuinely needs *both* the #136 fix (gen3-only) and the
-absence of this regression (gen2-only); no single existing binary compiles it.
+### 147. OPEN — an explicit `: Any` annotation is indistinguishable from no annotation, so the initializer's type wins
+
+**Severity: low.** Split out of #139, where it was point 1 ("it ignores explicit
+annotations"). It is real, and independent of that entry's actual cause.
+
+`parser.sf:2290` defaults an omitted annotation to the string `"Any"`:
+
+```saffron
+var type_ann: String = "Any"
+```
+
+and `checker.sf:2237` decides whether an annotation was written by comparing
+against that same default:
+
+```saffron
+if (type_ann_str != "Any") {
+    ... this.env.define_var(name, type_ann_node)
+} else if (init_type != "Any") {
+    this.env.define_var(name, init_type_node)     // <- an explicit `: Any` lands here
+}
+```
+
+So `var x: Any = something_typed()` takes the inferred-from-initializer branch and
+binds the initializer's type, not `Any`. Writing `: Any` cannot widen a binding —
+the one thing an author writes it for. Under #139 that made the documented
+workaround (`var data: Any = ...`) fail to launder, which is how it was found.
+
+The fix is to stop overloading a value as the "absent" marker: an empty string, or
+a separate `has_annotation` flag on the AST node, distinguishes the two. Note the
+`type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
+one of the sites rewrite stage 3 has to touch.
 
 ---
 
 ## Resolved
+
+### 139. FIXED — a free function decided the type of any same-named method call on an unresolved receiver
+
+**Severity: high.** Sole blocker for the `bazaar/frontend` build: 14 errors, no
+artifact. Reported as a `Signal<T>.get()` regression, which it was not — the title
+of this entry used to read "a value flowing through `Signal<T>.get()` re-infers as
+`Nil`", and the entry blamed the in-flight `UnknownType`/`NeverType` lattice work.
+Both were wrong, and the second was checkable: those two variants have match arms
+and **zero construction sites** anywhere in `src/`, so nothing could have produced
+one. Worth remembering as a diagnosis failure and not just a bug: the entry's
+"isolation notes" section confidently ruled the cause into the generic machinery
+because that is where the symptom appeared.
+
+The cause was `infer_method_call`'s last-resort arm (`checker.sf:3610` before the
+fix):
+
+```saffron
+var ret: String = this.env.get_func_ret(method)
+if (ret != "Any") return ret
+```
+
+That reads the method name out of the table of **free functions**. It exists for
+the alias-qualified call `Mod.helper()`: the parser builds that as a MethodCall
+whose receiver is a module alias — a name the checker has no type for — so the
+callee's declared return type is only reachable under its bare name.
+
+Ungated, it also answered for every unresolved `value.foo()`, from whatever free
+`fun foo` the program happened to declare. The chain in bazaar:
+
+1. `basil/fetch.sf:16` declares `fun get(url, callback)` with no return annotation.
+2. `parser.sf:2438` defaults an omitted return type to `"Nil"`.
+3. `data.get("k")` on an `Any`-typed receiver — an ordinary Map read — infers `Nil`.
+4. The next line's `.length()` trips the nullable-receiver check:
+   `cannot call .length() on nullable 'pkgs' (type Nil); add a nil check first`.
+
+Nothing in the user's file was wrong. A function three modules away, whose only
+sin was sharing a name with a Map method, decided the type — and the diagnostic
+named a variable that was never nil, which is why the reported repro looked like a
+narrowing bug.
+
+The fix gates the arm on the receiver being a bare name that is **not** a bound
+variable, the only shape a module alias can take, and adds `TypeEnv.has_var()` to
+ask that. `get_var_type(name) == AnyType` cannot answer it: an unbound name and a
+name declared `Any` both return `AnyType`. An empty `obj_name` (the receiver is an
+expression, e.g. `q.data.get(k)`) is excluded by the same length check.
+
+Measured: the bazaar repro goes 14 errors → 0 with an artifact; the alias path
+stays typed (`Mod.make_label(3)` still infers `String`, not `Any`); suite
+262 passed / 16 failed with a failure set identical to `test/FAILURE_BASELINE.txt`
+— no regressions, no incidental fixes.
+
+`test/pass/free_fun_name_shadow.sf` is the regression test. It was verified to
+FAIL on the pre-fix binary with the exact #139 error and pass after, so it guards
+something rather than merely passing.
+
+Two things this entry used to contain are separate bugs, now filed as such:
+**#147** (an explicit `: Any` annotation is ignored — this entry's point 1, and why
+the documented `var data: Any = ...` workaround did not work) and **#146** (the
+codegen errors this fix uncovered in the frontend, which the checker's early abort
+had been hiding).
 
 Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
