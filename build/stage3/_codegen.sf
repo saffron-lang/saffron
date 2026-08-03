@@ -887,6 +887,18 @@ class Codegen {
         return parts[1]
     }
 
+    // Extract the key type string from a Map<K, V> type annotation.
+    // e.g. "Map<String,AST.Type>" → "String"
+    //      "Map<Int,String>"      → "Int"
+    //      "Map" or unknown       → "Any"
+    fun get_map_key_type(map_type: String): String {
+        if (!map_type.starts_with("Map<")) return "Any"
+        var inner: String = map_type.slice(4, map_type.length() - 1)
+        var parts: List<String> = this.split_respecting_generics(inner, ",")
+        if (parts.length() < 1) return "Any"
+        return parts[0]
+    }
+
     // Get the type string for a variable from typed_vars (the single source of truth).
     // Returns "" if the variable is not registered.
     fun get_var_type_str(name: String): String {
@@ -7784,6 +7796,113 @@ class Codegen {
         return arg_str
     }
 
+    /// Pre-register one function declaration's signature: defaults, param count,
+    /// param names and RETURN TYPE.
+    ///
+    /// This is the single implementation of the declaration pre-scan. It used to
+    /// be copy-pasted into `generate_with_modules` and both `..._flat_opts`
+    /// variants, plus a fourth, *divergent* copy for the main program's own
+    /// declarations. BUGS #33 and #36 each had to be applied to every copy, and
+    /// #33's first attempt got two of them wrong — the build caught it. Worse,
+    /// the main-program copy never registered `func_ret_types` at all, so #33
+    /// was still live for top-level functions: a caller declared above its
+    /// callee inferred `Int` for the result and every method on it silently
+    /// fell through (#37).
+    ///
+    /// `prefix` is "" for the main program and the module prefix otherwise.
+    fun prescan_fun_decl(stmt: AST.Stmt, prefix: String) {
+        var name: String = this.get_fun_name(stmt)
+        if (name.length() == 0) return nil
+        var doc: String = this.get_fun_doc(stmt)
+        // @intrinsic / @extern declarations are dispatched by other machinery and
+        // must not be registered as ordinary callables.
+        if (doc.starts_with("@intrinsic") or doc.starts_with("@extern:")) return nil
+
+        var emit_name: String = prefix + name
+        var params: List<AST.Param> = this.get_fun_params(stmt)
+        var defaults: List<AST.Expr> = []
+        var pnames: List<String> = []
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p: AST.Param = params[pi]
+            defaults.push(match (p) { Param(n, t, d) => d })
+            pnames.push(match (p) { Param(n, t, d) => n })
+            pi = pi + 1
+        }
+        this.func_defaults.set(emit_name, defaults)
+        this.func_param_count.set(emit_name, params.length())
+        this.func_param_names.set(emit_name, pnames)
+
+        // Return type too, or a call compiled before the callee's own
+        // gen_function runs falls back to Int and misdispatches every method on
+        // the result (BUGS #33). gen_function still sets this, but only when it
+        // reaches the declaration — too late for a caller appearing earlier.
+        var ret: String = this.get_fun_ret(stmt)
+        if (ret.length() > 0) {
+            this.func_ret_types.set(emit_name, this.str_to_type(ret))
+            if (prefix.length() > 0) {
+                this.func_ret_types.set(name, this.str_to_type(ret))
+            }
+        }
+    }
+
+    /// Pre-register every method of a class declaration. Methods take an implicit
+    /// leading `self`, registered under both the bare `Class__method` name and
+    /// the prefixed one.
+    fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
+        var cname: String = match (stmt) { ClassDecl(n, p, f, m, d) => n
+            _ => ""
+        }
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, p, f, m, d) => m
+            _ => []
+        }
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var mname: String = this.get_fun_name(methods[mi])
+            if (mname.length() > 0) {
+                var mparams: List<AST.Param> = this.get_fun_params(methods[mi])
+                var mdefs: List<AST.Expr> = []
+                var mpnames: List<String> = []
+                mpnames.push("self")
+                mdefs.push(AST.Expr.NilLit)
+                var mpi: Float = 0
+                while (mpi < mparams.length()) {
+                    var mp: AST.Param = mparams[mpi]
+                    mdefs.push(match (mp) { Param(n, t, d) => d })
+                    mpnames.push(match (mp) { Param(n, t, d) => n })
+                    mpi = mpi + 1
+                }
+                var full: String = cname + "__" + mname
+                this.func_defaults.set(full, mdefs)
+                this.func_param_count.set(full, mpnames.length())
+                this.func_param_names.set(full, mpnames)
+                if (prefix.length() > 0) {
+                    var pfull: String = prefix + full
+                    this.func_defaults.set(pfull, mdefs)
+                    this.func_param_count.set(pfull, mpnames.length())
+                    this.func_param_names.set(pfull, mpnames)
+                }
+            }
+            mi = mi + 1
+        }
+    }
+
+    /// Pre-scan a contiguous run of statements, registering every function and
+    /// class declaration. One call site per corpus — modules and main program
+    /// alike — so the four copies cannot drift again.
+    fun prescan_decls(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var si: Float = start
+        while (si < end) {
+            var kind: String = this.classify_stmt(stmts[si])
+            if (kind == "fun") {
+                this.prescan_fun_decl(stmts[si], prefix)
+            } else if (kind == "class") {
+                this.prescan_class_decl(stmts[si], prefix)
+            }
+            si = si + 1
+        }
+    }
+
     // --- Statement codegen ---
 
     // @codegen-split: output
@@ -9174,10 +9293,29 @@ class Codegen {
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
         if (mc_method == "slice") {
             if (mc_obj_type.starts_with("List")) { return mc_obj_type }
-            return "String"
+            if (mc_obj_type == "String") { return "String" }
+            // Unknown receiver: don't claim String. `slice` is defined on both
+            // List and String, so on an unannotated value we cannot say which.
+            // Claiming String let a sliced list be handed to string-typed code.
+            return "Any"
         }
         if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "char_at") return "String"
-        if (mc_method == "split" or mc_method == "keys") return "List<String>"
+        if (mc_method == "split") return "List<String>"
+        // Map.keys()/values() element type comes from the Map<K, V> annotation.
+        // Hardcoding List<String> made `for (v in m.values())` on a
+        // Map<String,Int> treat every Int as a string pointer and SEGFAULT.
+        if (mc_method == "keys") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_key_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
+        if (mc_method == "values") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_value_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
             // Infer return type from Map<K, V> annotation rather than always "String"
@@ -9326,10 +9464,10 @@ class Codegen {
         var ig_otype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_otype.starts_with("Map")) {
             var map_obj: String = this.gen_arg_value(object)
-            var key_val: String = this.gen_arg_value(index)
-            var key_ptr: String = this.emit_untag_ptr(key_val)
-            var key_raw: String = this.fresh_local()
-            this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+            // Key passed through NaN-boxed, NOT untagged — see Map.set. The
+            // runtime's __map_key_cmp reads the tag to tell string keys from
+            // numeric ones; untagging here destroyed that discriminator.
+            var key_raw: String = this.gen_arg_value(index)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_get(i64 " + map_obj + ", i64 " + key_raw + ")")
             if (ig_otype.starts_with("Map<")) {
@@ -10693,7 +10831,10 @@ class Codegen {
             } else {
                 this.emit_indent(__mk_local + " = call i64 @__map_keys(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // The element type is K, not String. Hardcoding List<String> here
+            // made `for (k in m.keys())` on a Map<Int,String> hand each raw Int
+            // to string-typed consumers and SEGFAULT. Unannotated maps stay Any.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_key_type(__map_obj_type))])
             return __mk_local
         }
         if (__map_type_match and method == "values") {
@@ -10704,7 +10845,8 @@ class Codegen {
             } else {
                 this.emit_indent(__mv_local + " = call i64 @__map_values(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // Element type is V — see the keys() note above.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_value_type(__map_obj_type))])
             return __mv_local
         }
     }
@@ -10916,11 +11058,14 @@ class Codegen {
             this.last_type = AST.Type.NilType
             return "0"
         }
-        // Map.set(key, value) -> __map_set (untag key for runtime)
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_s: String = this.emit_untag_ptr(key_val)
-        var key_raw_s: String = this.fresh_local()
-        this.emit_indent(key_raw_s + " = ptrtoint i8* " + key_ptr_s + " to i64")
+        // Map.set(key, value) -> __map_set
+        //
+        // The key is passed through NaN-boxed, NOT untagged. Untagging threw
+        // away the only thing that distinguishes a string key from a numeric
+        // one, and the runtime then compared every stored key with strcmp — so
+        // a second `set()` on a Map<Int, _> dereferenced the number itself and
+        // segfaulted. __map_key_cmp reads the tag; it needs the tag intact.
+        var key_raw_s: String = this.gen_arg_value(args[0])
         var val: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
         if (this.use_llvm_lib) {
@@ -10940,11 +11085,10 @@ class Codegen {
         if (has_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        // Untag string key for runtime (expects raw pointer)
-        var key_ptr: String = this.emit_untag_ptr(key_val)
-        var key_raw: String = this.fresh_local()
-        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_has
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw))
@@ -10964,10 +11108,10 @@ class Codegen {
         if (get_recv_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_g: String = this.emit_untag_ptr(key_val)
-        var key_raw_g: String = this.fresh_local()
-        this.emit_indent(key_raw_g + " = ptrtoint i8* " + key_ptr_g + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_get
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw_g: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g))
@@ -12406,88 +12550,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation, so a call compiled before
+    // its callee's declaration still resolves. One shared implementation —
+    // see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
     var df_mi: Float = 0
     while (df_mi < module_stmts.length()) {
         var df_stmts: List<AST.Stmt> = module_stmts[df_mi]
-        var df_prefix: String = module_prefixes_list[df_mi]
-        var df_si: Float = 0
-        while (df_si < df_stmts.length()) {
-            var df_kind: String = gen.classify_stmt(df_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(df_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(df_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(df_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(df_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
+        gen.prescan_decls(df_stmts, 0, df_stmts.length(), module_prefixes_list[df_mi])
         df_mi = df_mi + 1
     }
 
@@ -13064,150 +13134,19 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
-    mi = 0
-    while (mi < prefixes.length()) {
-        var df_prefix: String = prefixes[mi]
-        var df_start: Float = boundaries[mi]
-        var df_end: Float = boundaries[mi + 1]
-        var df_si: Float = df_start
-        while (df_si < df_end) {
-            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(all_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
-        mi = mi + 1
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation. One shared implementation
+    // — see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
+    var pre_mi: Float = 0
+    while (pre_mi < prefixes.length()) {
+        gen.prescan_decls(all_stmts, boundaries[pre_mi], boundaries[pre_mi + 1], prefixes[pre_mi])
+        pre_mi = pre_mi + 1
     }
-    // Also pre-scan main program's function defaults
-    var df_pi2: Float = 0
-    while (df_pi2 < program.length()) {
-        var df_pk: String = gen.classify_stmt(program[df_pi2])
-        if (df_pk == "fun") {
-            var df_name2: String = gen.get_fun_name(program[df_pi2])
-            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
-            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
-                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
-                var df_defaults2: List<AST.Expr> = []
-                var df_pnames2: List<String> = []
-                var df_pi3: Float = 0
-                while (df_pi3 < df_params2.length()) {
-                    var df_p2: AST.Param = df_params2[df_pi3]
-                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
-                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
-                    df_defaults2.push(df_dval2)
-                    df_pnames2.push(df_pn2)
-                    df_pi3 = df_pi3 + 1
-                }
-                gen.func_defaults.set(df_name2, df_defaults2)
-                gen.func_param_count.set(df_name2, df_params2.length())
-                gen.func_param_names.set(df_name2, df_pnames2)
-            }
-        } else if (df_pk == "class") {
-            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
-                _ => ""
-            }
-            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
-                _ => []
-            }
-            var df_mi3: Float = 0
-            while (df_mi3 < df_methods2.length()) {
-                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
-                if (df_mname2.length() > 0) {
-                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
-                    var df_mdefs2: List<AST.Expr> = []
-                    var df_mpnames2: List<String> = []
-                    df_mpnames2.push("self")
-                    df_mdefs2.push(AST.Expr.NilLit)
-                    var df_mpi2: Float = 0
-                    while (df_mpi2 < df_mparams2.length()) {
-                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
-                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
-                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
-                        df_mdefs2.push(df_mdval2)
-                        df_mpnames2.push(df_mpn2)
-                        df_mpi2 = df_mpi2 + 1
-                    }
-                    var df_full2: String = df_cname2 + "__" + df_mname2
-                    gen.func_defaults.set(df_full2, df_mdefs2)
-                    gen.func_param_count.set(df_full2, df_mpnames2.length())
-                    gen.func_param_names.set(df_full2, df_mpnames2)
-                }
-                df_mi3 = df_mi3 + 1
-            }
-        }
-        df_pi2 = df_pi2 + 1
-    }
+    // Pre-scan the main program's own declarations through the same path.
+    // This copy previously omitted func_ret_types entirely, leaving BUGS #33
+    // live for top-level functions: a caller declared above its callee inferred
+    // Int for the result and every method on it silently fell through (#37).
+    gen.prescan_decls(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []
@@ -13767,150 +13706,19 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
-    mi = 0
-    while (mi < prefixes.length()) {
-        var df_prefix: String = prefixes[mi]
-        var df_start: Float = boundaries[mi]
-        var df_end: Float = boundaries[mi + 1]
-        var df_si: Float = df_start
-        while (df_si < df_end) {
-            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(all_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
-        mi = mi + 1
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation. One shared implementation
+    // — see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
+    var pre_mi: Float = 0
+    while (pre_mi < prefixes.length()) {
+        gen.prescan_decls(all_stmts, boundaries[pre_mi], boundaries[pre_mi + 1], prefixes[pre_mi])
+        pre_mi = pre_mi + 1
     }
-    // Also pre-scan main program's function defaults
-    var df_pi2: Float = 0
-    while (df_pi2 < program.length()) {
-        var df_pk: String = gen.classify_stmt(program[df_pi2])
-        if (df_pk == "fun") {
-            var df_name2: String = gen.get_fun_name(program[df_pi2])
-            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
-            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
-                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
-                var df_defaults2: List<AST.Expr> = []
-                var df_pnames2: List<String> = []
-                var df_pi3: Float = 0
-                while (df_pi3 < df_params2.length()) {
-                    var df_p2: AST.Param = df_params2[df_pi3]
-                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
-                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
-                    df_defaults2.push(df_dval2)
-                    df_pnames2.push(df_pn2)
-                    df_pi3 = df_pi3 + 1
-                }
-                gen.func_defaults.set(df_name2, df_defaults2)
-                gen.func_param_count.set(df_name2, df_params2.length())
-                gen.func_param_names.set(df_name2, df_pnames2)
-            }
-        } else if (df_pk == "class") {
-            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
-                _ => ""
-            }
-            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
-                _ => []
-            }
-            var df_mi3: Float = 0
-            while (df_mi3 < df_methods2.length()) {
-                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
-                if (df_mname2.length() > 0) {
-                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
-                    var df_mdefs2: List<AST.Expr> = []
-                    var df_mpnames2: List<String> = []
-                    df_mpnames2.push("self")
-                    df_mdefs2.push(AST.Expr.NilLit)
-                    var df_mpi2: Float = 0
-                    while (df_mpi2 < df_mparams2.length()) {
-                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
-                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
-                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
-                        df_mdefs2.push(df_mdval2)
-                        df_mpnames2.push(df_mpn2)
-                        df_mpi2 = df_mpi2 + 1
-                    }
-                    var df_full2: String = df_cname2 + "__" + df_mname2
-                    gen.func_defaults.set(df_full2, df_mdefs2)
-                    gen.func_param_count.set(df_full2, df_mpnames2.length())
-                    gen.func_param_names.set(df_full2, df_mpnames2)
-                }
-                df_mi3 = df_mi3 + 1
-            }
-        }
-        df_pi2 = df_pi2 + 1
-    }
+    // Pre-scan the main program's own declarations through the same path.
+    // This copy previously omitted func_ret_types entirely, leaving BUGS #33
+    // live for top-level functions: a caller declared above its callee inferred
+    // Int for the result and every method on it silently fell through (#37).
+    gen.prescan_decls(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []
