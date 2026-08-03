@@ -1,0 +1,24 @@
+fun f() {
+    var a: Int = 1
+    var b: Int = 1
+    if (a == b) { IO.println("plain ==: no warning expected") }
+}
+fun g() {
+    var c: Int = 1
+    var d: Int = 1
+    if (c == d and c == d) { IO.println("== inside and") }
+}
+fun h() {
+    var e: Int = 1
+    if (e > 0 and e < 5) { IO.println("ordering inside and") }
+}
+fun i2() {
+    var g2: Int = 1
+    var h2: Int = 1
+    var t: Bool = g2 == h2
+    if (t) { IO.println("== assigned to a var") }
+}
+f()
+g()
+h()
+i2()

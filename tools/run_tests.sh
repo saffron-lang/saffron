@@ -84,7 +84,6 @@ NOT_A_TEST="goals hello_wasm gc_generational_test"
 # check below will (correctly) flag it.
 KNOWN_FAIL="
 oracle_println_class_not_bits 115
-pass/enum_payload_value_equality 116
 "
 
 known_fail_bug() {   # label -> echoes the BUGS number, or nothing
