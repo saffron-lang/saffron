@@ -1559,6 +1559,7 @@ declare i64 @__any_eq(i64, i64)
 declare i64 @__any_ne(i64, i64)
 declare i64 @__string_intern(i64)
 declare i64 @__rt_tag_ptr(i64)
+declare i64 @__rt_val_eq(i64, i64)
 declare double @strtod(i8*, i8*)
 declare double @llvm.floor.f64(double)
 
