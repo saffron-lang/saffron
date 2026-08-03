@@ -3,7 +3,11 @@
 ## Open
 
 **10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139. Next free number is **#141**.
+#139. Next free number is **#142**.
+
+#140 was never filed — the count was bumped past it in the same commit that
+closed five entries, so the number is burnt rather than in use. Do not reuse it;
+a gap is cheaper than two entries sharing a number in the git history.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -604,6 +608,48 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 141. FIXED — `return;` was a parse error, while `return` and `return 1;` both parsed
+
+**Severity: low as a defect, medium as a diagnostic.** The error names neither
+`return` nor the semicolon, and points at the *following* line.
+
+```saffron
+fun f(): Nil {
+    return;          // [line N, col C] Error: expected a literal, name or '(' here
+}
+```
+
+The caret lands on whatever follows the `;` — for a `return;` last in its body,
+on the closing `}`. Both neighbouring spellings work, which is what makes it
+misread as anything but a missing terminator:
+
+```saffron
+return       // fine
+return 1;    // fine — never enters the bare-return branch
+return;      // parse error
+```
+
+Cause: `parse_return` (`src/compiler/parser.sf:2922`) decided a `return` was bare
+when the next token was `}` or `eof`, and separately when the next token sat on a
+later line (the #99 fix). `;` is in none of those categories. Statements in this
+parser never consume their own trailing `;` — the enclosing body skips them
+afterwards with `while (this.match_kind(";")) {}`, at fourteen sites — so
+`return;` arrives at `parse_return` with the `;` still current, falls past every
+bare-return check, and reaches `parse_expr`, which demands an operand.
+
+Fixed by adding `;` to the existing bare-return check. This is the same class of
+gap as #99 and shares its condition, so the regression coverage went into
+`test/pass/bare_return_statement_boundary.sf` rather than a new file: the `;`
+cases sit alongside the line-boundary cases that constrain the same `if`. The
+test also pins `return v;` and `return;` directly before `}`, since a future
+rewrite of that condition could plausibly break either.
+
+Found by triaging the suite's standing red set, where it was the cause of
+`test_lib_repro` — one parse error in a 160-line file, reported against a line
+that had nothing wrong with it.
+
+---
 
 ### 123. FIXED — three stdlib files bound different modules to the same alias `Internal`, so the alias resolved to whichever won
 
