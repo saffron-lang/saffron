@@ -599,6 +599,13 @@
                     }
                 }
                 ClassDecl(pr_cname, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                    // Inheritance edges + own-method sets, needed by virtual
+                    // dispatch. This must happen here rather than in
+                    // gen_class_decl_with_parent: a base class's body is compiled
+                    // before its subclasses are declared, and the call site has to
+                    // already know an override exists to route through a stub.
+                    this.register_class_parent(pr_cname, this.current_prefix + pr_cname, pr_parent)
+                    this.register_own_methods(pr_cname, this.current_prefix + pr_cname, pr_methods)
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
@@ -688,6 +695,8 @@
         }
 
         // Second pass: wrap top-level statements in __saffron_entry
+        // (dispatch stubs are emitted after it, since top-level code can be the
+        // first thing to request one)
         var has_top_level: Bool = false
         i = 0
         while (i < program.length()) {
@@ -832,6 +841,13 @@
             this.emit("}")
             this.block_terminated = false
             this.in_function = false
+        }
+
+        // Virtual dispatch stubs. Emitted last so that every call site — method
+        // bodies and __saffron_entry alike — has already registered what it needs,
+        // and so the switch arms see the complete class/tag tables.
+        if (!this.identity_mode) {
+            this.emit_dispatch_helpers()
         }
 
         // Build final output with proper ordering

@@ -730,6 +730,47 @@
     }
     this.called_functions.push(full_method)
 
+    // Virtual dispatch: if some subclass of the static receiver type overrides
+    // this method, route through a tag-switch stub instead of binding the
+    // static target. Only for plain calls — the coroutine paths below pass the
+    // handle around and a stub returning i64 cannot stand in for that, and
+    // super./init are handled elsewhere and must stay static.
+    var vd_stub: String = ""
+    if (!this.str_in_list(this.coroutine_funcs, full_method)) {
+        vd_stub = this.virtual_dispatch_stub(ns, method, arg_strs.length())
+    }
+    if (vd_stub.length() > 0) {
+        var vd_local: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(vd_local, "i64", vd_stub, arg_strs.join(", ")))
+            if (!this.identity_mode) {
+                var vd_arg_vals: List<LLVMTypes.Value> = []
+                var vd_ai: Float = 0
+                while (vd_ai < arg_strs.length()) {
+                    var vd_part: String = arg_strs[vd_ai]
+                    var vd_sp: Float = vd_part.index_of(" ")
+                    if (vd_sp > 0) {
+                        var vd_reg: String = vd_part.slice(vd_sp + 1, vd_part.length())
+                        vd_arg_vals.push(LLVMTypes.Value.Instruction(vd_reg, LLVMTypes.Type.I64))
+                    }
+                    vd_ai = vd_ai + 1
+                }
+                var vd_res: LLVMTypes.Value = this.llvm_block_builder.call(vd_stub, LLVMTypes.Type.I64, vd_arg_vals)
+                this.llvm_values.set(vd_local, vd_res)
+            }
+        } else {
+            this.emit_indent(vd_local + " = call i64 @" + vd_stub + "(" + arg_strs.join(", ") + ")")
+        }
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return vd_local
+    }
+
     // Coroutine-aware method call: if this function is a coroutine and the
     // callee is also a coroutine, emit the await pattern instead of plain call.
     if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {

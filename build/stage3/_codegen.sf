@@ -33,6 +33,22 @@ class Codegen {
     // Methods declared with an empty body. Only these are requirements on a
     // subclass; a parent method WITH a body is simply inherited.
     var class_abstract_methods: Map<String, List<String>>
+    // Inheritance edges: class name -> parent class name. Registered under both
+    // the bare and the module-prefixed name, like class_fields/class_methods.
+    // The checker has its own copy of this (checker.sf) but codegen cannot see it.
+    var class_parents: Map<String, String>
+    // Methods each class declares ITSELF, as "name:arity" entries (arity counts
+    // self). Unlike class_methods this is never widened with inherited names, so
+    // it answers "does this class override?" rather than "can you call this?".
+    var class_own_methods: Map<String, List<String>>
+    // Virtual dispatch stubs requested by call sites. Four parallel lists:
+    // the stub symbol (also the dedupe key), the base class it dispatches from,
+    // the method name, and the argument count (including self).
+    // emit_dispatch_helpers() emits exactly these at the end of the module.
+    var dispatch_stubs: List<String>
+    var dispatch_bases: List<String>
+    var dispatch_methods: List<String>
+    var dispatch_arities: List<Float>
     var current_class: String
     var current_parent: String
     var current_function_name: String
@@ -100,6 +116,12 @@ class Codegen {
         this.class_struct_names = {}
         this.class_methods = {}
         this.class_abstract_methods = {}
+        this.class_parents = {}
+        this.class_own_methods = {}
+        this.dispatch_stubs = []
+        this.dispatch_bases = []
+        this.dispatch_methods = []
+        this.dispatch_arities = []
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
@@ -5321,6 +5343,11 @@ class Codegen {
                 all_fields = "__actor_busy:Int,__actor_queue:Int"
             }
         }
+        // Record the inheritance edge and this class's OWN methods before
+        // gen_class_decl widens class_methods with inherited names — virtual
+        // dispatch needs to know who actually overrides what.
+        this.register_class_parent(name, this.current_prefix + name, parent)
+        this.register_own_methods(name, this.current_prefix + name, methods)
         // Generate the class with inherited fields
         this.current_parent = parent
         this.gen_class_decl(name, all_fields, methods)
@@ -6413,6 +6440,240 @@ class Codegen {
         this.loop_continue_label = saved_continue
 
         this.start_block(end_label)
+    }
+
+    // --- Virtual (dynamic) method dispatch ---------------------------------
+    //
+    // Saffron has no vtable. A call site emits `<StaticTypeOfReceiver>__<method>`,
+    // so a base-class body calling `this.speak()` always reached the base's own
+    // `speak` even when the receiver was a subclass that overrode it. The fix is
+    // a tag-switch stub, modelled on emit_reflect_helpers: every instance carries
+    // a per-class GC type tag, so the stub reads the tag and jumps to the arm for
+    // the concrete class, falling back to the static target for tags it does not
+    // know (including 0 for nil).
+    //
+    // Stubs are only emitted for call sites that can actually be polymorphic —
+    // some strict subclass of the static receiver type declares the method
+    // itself. Everything else stays statically bound, so monomorphic code pays
+    // nothing.
+    //
+    // None of this runs in identity mode: there gen_class_constructor allocates
+    // with a bare malloc and no GC header, so __gc_get_type_tag would read
+    // garbage. The compiler compiles itself in identity mode.
+
+    // Dispatch needs a real per-instance type tag. Identity mode has none (bare
+    // malloc, no GC header) and neither does wasm64: wasm_base.ll's __gc_alloc
+    // ignores its type_tag argument and the file defines no __gc_get_type_tag at
+    // all — it only ever linked because wasm-ld runs with --allow-undefined. Both
+    // stay on static dispatch, which is the pre-existing behaviour.
+    fun dispatch_supported(): Bool {
+        if (this.identity_mode) { return false }
+        if (this.target == "wasm" or this.target == "wasm64") { return false }
+        return true
+    }
+
+    // Canonical (module-prefixed) struct name for a class name.
+    fun norm_class(n: String): String {
+        if (this.class_struct_names.has(n)) { return this.class_struct_names.get(n) }
+        return n
+    }
+
+    fun register_class_parent(cname: String, prefixed: String, parent: String) {
+        if (cname.length() == 0) { return }
+        if (parent.length() == 0) { return }
+        this.class_parents.set(cname, parent)
+        if (prefixed.length() > 0 and prefixed != cname) {
+            this.class_parents.set(prefixed, parent)
+        }
+    }
+
+    // Records the methods a class declares ITSELF as "name:arity" (arity counts
+    // self). class_methods cannot answer this: gen_class_decl_with_parent widens
+    // it with every inherited name so that `child.inherited()` resolves.
+    fun register_own_methods(cname: String, prefixed: String, methods: List<AST.Stmt>) {
+        if (cname.length() == 0) { return }
+        var entries: List<String> = []
+        var omi: Float = 0
+        while (omi < methods.length()) {
+            var omn: String = this.get_fun_name(methods[omi])
+            if (omn.length() > 0) {
+                var omar: Float = this.get_fun_params(methods[omi]).length() + 1
+                entries.push(omn + ":" + omar.floor().to_string())
+            }
+            omi = omi + 1
+        }
+        this.class_own_methods.set(cname, entries)
+        if (prefixed.length() > 0 and prefixed != cname) {
+            this.class_own_methods.set(prefixed, entries)
+        }
+    }
+
+    fun class_declares_method(cls: String, method: String, arity: Float): Bool {
+        if (!this.class_own_methods.has(cls)) { return false }
+        var entries: List<String> = this.class_own_methods.get(cls)
+        return this.str_in_list(entries, method + ":" + arity.floor().to_string())
+    }
+
+    fun is_subclass_of(cls: String, base: String): Bool {
+        var cur: String = cls
+        var depth: Float = 0
+        while (depth < 32) {
+            if (!this.class_parents.has(cur)) { return false }
+            var p: String = this.norm_class(this.class_parents.get(cur))
+            if (p.length() == 0) { return false }
+            if (p == base) { return true }
+            cur = p
+            depth = depth + 1
+        }
+        return false
+    }
+
+    fun is_builtin_pseudo_class(n: String): Bool {
+        if (n == "String" or n == "List" or n == "Map") { return true }
+        if (n == "Int" or n == "Float" or n == "Bool") { return true }
+        if (n == "Number" or n == "Any" or n == "Nil") { return true }
+        return false
+    }
+
+    // Emitted symbol for cls.method, mirroring the resolution gen_namespace_call
+    // does for a direct call.
+    fun resolve_method_symbol(cls: String, method: String): String {
+        var f: String = cls + "__" + method
+        if (this.str_in_list(this.known_functions, f)) { return f }
+        if (this.func_prefix_map.has(f)) { return this.func_prefix_map.get(f) }
+        if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions, this.current_prefix + f)) {
+            return this.current_prefix + f
+        }
+        var rmi: Float = 0
+        while (rmi < this.known_functions.length()) {
+            if (this.known_functions[rmi].ends_with(f)) { return this.known_functions[rmi] }
+            rmi = rmi + 1
+        }
+        return f
+    }
+
+    // Subclasses of `base` (strict) that declare `method` at this arity, as
+    // canonical struct names. Used both to decide whether a stub is needed and
+    // to build its switch arms, so the two always agree.
+    fun collect_overriders(base: String, method: String, arity: Float): List<String> {
+        var out: List<String> = []
+        var keys: List<String> = this.class_parents.keys()
+        var ki: Float = 0
+        while (ki < keys.length()) {
+            var cand: String = this.norm_class(keys[ki])
+            if (cand != base and !this.str_in_list(out, cand) and !this.actor_classes.has(cand)) {
+                if (this.class_declares_method(cand, method, arity)) {
+                    if (this.is_subclass_of(cand, base)) {
+                        out.push(cand)
+                    }
+                }
+            }
+            ki = ki + 1
+        }
+        return out
+    }
+
+    // Returns the stub symbol a call site should target, or "" to stay static.
+    // Requesting a stub also queues it for emit_dispatch_helpers().
+    fun virtual_dispatch_stub(ns: String, method: String, arity: Float): String {
+        if (this.identity_mode) { return "" }
+        if (this.register_only) { return "" }
+        if (!this.dispatch_supported()) { return "" }
+        if (arity < 1) { return "" }
+        if (method == "init") { return "" }
+        if (this.is_builtin_pseudo_class(ns)) { return "" }
+        if (!this.class_fields.has(ns)) { return "" }
+        if (this.actor_classes.has(ns)) { return "" }
+        var base: String = this.norm_class(ns)
+        if (this.actor_classes.has(base)) { return "" }
+        if (this.collect_overriders(base, method, arity).length() == 0) { return "" }
+        var stub: String = "__vdisp_" + this.sanitize_name(base) + "_" + this.sanitize_name(method) + "_" + arity.floor().to_string()
+        if (!this.str_in_list(this.dispatch_stubs, stub)) {
+            this.dispatch_stubs.push(stub)
+            this.dispatch_bases.push(base)
+            this.dispatch_methods.push(method)
+            this.dispatch_arities.push(arity)
+            // known_functions so the auto-declare pass in generate() does not
+            // emit a bogus 1-arity `declare` next to the definition below.
+            this.known_functions.push(stub)
+        }
+        return stub
+    }
+
+    fun emit_dispatch_helpers() {
+        if (!this.dispatch_supported()) { return }
+        var di: Float = 0
+        while (di < this.dispatch_stubs.length()) {
+            var stub: String = this.dispatch_stubs[di]
+            var base: String = this.dispatch_bases[di]
+            var meth: String = this.dispatch_methods[di]
+            var arity: Float = this.dispatch_arities[di]
+            var base_sym: String = this.resolve_method_symbol(base, meth)
+            // Re-derive the arm set here rather than caching it: classes declared
+            // after the requesting call site was compiled still get an arm.
+            var overriders: List<String> = this.collect_overriders(base, meth, arity)
+            var arm_classes: List<String> = []
+            var arm_tags: List<String> = []
+            var oi: Float = 0
+            while (oi < overriders.length()) {
+                if (this.class_type_ids.has(overriders[oi])) {
+                    var tid: Float = this.class_type_ids.get(overriders[oi])
+                    arm_classes.push(overriders[oi])
+                    arm_tags.push(tid.floor().to_string())
+                }
+                oi = oi + 1
+            }
+            var params_def: String = "i64 %self"
+            var params_call: String = "i64 %self"
+            var pi: Float = 1
+            while (pi < arity) {
+                params_def = params_def + ", i64 %a" + pi.floor().to_string()
+                params_call = params_call + ", i64 %a" + pi.floor().to_string()
+                pi = pi + 1
+            }
+            this.emit("")
+            this.emit("define i64 @" + stub + "(" + params_def + ") {")
+            this.emit("entry:")
+            this.block_terminated = false
+            this.reset_locals()
+            if (arm_classes.length() == 0) {
+                var only_r: String = this.fresh_local()
+                this.emit_indent(only_r + " = call i64 @" + base_sym + "(" + params_call + ")")
+                this.emit_terminator("ret i64 " + only_r)
+            } else {
+                var tag_r: String = this.fresh_local()
+                this.emit_indent(tag_r + " = call i64 @__gc_get_type_tag(i64 %self)")
+                var fb_lbl: String = this.fresh_label("vd.fb")
+                var switch_str: String = ""
+                var arm_labels: List<String> = []
+                var ai: Float = 0
+                while (ai < arm_classes.length()) {
+                    var lbl: String = this.fresh_label("vd.c")
+                    arm_labels.push(lbl)
+                    switch_str = switch_str + " i64 " + arm_tags[ai] + ", label %" + lbl
+                    ai = ai + 1
+                }
+                this.emit_indent("switch i64 " + tag_r + ", label %" + fb_lbl + " [" + switch_str + " ]")
+                this.block_terminated = true
+                ai = 0
+                while (ai < arm_classes.length()) {
+                    this.start_block(arm_labels[ai])
+                    var arm_sym: String = this.resolve_method_symbol(arm_classes[ai], meth)
+                    var arm_r: String = this.fresh_local()
+                    this.emit_indent(arm_r + " = call i64 @" + arm_sym + "(" + params_call + ")")
+                    this.emit_terminator("ret i64 " + arm_r)
+                    ai = ai + 1
+                }
+                this.start_block(fb_lbl)
+                var fb_r: String = this.fresh_local()
+                this.emit_indent(fb_r + " = call i64 @" + base_sym + "(" + params_call + ")")
+                this.emit_terminator("ret i64 " + fb_r)
+            }
+            this.emit("}")
+            this.block_terminated = false
+            this.defined_funcs.push(stub)
+            di = di + 1
+        }
     }
 
     fun emit_reflect_helpers() {
@@ -8388,6 +8649,13 @@ class Codegen {
                     }
                 }
                 ClassDecl(pr_cname, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                    // Inheritance edges + own-method sets, needed by virtual
+                    // dispatch. This must happen here rather than in
+                    // gen_class_decl_with_parent: a base class's body is compiled
+                    // before its subclasses are declared, and the call site has to
+                    // already know an override exists to route through a stub.
+                    this.register_class_parent(pr_cname, this.current_prefix + pr_cname, pr_parent)
+                    this.register_own_methods(pr_cname, this.current_prefix + pr_cname, pr_methods)
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
@@ -8477,6 +8745,8 @@ class Codegen {
         }
 
         // Second pass: wrap top-level statements in __saffron_entry
+        // (dispatch stubs are emitted after it, since top-level code can be the
+        // first thing to request one)
         var has_top_level: Bool = false
         i = 0
         while (i < program.length()) {
@@ -8621,6 +8891,13 @@ class Codegen {
             this.emit("}")
             this.block_terminated = false
             this.in_function = false
+        }
+
+        // Virtual dispatch stubs. Emitted last so that every call site — method
+        // bodies and __saffron_entry alike — has already registered what it needs,
+        // and so the switch arms see the complete class/tag tables.
+        if (!this.identity_mode) {
+            this.emit_dispatch_helpers()
         }
 
         // Build final output with proper ordering
@@ -9654,6 +9931,47 @@ class Codegen {
         }
     }
     this.called_functions.push(full_method)
+
+    // Virtual dispatch: if some subclass of the static receiver type overrides
+    // this method, route through a tag-switch stub instead of binding the
+    // static target. Only for plain calls — the coroutine paths below pass the
+    // handle around and a stub returning i64 cannot stand in for that, and
+    // super./init are handled elsewhere and must stay static.
+    var vd_stub: String = ""
+    if (!this.str_in_list(this.coroutine_funcs, full_method)) {
+        vd_stub = this.virtual_dispatch_stub(ns, method, arg_strs.length())
+    }
+    if (vd_stub.length() > 0) {
+        var vd_local: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(vd_local, "i64", vd_stub, arg_strs.join(", ")))
+            if (!this.identity_mode) {
+                var vd_arg_vals: List<LLVMTypes.Value> = []
+                var vd_ai: Float = 0
+                while (vd_ai < arg_strs.length()) {
+                    var vd_part: String = arg_strs[vd_ai]
+                    var vd_sp: Float = vd_part.index_of(" ")
+                    if (vd_sp > 0) {
+                        var vd_reg: String = vd_part.slice(vd_sp + 1, vd_part.length())
+                        vd_arg_vals.push(LLVMTypes.Value.Instruction(vd_reg, LLVMTypes.Type.I64))
+                    }
+                    vd_ai = vd_ai + 1
+                }
+                var vd_res: LLVMTypes.Value = this.llvm_block_builder.call(vd_stub, LLVMTypes.Type.I64, vd_arg_vals)
+                this.llvm_values.set(vd_local, vd_res)
+            }
+        } else {
+            this.emit_indent(vd_local + " = call i64 @" + vd_stub + "(" + arg_strs.join(", ") + ")")
+        }
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return vd_local
+    }
 
     // Coroutine-aware method call: if this function is a coroutine and the
     // callee is also a coroutine, emit the await pattern instead of plain call.
@@ -12241,6 +12559,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         cm3i = cm3i + 1
                     }
                     gen.class_methods.set(cn3, cm3_names)
+                    gen.register_class_parent(cn3, prefix3 + cn3, cp3)
+                    gen.register_own_methods(cn3, prefix3 + cn3, cm3)
                 }
             }
             si3 = si3 + 1
@@ -12798,6 +13118,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         mod_mi2 = mod_mi2 + 1
                     }
                     gen.class_methods.set(mod_name, mod_method_names)
+                    gen.register_class_parent(mod_name, prefix + mod_name, mod_parent)
+                    gen.register_own_methods(mod_name, prefix + mod_name, mod_methods)
                 }
             }
             si = si + 1
@@ -12883,6 +13205,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     pr_mi2 = pr_mi2 + 1
                 }
                 gen.class_methods.set(pr_name, pr_method_names)
+                gen.register_class_parent(pr_name, pr_name, pr_parent)
+                gen.register_own_methods(pr_name, pr_name, pr_methods)
             }
         }
         pri = pri + 1
@@ -13526,6 +13850,8 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                         mod_mi2 = mod_mi2 + 1
                     }
                     gen.class_methods.set(mod_name, mod_method_names)
+                    gen.register_class_parent(mod_name, prefix + mod_name, mod_parent)
+                    gen.register_own_methods(mod_name, prefix + mod_name, mod_methods)
                 }
             }
             si = si + 1
@@ -13596,6 +13922,8 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     pr_mi2 = pr_mi2 + 1
                 }
                 gen.class_methods.set(pr_name, pr_method_names)
+                gen.register_class_parent(pr_name, pr_name, pr_parent)
+                gen.register_own_methods(pr_name, pr_name, pr_methods)
             }
         }
         pri = pri + 1

@@ -34,6 +34,22 @@ class Codegen {
     // Methods declared with an empty body. Only these are requirements on a
     // subclass; a parent method WITH a body is simply inherited.
     var class_abstract_methods: Map<String, List<String>>
+    // Inheritance edges: class name -> parent class name. Registered under both
+    // the bare and the module-prefixed name, like class_fields/class_methods.
+    // The checker has its own copy of this (checker.sf) but codegen cannot see it.
+    var class_parents: Map<String, String>
+    // Methods each class declares ITSELF, as "name:arity" entries (arity counts
+    // self). Unlike class_methods this is never widened with inherited names, so
+    // it answers "does this class override?" rather than "can you call this?".
+    var class_own_methods: Map<String, List<String>>
+    // Virtual dispatch stubs requested by call sites. Four parallel lists:
+    // the stub symbol (also the dedupe key), the base class it dispatches from,
+    // the method name, and the argument count (including self).
+    // emit_dispatch_helpers() emits exactly these at the end of the module.
+    var dispatch_stubs: List<String>
+    var dispatch_bases: List<String>
+    var dispatch_methods: List<String>
+    var dispatch_arities: List<Float>
     var current_class: String
     var current_parent: String
     var current_function_name: String
@@ -101,6 +117,12 @@ class Codegen {
         this.class_struct_names = {}
         this.class_methods = {}
         this.class_abstract_methods = {}
+        this.class_parents = {}
+        this.class_own_methods = {}
+        this.dispatch_stubs = []
+        this.dispatch_bases = []
+        this.dispatch_methods = []
+        this.dispatch_arities = []
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
@@ -689,6 +711,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         cm3i = cm3i + 1
                     }
                     gen.class_methods.set(cn3, cm3_names)
+                    gen.register_class_parent(cn3, prefix3 + cn3, cp3)
+                    gen.register_own_methods(cn3, prefix3 + cn3, cm3)
                 }
             }
             si3 = si3 + 1
@@ -1246,6 +1270,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         mod_mi2 = mod_mi2 + 1
                     }
                     gen.class_methods.set(mod_name, mod_method_names)
+                    gen.register_class_parent(mod_name, prefix + mod_name, mod_parent)
+                    gen.register_own_methods(mod_name, prefix + mod_name, mod_methods)
                 }
             }
             si = si + 1
@@ -1331,6 +1357,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     pr_mi2 = pr_mi2 + 1
                 }
                 gen.class_methods.set(pr_name, pr_method_names)
+                gen.register_class_parent(pr_name, pr_name, pr_parent)
+                gen.register_own_methods(pr_name, pr_name, pr_methods)
             }
         }
         pri = pri + 1
@@ -1974,6 +2002,8 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                         mod_mi2 = mod_mi2 + 1
                     }
                     gen.class_methods.set(mod_name, mod_method_names)
+                    gen.register_class_parent(mod_name, prefix + mod_name, mod_parent)
+                    gen.register_own_methods(mod_name, prefix + mod_name, mod_methods)
                 }
             }
             si = si + 1
@@ -2044,6 +2074,8 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     pr_mi2 = pr_mi2 + 1
                 }
                 gen.class_methods.set(pr_name, pr_method_names)
+                gen.register_class_parent(pr_name, pr_name, pr_parent)
+                gen.register_own_methods(pr_name, pr_name, pr_methods)
             }
         }
         pri = pri + 1

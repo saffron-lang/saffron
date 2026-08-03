@@ -460,8 +460,15 @@ extend fun Codegen.gen_namespace_call(ns: String, method: String, obj: String, a
         full_method = this.current_prefix + full_method
     }
     this.called_functions.push(full_method)
+    // Virtual dispatch: when some subclass of the static receiver type overrides
+    // this method, call the tag-switch stub instead of binding the static target.
+    var callee: String = full_method
+    if (!this.str_in_list(this.coroutine_funcs, full_method)) {
+        var vd_stub: String = this.virtual_dispatch_stub(ns, method, arg_strs.length())
+        if (vd_stub.length() > 0) { callee = vd_stub }
+    }
     var local: String = this.fresh_local()
-    this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+    this.emit_indent(local + " = call i64 @" + callee + "(" + arg_strs.join(", ") + ")")
     if (this.func_ret_types.has(full_method)) {
         this.set_last_type(this.str_to_type(this.func_ret_types.get(full_method)))
     } else if (this.func_ret_types.has(canonical)) {
