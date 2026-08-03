@@ -2169,6 +2169,28 @@ class NullChecker {
             // caller below already treats as "unknown callee".
             _ => ""
         }
+        // The callee is an expression like any other, so infer it. The match
+        // above reads a *name* out of it for the return-type lookup, and a name
+        // is not a visit: before this line the callee subtree was never walked
+        // at all, so a variable whose only appearance is in callee position was
+        // never marked used and got a false "unused variable" warning
+        // (BUGS #121) — `fs[0](7)` is the whole use of `fs`.
+        //
+        // Walking the callee rather than calling mark_used(name) on the string
+        // above, for two reasons. (1) `name` does not exist for the shapes that
+        // actually trigger the bug: IndexGet, Call, MethodCall and a
+        // parenthesized expression all take the `_ => ""` arm, so a name-based
+        // fix could not see `fs[0](7)` at all. (2) For a MemberAccess callee
+        // `name` is the *field* name, and mark_used searches lexical scopes by
+        // string — so `b.cb(1)` would have marked an unrelated local named `cb`
+        // used and silently swallowed a warning that should fire.
+        //
+        // This is not double inference: infer_type's Call arm is the only walker
+        // of a Call, and it delegates here, which until now inferred the args
+        // and skipped the callee entirely. So a nested callee's own arguments
+        // (`f(a)(b)`, `o.m(a)(b)`) were not being checked either, and now are —
+        // exactly once.
+        this.infer_expr(callee)
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
         var di: Float = 0
         while (di < args.length()) {
