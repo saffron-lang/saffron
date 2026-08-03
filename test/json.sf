@@ -1,66 +1,95 @@
+// JSON serialization and parsing.
+//
+// Originally written against the dead C VM's `data class` form, which does not
+// exist in the self-hosted compiler (no token, no AST node, no parse rule) — it
+// was lexed as an identifier and the file died with
+// "[codegen] Error: undefined variable 'data'". The classes below are plain
+// classes with an explicit `init`, which is what `@json`/`@reflect` actually
+// key off (they dispatch on the GC type tag, not on any data-class flag).
+//
+// The `parse_into` half of this file currently SEGFAULTS, and that is a real
+// compiler bug, not a defect in this file. Two independent causes:
+//
+//   1. Passing a bare class name as a value emits a closure box ([2 x i64] of
+//      {trampoline, env}), but `__reflect_construct_from_map` compares its
+//      argument against a raw ctor function pointer. Every arm misses, so it
+//      falls through to `ret i64 0`, and the first field read dereferences nil.
+//   2. `__reflect_construct_from_map` builds its map keys with `ptr_to_val`
+//      (a bare `ptrtoint`) instead of `emit_tag_ptr`, so the keys are untagged
+//      and never match the tagged keys `__map_set` stored.
+//
+// Both are verified fixable; patching only the emitted IR makes every line
+// below print correctly. This file should be listed in run_tests.sh's
+// KNOWN_FAIL until those two codegen fixes land.
+
 import "@json" as Json
 
-// Data class definitions
-data class Point {
+class Point {
     var x: Int
     var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
 }
 
-data class User {
+class User {
     var name: String
     var age: Int
     var active: Bool
+    fun init(name: String, age: Int, active: Bool) {
+        this.name = name
+        this.age = age
+        this.active = active
+    }
 }
 
-data class Config {
+class Config {
     var host: String
     var port: Int
     var debug: Bool
+    fun init(host: String, port: Int, debug: Bool) {
+        this.host = host
+        this.port = port
+        this.debug = debug
+    }
 }
 
-// --- Test: data class construction ---
+// --- Test: class construction ---
 var p = Point(3, 4)
-IO.print(p.x)
-IO.print(p.y)
+IO.println(p.x)
+IO.println(p.y)
 
 var u = User("alice", 30, true)
-IO.print(u.name)
-IO.print(u.age)
-IO.print(u.active)
+IO.println(u.name)
+IO.println(u.age)
+IO.println(u.active)
 
 // --- Test: Json.to_string ---
-IO.print(Json.to_string(p))
-IO.print(Json.to_string(u))
+IO.println(Json.to_string(p))
+IO.println(Json.to_string(u))
 
 // --- Test: Json.parse (untyped) ---
-var nums = Json.parse("[1, 2, 3, 4, 5]")
-IO.print(nums)
+var nums: List<Any> = Json.parse("[1, 2, 3, 4, 5]")
+IO.println(nums)
 
-var flag = Json.parse("true")
-IO.print(flag)
-
-var nothing = Json.parse("null")
-IO.print(nothing)
-
-var num = Json.parse("42")
-IO.print(num)
+IO.println(Json.parse("true"))
+IO.println(Json.parse("null"))
+IO.println(Json.parse("42"))
 
 // --- Test: Json.parse_into (typed deserialization) ---
-var p2 = Json.parse_into(Point, "{\"x\":10,\"y\":20}")
-IO.print(p2.x)
-IO.print(p2.y)
+var p2: Point = Json.parse_into(Point, "{\"x\":10,\"y\":20}")
+IO.println(p2.x)
+IO.println(p2.y)
 
-var u2 = Json.parse_into(User, "{\"name\":\"bob\",\"age\":25,\"active\":false}")
-IO.print(u2.name)
-IO.print(u2.age)
-IO.print(u2.active)
+var u2: User = Json.parse_into(User, "{\"name\":\"bob\",\"age\":25,\"active\":false}")
+IO.println(u2.name)
+IO.println(u2.age)
+IO.println(u2.active)
 
 // --- Test: roundtrip (stringify -> parse_into) ---
 var cfg = Config("localhost", 8080, true)
 var json = Json.to_string(cfg)
-IO.print(json)
+IO.println(json)
 
-var cfg2 = Json.parse_into(Config, json)
-IO.print(cfg2.host)
-IO.print(cfg2.port)
-IO.print(cfg2.debug)
+var cfg2: Config = Json.parse_into(Config, json)
+IO.println(cfg2.host)
+IO.println(cfg2.port)
+IO.println(cfg2.debug)

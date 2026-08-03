@@ -2,8 +2,15 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
-#129, #131, #132. Next free number is **#138**.
+**13 open entries:** #2, #49, #65, #75, #107, #115, #117, #123, #128,
+#129, #131, #132, #143. Next free number is **#144**.
+
+Numbering note: #137–#141 were taken concurrently on `main` for unrelated bugs
+(`as` as an expression, index-headed statements, a `Signal<T>.get()` regression,
+`return;`). Two entries filed on this branch were renumbered to avoid the
+collision — structural `==` on List/Map is **#142**, formerly #137, and the
+condition-lowering bug below is **#143**, formerly #138. If you follow a git
+message or commit that cites the old number, this is why it does not match.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -22,6 +29,55 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
+
+**Severity: high.** Silent wrong branch, no diagnostic, and for pointers the
+answer is not even deterministic across runs.
+
+Every condition site funnels through `to_i1` (`codegen/stmts_body.sf:1293`),
+which emits
+
+```llvm
+%t3 = trunc i64 %val to i1
+br i1 %t3, label %then, label %else
+```
+
+`trunc … to i1` keeps **the low bit of the NaN-boxed i64**. That is correct for a
+real `Bool` purely by accident of the encoding — `__val_tag_bool` returns
+`0x7FFA000000000001` for true and `…0000` for false, so the low bit happens to be
+the truth value. For anything else it is arithmetic nonsense:
+
+```saffron
+if (1)    { }   // taken     — 1 is odd
+if (42)   { }   // NOT taken — 42 is even
+if (0)    { }   // not taken — coincidentally "right"
+if ("x")  { }   // depends on the low bit of the string's pointer
+if ([])   { }   // likewise
+```
+
+So `if (42)` and `if (43)` disagree, and `if (some_string)` can flip between
+runs as the allocator hands out a different address. `0` being falsey is not a
+truthiness rule anyone implemented — it is `0 & 1 == 0`.
+
+The root cause is upstream of codegen: the checker's `If` and `While` arms
+(`checker.sf:2306` and `:2321`) call `infer_expr(cond)` and **discard the
+result**. Nothing ever requires the condition to be `Bool`, so a `Int`, `String`
+or `List` condition type checks clean and reaches `to_i1`. The ternary and the
+`and`/`or` operands reach the same helper (5 call sites total).
+
+**Resolution: require `Bool`.** Saffron is statically typed and already refuses
+`Float`→`Int` and narrows unions; a language that rejects `var i: Int = 2.5`
+should not accept `if (2.5)`. Python/JS-style truthiness was considered and
+rejected — it would need a runtime `__val_truthy` call per condition on all four
+IR bases, and it converts a type error into a silent branch, which is the class
+of defect this entry is about. `if (v)` on a nullable was also considered as
+sugar for `v != nil` and rejected for now: it is the one genuinely useful case,
+but mixing "must be Bool" with "except when nullable" is the kind of exception
+that makes the rule unmemorable. Write the comparison.
+
+The fix is a diagnostic in the checker, not a change to `to_i1`: once the
+condition is provably `Bool`, `trunc` is correct and stays.
 
 ### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
 
@@ -1034,7 +1090,7 @@ because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
 
-### 137. FIXED — `==` on two Lists or two Maps compared addresses, not contents
+### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
 
 **Severity: high.** `[1,2] == [1,2]` was `false`; `{"a":1} == {"a":1}` was
 `false`; nested and reordered cases likewise. `IO.println` showed the operands
