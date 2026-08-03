@@ -312,42 +312,63 @@ fun __rt_dbl_key(bits: Int): Int {
 // "not a string". Hence the asymmetry: reject what is provably a non-string
 // object, strcmp everything else, which is the choice __any_eq also makes.
 //
-// Measured caveat, so nobody mistakes that guard for more than it is: today a
-// List, Map or class instance reaches here *untagged* (upper == 0), not as
-// TAG_PTR, so it never enters this branch and is ordered by the numeric path
-// below — i.e. by address. The guard therefore currently only covers TAG_PTR
-// non-strings, and it is here so that ordering two Lists cannot become a strcmp
-// walk over a length field if that tagging ever changes. Ordering non-strings is
-// meaningless either way; `<` on two Lists is a thing the checker ought to
-// reject outright, which is a separate concern from this bug.
+// The "provably not a string" test now covers BOTH representations, which it did
+// not when it was written. A List, Map or class instance normally reaches here
+// *untagged* (upper == 0), not as TAG_PTR, so it used to miss the TAG_PTR branch
+// entirely and fall through to the numeric path below — i.e. get ordered by heap
+// address. That is how `<` on two Lists answered **true at -O2 and false at -O0**
+// from identical source through an identical compiler, the same layout-luck
+// signature as #104 itself:
 //
-// Untagged pointers are deliberately NOT treated as strings. The `> 65536`
-// heuristic __map_key_str uses to guess "this is a pointer" is safe there
-// because a mis-guess only costs a failed key match; here it would hand a large
-// integer to strcmp and segfault. Ordering is defined for strings and numbers,
-// and identity mode has no strings to order.
+//   fun lt_any(a: Any, b: Any): Bool { return a < b }
+//   lt_any([1, 2, 3], [9])     // true at -O2, false at -O0
+//
+// The old comment said covering the untagged case was impossible without a
+// header, and that was the one thing to check rather than assume: these objects
+// DO have GC headers. __gc_alloc gives a List tag 2, a Map tag 3 and a class
+// instance a per-class tag >= 10. What was actually missing was a *safe way to
+// look* — the guards needed to dereference a value of unknown provenance without
+// faulting. __rt_gc_tag_of now owns exactly that, so the refusal extends to the
+// representation that actually occurs.
+//
+// This deliberately does NOT invent an ordering for Lists. It reports 0,
+// "neither less nor greater", which is what the TAG_PTR branch has always done
+// for a GC non-string; the change makes __val_cmp answer the same for one value
+// in both of its representations instead of ordering one by address. `<` on two
+// Lists remains meaningless and should be rejected by the checker
+// (src/compiler/checker.sf) rather than answered here — but it is now
+// meaningless *deterministically*, and no longer varies with optimization level.
+//
+// The converse still does not hold, and that asymmetry is load-bearing: string
+// *literals* are plain malloc'd char* with no GC header at all (see
+// __rt_as_string_ptr), so a missing header cannot be read as "not a string".
+// Reject what is provably a non-string object, strcmp everything else — the same
+// choice __any_eq makes.
 
-// True when `raw` is a GC-allocated object that is definitely not a string, i.e.
+// True when `v` is a GC-allocated object that is definitely not a string, i.e.
 // it has a valid header sentinel and a type tag other than 1 (string). Used to
-// keep a List or Map out of strcmp. A header-less pointer answers false, because
-// string literals look exactly like that.
-fun __rt_is_gc_non_string(raw: Int): Bool {
-    if (raw == 0) { return false }
-    var magic: Int = load64(raw - 8)
-    if (magic != 6557403441622859503) { return false }
-    return __rt_gc_type_tag(raw) != 1
+// keep a List, Map or class instance out of strcmp and out of the address-
+// ordered numeric path. Takes the value in either representation, tagged or
+// bare, and answers false for a header-less pointer because string literals look
+// exactly like that.
+fun __rt_is_gc_non_string(v: Int): Bool {
+    var tag: Int = __rt_gc_tag_of(v)
+    if (tag == 0) { return false }
+    return tag != 1
 }
 
 fun __val_cmp(a: Int, b: Int): Int {
     if (a == b) { return 0 }
+    // A List/Map/instance is a pointer but has no ordering; strcmp would read its
+    // payload as text and the numeric path would order it by address. Report
+    // "neither less nor greater" instead. Checked before the tag split so it
+    // catches the untagged form, which is the one that actually occurs.
+    if (__rt_is_gc_non_string(a) or __rt_is_gc_non_string(b)) { return 0 }
     var ua: Int = a >> 48
     var ub: Int = b >> 48
     if (ua == 32760 and ub == 32760) {
         var ra: Int = __rt_untag_ptr(a)
         var rb: Int = __rt_untag_ptr(b)
-        // A List/Map is a pointer but has no ordering; strcmp would read its
-        // payload as text. Report "neither less nor greater" instead.
-        if (__rt_is_gc_non_string(ra) or __rt_is_gc_non_string(rb)) { return 0 }
         if (ra != 0 and rb != 0) {
             var c: Int = rt_strcmp(ra, rb)
             if (c < 0) { return 0 - 1 }
@@ -396,9 +417,17 @@ fun __val_ge(a: Int, b: Int): Int {
 //
 //   TAG_PTR (0x7FF8)  → NaN-boxed heap pointer; strcmp the payload
 //   upper == 0        → identity mode / bare pointer. Small values cannot be
-//                       pointers, so the same >65536 guard used by
-//                       __rt_as_list_ptr keeps numeric keys out of the deref.
+//                       pointers, so a >65536 floor keeps numeric keys out of
+//                       strcmp.
 //   anything else     → TAG_INT, TAG_SPEC, or a float: never a string
+//
+// That floor is weaker than the guard set __rt_gc_tag_of uses, and it is NOT
+// equivalent: a Float key whose bit pattern lands in [65537, 2^48) is handed
+// straight to strcmp here. Not tightened in the same pass as __rt_gc_tag_of
+// because this returns a char* to compare rather than dereferencing a header, so
+// the alignment/4 GB pair does not transfer unchanged — a string literal is a
+// plain malloc'd char* with no header and must keep working. Filed separately
+// rather than guessed at.
 //
 // Returns the raw char* to compare, or 0 when the key is not a string.
 fun __map_key_str(v: Int): Int {
@@ -591,31 +620,89 @@ fun __int_to_string(val: Int): Int {
     return buf
 }
 
-// If `v` refers to a GC-managed list, return its raw (untagged) pointer.
-// Returns 0 for anything that is not a list. Accepts both NaN-boxed pointer
-// values (0x7FF8 tag) and bare raw pointers, since list values reach the
-// runtime in both forms depending on where they were produced.
-fun __rt_as_list_ptr(v: Int): Int {
+// The GC type tag of `v`, or 0 when `v` is not a GC-managed object.
+//
+// This is the single place that decides whether an i64 of unknown provenance may
+// have its GC header read, and every __rt_as_*_ptr helper goes through it.
+// Returning the tag rather than a bool is what lets them share the decision: 0
+// is an unambiguous "not a GC object" because the built-in tags start at 1 and
+// per-class instance tags start at 10.
+//
+// Both representations are accepted. A collection or instance reaches the
+// runtime either NaN-boxed (TAG_PTR) or as a bare pointer with upper 16 bits
+// zero, because __list_new, __map_new and codegen's class constructors all hand
+// back a raw `ptrtoint`.
+//
+// THE THREE GUARDS BEFORE THE LOAD ARE NOT OPTIONAL, and two of them used to be
+// missing here. `upper == 0 and v > 65536` was the whole test, which is far too
+// weak: it admits any *double* whose IEEE-754 bit pattern happens to land in
+// [65537, 2^48), i.e. every value from about 3.24e-319 up to 1.39e-309, and then
+// dereferences it at raw-8. `IO.println(1.0e-310)` — bits 20240225330731 —
+// therefore segfaulted in __rt_as_list_ptr with EXC_BAD_ACCESS at 0x12688b70e623
+// before printing anything. Small subnormals like 5e-320 (bits 10120) sat under
+// the 65536 floor and survived, which is why this went unnoticed.
+//
+// The guard set is the one @__val_class_tag in base_nanbox.ll already uses and
+// documents as mandatory for exactly this reason, so this brings the two into
+// agreement rather than inventing a rule:
+//
+//   8-byte alignment — every GC user pointer is aligned (malloc guarantee plus a
+//     24-byte header), so a misaligned value cannot be one. This alone rejects
+//     7 of every 8 stray bit patterns.
+//   >= 4 GB — all Darwin heap allocations live above 0x100000000, so anything
+//     below is a small integer, an enum tag, or a subnormal double. This is the
+//     guard that fixes the crash above: 20240225330731 is only ~20 TB as an
+//     integer but the real test that catches it is alignment (0x...62b is odd),
+//     and 1.0e-310-shaped values that ARE aligned are still rejected here only
+//     if below 4 GB — so both guards carry weight and neither is redundant.
+//   magic sentinel — the final authority, and safe to load once the address is
+//     known plausible.
+//
+// A header-less pointer answers 0, and that is deliberate rather than a gap:
+// string *literals* are plain malloc'd char* with no GC header at all, so
+// "no header" cannot be read as "not a string". See __rt_as_string_ptr.
+fun __rt_gc_tag_of(v: Int): Int {
     if (v == 0) { return 0 }
     var upper: Int = v >> 48
     var raw: Int = 0
     if (upper == 32760) {
         // NaN-boxed heap pointer (TAG_PTR)
         raw = __rt_untag_ptr(v)
-    } else if (upper == 0 and v > 65536) {
-        // Plausible bare heap pointer (identity mode / untagged runtime value).
-        // The >65536 guard keeps small ints out of the pointer-deref path.
+    } else if (upper == 0) {
+        // Bare pointer (identity mode / untagged runtime value).
         raw = v
     } else {
-        // Int tag (0x7FF9), special tag (0x7FFA), or a float: never a list.
+        // Int tag (0x7FF9), special tag (0x7FFA), or a large float: never a
+        // GC object.
         return 0
     }
     if (raw == 0) { return 0 }
-    // Verify the GC header magic sentinel before trusting the type tag.
+    // Alignment: every GC user pointer is 8-byte aligned.
+    if ((raw & 7) != 0) { return 0 }
+    // Bounds: Darwin heap allocations are all above 4 GB. Below that the value
+    // is an integer, an enum tag, or a subnormal double, and raw-8 is either
+    // unmapped or somebody else's memory.
+    if (raw < 4294967296) { return 0 }
+    // Only now is it safe to read the header sentinel.
     var magic: Int = load64(raw - 8)
     if (magic != 6557403441622859503) { return 0 }
-    if (__rt_gc_type_tag(raw) != 2) { return 0 }
-    return raw
+    return __rt_gc_type_tag(raw)
+}
+
+// The raw (untagged) pointer of `v` if it is a GC object whose type tag is
+// `want`, else 0. The shared body of __rt_as_list_ptr / __rt_as_map_ptr /
+// __rt_as_string_ptr, which differ only in the tag they accept.
+fun __rt_as_gc_ptr(v: Int, want: Int): Int {
+    if (__rt_gc_tag_of(v) != want) { return 0 }
+    var upper: Int = v >> 48
+    if (upper == 32760) { return __rt_untag_ptr(v) }
+    return v
+}
+
+// If `v` refers to a GC-managed list, return its raw (untagged) pointer.
+// Returns 0 for anything that is not a list.
+fun __rt_as_list_ptr(v: Int): Int {
+    return __rt_as_gc_ptr(v, 2)
 }
 
 // If `v` refers to a GC-managed string, return its raw (untagged) pointer.
@@ -626,21 +713,7 @@ fun __rt_as_list_ptr(v: Int): Int {
 // header to check, so it cannot be told apart from a float bit pattern here and
 // is deliberately not claimed.
 fun __rt_as_string_ptr(v: Int): Int {
-    if (v == 0) { return 0 }
-    var upper: Int = v >> 48
-    var raw: Int = 0
-    if (upper == 32760) {
-        raw = __rt_untag_ptr(v)
-    } else if (upper == 0 and v > 65536) {
-        raw = v
-    } else {
-        return 0
-    }
-    if (raw == 0) { return 0 }
-    var magic: Int = load64(raw - 8)
-    if (magic != 6557403441622859503) { return 0 }
-    if (__rt_gc_type_tag(raw) != 1) { return 0 }
-    return raw
+    return __rt_as_gc_ptr(v, 1)
 }
 
 // Format a single collection element. Dispatches on the NaN-box tag via
@@ -725,24 +798,7 @@ fun __list_to_string(list: Int): Int {
 // values also reach the runtime both NaN-boxed and bare, since __map_new
 // returns a raw pointer.
 fun __rt_as_map_ptr(v: Int): Int {
-    if (v == 0) { return 0 }
-    var upper: Int = v >> 48
-    var raw: Int = 0
-    if (upper == 32760) {
-        raw = __rt_untag_ptr(v)
-    } else if (upper == 0 and v > 65536) {
-        // Plausible bare heap pointer. The >65536 guard keeps small ints out
-        // of the pointer-deref path.
-        raw = v
-    } else {
-        return 0
-    }
-    if (raw == 0) { return 0 }
-    // Verify the GC header magic sentinel before trusting the type tag.
-    var magic: Int = load64(raw - 8)
-    if (magic != 6557403441622859503) { return 0 }
-    if (__rt_gc_type_tag(raw) != 3) { return 0 }
-    return raw
+    return __rt_as_gc_ptr(v, 3)
 }
 
 // Element at *position* i of an iteration over `v` — the `for-in` desugaring's
@@ -796,26 +852,19 @@ fun __any_iter_get(v: Int, index: Int): Int {
     // defines its own `length()` gets past codegen, since there is no iterator
     // protocol and `length()` is all the desugaring requires (BUGS #62). A class
     // without `length()` is still the cleaner compile error.
-    // The pointer-plausibility guard is the same one __rt_as_list_ptr uses, and
-    // it is load-bearing rather than defensive: __rt_untag_ptr only masks off the
-    // low 48 bits, so a float's mantissa would come back as a wild address and
-    // the `raw - 8` magic read would fault. Only a TAG_PTR value or a bare heap
-    // pointer may be dereferenced here.
-    var upper: Int = v >> 48
-    var raw: Int = 0
-    if (upper == 32760) {
-        raw = __rt_untag_ptr(v)
-    } else if (upper == 0 and v > 65536) {
-        raw = v
-    }
-    if (raw != 0) {
-        var magic: Int = load64(raw - 8)
-        if (magic == 6557403441622859503 and __rt_gc_type_tag(raw) != 1) {
-            // A verified GC object that is neither string (1), list (2) nor map
-            // (3) — class instances get per-class tags starting at 10.
-            __not_iterable_error()
-            return __rt_nil()
-        }
+    // The pointer-plausibility guard is load-bearing rather than defensive:
+    // __rt_untag_ptr only masks off the low 48 bits, so a float's mantissa would
+    // come back as a wild address and the `raw - 8` magic read would fault.
+    // __rt_gc_tag_of owns that decision — alignment, the 4 GB floor, then the
+    // sentinel — so this asks it for the tag instead of re-deriving the guards,
+    // which is how the weaker `> 65536` version of them got out of step in the
+    // first place.
+    var gtag: Int = __rt_gc_tag_of(v)
+    if (gtag != 0 and gtag != 1) {
+        // A verified GC object that is neither string (1), list (2) nor map (3)
+        // — class instances get per-class tags starting at 10.
+        __not_iterable_error()
+        return __rt_nil()
     }
     return __str_get(v, index)
 }
