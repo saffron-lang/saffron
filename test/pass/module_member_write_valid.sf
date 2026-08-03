@@ -1,0 +1,78 @@
+// BUGS #122 companion: the half that can break shipped code.
+//
+// The fix makes an unresolvable *write* through a module alias fatal. Everything
+// that legitimately writes must keep working. These are the spellings measured
+// against the guard before it was made fatal — each one is a distinct reason the
+// guard's condition (`module_prefixes.has(name)` plus a member-lookup miss)
+// could be met wrongly.
+import "@test" as Test
+import "@math" as Math
+
+// 1. A module GLOBAL written through its alias. The one legitimate namespace
+//    write, and what `test/cross_module_global.sf` has been doing all along.
+Math.pi = 3.0
+Test.assert_eq(Math.pi, 3.0, "module global write through an alias")
+
+// 2. A second module global, to show it is not one special name.
+Math.tau = 6.0
+Test.assert_eq(Math.tau, 6.0, "a second module global write")
+
+// 3. The same write from inside a function body, which is a different
+//    current_prefix/typed_vars environment than top level.
+fun write_in_fun(): Float {
+    Math.e = 2.5
+    return Math.e
+}
+Test.assert_eq(write_in_fun(), 2.5, "module global write inside a function")
+
+// 4. A field of a class INSTANCE — a completely different lowering path that the
+//    guard must not touch. It shares `gen_set_field` with the module write, so
+//    the guard sits above the shared code and has to decline here.
+class Box {
+    var v: Int
+    fun init() { this.v = 0 }
+}
+var b = Box()
+b.v = 7
+Test.assert_eq(b.v, 7, "class instance field write is untouched")
+
+// 5. `this.field = x` inside a method, the other spelling of the same path.
+class Counter {
+    var n: Int
+    fun init() { this.n = 1 }
+    fun set(to: Int) { this.n = to }
+}
+var c = Counter()
+c.set(9)
+Test.assert_eq(c.n, 9, "this.field write is untouched")
+
+// 6. A nested field write, `outer.inner.field = x`.
+class Inner {
+    var n: Int
+    fun init() { this.n = 0 }
+}
+class Outer {
+    var i: Inner
+    fun init() { this.i = Inner() }
+}
+var o = Outer()
+o.i.n = 5
+Test.assert_eq(o.i.n, 5, "nested field write is untouched")
+
+// 7. A LOCAL that shadows a module alias. `Math` is in module_prefixes, so a
+//    naive guard would fire here; the write is on the local. This is the
+//    BUGS #40 hazard in write form.
+fun local_shadows_alias(): Int {
+    var Math: Int = 1
+    Math = 2
+    return Math
+}
+Test.assert_eq(local_shadows_alias(), 2, "a local shadowing an alias still writes")
+
+// 8. A module global read back after a write, to show the store actually landed
+//    rather than being reported and skipped.
+Math.pi = 3.25
+Test.assert(Math.pi > 3.2, "the store landed, it was not silently dropped")
+Test.assert(Math.pi < 3.3, "and it landed with the right value")
+
+Test.summary()
