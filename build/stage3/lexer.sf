@@ -136,6 +136,14 @@ class Lexer {
         return "0123456789abcdefABCDEF".contains(ch)
     }
 
+    fun hex_digit_value(ch: String): Float {
+        var idx: Float = "0123456789abcdef".index_of(ch)
+        if (idx >= 0) {
+            return idx
+        }
+        return "0123456789ABCDEF".index_of(ch)
+    }
+
     fun skip_whitespace() {
         while (this.pos < this.source.length()) {
             var ch: String = this.peek()
@@ -176,8 +184,16 @@ class Lexer {
                     while (this.pos < this.source.length() and this.is_hex(this.peek())) {
                         this.advance()
                     }
-                    var text: String = this.source.slice(start, this.pos)
-                    var value: Float = text.to_number()
+                    // to_number() does not understand the "0x" prefix, so
+                    // accumulate the hex digits manually.
+                    var digits_start: Float = start + 2
+                    var value: Float = 0
+                    var i: Float = digits_start
+                    while (i < this.pos) {
+                        var d: Float = this.hex_digit_value(this.source.char_at(i))
+                        value = value * 16 + d
+                        i = i + 1
+                    }
                     this.emit(TokenKind.TkInt(value))
                     return
                 }
