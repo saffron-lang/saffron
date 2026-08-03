@@ -62,6 +62,153 @@ fun sink_had_error(): Bool {
     return _had_error
 }
 
+// --- JSON serialization ---
+//
+// Hand-rolled, not `@json`: that module imports `@reflect`, which the compiler
+// cannot depend on without a cycle (diag.sf is imported by every phase and must
+// stay dependency-free — see the module docstring). The shapes here are fixed and
+// small, so manual assembly costs a page and buys the compiler no new imports.
+// This matches existing precedent in the tree for compiler-side serialization.
+
+/// A JSON string literal, quotes included, with the five escapes JSON requires
+/// for the characters that actually occur in diagnostics.
+///
+/// Compiler messages routinely carry `'`, `"` and `\` — quoted identifiers
+/// (`unused variable 'x'`), Windows-ish paths, and the escape sequences in a
+/// string-literal error all reach here — so an unescaped assembly would emit
+/// JSON that no parser accepts, on exactly the inputs an editor most needs.
+///
+/// Control characters below 0x20 other than \n, \t and \r are passed through
+/// rather than \u-escaped. Producing them would need char-to-int conversion,
+/// they cannot appear in a Saffron identifier or in any message the compiler
+/// composes, and the alternative — silently dropping them — is worse than
+/// emitting them, because a truncated message reads as a complete one.
+fun json_escape(s: String): String {
+    var out: String = "\""
+    var i: Float = 0
+    while (i < s.length()) {
+        var c: String = s.char_at(i)
+        if (c == "\"") { out = out + "\\\"" }
+        else if (c == "\\") { out = out + "\\\\" }
+        else if (c == "\n") { out = out + "\\n" }
+        else if (c == "\t") { out = out + "\\t" }
+        else if (c == "\r") { out = out + "\\r" }
+        else { out = out + c }
+        i = i + 1
+    }
+    return out + "\""
+}
+
+/// An integer for JSON, with no `.0` tail.
+///
+/// Every number in a span is a whole number — line, column, byte offset, length
+/// — but they are held as Float, and `to_string()` on a Float renders `4.0`.
+/// `4.0` is legal JSON, so this is not a correctness fix; it is that a consumer
+/// reading `line` expects an integer, and `JSON.parse` in TypeScript hands back
+/// `4` either way. `floor()` first so the intent is explicit rather than relying
+/// on the renderer.
+fun json_int(n: Float): String {
+    return n.floor().to_string()
+}
+
+/// One diagnostic as a JSON object.
+///
+/// `line`/`column`/`offset`/`length` are omitted entirely when the span is
+/// synthetic, rather than emitted as 0. A consumer must be able to tell "this
+/// diagnostic has no location" from "this diagnostic is at line 0", and 0 is a
+/// plausible-looking lie: an editor would place the squiggle at the top of the
+/// file, pointing at code that has nothing to do with the error. `located` says
+/// which case it is without the consumer having to infer it from sentinel values.
+///
+/// This matters more than it sounds: most checker errors are still unlocated,
+/// because they are about expressions and only declarations carried spans until
+/// recently. An editor that trusted a 0 would mislocate the majority of type
+/// errors.
+fun diagnostic_to_json(file: String, d: Diagnostic): String {
+    return match (d) {
+        Diag(sev, phase, span, msg) => {
+            var out: String = "{\"severity\":" + json_escape(severity_label(sev))
+            out = out + ",\"phase\":" + json_escape(phase)
+            out = out + ",\"file\":" + json_escape(file)
+            out = out + ",\"message\":" + json_escape(msg)
+            if (AST.span_is_real(span)) {
+                out = out + ",\"located\":true"
+                out = out + ",\"line\":" + json_int(AST.span_line(span))
+                out = out + ",\"column\":" + json_int(AST.span_col(span))
+                out = out + ",\"offset\":" + json_int(AST.span_offset(span))
+                out = out + ",\"length\":" + json_int(AST.span_len(span))
+            } else {
+                out = out + ",\"located\":false"
+            }
+            out + "}"
+        }
+    }
+}
+
+/// Every diagnostic in the sink as a JSON array, in emission order.
+///
+/// `file` is attached here because a Diagnostic deliberately does not carry one
+/// — a span is meaningful only against the text it was lexed from, and in a
+/// multi-module compile the driver holds that text per unit. See the note on the
+/// `Diagnostic` enum above.
+fun diagnostics_to_json(file: String): String {
+    var out: String = "["
+    var i: Float = 0
+    while (i < _sink.length()) {
+        if (i > 0) { out = out + "," }
+        out = out + diagnostic_to_json(file, _sink[i])
+        i = i + 1
+    }
+    return out + "]"
+}
+
+/// One document symbol as a JSON object, or "" when the declaration is
+/// synthetic and thus has no source region.
+///
+/// A synthetic symbol is dropped rather than emitted at 0:0, for the same reason
+/// `diagnostic_to_json` drops an unlocated span. A symbol the editor cannot jump
+/// to is worse than a symbol it never heard of — go-to-definition would land at
+/// the top of the file on a name the author never wrote. The caller filters ""
+/// out of the array, so a dropped symbol leaves no empty object behind.
+///
+/// The field set matches `SaffronSymbol` in the editor client (name, kind, line,
+/// column, length); `offset` is emitted too, unused by today's client but needed
+/// by a range-based editor operation, and a consumer ignores fields it does not
+/// read.
+fun symbol_json(name: String, kind: String, s: AST.Span): String {
+    if (!AST.span_is_real(s)) { return "" }
+    var out: String = "{\"name\":" + json_escape(name)
+    out = out + ",\"kind\":" + json_escape(kind)
+    out = out + ",\"line\":" + json_int(AST.span_line(s))
+    out = out + ",\"column\":" + json_int(AST.span_col(s))
+    out = out + ",\"offset\":" + json_int(AST.span_offset(s))
+    out = out + ",\"length\":" + json_int(AST.span_len(s))
+    return out + "}"
+}
+
+// --- Console suppression for --json ---
+//
+// There is no stderr channel in io.sf: every phase's diagnostics and the IR both
+// go to stdout. In --json mode the JSON object must be the ONLY thing on stdout,
+// or the client's JSON.parse chokes on a leading `[line N, col M] Error:` line.
+// The sink already holds every diagnostic as data, so the console form is pure
+// redundancy in that mode and is switched off wholesale.
+//
+// A global flag, not a parameter threaded through every printer, because the
+// printers are called from a dozen sites across three phases and the driver is
+// the single place that knows the mode. Same rationale as the sink itself being
+// a global. reset_sink() does NOT clear this — the mode is a property of the
+// invocation, set once before any file is processed, not per-file state.
+var _quiet: Bool = false
+
+fun set_quiet(q: Bool) {
+    _quiet = q
+}
+
+fun is_quiet(): Bool {
+    return _quiet
+}
+
 fun severity_label(s: Severity): String {
     return match (s) {
         SevError => "error"

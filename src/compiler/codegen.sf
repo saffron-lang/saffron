@@ -416,7 +416,9 @@ class Codegen {
     /// do, this gains a located sibling and these calls pass the offending node's
     /// span.
     fun codegen_error(msg: String) {
-        IO.println("[codegen] Error: " + msg)
+        // The sink record is unconditional; the console line is suppressed in
+        // --json mode so stdout stays parseable JSON. See Diag.set_quiet.
+        if (!Diag.is_quiet()) { IO.println("[codegen] Error: " + msg) }
         this.has_errors = true
         Diag.record_error("codegen", AST.span_none(), msg)
     }

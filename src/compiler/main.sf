@@ -4,6 +4,7 @@
 // Type checking is enabled by default; --no-check disables it.
 
 import "os" as OS
+import "./ast.sf" as AST
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
@@ -482,6 +483,86 @@ fun get_stmt_name(stmt: AST.Stmt): String {
         FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => n
         _ => ""
     }
+}
+
+// Append one symbol's JSON to `acc`, prefixing a comma when `acc` is non-empty.
+// Drops the symbol silently when symbol_json returns "" (a synthetic span, no
+// jump target — see Diag.symbol_json), so `acc` never carries a stray comma or
+// an empty `{}`.
+fun push_symbol(acc: String, name: String, kind: String, s: AST.Span): String {
+    var j: String = Diag.symbol_json(name, kind, s)
+    if (j.length() == 0) { return acc }
+    if (acc.length() == 0) { return j }
+    return acc + "," + j
+}
+
+// The top-level declarations of `program`, plus the members that belong under
+// them (enum variants, class/interface/actor methods), as a JSON array body —
+// the elements only, no surrounding brackets, so the caller wraps it.
+//
+// Only *declarations* become symbols. Import nodes are skipped: they carry a
+// synthesized name (`_import_…`) and a span that points at the `import` keyword,
+// not at anything the user would rename or jump to. Everything else is matched by
+// its exact field arity — a short arm here would bind the wrong field as the name
+// (BUGS #96's shape), so the counts mirror ast.sf's enum precisely.
+//
+// Symbol `kind` uses the vocabulary the editor client's SaffronSymbol expects:
+// class/interface come from ClassDecl.introducer (the parser records which
+// keyword was written — an outline cannot label the entry without it), and a
+// class's methods are emitted as children with kind "method".
+fun collect_symbols_json(program: List<AST.Stmt>): String {
+    var acc: String = ""
+    var i: Float = 0
+    while (i < program.length()) {
+        var stmt: AST.Stmt = program[i]
+        if (!is_import_stmt(stmt)) {
+            acc = match (stmt) {
+                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns)
+                FunDecl(n, p, r, b, d, f_vis, ns, fs) => push_symbol(acc, n, "function", ns)
+                EnumDecl(n, variants, d, e_vis, ns, fs) => {
+                    var a2: String = push_symbol(acc, n, "enum", ns)
+                    var vi: Float = 0
+                    while (vi < variants.length()) {
+                        a2 = match (variants[vi]) {
+                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns)
+                        }
+                        vi = vi + 1
+                    }
+                    a2
+                }
+                ClassDecl(n, tp, parents, fields, methods, d, c_vis, ns, fs, introducer) => {
+                    var kind: String = "class"
+                    if (introducer == "interface") { kind = "interface" }
+                    var a3: String = push_symbol(acc, n, kind, ns)
+                    var mi: Float = 0
+                    while (mi < methods.length()) {
+                        a3 = match (methods[mi]) {
+                            FunDecl(mn, mp, mr, mb, md, m_vis, mns, mfs) => push_symbol(a3, mn, "method", mns)
+                            _ => a3
+                        }
+                        mi = mi + 1
+                    }
+                    a3
+                }
+                _ => acc
+            }
+        }
+        i = i + 1
+    }
+    return acc
+}
+
+// The one line of stdout in --json mode: {file, diagnostics, symbols}, matching
+// the editor client's CheckOutput. `symbols_body` is the pre-rendered element
+// list from collect_symbols_json (captured before the resolve pass rewrote the
+// program), and diagnostics come from the sink, which by this point holds every
+// error and warning every phase raised. This is the whole output — the caller
+// prints it and exits without writing IR.
+fun emit_json(file: String, symbols_body: String) {
+    var out: String = "{\"file\":" + Diag.json_escape(file)
+    out = out + ",\"diagnostics\":" + Diag.diagnostics_to_json(file)
+    out = out + ",\"symbols\":[" + symbols_body + "]}"
+    IO.println(out)
 }
 
 fun is_import_stmt(stmt: AST.Stmt): Bool {
@@ -1024,12 +1105,26 @@ fun main(): Int {
     // how it is observable and testable at all; test/pass/package_map_test.sf
     // drives it.
     var dump_packages: Bool = false
+    // --json makes the compiler emit one JSON object — {file, diagnostics,
+    // symbols} matching the editor client's CheckOutput — as the ONLY thing on
+    // stdout, and write no IR. It is the structured replacement for scraping the
+    // human diagnostic format: the client used to regex the parser's `[line N,
+    // col M]` lines, which the checker and codegen never produced, so type and
+    // codegen errors could not reach the editor at all. With --json every phase's
+    // diagnostics come through the sink as data, and declaration spans (WS1a) ride
+    // along as `symbols` so hover/definition finally have something to resolve
+    // against. Implies a check pass; forces console diagnostics quiet so nothing
+    // non-JSON lands on stdout.
+    var json_mode: Bool = false
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg == "--no-check") {
             run_checker = false
+        }
+        if (arg == "--json") {
+            json_mode = true
         }
         if (arg == "--no-resolve") {
             run_resolve = false
@@ -1068,6 +1163,13 @@ fun main(): Int {
             }
         }
         i = i + 1
+    }
+    // --json implies a check pass (there is nothing structured to report without
+    // it) and silences every phase's console diagnostics so the JSON object is
+    // the only thing on stdout. Both are set here, once, before any file work.
+    if (json_mode) {
+        run_checker = true
+        Diag.set_quiet(true)
     }
     // Also read SAFFRON_LIB_PATH env var (colon-separated, like PATH)
     var env_lib_path: String = OS.env("SAFFRON_LIB_PATH")
@@ -1155,6 +1257,16 @@ fun main(): Int {
     // corrosive to measurement: a typo'd path in a sweep looked like a clean
     // compile. Diagnose it here, where the path is first known.
     if (!OS.file_exists(input_path)) {
+        if (json_mode) {
+            // The client keys diagnostics by file, so a missing input is reported
+            // as a located-nowhere diagnostic on that file rather than a bare
+            // non-JSON line it could not parse. reset_sink first: nothing has run
+            // yet, but the record path is the sink, and JSON reads the sink.
+            Diag.reset_sink()
+            Diag.record_error("driver", AST.span_none(), "cannot open input file: " + input_path)
+            emit_json(input_path, "")
+            c_exit(1)
+        }
         IO.println("saffronc: cannot open input file: " + input_path)
         c_exit(1)
     }
@@ -1182,7 +1294,24 @@ fun main(): Int {
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse_with_source(tokens, source)
 
+    // Symbols are collected from the freshly-parsed program, BEFORE the resolve
+    // pass rewrites Variable→Ref and the checker runs — those passes are about
+    // meaning, not surface declarations, and a declaration's name/span is fixed
+    // at parse time. Collecting here also means a file that fails to type-check
+    // still yields an outline, which is exactly when an editor most needs one.
+    var json_symbols: String = ""
+    if (json_mode) {
+        json_symbols = collect_symbols_json(program)
+    }
+
     if (Parser.had_error()) {
+        // A parse error is terminal, but in --json the errors are already in the
+        // sink (parser.report_at records unconditionally). Emit them plus whatever
+        // symbols parsed before the failure, rather than the bare exit the console
+        // path takes.
+        if (json_mode) {
+            emit_json(input_path, json_symbols)
+        }
         c_exit(1)
     }
 
@@ -1545,10 +1674,23 @@ fun main(): Int {
         } else {
             checker_errors = Checker.check_errors_only(program)
         }
-        if (checker_errors.length() > 0) {
+        if (checker_errors.length() > 0 and !json_mode) {
             IO.println(checker_errors)
             c_exit(1)
         }
+    }
+
+    // --json is a check-only endpoint: emit the {diagnostics, symbols} object and
+    // stop. No codegen, no IR — an editor asking "what's wrong and what's here?"
+    // does not want a build. The sink now holds every parser and checker
+    // diagnostic; symbols were captured off the pre-resolve program above. Exit is
+    // non-zero when any error was recorded so a caller that keys off the code
+    // still learns pass/fail, while the client (which reads stdout in both cases)
+    // gets identical JSON either way.
+    if (json_mode) {
+        emit_json(input_path, json_symbols)
+        if (Diag.sink_had_error()) { c_exit(1) }
+        return 0
     }
 
     var ir: String = ""

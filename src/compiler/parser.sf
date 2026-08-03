@@ -306,6 +306,10 @@ class Parser {
     /// The sink is the forward path; the print is the compatibility path.
     fun report_at(s: AST.Span, label: String, message: String) {
         Diag.record_error("parser", s, message)
+        // In --json mode the sink above is the whole story; the console form
+        // would be a non-JSON line on the one stream the client parses. The
+        // record stays, unconditionally, so --json loses nothing.
+        if (Diag.is_quiet()) { return }
         IO.println("[" + this.span_prefix(s) + "] " + label + ": " + message)
         if (this.source.length() == 0) { return }
         if (!AST.span_is_real(s)) { return }
@@ -338,7 +342,7 @@ class Parser {
     fun parse_error(message: String) {
         this.error_count = this.error_count + 1
         if (this.error_count > 20) {
-            if (this.error_count == 21) {
+            if (this.error_count == 21 and !Diag.is_quiet()) {
                 IO.println("Too many errors (20+), stopping.")
             }
             this.had_error = true
@@ -360,7 +364,7 @@ class Parser {
     fun parse_error_at(s: AST.Span, message: String) {
         this.error_count = this.error_count + 1
         if (this.error_count > 20) {
-            if (this.error_count == 21) {
+            if (this.error_count == 21 and !Diag.is_quiet()) {
                 IO.println("Too many errors (20+), stopping.")
             }
             this.had_error = true
