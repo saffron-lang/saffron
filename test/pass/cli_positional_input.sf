@@ -1,0 +1,139 @@
+// BUGS #119 — the compiler's input file is the first POSITIONAL argument, never
+// an argument that merely *looks* like a source file.
+//
+// The arg parser used to pick the input by scanning argv for
+// `arg.contains(".sf")` and keeping the LAST match. Two defects compounded:
+//
+//   * `contains` matches `.sf` anywhere, so an output named `out.sf.ll`
+//     qualified as an input and got `.ll` appended again → `out.sf.ll.ll`;
+//   * last-match-wins meant that when the input AND the output both qualified,
+//     the OUTPUT was compiled and the real input was never opened.
+//
+// So `saffronc real.sf decoy.sf` compiled decoy.sf, silently, with exit 0. That
+// makes a compiler which *rejects* a file look like it accepted it, which is why
+// this is a measurement bug and not merely an output bug: a sweep whose output
+// names embed `.sf` reports nothing while appearing to report everything.
+//
+// This test drives the real `build/saffronc` binary, because argument parsing has
+// no in-language surface — there is nothing to assert about it from inside a
+// compiled program. It locates the compiler by walking up from the working
+// directory; if it cannot find one it FAILS rather than skipping, deliberately.
+// A test that quietly passes when it did not run is the exact failure mode of the
+// bug it is guarding.
+import "@test" as Test
+import "os" as OS
+
+// Walk up from the working directory looking for a repo root — a directory that
+// has BOTH a built compiler and a stdlib. Returning the root rather than the
+// compiler path avoids reconstructing the root by slicing a fixed number of
+// characters off the end, which is the kind of arithmetic that silently yields a
+// neighbouring directory when it is off by one.
+fun find_root(): String {
+    var dir: String = OS.cwd()
+    var depth: Float = 0
+    while (depth < 12) {
+        if (OS.file_exists(dir + "/build/saffronc") and OS.file_exists(dir + "/src/lib/prelude.sf")) {
+            return dir
+        }
+        var slash: Float = -1
+        var i: Float = 0
+        while (i < dir.length()) {
+            if (dir.char_at(i) == "/") { slash = i }
+            i = i + 1
+        }
+        if (slash <= 0) { return "" }
+        dir = dir.slice(0, slash)
+        depth = depth + 1
+    }
+    return ""
+}
+
+var root: String = find_root()
+Test.assert(root.length() > 0, "found a repo root with a built compiler, walking up from " + OS.cwd())
+
+var saffronc: String = root + "/build/saffronc"
+var stdlib: String = root + "/src/lib"
+var work: String = root + "/build/cli_positional_input"
+OS.system("rm -rf " + work)
+OS.system("mkdir -p " + work)
+
+// Two programs distinguishable by the string each prints, so the emitted IR says
+// unambiguously which one was actually read.
+IO.write_file(work + "/real.sf", "IO.println(\"REAL_INPUT\")\n")
+IO.write_file(work + "/decoy.sf", "IO.println(\"DECOY_INPUT\")\n")
+
+fun compile(args: String): Int {
+    return OS.system(saffronc + " --stdlib " + stdlib + " " + args + " >/dev/null 2>&1")
+}
+
+// --- 1. The ordinary form still works. -------------------------------------
+var ec1: Int = compile(work + "/real.sf " + work + "/out.ll")
+Test.assert_eq(ec1, 0, "input.sf output.ll succeeds")
+Test.assert(OS.file_exists(work + "/out.ll"), "input.sf output.ll writes exactly the named output")
+Test.assert(IO.read_file(work + "/out.ll").contains("REAL_INPUT"), "the IR came from the input, not the output arg")
+
+// --- 2. An output that looks like an input. --------------------------------
+// The whole bug: the SECOND positional is the output even when it ends in `.sf`.
+var ec2: Int = compile(work + "/real.sf " + work + "/written.sf")
+Test.assert_eq(ec2, 0, "input.sf output.sf succeeds")
+var written: String = IO.read_file(work + "/written.sf")
+Test.assert(written.contains("REAL_INPUT"), "the FIRST positional is the input even when the second ends in .sf")
+Test.assert(!written.contains("DECOY_INPUT"), "the second positional was not compiled")
+
+// The decoy is never touched, in either direction: not read as an input and not
+// clobbered as an output.
+var ec2b: Int = compile(work + "/real.sf " + work + "/out2.ll " + work + "/decoy.sf")
+Test.assert_eq(ec2b, 0, "a third positional is ignored, not treated as the output")
+Test.assert_eq(IO.read_file(work + "/decoy.sf"), "IO.println(\"DECOY_INPUT\")\n", "a trailing .sf positional is not overwritten")
+Test.assert(IO.read_file(work + "/out2.ll").contains("REAL_INPUT"), "the second positional is still the output")
+
+// --- 3. `.sf` in the middle of the output name. ----------------------------
+// `contains(".sf")` matched here, so the output was taken as the input and the
+// real output name got a second `.ll` glued on.
+var ec3: Int = compile(work + "/real.sf " + work + "/mid.sf.ll")
+Test.assert_eq(ec3, 0, "an output named *.sf.ll succeeds")
+Test.assert(OS.file_exists(work + "/mid.sf.ll"), "an output named *.sf.ll is written under exactly that name")
+Test.assert(!OS.file_exists(work + "/mid.sf.ll.ll"), "no second .ll is appended (BUGS #119)")
+Test.assert(IO.read_file(work + "/mid.sf.ll").contains("REAL_INPUT"), "*.sf.ll output still compiles the real input")
+
+// --- 4. A flag VALUE that looks like a source file. ------------------------
+// --stdlib, --lib-path and --target consume the argument after them. That
+// argument must never be mistaken for the positional input.
+var ec4: Int = compile("--lib-path " + work + "/decoy.sf " + work + "/real.sf " + work + "/out4.ll")
+Test.assert_eq(ec4, 0, "--lib-path <something.sf> before the input succeeds")
+Test.assert(IO.read_file(work + "/out4.ll").contains("REAL_INPUT"), "a --lib-path value ending in .sf is not taken as the input")
+
+var ec4b: Int = compile("--target native " + work + "/real.sf " + work + "/out4b.ll")
+Test.assert_eq(ec4b, 0, "--target's value is skipped, not consumed as a positional")
+Test.assert(IO.read_file(work + "/out4b.ll").contains("REAL_INPUT"), "--target native leaves the input positional intact")
+
+// A flag value ending in `.sf` and NO real input must be "no input file" — proof
+// the value was skipped rather than silently promoted to the input.
+var ec4c: Int = compile("--lib-path " + work + "/decoy.sf")
+Test.assert(ec4c != 0, "a --lib-path value alone is not enough to compile: it is not an input")
+
+// A bare switch after the input is still a switch, not the output.
+var ec4d: Int = compile(work + "/real.sf " + work + "/out4d.ll --no-check")
+Test.assert_eq(ec4d, 0, "a trailing switch after input and output succeeds")
+Test.assert(IO.read_file(work + "/out4d.ll").contains("REAL_INPUT"), "a trailing switch does not disturb the positionals")
+
+// --- 5. No input at all must fail loudly. ---------------------------------
+// This used to print the usage text and exit 0, because `return 1` from main()
+// does not set the process status.
+var ec5: Int = compile("")
+Test.assert(ec5 != 0, "no input file exits nonzero")
+
+// An input path that does not exist read back as "" and compiled as an empty
+// program, exiting 0. Same silent-success shape.
+var ec5b: Int = compile(work + "/no_such_file.sf " + work + "/out5b.ll")
+Test.assert(ec5b != 0, "a nonexistent input file exits nonzero")
+Test.assert(!OS.file_exists(work + "/out5b.ll"), "a nonexistent input writes no output")
+
+// --- 6. Output defaults to <input>.ll when only one positional is given. ---
+var ec6: Int = compile(work + "/real.sf")
+Test.assert_eq(ec6, 0, "input with no output arg succeeds")
+Test.assert(OS.file_exists(work + "/real.sf.ll"), "the default output is <input>.ll")
+
+OS.system("rm -rf " + work)
+
+Test.summary()
