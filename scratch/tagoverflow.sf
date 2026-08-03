@@ -1,0 +1,512 @@
+// Generated: does the 8-bit GC type tag field overflow past 255?
+// Class tags start at 10 and increment; the info word stores tag in bits 8-15
+// (gc.ll:126 masks with 255). With >=246 classes the tag wraps.
+class C0 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C1 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C2 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C3 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C4 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C5 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C6 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C7 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C8 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C9 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C10 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C11 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C12 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C13 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C14 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C15 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C16 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C17 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C18 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C19 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C20 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C21 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C22 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C23 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C24 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C25 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C26 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C27 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C28 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C29 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C30 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C31 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C32 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C33 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C34 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C35 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C36 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C37 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C38 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C39 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C40 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C41 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C42 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C43 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C44 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C45 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C46 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C47 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C48 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C49 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C50 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C51 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C52 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C53 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C54 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C55 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C56 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C57 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C58 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C59 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C60 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C61 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C62 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C63 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C64 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C65 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C66 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C67 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C68 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C69 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C70 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C71 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C72 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C73 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C74 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C75 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C76 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C77 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C78 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C79 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C80 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C81 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C82 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C83 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C84 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C85 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C86 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C87 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C88 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C89 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C90 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C91 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C92 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C93 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C94 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C95 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C96 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C97 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C98 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C99 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C100 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C101 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C102 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C103 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C104 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C105 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C106 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C107 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C108 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C109 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C110 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C111 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C112 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C113 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C114 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C115 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C116 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C117 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C118 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C119 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C120 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C121 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C122 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C123 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C124 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C125 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C126 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C127 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C128 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C129 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C130 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C131 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C132 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C133 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C134 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C135 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C136 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C137 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C138 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C139 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C140 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C141 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C142 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C143 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C144 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C145 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C146 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C147 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C148 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C149 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C150 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C151 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C152 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C153 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C154 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C155 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C156 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C157 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C158 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C159 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C160 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C161 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C162 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C163 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C164 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C165 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C166 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C167 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C168 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C169 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C170 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C171 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C172 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C173 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C174 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C175 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C176 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C177 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C178 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C179 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C180 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C181 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C182 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C183 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C184 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C185 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C186 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C187 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C188 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C189 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C190 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C191 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C192 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C193 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C194 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C195 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C196 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C197 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C198 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C199 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C200 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C201 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C202 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C203 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C204 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C205 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C206 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C207 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C208 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C209 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C210 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C211 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C212 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C213 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C214 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C215 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C216 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C217 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C218 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C219 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C220 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C221 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C222 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C223 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C224 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C225 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C226 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C227 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C228 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C229 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C230 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C231 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C232 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C233 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C234 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C235 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C236 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C237 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C238 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C239 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C240 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C241 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C242 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C243 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C244 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C245 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C246 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C247 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C248 { var v: Int
+            fun init(v: Int) { this.v = v } }
+class C249 { var v: Int
+            fun init(v: Int) { this.v = v } }
+fun main() {
+    var first = C0(1)
+    var last  = C249(1)
+    IO.println("C0    is C0   (want true):  " + (first is C0).to_string())
+    IO.println("C249 is C249(want true):  " + (last is C249).to_string())
+    IO.println("C249 is C0   (want false): " + (last is C0).to_string())
+    IO.println("C0    is C249(want false): " + (first is C249).to_string())
+}
+main()

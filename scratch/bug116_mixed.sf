@@ -1,0 +1,15 @@
+// "Fieldless" splits TWO ways, and only one of them works today.
+//
+// gen_enum_construct picks the encoding per ENUM, not per variant:
+//   max_fields == 0  -> every variant is the immediate `tag << 56`  (== works)
+//   max_fields  > 0  -> every variant is a heap array, INCLUDING the
+//                       zero-field ones, which get a 1-slot array (== broken)
+enum AllFieldless { Red, Green }
+enum Mixed { Nothing, One(v: Number) }
+
+fun main() {
+    IO.println("whole-enum-fieldless  Red==Red     (want true): " + (AllFieldless.Red == AllFieldless.Red).to_string())
+    IO.println("fieldless-in-payload  Nothing==Nothing (want true): " + (Mixed.Nothing == Mixed.Nothing).to_string())
+    IO.println("fieldless-in-payload  Nothing==One(1) (want false): " + (Mixed.Nothing == Mixed.One(1)).to_string())
+}
+main()

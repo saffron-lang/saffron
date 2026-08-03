@@ -1,0 +1,12 @@
+// Does the checker reject `==` between two DIFFERENT enum types? If it does,
+// enum identity need not be carried at runtime for the statically-typed path,
+// and only the Any-typed path can see a cross-enum comparison.
+enum Shape { Circle(r: Number) }
+enum Blob { Round(r: Number) }
+
+fun main() {
+    var a = Shape.Circle(2)
+    var b = Blob.Round(2)
+    IO.println((a == b).to_string())
+}
+main()

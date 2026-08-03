@@ -1,0 +1,11 @@
+enum Shape { Circle(r: Number), Square(s: Number) }
+
+@extern("i64 __val_class_tag(i64)") fun val_class_tag(v: Any): Int
+
+fun main() {
+    var a: Any = Shape.Circle(2)
+    var b: Any = Shape.Circle(2)
+    IO.println("Any payload eq (want true): " + (a == b).to_string())
+    IO.println("class_tag of payload enum:  " + val_class_tag(a).to_string())
+}
+main()

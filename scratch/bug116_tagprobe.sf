@@ -1,0 +1,32 @@
+// Hunt for a FALSE POSITIVE. __any_eq's ptr_compare arm strcmp's its operands.
+// A payload variant's array begins with the tag as a full i64, so a tag-0
+// variant's first eight bytes are ALL ZERO -> strcmp sees "" for every tag-0
+// variant regardless of payload. If any path applies TAG_PTR to a payload enum,
+// two *different* tag-0 values compare EQUAL, which is worse than #116's false
+// negative. Sweep the paths that are known to add TAG_PTR.
+enum Shape { Circle(r: Number), Square(s: Number) }
+
+class Box { var v: Any
+            fun init(v: Any) { this.v = v } }
+
+fun thru(a: Any, b: Any): Bool { return a == b }
+
+fun main() {
+    // 1. bare ctor through an Any parameter
+    IO.println("param  C(2)==C(3) want false: " + thru(Shape.Circle(2), Shape.Circle(3)).to_string())
+    // 2. map round trip
+    var m: Map<String, Any> = {}
+    m.set("a", Shape.Circle(2))
+    m.set("b", Shape.Circle(3))
+    IO.println("map    C(2)==C(3) want false: " + thru(m.get("a"), m.get("b")).to_string())
+    // 3. list round trip
+    var l: List<Any> = [Shape.Circle(2), Shape.Circle(3)]
+    IO.println("list   C(2)==C(3) want false: " + thru(l[0], l[1]).to_string())
+    // 4. class field round trip
+    var b1 = Box(Shape.Circle(2))
+    var b2 = Box(Shape.Circle(3))
+    IO.println("field  C(2)==C(3) want false: " + thru(b1.v, b2.v).to_string())
+    // 5. tag-0 variant vs tag-1 variant, both one field: cross-variant
+    IO.println("map    C(2)==S(2) want false: " + thru(m.get("a"), Shape.Square(2)).to_string())
+}
+main()

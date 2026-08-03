@@ -1,0 +1,14 @@
+enum Color { Red, Green, Blue }
+enum Shape { Circle(r: Number), Square(s: Number), Group(inner: Shape) }
+
+fun main() {
+    IO.println("fieldless eq (want true):   " + (Color.Red == Color.Red).to_string())
+    IO.println("fieldless ne (want false):  " + (Color.Red == Color.Green).to_string())
+    IO.println("payload eq (want true):     " + (Shape.Circle(2) == Shape.Circle(2)).to_string())
+    IO.println("payload ne (want false):    " + (Shape.Circle(2) == Shape.Circle(3)).to_string())
+    IO.println("cross-variant (want false): " + (Shape.Circle(2) == Shape.Square(2)).to_string())
+    var a = Shape.Group(Shape.Circle(2))
+    var b = Shape.Group(Shape.Circle(2))
+    IO.println("nested eq (want true):      " + (a == b).to_string())
+}
+main()

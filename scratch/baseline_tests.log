@@ -1,0 +1,275 @@
+
+=== test/*.sf ===
+SKIP  stale              any_bug_repro
+PASS         async_coop
+FAIL  invalid-ir         async  — saffron: this is a compiler bug, not an error in your program.
+SKIP  stale              builtin_types
+PASS         classes
+PASS         closure_self_capture
+PASS         comprehensive
+PASS         cross_module_enum_tuple
+PASS         cross_module_global_helper
+PASS         cross_module_global
+SKIP  stale              decorators
+PASS         destructure
+FAIL  link-error         docstrings  — undefined: _stdlib_reflect_doc _stdlib_reflect_module_doc 
+FAIL  compile-error      enum_cross_simple  — Error: cannot resolve import "./enum_module_helper.sf" in /Users/willemhs/personal/saffron/.claude/w
+PASS         exceptions
+SKIP  stale              for_in
+PASS         fun_types
+FAIL  timeout            functions  — hung for >10s
+PASS         gc_api_test
+PASS         gc_deep_test
+SKIP  not-a-test         gc_generational_test
+./tools/run_tests.sh: line 251: 93765 Segmentation fault: 11  timeout "$RUN_TIMEOUT" "$bin" > "$runlog" 2>&1 < /dev/null
+FAIL  segfault           gc_roots_test  — exit 139
+PASS         gc_test
+PASS         generic_infer_test
+SKIP  not-a-test         goals
+PASS         hello_bootstrap
+SKIP  not-a-test         hello_wasm
+PASS         if_else_in_match
+FAIL  compile-error      imports  — [codegen] Error: undefined variable 'inheritance'
+FAIL  invalid-ir         inheritance  — saffron: this is a compiler bug, not an error in your program.
+FAIL  compile-error      iterators  — [line 11, col 17] Error: expected ')' but found '?'
+FAIL  compile-error      json  — [codegen] Error: undefined variable 'data'
+PASS         lists
+SKIP  stale              loops
+PASS         map_enum_values
+PASS         map_nonstring_values
+PASS         maps
+PASS         mini_1param
+PASS         mini_arithmetic
+PASS         mini_collatz
+PASS         mini_enum
+PASS         mini_fizzbuzz
+PASS         mini_hello
+PASS         mini_ifelse
+PASS         mini_logical
+PASS         mini_primes
+PASS         mini_suite
+PASS         mini_while
+PASS         named_args
+PASS         nullable_narrowing
+PASS         oracle_any_compare
+PASS         oracle_enum_payload_tostring
+FAIL  output-mismatch    oracle_enum_println  — 22,23c22,23 < [0, 4.77831e-299] < [5.21502e-310, 5.21502e-310] 
+PASS         oracle_match_shadow
+PASS         oracle_stringify
+PASS         pantry_config
+PASS         qualified_type_generic
+FAIL  link-error         qualified_type_helper  — undefined: _main 
+PASS         qualified_type
+PASS         relative_import_check
+PASS         relative_import_helper
+SKIP  stale              runner
+PASS         segfault_repro
+PASS         stdlib_io
+PASS         stdlib_math_sf
+PASS         stdlib_math
+PASS         stdlib_os_sf
+PASS         stdlib_os
+PASS         stdlib_random_sf
+PASS         stdlib_random
+PASS         stdlib_time_sf
+PASS         stdlib_time
+PASS         string_case
+PASS         string_match
+PASS         test_actor_async
+PASS         test_actor_captures
+PASS         test_actor_contention
+PASS         test_actor_scheduler_liveness
+PASS         test_actor_send
+PASS         test_actor_sendable
+PASS         test_actor
+PASS         test_array_pattern
+SKIP  network            test_async_io
+PASS         test_async
+PASS         test_await_loop_once
+FAIL  runtime-error      test_base64  — Runtime Error: base64: non-ASCII character encountered
+PASS         test_binary_verify
+PASS         test_buffer
+PASS         test_classes
+PASS         test_closures
+FAIL  compile-error      test_collections  — [line 46, col 20] Error: expected ')' but found '?'
+PASS         test_control_flow
+SKIP  network            test_dns
+PASS         test_enums
+PASS         test_expr_features
+PASS         test_file
+PASS         test_finally_is_native
+PASS         test_finally_is
+PASS         test_generics
+./tools/run_tests.sh: line 251:  4757 Segmentation fault: 11  timeout "$RUN_TIMEOUT" "$bin" > "$runlog" 2>&1 < /dev/null
+FAIL  segfault           test_glob  — exit 139
+SKIP  network            test_httpx
+PASS         test_json
+FAIL  compile-error      test_lib_repro  — [line 91, col 9] Error: expected a literal, name or '(' here
+FAIL  runtime-error      test_log  — Runtime Error: IndexError: index 0 out of bounds (length 0)
+PASS         test_map_get_types
+SKIP  network            test_net
+FAIL  compile-error      test_package_import  — Error: cannot resolve import "testpkg" in /Users/willemhs/personal/saffron/.claude/worktrees/agent-a
+PASS         test_receiver_closures
+./tools/run_tests.sh: line 251:  5633 Segmentation fault: 11  timeout "$RUN_TIMEOUT" "$bin" > "$runlog" 2>&1 < /dev/null
+FAIL  segfault           test_reflect  — exit 139
+PASS         test_regressions
+PASS         test_semver
+PASS         test_sorted_collections
+PASS         test_sorted_set
+PASS         test_stdlib
+PASS         test_url
+PASS         test_uuid
+PASS         toml_test
+PASS         trailing_closure_params
+PASS         trailing_closure
+PASS         tuple_test
+SKIP  stale              types
+--- test/*.sf: 89 passed, 18 failed, 14 skipped
+
+=== test/pass/*.sf (must compile AND run) ===
+PASS         pass/async_await_function
+PASS         pass/async_module_coro_call
+PASS         pass/bare_return_statement_boundary
+PASS         pass/binary_file_bytes
+PASS         pass/block_comments
+PASS         pass/checker_block_param_arrow_type
+PASS         pass/checker_block_param_typed
+PASS         pass/checker_cstr_module
+PASS         pass/closure_capture_writeback
+PASS         pass/closures
+PASS         pass/cmp_any_ordering
+PASS         pass/container_literal_nested_decl
+FAIL  compile-error      pass/data_equality  — [codegen] Error: undefined variable 'data'
+FAIL  compile-error      pass/deep_deserialize  — [codegen] Error: undefined variable 'data'
+PASS         pass/dispatch_readln_is_a_string
+PASS         pass/enum_println_to_string
+PASS         pass/enum_to_string
+PASS         pass/enum_wide_payload
+PASS         pass/enumfmt_payload_to_string
+PASS         pass/enums
+FAIL  compile-error      pass/expressions  — [line 10, col 6] Error: expected a literal, name or '(' here
+PASS         pass/extend_cross_module
+PASS         pass/first_class_types
+PASS         pass/for_header_infer
+PASS         pass/for_in_map
+PASS         pass/forward_refs
+PASS         pass/fun_decl_order
+PASS         pass/gc_coro_root_depth
+PASS         pass/gc_coro_root_order
+PASS         pass/gc_coro_root_overpop
+PASS         pass/gc_old_to_young
+PASS         pass/generic_class_type_params
+PASS         pass/generic_inference
+PASS         pass/generics
+PASS         pass/getitem_overload_typed
+PASS         pass/getitem_overload
+PASS         pass/http_binary_response
+PASS         pass/if_expressions
+FAIL  compile-error      pass/increment  — [line 2, col 8] Error: expected a literal, name or '(' here
+PASS         pass/indirect_call_field
+PASS         pass/int_to_float_widening
+PASS         pass/interfaces
+PASS         pass/interp_method_call
+PASS         pass/io_explicit_alias
+PASS         pass/io_module_wrappers
+PASS         pass/is_check
+PASS         pass/is_match
+PASS         pass/is_union
+PASS         pass/iter_arrow_param_split
+PASS         pass/local_named_like_temp
+PASS         pass/map_key_value_types
+PASS         pass/map_literal_types
+FAIL  invalid-ir         pass/math  — saffron: this is a compiler bug, not an error in your program.
+PASS         pass/module_extern_dispatch
+PASS         pass/multi_inherit
+PASS         pass/named_imports
+PASS         pass/narrowing
+PASS         pass/nullable_recv_dispatch
+PASS         pass/nullable_shorthand
+PASS         pass/operator_compare
+PASS         pass/operators
+PASS         pass/os_ordinary_import
+FAIL  compile-error      pass/overloading  — [codegen] Error: 'add' expects 3 arguments, got 2
+FAIL  runtime-error      pass/ranges  — Runtime Error: NullError: null pointer dereference
+PASS         pass/scientific_notation
+PASS         pass/scope_match_arm_binding
+PASS         pass/segv_name_collision_fun_vs_var
+PASS         pass/type_aliases
+FAIL  compile-error      pass/varargs  — [line 4, col 10] Error: Parameter '' requires a type annotation
+PASS         pass/visibility_response_collision
+--- test/pass/*.sf: 62 passed, 8 failed, 0 skipped
+
+=== test/fail/*.sf (must be REJECTED by the compiler) ===
+PASS         fail/checker_block_param_untypeable (rejected, exit 1)
+PASS         fail/class_errors (rejected, exit 1)
+PASS         fail/conformance (rejected, exit 1)
+PASS         fail/dispatch_dropped_call_on_any (rejected, exit 1)
+PASS         fail/dispatch_dropped_call_on_map (rejected, exit 1)
+PASS         fail/dispatch_extern_unconvertible_param (rejected, exit 1)
+PASS         fail/dispatch_extern_unconvertible_return (rejected, exit 1)
+PASS         fail/enum_binding_type_generic_field (rejected, exit 1)
+PASS         fail/enum_binding_type_qualified (rejected, exit 1)
+PASS         fail/exhaustiveness_return_type (rejected, exit 1)
+PASS         fail/exhaustiveness (rejected, exit 1)
+PASS         fail/extern_no_signature (rejected, exit 1)
+PASS         fail/float_to_int_narrowing (rejected, exit 1)
+PASS         fail/indirect_call_field (rejected, exit 1)
+PASS         fail/inheritance_errors (rejected, exit 1)
+PASS         fail/match_pattern_arity_excess (rejected, exit 1)
+PASS         fail/match_pattern_arity (rejected, exit 1)
+PASS         fail/scalar_annotation_mismatch (rejected, exit 1)
+PASS         fail/type_errors (rejected, exit 1)
+PASS         fail/undefined_variable (rejected, exit 1)
+--- test/fail/*.sf: 20 passed, 0 failed, 0 skipped
+
+=== Category breakdown ===
+  pass               171
+  compile-error      13
+  link-error         2
+  invalid-ir         3
+  segfault           3
+  runtime-error      3
+  output-mismatch    1
+  timeout            1
+  network            4
+  stale              7
+  not-a-test         3
+
+=== Stale tests (human decision needed: modernise or delete) ===
+  test/any_bug_repro.sf
+  test/builtin_types.sf
+  test/decorators.sf
+  test/for_in.sf
+  test/loops.sf
+  test/runner.sf
+  test/types.sf
+
+=== Failures ===
+  invalid-ir         async  — saffron: this is a compiler bug, not an error in your program.
+  link-error         docstrings  — undefined: _stdlib_reflect_doc _stdlib_reflect_module_doc 
+  compile-error      enum_cross_simple  — Error: cannot resolve import "./enum_module_helper.sf" in /Users/willemhs/personal/saffron/.claude/w
+  timeout            functions  — hung for >10s
+  segfault           gc_roots_test  — exit 139
+  compile-error      imports  — [codegen] Error: undefined variable 'inheritance'
+  invalid-ir         inheritance  — saffron: this is a compiler bug, not an error in your program.
+  compile-error      iterators  — [line 11, col 17] Error: expected ')' but found '?'
+  compile-error      json  — [codegen] Error: undefined variable 'data'
+  output-mismatch    oracle_enum_println  — 22,23c22,23 < [0, 4.77831e-299] < [5.21502e-310, 5.21502e-310] 
+  link-error         qualified_type_helper  — undefined: _main 
+  runtime-error      test_base64  — Runtime Error: base64: non-ASCII character encountered
+  compile-error      test_collections  — [line 46, col 20] Error: expected ')' but found '?'
+  segfault           test_glob  — exit 139
+  compile-error      test_lib_repro  — [line 91, col 9] Error: expected a literal, name or '(' here
+  runtime-error      test_log  — Runtime Error: IndexError: index 0 out of bounds (length 0)
+  compile-error      test_package_import  — Error: cannot resolve import "testpkg" in /Users/willemhs/personal/saffron/.claude/worktrees/agent-a
+  segfault           test_reflect  — exit 139
+  compile-error      pass/data_equality  — [codegen] Error: undefined variable 'data'
+  compile-error      pass/deep_deserialize  — [codegen] Error: undefined variable 'data'
+  compile-error      pass/expressions  — [line 10, col 6] Error: expected a literal, name or '(' here
+  compile-error      pass/increment  — [line 2, col 8] Error: expected a literal, name or '(' here
+  invalid-ir         pass/math  — saffron: this is a compiler bug, not an error in your program.
+  compile-error      pass/overloading  — [codegen] Error: 'add' expects 3 arguments, got 2
+  runtime-error      pass/ranges  — Runtime Error: NullError: null pointer dereference
+  compile-error      pass/varargs  — [line 4, col 10] Error: Parameter '' requires a type annotation
+
+TOTAL: 171 passed, 26 failed, 14 skipped

@@ -1,0 +1,27 @@
+// __any_eq's ptr_compare arm strcmp's ANY two TAG_PTR values, including lists,
+// maps and class instances — all of which DO carry a GC header and could be
+// discriminated. Does that produce a wrong answer or a wild read?
+class Box { var v: Int
+            fun init(v: Int) { this.v = v } }
+
+fun thru(a: Any, b: Any): Bool { return a == b }
+
+fun main() {
+    IO.println("list  [1,2]==[1,2] : " + thru([1, 2], [1, 2]).to_string())
+    IO.println("list  [1,2]==[3,4] : " + thru([1, 2], [3, 4]).to_string())
+    var m1: Map<String, Int> = {"a": 1}
+    var m2: Map<String, Int> = {"a": 1}
+    IO.println("map   {a:1}=={a:1} : " + thru(m1, m2).to_string())
+    IO.println("class Box(1)==Box(1): " + thru(Box(1), Box(1)).to_string())
+    // A list vs a string: strcmp over a list struct's bytes.
+    IO.println("list  [1,2]==\"hi\"  : " + thru([1, 2], "hi").to_string())
+    // Two EMPTY lists: a list struct is { count@0, capacity@8, data_ptr@16 };
+    // count 0 means the first eight bytes are zero, so strcmp sees "" for both.
+    IO.println("list  []==[]        : " + thru([], []).to_string())
+    // An empty list vs an empty string, both ""-looking to strcmp.
+    IO.println("list  []==\"\"       : " + thru([], "").to_string())
+    // An empty MAP vs an empty list — different types, both zero count.
+    var em: Map<String, Int> = {}
+    IO.println("map   {}==[]        : " + thru(em, []).to_string())
+}
+main()

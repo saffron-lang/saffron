@@ -1,0 +1,25 @@
+// Does a TAG_PTR'd payload enum reach __any_eq's strcmp arm, and does strcmp
+// then report two DIFFERENT values as equal? Variant tag 0's array begins with
+// eight zero bytes, so strcmp sees "" for every tag-0 variant regardless of
+// payload.
+enum Shape { Circle(r: Number), Square(s: Number) }
+
+fun main() {
+    // A Map round trip is what applies TAG_PTR (per BUGS #115's note on
+    // __val_class_tag: ctors return a bare ptrtoint, Maps/lists/interpolation
+    // add the tag).
+    var m: Map<String, Any> = {}
+    m.set("a", Shape.Circle(2))
+    m.set("b", Shape.Circle(3))
+    m.set("c", Shape.Square(2))
+    var a: Any = m.get("a")
+    var b: Any = m.get("b")
+    var c: Any = m.get("c")
+    IO.println("tagged Circle(2)==Circle(3) (want false): " + (a == b).to_string())
+    IO.println("tagged Circle(2)==Square(2) (want false): " + (a == c).to_string())
+    var m2: Map<String, Any> = {}
+    m2.set("d", Shape.Circle(2))
+    var d: Any = m2.get("d")
+    IO.println("tagged Circle(2)==Circle(2) (want true):  " + (a == d).to_string())
+}
+main()
