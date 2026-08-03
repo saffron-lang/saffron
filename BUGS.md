@@ -4929,7 +4929,7 @@ cannot fail, so it guesses instead of reporting not-found (#22, #40, #78, #37,
 #103).
 
 
-### 112. A range literal `0..5` lexes as `0.` `.` `5` and silently compiles to a list index
+### 112. FIXED — a range literal `0..5` lexed as `0.` `.` `5` and silently compiled to a list index
 
 There is no range syntax. `TkDot` is the only dot token; `grep -n "Range\|DotDot"`
 finds nothing in `lexer.sf`, `parser.sf` or `ast.sf`. What happens instead is that
@@ -4967,6 +4967,43 @@ followed by another `.`, which also leaves room for real range syntax later.
 Note this is a *syntax* gap wearing a codegen costume. The language has no ranges;
 the defect is that asking for one produces a running program instead of a parse
 error.
+
+**FIXED (2026-08-02)** with two independent guards, and the pair is not
+redundant — each catches a case the other cannot.
+
+`read_number` (`src/compiler/lexer.sf:294`) no longer treats a `.` as a decimal
+point when a second `.` follows, so `0..5` scans as `TkInt(0) TkDot TkDot
+TkInt(5)` — which is also the token stream a real range operator would want, so
+the fix does not foreclose one. `parse_call` (`src/compiler/parser.sf:597`)
+rejects `..` by name, and *separately* rejects `<float literal> . <int>` because a
+tuple-access receiver can never be a float.
+
+The second guard is what makes the lexer fix sufficient: `1.5.0` and a
+hand-written `0. . 5` scan **correctly** and still reach the tuple branch, so the
+lexer change does not touch them. Conversely the lexer fix is what makes the
+messages good — with only the parser guard, `0..5` would be blamed on its float
+literal rather than named as `..`. The `..` guard fires first, before the dot is
+consumed, so neither diagnostic swallows the other:
+
+```
+[line 1, col 10] Error: '..' is not an operator - Saffron has no range syntax; build a list or use a while/for loop
+[line 1, col 13] Error: cannot use '.' field access on a float literal - a '.' right after a number is its decimal point
+```
+
+Verified: both spellings compiled with **exit 0** before and exit 1 after — the
+prior behaviour was `[checker] Warning: r: cannot infer type` and nothing else,
+then NullError for `0..5` and a segfault for `1..5`.
+
+Float lexing does not regress, which was the real risk. `1.5 0.5 1. 1.0 1.5e3
+1e3 1.5E-2 0x1F 3.14159 9.` and `(1.5).floor()` produce **byte-identical output**
+before and after. A compile-exit-code sweep over all 290 `.sf` files in `test/`,
+`test/pass/`, `test/fail/`, `src/lib/`, `src/compiler/` and `src/runtime/` differs
+in exactly two files, both of them the new fail-tests; the new diagnostic fires on
+one pre-existing file only, `ranges.sf`.
+
+Regression tests: `test/fail/ranges.sf` — `git mv`'d out of `test/pass/`, where it
+had been asserting a feature that never existed — and `test/fail/float_literal_dot_int.sf`
+for the case the lexer change does not cover.
 
 ---
 
@@ -5151,6 +5188,55 @@ value whose type inference failed is dropped or misdispatched rather than
 diagnosed), and it is *why* `test/oracle_println_class_not_bits.sf` annotates its
 lists. It also means #115's "only nested elements are wrong" framing holds for
 **annotated** collections only.
+
+---
+
+### 118. A nonexistent member of an imported module compiles cleanly and emits invalid IR
+
+**Severity: high.** Not a wrong answer — a compiler crash *reported as a compiler
+bug*, blaming itself for a plain typo in the user's program.
+
+```saffron
+import "@math" as Math
+IO.println(Math.NOPE)     // compiler exits 0; the IR is then rejected
+IO.println(Math.pi)       // 3.14159 — a real member is fine
+```
+
+```
+saffron: the compiler emitted invalid LLVM IR for test/pass/math.sf
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:1288:24: error: use of undefined value '%Math'
+    %t1 = load i64, i64* %Math
+```
+
+The last line is the whole story: having failed to resolve the *member*, codegen
+falls back to evaluating the **namespace itself** as if it were a local variable,
+and emits a load from an SSA name that was never defined. The message is actively
+misleading — it tells the user their correct compiler is broken when in fact their
+program has a typo, so the diagnostic points at the wrong party.
+
+Mechanism, and it is the recurring pattern again (**eighth instance**, after #22,
+#40, #78, #37, #103, #113, #114): a resolver with no way to say *not found*.
+`expr_body.sf:311` handles a module-prefixed member by trying two lookups —
+`known_functions` for `Module.fun`, then `module_globals` for `Module.global`. When
+both miss it does not report absence; it simply falls out of the block, and control
+reaches the generic receiver path at `expr_body.sf:332`, which evaluates `object`
+— the bare alias `Math`. The undefined-variable check that would have caught that
+(`expr_body.sf:91`) explicitly exempts `module_prefixes.has(name)`, and rightly so
+for a *valid* member access, so nothing else stops it.
+
+The fix belongs in the `module_prefixes` block: after both lookups miss, report
+`no member 'NOPE' in module 'Math'` and set `has_errors`, rather than falling
+through to a path that can only produce a load from a namespace. The alias is known
+to be a module at that point, so "not found" is expressible there and nowhere
+downstream.
+
+Found while checking a claim that `test/pass/math.sf` was merely a stale test
+calling `Math.PI` when `src/lib/math.sf:21` defines lowercase `pi`. The test *is*
+wrong, but that is not why it fails: any nonexistent member reproduces this, so
+renaming the constant would hide the bug rather than fix it. `test/pass/math.sf`
+remains red pending the diagnostic; fixing the test alone would be papering over
+the real defect.
 
 ---
 
