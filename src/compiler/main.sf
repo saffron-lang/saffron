@@ -181,7 +181,11 @@ fun _extract_entry_from_toml(source: String): String {
 //   "nopkg"                                            — provably has none
 // The two can never collide: "nopkg" does not start with "pkg:".
 
-fun _no_package_marker(): String { return "nopkg" }
+// Delegates to checker.sf so the marker has exactly one definition. Both sides
+// of the package seam compare against it, and two literals that must stay equal
+// would drift silently: a mismatch compiles fine and just makes every `internal`
+// check answer "different package".
+fun _no_package_marker(): String { return Checker.no_package_marker() }
 
 // Package identity is a directory compared by string, so the same directory must
 // have exactly one spelling. It does not, naturally: --lib-path is canonicalised
@@ -321,6 +325,40 @@ fun same_package(a_path: String, b_path: String): Bool {
 /// this is the whole mapping, for a later phase to thread into the front end.
 fun loaded_file_paths(): List<String> {
     return _file_to_package.keys()
+}
+
+/// The owning package root of one file, as the seam spells it: a real root when
+/// the file has one, the packageless marker when it provably does not. Used for
+/// the entry program, which is a module like any other but is not in
+/// `module_file_paths` — the boundary list covers the imports only.
+fun _entry_package_root(file_path: String): String {
+    if (file_has_package(file_path)) { return package_root_of_file(file_path) }
+    return _no_package_marker()
+}
+
+/// The owning package root of each module, in the same order as
+/// `module_prefixes_list` — so entry i answers "which package declared module i?"
+/// for the same i that indexes `prefixes_joined` and `module_boundaries`.
+///
+/// Encoded as a newline-joined string for the same reason `prefixes_joined` is
+/// "|"-joined: passing a `List<String>` through this seam hits the native list
+/// issues that encoding exists to dodge. Newline rather than "|" because a
+/// package root is a filesystem path and "|" is legal in one, while the prefix
+/// strings this sits beside are identifiers. A path cannot contain a newline on
+/// either supported platform, so this separator cannot collide.
+///
+/// Files with no owning package get the `_no_package_marker()` sentinel, never an
+/// empty string and never a synthetic name — a reader must be able to tell
+/// "packageless" from "package whose name I could not read".
+fun package_roots_joined(module_file_paths: List<String>): String {
+    var joined: String = ""
+    var i: Float = 0
+    while (i < module_file_paths.length()) {
+        if (i > 0) { joined = joined + "\n" }
+        joined = joined + _entry_package_root(module_file_paths[i])
+        i = i + 1
+    }
+    return joined
 }
 
 fun print_package_map() {
@@ -826,7 +864,12 @@ fun _build_package_exports(alias: String, entry_path: String, imp_path: String, 
     return exports
 }
 
-fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
+// `module_file_paths` is pushed in lockstep with `module_prefixes_list`, so index
+// i names the file that declared module i. Kept as a parallel list rather than
+// derived later from loaded_file_paths(): that map is in *load* order and also
+// holds files that are not modules, so recovering the correspondence afterwards
+// would be a re-derivation of something this walk already knows (M1).
+fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, module_file_paths: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
     // Owning package, recorded by the same walk that fills path_to_prefix.
@@ -873,7 +916,7 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
             }
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, all_aliases, path_to_prefix)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, all_aliases, path_to_prefix)
         }
         pi = pi + 1
     }
@@ -887,6 +930,7 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     }
     module_stmts.push(program)
     module_prefixes_list.push(prefix)
+    module_file_paths.push(file_path)
 }
 
 fun module_prefix_from_file(file_path: String): String {
@@ -1141,12 +1185,15 @@ fun main(): Int {
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
+    // Parallel to module_prefixes_list: index i is the file that declared module i.
+    var module_file_paths: List<String> = []
     if (OS.file_exists(prelude_path)) {
         var prelude_src: String = IO.read_file(prelude_path)
         var prelude_tokens: List = Lexer.lex(prelude_src)
         var prelude_program: List = Parser.parse_with_source(prelude_tokens, prelude_src)
         module_stmts.push(prelude_program)
         module_prefixes_list.push("")
+        module_file_paths.push(prelude_path)
         visited.set(prelude_path, true)
         record_file_package(prelude_path)
     }
@@ -1177,6 +1224,7 @@ fun main(): Int {
                     var dep_prefix: String = pkg_name + "_prelude_"
                     module_stmts.push(dep_program)
                     module_prefixes_list.push(dep_prefix)
+                    module_file_paths.push(pkg_prelude)
                     visited.set(pkg_prelude, true)
                     record_file_package(pkg_prelude)
 
@@ -1214,7 +1262,7 @@ fun main(): Int {
                             if (!path_to_prefix.has(dp_imp_full)) {
                                 path_to_prefix.set(dp_imp_full, path_based_prefix(dp_imp, dp_imp_full, stdlib_dir))
                             }
-                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
+                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix)
                         }
                         dpj = dpj + 1
                     }
@@ -1236,7 +1284,7 @@ fun main(): Int {
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
             }
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix)
         }
         pi = pi + 1
     }
@@ -1379,7 +1427,7 @@ fun main(): Int {
             // which module anything came from, so two modules declaring the
             // same class name are one entry (docs/design/access-modifiers.md
             // Phase 2; `Response` in http/client.sf and http/server.sf).
-            checker_errors = Checker.check_errors_with_modules(program, all_import_stmts, module_boundaries, prefixes_joined)
+            checker_errors = Checker.check_errors_with_module_packages(program, all_import_stmts, module_boundaries, prefixes_joined, package_roots_joined(module_file_paths), _entry_package_root(input_path))
         } else {
             checker_errors = Checker.check_errors_only(program)
         }
