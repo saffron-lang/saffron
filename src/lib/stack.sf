@@ -10,7 +10,7 @@ class StackIter {
         this._pos = items.length() - 1
     }
 
-    fun next?(): Bool {
+    fun has_next(): Bool {
         return this._pos >= 0
     }
 
