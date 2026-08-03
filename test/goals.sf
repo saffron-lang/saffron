@@ -27,7 +27,7 @@ interface Container<T> {
 
     fun get_size(): Number
 
-    fun full?(): Bool {
+    fun is_full(): Bool {
         return this.get_size() >= capacity
     }
 }
@@ -136,7 +136,7 @@ for (item in [10, 20, 30]) {
 // --- Map iteration ---
 var scores: Map<String, Number> = {"alice": 95, "bob": 87}
 var iter = scores.iter()
-while (iter.next?()) {
+while (iter.has_next()) {
     IO.println(iter.next())
 }
 

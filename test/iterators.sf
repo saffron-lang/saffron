@@ -8,7 +8,7 @@ for (item in [10, 20, 30, 40]) {
 IO.println("=== Map ===")
 var scores: Map<String, Number> = {"alice": 95, "bob": 87, "carol": 92}
 var iter = scores.iter()
-while (iter.next?()) {
+while (iter.has_next()) {
     IO.println(iter.next())
 }
 
