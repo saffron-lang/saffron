@@ -2345,7 +2345,16 @@ class NullChecker {
             MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
-            Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
+            // A lambda's body is code, so walk it. Returning the FuncType without
+            // visiting `b` meant a variable captured *only* inside a lambda was
+            // never marked used and drew a false "unused variable" (BUGS #126) —
+            // the same false-diagnostic class as #121, at a different un-walked
+            // subtree. The type is still the same erased FuncType: this arm is a
+            // walk, not new inference.
+            Lambda(p, r, b) => {
+                this.check_lambda_body(p, b)
+                AST.Type.FuncType([], AST.Type.AnyType)
+            }
             GetField(obj, field) => AST.Type.AnyType
             SetField(obj, field, value) => {
                 // A write is an access. This arm used to infer only `value` and
@@ -2452,6 +2461,45 @@ class NullChecker {
                 }
             }
         }
+    }
+
+    /// Walk a lambda's body so the variables it captures are marked used
+    /// (BUGS #126). The lambda's own parameters go into a pushed scope first, or
+    /// every use inside the body would resolve past them to an enclosing
+    /// variable of the same name — and the parameters themselves would read as
+    /// declarations that nothing touches.
+    ///
+    /// Two things this deliberately does NOT do.
+    ///
+    /// It does not call check_unused_in_scope() on the lambda scope, so an
+    /// unused lambda *parameter* stays unwarned. A callback that ignores an
+    /// argument it is handed is ordinary — `list.sort(fun (a: Int, b: Int) => 0)`
+    /// — and the parser also synthesises Lambdas the user never wrote (for-in
+    /// desugaring, trailing closures, `@suspend` bodies), whose parameters would
+    /// draw warnings naming code that does not exist in the source. Marking uses
+    /// is the fix; adding a new warning class is not.
+    ///
+    /// It clears current_func_ret to Any for the duration. The Return arm of
+    /// check_stmt compares against it, and a lambda's declared return type is
+    /// unreliable: parse_lambda defaults it to the *string* "Int" when there is
+    /// no annotation, so `fun () => nil` would be checked as returning nil from
+    /// an Int function and would fail. This walk exists to record uses, so it
+    /// must not start enforcing a return type nobody wrote.
+    fun check_lambda_body(params: List<AST.Param>, body: List<AST.Stmt>) {
+        var saved_ret: AST.Type = this.current_func_ret
+        this.current_func_ret = AST.Type.AnyType
+        this.env.push_scope()
+        var li: Float = 0
+        while (li < params.length()) {
+            var lp: AST.Param = params[li]
+            var lp_name: String = match (lp) { Param(n, t, d, p_vis) => n }
+            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis) => t }
+            this.env.define_var(lp_name, lp_type)
+            li = li + 1
+        }
+        this.check_stmts(body)
+        this.env.pop_scope()
+        this.current_func_ret = saved_ret
     }
 
     // String wrapper for backward compat — delegates to infer_type
