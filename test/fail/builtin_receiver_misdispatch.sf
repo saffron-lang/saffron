@@ -1,0 +1,23 @@
+// BUGS #134 — a method call on a concrete builtin receiver must NOT dispatch to
+// an unrelated user class that happens to declare a method of the same name.
+//
+// `s.frobnicate()` where `s: String` and only the unrelated `Widget` declares
+// `frobnicate()` used to resolve, via find_class_for_method, to Widget__frobnicate
+// and call it with the String pointer as `this` — printing 42 with no
+// diagnostic, and segfaulting outright when the borrowed method touched a field.
+// The receiver's static type is a concrete builtin (String), so the call must be
+// rejected as "type 'String' has no method 'frobnicate'", not silently rerouted.
+//
+// This file MUST be rejected by the compiler. A clean compile is a regression.
+
+class Widget {
+    var tag: Int
+    fun init() { this.tag = 7 }
+    fun frobnicate(): Int { return this.tag }
+}
+
+fun main() {
+    var s: String = "ab"
+    IO.println(s.frobnicate())
+}
+main()
