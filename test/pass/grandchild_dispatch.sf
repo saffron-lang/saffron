@@ -1,0 +1,59 @@
+// BUGS #135 — a method inherited from a GRANDPARENT but not redeclared on the
+// leaf must dispatch through a base-typed receiver.
+//
+// gen_virtual_dispatch emitted, for each concrete descendant, an arm switching
+// on that descendant's runtime tag but CALLING a symbol derived from the
+// descendant's own name. When the leaf inherits the method without redeclaring
+// it (Base→Mid overrides `label`, Leaf does not), no `Leaf__label` forwarder is
+// ever emitted, so codegen reported "no symbol for method 'label' on class
+// 'Leaf'" on a valid program. The arm must call the RESOLVED owner's symbol
+// (Mid__label) while still switching on the leaf's tag.
+//
+// The failure needed a base-typed receiver (`var x: Base = Leaf()`), which is
+// what forces a runtime dispatch arm per concrete class; `var x: Leaf` compiled
+// and printed "mid" because it bound statically.
+
+import "@test" as Test
+
+class Base {
+    fun init() {}
+    fun label(): String { return "base" }
+    fun show(): String { return this.label() }   // inherited call site
+}
+class Mid extends Base {
+    fun init() {}
+    fun label(): String { return "mid" }
+}
+class Leaf extends Mid {
+    fun init() {}                                 // does NOT redeclare label
+}
+
+// The headline repro: a Leaf viewed through a Base-typed slot.
+var x: Base = Leaf()
+Test.assert_eq(x.label(), "mid", "leaf inherits Mid's override through a base slot")
+
+// Reached through an inherited method whose body calls this.label() — the same
+// dispatch, one level of indirection deeper.
+Test.assert_eq(x.show(), "mid", "inherited show() dispatches label() to Mid")
+
+// A Mid in the same slot still resolves to its own override (the arm we always
+// had), so the fix did not regress the redeclaring case.
+var y: Base = Mid()
+Test.assert_eq(y.label(), "mid", "a Mid still uses its own override")
+
+// The base itself is unaffected.
+var z: Base = Base()
+Test.assert_eq(z.label(), "base", "the base's own method still resolves")
+
+// Through a List<Base> — another slot that forces runtime dispatch.
+var list: List<Base> = [Leaf(), Mid(), Base()]
+Test.assert_eq(list[0].label(), "mid", "leaf in a List<Base> dispatches to Mid")
+Test.assert_eq(list[2].label(), "base", "base in a List<Base> resolves to base")
+
+// A four-level chain where two consecutive leaves both skip the method: the
+// resolved owner is two hops up, which a one-level walk would still miss.
+class L3 extends Leaf { fun init() {} }
+var w: Base = L3()
+Test.assert_eq(w.label(), "mid", "a two-hop inherited method resolves to Mid")
+
+Test.summary()

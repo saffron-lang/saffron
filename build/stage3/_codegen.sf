@@ -12005,6 +12005,24 @@ class Codegen {
     return "i64"
     }
 
+    // True when the receiver's static type is a concrete builtin — a primitive,
+    // a container, or StringBuilder — as opposed to `Any` (unknown, keep the
+    // heuristic) or a user class (has class_fields). find_class_for_method must
+    // NOT fire for these: a String receiver calling a method String does not have
+    // was resolving to whatever unrelated user class happened to declare that
+    // name, dispatching to its symbol with a String pointer as `this` — printing
+    // a garbage value, or segfaulting when the borrowed method touched a field
+    // (BUGS #134). A concrete builtin with no matching builtin arm must instead
+    // reach the terminal fall-through, which reports "type 'X' has no method".
+    // `Any` is deliberately excluded — it stays on the find_class heuristic and
+    // its own "annotate the receiver" diagnostic.
+    fun recv_is_concrete_builtin(obj_type: String): Bool {
+        if (obj_type == "Int" or obj_type == "Float" or obj_type == "Bool" or obj_type == "String" or obj_type == "Nil") { return true }
+        if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { return true }
+        if (obj_type == "StringBuilder" or obj_type == "SB") { return true }
+        return false
+    }
+
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
         MethodCall(o, m, a) => "method_call"
@@ -12896,8 +12914,18 @@ class Codegen {
                 if (is_desc) {
                     var sc_owner: String = this.effective_method_owner(sc, method)
                     if (sc_owner.length() > 0 and sc_owner != ns_owner) {
-                        var bare: String = sc
-                        if (this.class_bare_of.has(sc)) { bare = this.class_bare_of.get(sc) }
+                        // The arm switches on sc's runtime tag (the concrete
+                        // class) but must CALL sc_owner's symbol — the class that
+                        // actually declares the method. When the concrete class
+                        // inherits the method without redeclaring it (Base→Mid
+                        // overrides, Leaf does not), no `Leaf__label` forwarder is
+                        // ever emitted, so deriving the symbol from sc gave
+                        // resolve_method_symbol a name that does not exist and it
+                        // reported "no symbol for method" on a valid program
+                        // (BUGS #135). sc_owner (Mid) is exactly the class whose
+                        // symbol was emitted.
+                        var bare: String = sc_owner
+                        if (this.class_bare_of.has(sc_owner)) { bare = this.class_bare_of.get(sc_owner) }
                         var tag: Float = this.class_type_ids.get(sc)
                         arm_tags.push(tag.floor().to_string())
                         arm_syms.push(this.resolve_method_symbol(bare, method))
@@ -14222,7 +14250,12 @@ class Codegen {
     // treat as user class dispatch. Skip known builtin methods (length, push, etc.)
     // to avoid hijacking built-in container dispatch.
     var __uc_is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
-    if (!is_user_class and !__uc_is_builtin_method and args.length() == 0) {
+    // The find_class_for_method fallback is a heuristic for a receiver whose type
+    // codegen could not resolve — it must not fire when the receiver has a KNOWN
+    // concrete builtin type, or an unrelated user class declaring `method` hijacks
+    // the call (BUGS #134). Only an Any/unresolved receiver keeps the heuristic.
+    var __uc_recv_type: String = this.dispatch_recv_type(obj_name, this.last_type)
+    if (!is_user_class and !__uc_is_builtin_method and args.length() == 0 and !this.recv_is_concrete_builtin(__uc_recv_type)) {
         var __uc_fcm: String = this.find_class_for_method(method)
         if (__uc_fcm.length() > 0 and __uc_fcm != "String" and __uc_fcm != "List" and __uc_fcm != "Map" and __uc_fcm != "Int" and __uc_fcm != "Float" and __uc_fcm != "Bool") {
             is_user_class = true
@@ -15237,10 +15270,16 @@ class Codegen {
     // Includes type-class methods (to_string, abs, floor, ceil, to_float) that are
     // handled by inline codegen above for known primitive types.
     var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
-    if (class_name.length() == 0 and this.current_class.length() > 0 and !is_builtin_method) {
+    // Same guard as the is_user_class fallback above: a non-builtin method on a
+    // concrete builtin receiver must NOT resolve to an unrelated user class that
+    // happens to declare the name (BUGS #134). Leave it empty so the terminal
+    // fall-through reports "type 'X' has no method". Only Any/unresolved receivers
+    // reach find_class_for_method here.
+    var __recv_builtin: Bool = this.recv_is_concrete_builtin(obj_type)
+    if (class_name.length() == 0 and this.current_class.length() > 0 and !is_builtin_method and !__recv_builtin) {
         class_name = this.find_class_for_method(method)
     }
-    if (class_name.length() == 0 and !is_builtin_method) {
+    if (class_name.length() == 0 and !is_builtin_method and !__recv_builtin) {
         class_name = this.find_class_for_method(method)
     }
     // Fallback: if class_name is still empty, try find_class_for_method even for

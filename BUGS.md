@@ -2,8 +2,8 @@
 
 ## Open
 
-**17 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
-#129, #130, #131, #132, #134, #135. Next free number is **#137**.
+**15 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
+#129, #130, #131, #132. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -22,81 +22,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 134. a method call on a builtin receiver silently dispatches to an unrelated user class
-
-**Severity: high — a silent wrong answer, and a segfault in the field-touching
-variant.** A call to a method name the receiver's real type does not have, but
-which *some* unrelated user class declares, resolves to that class's method
-instead of being rejected.
-
-```saffron
-class Widget { fun init() {} fun frobnicate(): Int { return 42 } }
-fun main() {
-    var s: String = "ab"
-    IO.println(s.frobnicate())   // prints 42 — String has no frobnicate()
-}
-main()
-```
-
-`String` has no `frobnicate`, `Widget` is never even constructed, yet the call
-prints `42`. Make the borrowed method touch a field and it is worse — the
-unrelated class's `this` is now a `String` pointer read at a class field offset:
-
-```saffron
-class Widget { var tag: Int  fun init() { this.tag = 7 } fun frobnicate(): Int { return this.tag } }
-// var s: String = "ab"; s.frobnicate()  →  Segmentation fault: 11
-```
-
-**Not String-specific.** I ran the same `Widget`/`frobnicate` shape over five
-receiver types and every one prints `42`:
-
-| receiver | result |
-|---|---|
-| `var s: String = "ab"` | 42 |
-| `var s: Int = 5` | 42 |
-| `var s: List<Int> = [1,2]` | 42 |
-| `var s: Bool = true` | 42 |
-| `var s: Float = 1.5` | 42 |
-
-So it is not "String is under-checked" — it is that a call on *any* builtin
-receiver, when nothing legitimately matches, falls through to whatever user class
-declares that name rather than erroring. Distinct from #37 (no branch matches →
-call silently dropped, RC 0): here the *wrong* branch matches. Same
-dispatch-permissiveness family as the resolved #37/#38/#91 cluster, so the
-receiver-type guard on the user-class method arm in `methods_body.sf` is where to
-look — a method arm is being emitted without first confirming the receiver's
-static type is that class (or a subtype).
-
-### 135. a method inherited from a grandparent but not redeclared on the leaf has no dispatch symbol
-
-**Severity: high — rejects valid programs at codegen.** A three-level chain where
-the middle class overrides a method and the leaf does not redeclare it fails to
-compile *when the call goes through a base-typed receiver* (the case that forces
-runtime dispatch):
-
-```saffron
-class Base { fun init() {} fun label(): String { return "base" }
-             fun show(): String { return this.label() } }
-class Mid extends Base { fun init() {} fun label(): String { return "mid" } }
-class Leaf extends Mid { fun init() {} }
-fun main() {
-    var x: Base = Leaf()
-    IO.println(x.label())   // [codegen] Error: no symbol for method 'label' on class 'Leaf'
-}
-main()
-```
-
-`var x: Leaf = Leaf(); x.label()` compiles and prints `mid` — the failure needs
-the base-typed variable, which is what makes codegen emit a runtime dispatch arm
-per concrete class. For `Leaf`, `effective_method_owner` resolves `Leaf`→`Mid`
-(the nearest ancestor that declares `label`), which differs from `ns_owner`
-(`Base`), so the arm is emitted — but it calls `resolve_method_symbol("Leaf",
-"label")` and no `Leaf__label` forwarder was ever emitted, only `Mid__label`. The
-arm should target the *resolved owner's* symbol (`Mid__label`), not the leaf's.
-Reported region: `methods_body.sf:904-938`. `test/pass/` has no three-level chain
-with a non-redeclaring leaf, which is why it survived; both cases above were
-reproduced on clean main.
 
 ### 110. FIXED — wasm32 never auto-invoked `fun main()`, so a main-only program silently printed nothing
 
@@ -1232,6 +1157,82 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 134. FIXED — a method call on a concrete builtin receiver dispatched to an unrelated user class
+
+**Severity: high — a silent wrong answer, and a segfault in the field-touching
+variant.** A call to a method name the receiver's real type does not have, but
+which *some* unrelated user class declared, resolved to that class's method
+instead of being rejected.
+
+```saffron
+class Widget { fun init() {} fun frobnicate(): Int { return 42 } }
+fun main() {
+    var s: String = "ab"
+    IO.println(s.frobnicate())   // printed 42 — String has no frobnicate()
+}
+main()
+```
+
+`String` has no `frobnicate`, `Widget` was never even constructed, yet the call
+printed `42`. With a field-touching body the unrelated class's `this` became a
+`String` pointer read at a class field offset — `Segmentation fault: 11`.
+
+**Not String-specific.** The same `Widget`/`frobnicate` shape over five receiver
+types (String, Int, `List<Int>`, Bool, Float) all printed `42`, so it was not
+"String is under-checked" — a call on *any* concrete builtin receiver, when
+nothing legitimately matched, fell through to whatever user class declared that
+name. Distinct from #37 (no branch matches → call silently dropped): there the
+*wrong* branch matched. Same dispatch-permissiveness family as #37/#38/#91.
+
+The cause: `find_class_for_method(method)` is a heuristic for a receiver whose
+type codegen could not resolve, and three sites in `gen_method_call` invoked it
+without first checking the receiver's static type. A `String` receiver resolved
+to `""`, `is_user_class` stayed false, and the heuristic found `Widget`. Fixed by
+`recv_is_concrete_builtin(obj_type)` — true for a primitive, container or
+StringBuilder, false for `Any` (which keeps the heuristic and its own
+annotate-the-receiver diagnostic) and for user classes — gating all three
+`find_class_for_method` sites. A concrete builtin with no matching builtin arm
+now reaches the terminal fall-through, which already reported "type 'X' has no
+method 'm'". The genuine builtin methods (`length`, `to_upper`, `abs`, `floor`,
+…) are dispatched by the arms above and are unaffected.
+
+`test/fail/builtin_receiver_misdispatch.sf` (must be rejected) and the legitimate
+builtin methods verified still working. Note the guard is keyed on the *static*
+type: a receiver whose type is genuinely `Any` still rides the heuristic, so the
+"annotate the value" story for #37 is intact.
+
+### 135. FIXED — a method inherited from a grandparent but not redeclared on the leaf had no dispatch symbol
+
+**Severity: high — rejected valid programs at codegen.** A three-level chain where
+the middle class overrode a method and the leaf did not redeclare it failed to
+compile *when the call went through a base-typed receiver* (the case that forces
+runtime dispatch):
+
+```saffron
+class Base { fun init() {} fun label(): String { return "base" }
+             fun show(): String { return this.label() } }
+class Mid extends Base { fun init() {} fun label(): String { return "mid" } }
+class Leaf extends Mid { fun init() {} }
+var x: Base = Leaf()
+x.label()   // was: [codegen] Error: no symbol for method 'label' on class 'Leaf'
+```
+
+`var x: Leaf = Leaf(); x.label()` compiled and printed `mid` — the failure needed
+the base-typed variable, which makes codegen emit a runtime dispatch arm per
+concrete descendant. In `gen_virtual_dispatch` each arm switches on the
+descendant's runtime tag but derived the *called symbol* from the descendant's
+own name (`sc`), so for `Leaf` it asked `resolve_method_symbol` for `Leaf__label`
+— a forwarder never emitted, because `Leaf` inherits `label` from `Mid` without
+redeclaring it. The arm already computed `sc_owner` (`effective_method_owner(sc,
+method)` = `Mid`, the class that actually declares the method); the fix derives
+the symbol's bare name from `sc_owner` while still switching on `sc`'s tag. When
+the descendant does redeclare, `sc_owner == sc` and behaviour is unchanged.
+
+`test/pass/grandchild_dispatch.sf`, 7 assertions: leaf through a base slot,
+through an inherited `show()`, a redeclaring `Mid` (the always-worked arm), the
+base itself, a `List<Base>`, and a four-level chain where the resolved owner is
+two hops up (a one-level walk would still miss it).
 
 ### 136. FIXED — a semicolon inside a block EXPRESSION was a parse error
 
