@@ -1,0 +1,97 @@
+// A class instance reaching a *formatter* prints its raw bit pattern.
+//
+// This is the class-shaped sibling of BUGS #105 (enums), and it is a SEPARATE
+// defect with a different mechanism, which is why it needs its own test:
+//
+//   #105 was cured for enums by codegen inserting an explicit
+//   `<Enum>__to_string()` call on the IO.println argument when the argument's
+//   static type is a known enum. That fix is static-type-driven, so it covers
+//   `IO.println(Color.Red)` and misses everything the checker cannot see
+//   through — a list element, most of all.
+//
+//   A class instance is not covered even at top level. `IO.println(p)` where
+//   `p: Pt` and Pt declares its own `to_string()` STILL prints
+//   `5.21502e-310`, because the println path has no class arm at all.
+//
+// The runtime cannot recover the answer on its own. A class instance DOES carry
+// a GC header (`__gc_alloc(size, class_tag)`, tags from 10 up) and
+// `__val_class_tag` can read it safely — so, unlike a fieldless enum, the value
+// is identifiable. What is missing is the other half: nothing maps a class tag
+// to that class's `to_string()`. `__any_to_string` in base_nanbox.ll has no
+// class arm because it has nothing to call. So this is a codegen change (emit a
+// tag-switch `__val_to_string` beside the `__class_parent_of` /
+// `__class_is_a` switches that `emit_class_hierarchy_helpers` already
+// generates), not a runtime one.
+//
+// WHAT THIS FILE ASSERTS, and what it deliberately does not:
+//
+// The two paths that go through an explicit `.to_string()` — interpolation
+// (the lexer inserts the call) and a hand-written call — are correct today, and
+// their correctness is asserted. Those are real invariants: they are what the
+// broken paths must eventually agree WITH.
+//
+// The broken paths are asserted only NEGATIVELY: whatever `IO.println` and the
+// list formatter produce, it must not be the bit-pattern garbage. That is the
+// invariant worth freezing, and it is the one that fails today. Per BUGS #107
+// discipline this file does NOT record `5.21502e-310` as expected output — that
+// address varies between runs and between optimization levels, and enshrining it
+// would turn the fix into a "regression".
+import "@test" as Test
+
+class Pt {
+    var x: Number
+    fun init(x: Number) { this.x = x }
+    fun to_string(): String { return "Pt(${this.x})" }
+}
+
+fun main() {
+    var p: Pt = Pt(3)
+
+    // --- The paths that work today. These are the reference answer.
+    Test.assert_eq("${p}", "Pt(3)", "interpolation calls the class to_string")
+    Test.assert_eq(p.to_string(), "Pt(3)", "an explicit to_string call works")
+
+    // Same for an element pulled back out of a list: the value survives the
+    // round trip, so nothing about list storage destroys it.
+    //
+    // The annotation is REQUIRED and is not decoration. Written
+    // `var ps = [Pt(1), Pt(2)]`, the element type is not inferred, so
+    // `ps[0].to_string()` dispatches on an untyped receiver and returns the raw
+    // pointer — it printed `5.21502e-310` too, from a *different* cause (the
+    // untyped-dispatch hazard, not the formatter). Annotating removes that
+    // second cause so the assertions below isolate the formatter.
+    var ps: List<Pt> = [Pt(1), Pt(2)]
+    Test.assert_eq(ps[0].to_string(), "Pt(1)", "explicit to_string on an element")
+    Test.assert_eq(ps[1].to_string(), "Pt(2)", "explicit to_string on element 1")
+
+    // --- The broken paths, stated as invariants rather than as expected text.
+    //
+    // A formatted instance must not be a bare float. Every garbage rendering
+    // seen so far is a subnormal double printed in exponential form, so the
+    // presence of "e-" is a sound detector for it and cannot fire on the
+    // correct answer "Pt(3)".
+    var s_interp: String = "${p}"
+    Test.assert(!s_interp.contains("e-"),
+        "an interpolated instance is not a raw float (passes today)")
+
+    // FAILS TODAY: the list formatter renders each element via
+    // __rt_elem_to_string -> __any_to_string, which has no class arm.
+    var s_list: String = "${ps}"
+    Test.assert(!s_list.contains("e-"),
+        "a list of instances is not a list of raw floats")
+
+    // A weaker, encoding-independent form of the same invariant: two instances
+    // with different field values must not format identically. Today they do —
+    // both render as the same subnormal, because the address is what gets
+    // printed and both addresses reinterpret to the same 6-digit float.
+    Test.assert_eq(ps[0].to_string() == ps[1].to_string(), false,
+        "distinct instances stringify differently via to_string (passes today)")
+
+    // And the invariant that ties the broken path to the working one: whatever
+    // the list formatter produces for element 0 must contain what the explicit
+    // call produces for element 0.
+    Test.assert(s_list.contains(ps[0].to_string()),
+        "the list rendering contains each element's own to_string")
+
+    Test.summary()
+}

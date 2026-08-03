@@ -1,0 +1,73 @@
+// SortedMap orders keys by `<` on String, not by a printable-ASCII table.
+//
+// sorted_map.sf used to compare keys through an `_alphabet` lookup table, a
+// workaround for BUGS #104 (`<` on strings compared heap addresses). The table
+// covered printable ASCII only and ranked characters with index_of, which
+// answers -1 for anything absent, so every non-ASCII byte tied at -1 and sorted
+// ahead of the space character.
+//
+// Two of these assertions FAIL against the table and pass against `<`:
+//   - the ordering of a non-ASCII key relative to an ASCII one
+//   - the sorted invariant itself, which the tie destroyed: inserting
+//     cafz/café/cafa left the table-backed map holding [café, cafa, cafz],
+//     which is not sorted under any ordering, and a binary search over a
+//     non-sorted array is undefined.
+//
+// The ASCII assertions are controls: they pass either way, and their job is to
+// show that routing through `<` did not regress the ordinary case.
+import "@test" as Test
+import "@sorted_map" as SortedMap
+
+fun main() {
+    // --- Control: plain ASCII keys, inserted in reverse-alphabetical order so
+    // no heap-layout luck can make a broken comparison look right.
+    var ascii = SortedMap.new()
+    ascii.set("zebra", 1)
+    ascii.set("mango", 2)
+    ascii.set("cherry", 3)
+    ascii.set("banana", 4)
+    ascii.set("apple", 5)
+    Test.assert_eq("${ascii.keys()}", "[apple, banana, cherry, mango, zebra]",
+        "ASCII keys come back in alphabetical order")
+    // Every key still retrieves its own value: the search agrees with the order.
+    Test.assert_eq(ascii.get("apple"), 5, "get(apple)")
+    Test.assert_eq(ascii.get("banana"), 4, "get(banana)")
+    Test.assert_eq(ascii.get("cherry"), 3, "get(cherry)")
+    Test.assert_eq(ascii.get("mango"), 2, "get(mango)")
+    Test.assert_eq(ascii.get("zebra"), 1, "get(zebra)")
+    Test.assert(ascii.has("mango"), "has(mango)")
+    Test.assert(!ascii.has("durian"), "absent key is absent")
+
+    // --- The non-ASCII case. "café" is 5 UTF-8 bytes ending 0xC3 0xA9; 0xC3 is
+    // 195, above 'z' (122), so byte order puts "café" after both "cafa" and
+    // "cafz". The table put it first.
+    Test.assert(!("café" < "cafz"), "café does not sort before cafz")
+    Test.assert("cafz" < "café", "cafz sorts before café")
+
+    var mixed = SortedMap.new()
+    mixed.set("cafz", 1)
+    mixed.set("café", 2)
+    mixed.set("cafa", 3)
+    Test.assert_eq("${mixed.keys()}", "[cafa, cafz, café]",
+        "a non-ASCII key sorts by byte order, after the ASCII ones")
+
+    // The invariant, stated without reference to what the right order is: the
+    // keys the map hands back must be non-decreasing under the same `<` the map
+    // searches with. This held for neither ordering under the table.
+    var ks = mixed.keys()
+    var i = 1
+    var sorted = true
+    while (i < ks.length()) {
+        if (ks[i] < ks[i - 1]) { sorted = false }
+        i = i + 1
+    }
+    Test.assert(sorted, "keys() is non-decreasing under `<`")
+
+    // And lookups still land on the right entry with a non-ASCII key present.
+    Test.assert_eq(mixed.get("café"), 2, "get(café)")
+    Test.assert_eq(mixed.get("cafz"), 1, "get(cafz)")
+    Test.assert_eq(mixed.get("cafa"), 3, "get(cafa)")
+    Test.assert(!mixed.has("cafb"), "absent key next to a non-ASCII one")
+
+    Test.summary()
+}
