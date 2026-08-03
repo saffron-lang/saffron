@@ -195,9 +195,14 @@ class Computed<T> {
         this.value = this.compute()
         // deps is List<Any> — holds mixed Signal/Computed, dispatched by memory offset
         var deps: List<Any> = stop_tracking()
-        var i: Float = 0
+        var i: Int = 0
         while (i < deps.length()) {
-            deps[i].subscribe(fun () => {
+            // Bound to a temp before the call: calling a user-defined method
+            // directly on an index expression (`deps[i].subscribe(...)`) is a
+            // parse error — BUGS #138. Builtin methods and field access on the
+            // same shape parse fine, which is why this reads as if it should work.
+            var dep: Any = deps[i]
+            dep.subscribe(fun () => {
                 this.value = this.compute()
                 _schedule_notify(this, fun () => this.notify())
             })
