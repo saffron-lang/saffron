@@ -65,11 +65,10 @@ fun fibonacci(n: Number): Number {
 Prefer lines under 100 characters. Break long function calls or chains:
 
 ```saffron
-// Break pipe chains
-var result = items
-    |> filter(fun (x: Number): Bool => x > threshold)
-    |> map(fun (x: Number): Number => x * 2)
-    |> Iter.sum()
+// Name intermediate steps instead of deeply nesting calls
+var big = Iter.filter(items, fun (x: Number): Bool => x > threshold)
+var scaled = Iter.map(big, fun (x: Number): Number => x * 2)
+var result = Iter.sum(scaled)
 
 // Break long parameter lists
 fun create_user(

@@ -196,7 +196,7 @@ The framework is unaware — it only sees function calls with trailing blocks re
 - **Enums + pattern matching** → conditional rendering (`match` on state)
 - **Generics** → typed props and signals (`Signal<Number>`)
 - **Interfaces** → component contracts
-- **Pipe operator** → composition chains
+- **Trailing closures** → builder-style element nesting
 - **Cooperative async** → data fetching / suspense
 - **String interpolation** → text content in templates
 - **Type system** → compile-time validation of attributes and props

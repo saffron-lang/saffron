@@ -63,21 +63,22 @@ m.length()       // number of entries
 
 ### Iteration
 
-Maps support iteration via `.iter()`, which yields `[key, value]` pairs:
+Maps are iterable and yield `[key, value]` pairs. The idiomatic form is a for-in loop:
 
 ```saffron
 var m = {"a": 1, "b": 2}
-var iter = m.iter()
-while (iter.next?()) {
-    var entry = iter.next()
+
+for (entry in m) {
     IO.println("${entry[0]} = ${entry[1]}")
 }
 ```
 
-Or with a for-in loop:
+Or drive the iterator by hand with `.iter()`, `has_next()`, and `next()`:
 
 ```saffron
-for (entry in m) {
-    IO.println(entry)
+var iter = m.iter()
+while (iter.has_next()) {
+    var entry = iter.next()
+    IO.println("${entry[0]} = ${entry[1]}")
 }
 ```
