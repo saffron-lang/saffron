@@ -3,7 +3,7 @@
 ## Open
 
 **10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139. Next free number is **#142**.
+#139. Next free number is **#143**.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -608,6 +608,41 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
+
+**Severity: high.** `[1,2] == [1,2]` was `false`; `{"a":1} == {"a":1}` was
+`false`; nested and reordered cases likewise. `IO.println` showed the operands
+identical, so the wrongness was invisible until you compared them.
+
+`gen_binary`'s `==` chain (`expr_body.sf`) had arms for String (`__string_eq`),
+Any (`__any_eq`), Float (`fcmp`), and same-enum (`__enum_eq_<Name>`), then fell
+through to a raw `icmp eq i64`. Two Lists or two Maps landed on that fall-through,
+which compares the two malloc addresses — the same "one spelling, two semantics"
+defect the enum arm right above it was added to fix, in a different shape.
+
+`__rt_val_eq` in `runtime.sf` already did the correct deep by-value comparison but
+nothing reached it: no arm routed a statically-typed List/Map to it. The fix adds
+an arm above the integer fall-through that sends both-aggregate operands to
+`__rt_val_eq`. It targets `__rt_val_eq`, not `__any_eq`, because `__any_eq`'s body
+is hand-written IR present only in `base_nanbox.ll` and `wasm_base_32.ll`, so an
+arm keyed on it would emit an unresolvable symbol under `--identity-mode`
+(`base.ll`) and on wasm64 (`wasm_base.ll`). `__rt_val_eq` is compiled from
+`runtime.sf` and links on every target, and is the body `__any_eq` itself
+delegates to, so the two cannot drift apart. A user `eq` overload cannot reach
+this: List and Map are runtime primitives with no Saffron class for the
+operator-overload dispatch to key on, which is why the fix lives in codegen.
+
+The declare needs the same `defined_funcs` guard `__runtime_error` uses:
+`runtime.sf` *defines* `__rt_val_eq`, and clang rejects a `declare`+`define` of one
+name in a single module. Emitting it unconditionally broke the gen4 link.
+**Filed as #142, not #137.** The fix landed on the `phase5-internal` worktree,
+which branched before #137/#138/#139 existed and numbered this entry #137 off its
+own stale next-free note. #137 is the soft-keyword `as` bug, already resolved
+below. The worktree's own commit message flags that it had earlier been called
+"BUGS #28" — an internal task-list ID colliding with the resolved #28 (Int->Float
+literal). Two renumberings for one bug is what a per-worktree next-free counter
+buys; the number is only free if you read the number from `main`.
 
 ### 141. FIXED — `return;` was a parse error, while `return` and `return 1;` both parsed
 

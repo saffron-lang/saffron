@@ -2494,6 +2494,50 @@ class Codegen {
                 return this.emit_tag_bool(ee_bool)
             }
 
+            // List and Map equality: structural, not by address.
+            //
+            // These are the last two builtin aggregates that reached the integer
+            // fall-through below, where `icmp eq` on two heap values compares the
+            // two malloc addresses: `[1,2] == [1,2]` and `{"a":1} == {"a":1}` both
+            // answered false while IO.println showed the operands identical. It is
+            // the enum defect above in a different shape, and the same argument
+            // applies — one spelling must not mean value equality for a String and
+            // identity for a List.
+            //
+            // A user-level `eq` overload cannot close this: the operator-overload
+            // dispatch at the top of gen_binary keys off class_methods, and List
+            // and Map are runtime primitives with no Saffron class to hang a
+            // method on. So the comparison routes to the runtime.
+            //
+            // __rt_val_eq, not __any_eq: __any_eq's body is hand-written IR that
+            // exists only in base_nanbox.ll and wasm_base_32.ll, so an arm keyed on
+            // it would emit an unresolvable symbol under --identity-mode (base.ll)
+            // and on wasm64 (wasm_base.ll), which have neither. __rt_val_eq is
+            // compiled from runtime.sf and is present wherever runtime.ll links,
+            // which is every target. It is also the body __any_eq itself delegates
+            // to, so the two spellings cannot disagree.
+            //
+            // Both operands must be statically List/Map. A single such operand
+            // means the other is Any (already handled above) or a genuine type
+            // mismatch, which is the checker's to report, not ours to guess at.
+            var lm_lbase: String = this.generic_base_name(left_type)
+            var lm_rbase: String = this.generic_base_name(right_type)
+            var lhs_is_aggregate: Bool = lm_lbase == "List" or lm_lbase == "Map"
+            var rhs_is_aggregate: Bool = lm_rbase == "List" or lm_rbase == "Map"
+            if (lhs_is_aggregate and rhs_is_aggregate) {
+                var lm_raw: String = this.fresh_local()
+                this.emit_indent(lm_raw + " = call i64 @__rt_val_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                // `!=` is the negation of the same call, so the two operators
+                // cannot drift apart.
+                var lm_cmp: String = this.fresh_local()
+                if (op == "==") { this.emit_indent(lm_cmp + " = icmp ne i64 " + lm_raw + ", 0") }
+                else { this.emit_indent(lm_cmp + " = icmp eq i64 " + lm_raw + ", 0") }
+                var lm_bool: String = this.fresh_local()
+                this.emit_indent(lm_bool + " = zext i1 " + lm_cmp + " to i64")
+                this.last_type = AST.Type.BoolType
+                return this.emit_tag_bool(lm_bool)
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
@@ -6741,7 +6785,13 @@ class Codegen {
     fun gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
         if (name.ends_with("load64")) {
             var addr: String = this.gen_arg_value(args[0])
-            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
+            // Untag before dereferencing: a void* extern return arrives NaN-tagged
+            // (via __val_tag_ptr_nullable), so a bare inttoptr would load through
+            // TAG_PTR bits and segfault. load8/store8 route through emit_untag_ptr
+            // for the same reason; the 64-bit pair was the outlier (BUGS #80).
+            var raw_ptr: String = this.emit_untag_ptr(addr)
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw_ptr + " to i64*")
             var val: String = this.fresh_local()
             this.emit_indent(val + " = load i64, i64* " + ptr)
             this.last_type = AST.Type.IntType
@@ -6750,7 +6800,9 @@ class Codegen {
         if (name.ends_with("store64")) {
             var addr: String = this.gen_arg_value(args[0])
             var val: String = this.gen_arg_value(args[1])
-            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
+            var raw_ptr: String = this.emit_untag_ptr(addr)
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw_ptr + " to i64*")
             this.emit_indent("store i64 " + val + ", i64* " + ptr)
             this.last_type = AST.Type.NilType
             return "0"
@@ -8978,7 +9030,7 @@ class Codegen {
         this.block_terminated = false
         this.reset_locals()
         var tag_r: String = this.fresh_local()
-        this.emit_indent(tag_r + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(tag_r + " = call i64 @__val_class_tag(i64 %val)")
         var end_lbl: String = this.fresh_label("rcn.end")
         var switch_str: String = ""
         var arm_labels: List<String> = []
@@ -9019,7 +9071,7 @@ class Codegen {
         this.block_terminated = false
         this.reset_locals()
         var is_tag: String = this.fresh_local()
-        this.emit_indent(is_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(is_tag + " = call i64 @__val_class_tag(i64 %val)")
         var cmp: String = this.fresh_local()
         this.emit_indent(cmp + " = icmp uge i64 " + is_tag + ", 10")
         var result: String = this.fresh_local()
@@ -9052,7 +9104,7 @@ class Codegen {
         this.block_terminated = false
         this.reset_locals()
         var gf_tag: String = this.fresh_local()
-        this.emit_indent(gf_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        this.emit_indent(gf_tag + " = call i64 @__val_class_tag(i64 %val)")
         var gf_end: String = this.fresh_label("rgf.end")
         var gf_switch: String = ""
         var gf_arms: List<String> = []
@@ -11826,6 +11878,17 @@ class Codegen {
         // --identity-mode and calls it to hand tagged values back to value
         // space. Omitting the declare left gen4 unable to link.
         out.append("declare i64 @__rt_tag_ptr(i64)\n")
+        // Deep by-value equality, used by the List/Map arm of gen_binary. Chosen
+        // over __any_eq because its body is compiled from runtime.sf and so exists
+        // on every target that links runtime.ll — including identity mode (base.ll)
+        // and wasm64 (wasm_base.ll), neither of which has __any_eq. The flip side
+        // is that runtime.sf DEFINES this symbol, so the module that compiles
+        // runtime.sf must not also declare it (clang rejects declare+define of one
+        // name). Guard exactly as __runtime_error is guarded below: emit the
+        // declare only when this module did not itself define it.
+        if (!this.str_in_list(this.defined_funcs, "__rt_val_eq")) {
+            out.append("declare i64 @__rt_val_eq(i64, i64)\n")
+        }
         out.append("declare double @strtod(i8*, i8*)\n")
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
@@ -16709,8 +16772,15 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 _ => ""
             }
             if (gvname.length() > 0) {
+                // A top-level name can be declared more than once (`var b = 6` then
+                // `var b = Doughnut()`); both re-use one slot. module_globals dedupes,
+                // but the globals LIST did not, so a second decl emitted a duplicate
+                // `@__g_b = global i64 0` — `redefinition of global` (BUGS #80). Guard
+                // the emission with has() BEFORE set().
+                if (!gen.module_globals.has(gvname)) {
+                    gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+                }
                 gen.module_globals.set(gvname, true)
-                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
                 // Infer from the initializer when unannotated, exactly as the
@@ -17419,8 +17489,15 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 _ => ""
             }
             if (gvname.length() > 0) {
+                // A top-level name can be declared more than once (`var b = 6` then
+                // `var b = Doughnut()`); both re-use one slot. module_globals dedupes,
+                // but the globals LIST did not, so a second decl emitted a duplicate
+                // `@__g_b = global i64 0` — `redefinition of global` (BUGS #80). Guard
+                // the emission with has() BEFORE set().
+                if (!gen.module_globals.has(gvname)) {
+                    gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+                }
                 gen.module_globals.set(gvname, true)
-                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
                 // Infer from the initializer when unannotated, exactly as the

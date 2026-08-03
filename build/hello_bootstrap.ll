@@ -64,6 +64,7 @@ declare double @__val_untag_float(i64)
 declare i64 @__val_tag_bool(i64)
 declare i64 @__val_untag_bool(i64)
 declare i64 @__rt_tag_ptr(i64)
+declare i64 @__rt_val_eq(i64, i64)
 declare double @strtod(i8*, i8*)
 declare double @llvm.floor.f64(double)
 
