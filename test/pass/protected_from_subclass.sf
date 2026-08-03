@@ -1,0 +1,56 @@
+// The positive half of §5b, covering both clauses of `protected` and the case
+// Phase 3b unblocked.
+//
+// `Sink` inherits from a SECONDARY base (`Meter` is parents[1]), which is the
+// case that made `protected` unimplementable before BUGS #111: the parser
+// discarded parents 2..n, so the checker could not answer "does Sink derive from
+// Meter?" and would have allowed the access without being able to resolve it.
+// inherits_from now searches the whole inheritance DAG, so it is answerable, and
+// §11 decision 2's precedence rule governs which base wins a tie.
+//
+// `Named` is first because only parents[0] contributes fields and forwards init.
+import "@test" as T
+
+class Named {
+    var label: String
+    fun init(label: String) { this.label = label }
+}
+
+interface Meter {
+    protected fun scale(): Int { return 10 }
+}
+
+class Sink extends Named, Meter {
+    fun init() { this.label = "sink" }
+    // A subclass reads a protected member of a base it reaches at position 1.
+    fun measure(v: Int): Int { return v * this.scale() }
+}
+
+// A protected member declared on the class itself, read from within its own body,
+// is the first clause — the same extent class-private already has.
+class Direct {
+    protected var seed: Int
+    fun init() { this.seed = 3 }
+    fun doubled(): Int { return this.seed * 2 }
+}
+
+// `protected init` must keep permitting the same-module factory, because
+// `protected` is `private` plus subclasses and the two must stay MONOTONE on
+// constructors: an author widening `private init` to `protected init` to reach
+// subclasses would otherwise silently lose the factory that was the reason to
+// restrict the constructor at all. test/fail/protected_init_external.sf is the
+// boundary that keeps this from being a blanket allowance.
+class Gate {
+    var ticks: Int
+    protected fun init(ticks: Int) { this.ticks = ticks }
+    fun get(): Int { return this.ticks }
+}
+
+fun new_gate(ticks: Int): Gate {
+    return Gate(ticks)
+}
+
+T.assert_eq(Sink().measure(4), 40, "protected member on a secondary base is reachable from a subclass")
+T.assert_eq(Direct().doubled(), 6, "protected member is reachable inside its own class")
+T.assert_eq(new_gate(11).get(), 11, "a same-module factory may call a protected init")
+T.summary()

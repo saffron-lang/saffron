@@ -287,7 +287,7 @@ class NullChecker {
 
     // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
     //
-    // Which class members are private, keyed "<class key>#<member name>". The
+    // Which class members are restricted, keyed "<class key>#<member name>". The
     // class name is part of the key on purpose: two classes can declare the same
     // member name with different visibility — one `private fun bump`, one public
     // — and a table keyed by member name alone would reject the public one. Both
@@ -299,15 +299,22 @@ class NullChecker {
     // same-module free function reading a private field is rejected. That
     // asymmetry with module-level `private` is deliberate (§6a) and is why the
     // stdlib's 24 leading-underscore fields must stay unannotated until they can
-    // be marked `internal`.
-    var private_members: Map<String, String>
-    // Every member name that is private on *some* class. This is the gate on the
-    // unresolvable-receiver warning (§3), and it is what keeps that warning from
-    // being useless noise: an `Any`-typed receiver is pervasive and honest, so
+    // be marked `internal`. Class-`protected` is the same rule widened to
+    // subclasses, which is the ONLY difference between the two (§5b).
+    //
+    // The VALUE is the restriction — "private" or "protected" — not a constant.
+    // Phase 4 wrote only "private" and Phase 5b added "protected"; keeping one
+    // table keyed the same way is what makes the two share a single ancestry walk
+    // and a single decision function, rather than growing a parallel table whose
+    // keys could drift out of step with this one.
+    var member_visibility: Map<String, String>
+    // Every member name that is restricted on *some* class. This is the gate on
+    // the unresolvable-receiver warning (§3), and it is what keeps that warning
+    // from being useless noise: an `Any`-typed receiver is pervasive and honest, so
     // warning about every member access through one would bury the signal. A
-    // warning is only worth printing when the name being read is private
+    // warning is only worth printing when the name being read is restricted
     // somewhere — i.e. when there is genuinely a check that could not be made.
-    var private_member_names: Map<String, Bool>
+    var restricted_member_names: Map<String, Bool>
     // Type names declared `private` — classes, interfaces, actors, enums and type
     // aliases. This is the input to the leak pass (§6b), and it is the FIRST
     // reader of a top-level declaration's visibility: module-level enforcement
@@ -368,8 +375,8 @@ class NullChecker {
         this.ambiguous_classes = []
         this.local_classes = []
         this.registering_local = false
-        this.private_members = {}
-        this.private_member_names = {}
+        this.member_visibility = {}
+        this.restricted_member_names = {}
         this.private_types = {}
         this.decl_visibility = {}
         this.entry_aliases = {}
@@ -1074,7 +1081,7 @@ class NullChecker {
                 // modules declaring the same class stay distinguishable
                 // (register_class_identity; the `Response` collision).
                 this.register_class_identity(name, this.params_list_to_string(fields))
-                this.register_private_members(name, fields, methods)
+                this.register_member_visibility(name, fields, methods)
                 this.register_type_visibility(name, c_vis)
                 // register_class_identity already wrote decl_module_file /
                 // decl_module_package under the qualified key; record only the
@@ -1462,6 +1469,19 @@ class NullChecker {
         }
     }
 
+    /// How to name a declaration whose signature the leak pass is checking.
+    ///
+    /// The pass runs on everything that is not `private`, because everything else
+    /// is reachable from somewhere the private type is not — `internal` from the
+    /// package, `protected` from a subclass in any module. So the subject label
+    /// must say which it is: calling a `protected` field "public" in a diagnostic
+    /// tells the reader to look for a `public` they will not find, and invites the
+    /// conclusion that the check is wrong rather than that their field leaks.
+    fun exposure_label(visibility: String): String {
+        if (visibility.length() == 0) { return "public" }
+        return visibility
+    }
+
     /// Is the type `name` spells private, as seen from the module under check?
     fun is_private_type(name: String): Bool {
         var base: String = this.generic_base(name)
@@ -1559,7 +1579,7 @@ class NullChecker {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc, f_vis) => {
                 if (f_vis != "private") {
-                    this.check_fun_leaks("public fun '" + name + "'", params, ret_type)
+                    this.check_fun_leaks(this.exposure_label(f_vis) + " fun '" + name + "'", params, ret_type)
                 }
             }
             ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
@@ -1580,20 +1600,20 @@ class NullChecker {
                 while (pi < parents.length()) {
                     var parent_leak: String = this.private_type_in(parents[pi])
                     if (parent_leak.length() > 0) {
-                        this.error("public class '" + name + "' extends private type '"
+                        this.error(this.exposure_label(c_vis) + " class '" + name + "' extends private type '"
                             + parent_leak + "'; '" + parent_leak
                             + "'s members become reachable through '" + name + "'")
                     }
                     pi = pi + 1
                 }
-                // L1: public fields.
+                // L1: fields reachable from outside — everything but `private`.
                 var fi: Float = 0
                 while (fi < fields.length()) {
                     var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
                     var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
                     var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pt }
                     if (f_vis != "private") {
-                        this.check_leak("public field '" + name + "." + f_name + "'",
+                        this.check_leak(this.exposure_label(f_vis) + " field '" + name + "." + f_name + "'",
                             "its declared type", this.type_to_str(f_type))
                     }
                     fi = fi + 1
@@ -1618,7 +1638,7 @@ class NullChecker {
                         _ => ""
                     }
                     if (m_name.length() > 0 and m_vis != "private") {
-                        this.check_fun_leaks("public method '" + name + "." + m_name + "'",
+                        this.check_fun_leaks(this.exposure_label(m_vis) + " method '" + name + "." + m_name + "'",
                             m_params, m_ret)
                     }
                     mi = mi + 1
@@ -1626,7 +1646,7 @@ class NullChecker {
             }
             VarDecl(n, t, i, d, v_vis) => {
                 if (v_vis != "private" and d != "@type_alias") {
-                    this.check_var_leaks(n, t, i)
+                    this.check_var_leaks(n, t, i, v_vis)
                 }
             }
             EnumDecl(name, variants, doc, e_vis) => {
@@ -1639,7 +1659,7 @@ class NullChecker {
                     while (vi < variants.length()) {
                         var v_name: String = match (variants[vi]) { Variant(vn, vf) => vn }
                         var v_fields: String = match (variants[vi]) { Variant(vn, vf) => vf }
-                        this.check_leak("public enum '" + name + "." + v_name + "'",
+                        this.check_leak(this.exposure_label(e_vis) + " enum '" + name + "." + v_name + "'",
                             "its payload", v_fields)
                         vi = vi + 1
                     }
@@ -1657,7 +1677,7 @@ class NullChecker {
             LetPattern(p, v) => {}
             TypeAlias(ta_n, ta_t, ta_vis) => {
                 if (ta_vis != "private") {
-                    this.check_leak("public type alias '" + ta_n + "'", "its target", ta_t)
+                    this.check_leak(this.exposure_label(ta_vis) + " type alias '" + ta_n + "'", "its target", ta_t)
                 }
             }
         }
@@ -1701,15 +1721,16 @@ class NullChecker {
     /// "traded one silent wrong answer for a batch of false rejections". So that
     /// case warns. The asymmetry is deliberate — say what you know, and say when
     /// you do not know.
-    fun check_var_leaks(name: String, type_ann: String, initializer: AST.Expr) {
+    fun check_var_leaks(name: String, type_ann: String, initializer: AST.Expr, visibility: String) {
+        var subject: String = this.exposure_label(visibility) + " var '" + name + "'"
         if (type_ann != "Any" and type_ann.length() > 0) {
-            this.check_leak("public var '" + name + "'", "its declared type", type_ann)
+            this.check_leak(subject, "its declared type", type_ann)
             return nil
         }
         // No annotation: look for a constructor call in the initializer.
         var ctor: String = this.constructor_call_name(initializer)
         if (ctor.length() > 0 and this.is_private_type(ctor)) {
-            this.error("public var '" + name + "' exposes private type '" + ctor
+            this.error(subject + " exposes private type '" + ctor
                 + "' in its inferred type (from initializer '" + ctor + "()')")
             return nil
         }
@@ -1717,7 +1738,7 @@ class NullChecker {
         var inferred: String = this.type_to_str(this.infer_type_readonly(initializer))
         var leaked: String = this.private_type_in(inferred)
         if (leaked.length() > 0) {
-            this.warn("public var '" + name + "' may expose private type '" + leaked
+            this.warn(subject + " may expose private type '" + leaked
                 + "' in its inferred type '" + inferred
                 + "'; add an explicit annotation to say which you mean")
         }
@@ -1781,16 +1802,16 @@ class NullChecker {
 
     // --- Class-member visibility (Phase 4 of docs/design/access-modifiers.md) ---
 
-    /// Record every `private` field and method of a class, and reject the one
-    /// combination that cannot mean anything.
-    fun register_private_members(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+    /// Record every restricted (`private` or `protected`) field and method of a
+    /// class, and reject the one combination that cannot mean anything.
+    fun register_member_visibility(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
         var qualified: String = this.current_prefix + name
         var fi: Float = 0
         while (fi < fields.length()) {
             var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
             var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
-            if (f_vis == "private") {
-                this.mark_private_member(name, qualified, f_name)
+            if (this.is_restricting_visibility(f_vis)) {
+                this.mark_restricted_member(name, qualified, f_name, f_vis)
             }
             fi = fi + 1
         }
@@ -1808,82 +1829,173 @@ class NullChecker {
                 FunDecl(mn, mp, mr, mb, md, mv) => mb
                 _ => []
             }
-            if (m_name.length() > 0 and m_vis == "private") {
-                // A private *abstract* method is a contradiction, not a
+            if (m_name.length() > 0 and this.is_restricting_visibility(m_vis)) {
+                // A restricted *abstract* method is a contradiction, not a
                 // restriction. The distinction is the one class_abstract_methods
                 // already draws: bodyless means "a requirement on subclasses".
                 // An implementor in another module must be able to name the
                 // method to implement it, and check_conformance would then demand
                 // an implementation that implementor is forbidden to write — so
-                // the declaration makes the type unimplementable. A private
-                // *default* method (one with a body) is a perfectly good private
-                // helper and is allowed.
+                // the declaration makes the type unimplementable. A restricted
+                // *default* method (one with a body) is a perfectly good helper
+                // and is allowed.
+                //
+                // This holds for `protected` as well as `private`, and for a
+                // narrower reason worth stating: `protected` *does* reach
+                // subclasses, so a protected abstract method looks implementable.
+                // It is not — the modifier restricts who may CALL the name, and
+                // an interface's abstract method exists to be called by code
+                // holding the interface type, which by construction is not a
+                // subclass. Kotlin agrees: an abstract member cannot be private,
+                // and a protected abstract member is legal only on a class, not
+                // as an interface requirement. Saffron has one declaration form
+                // for both, so the bodyless test is the available discriminator.
                 if (m_body.length() == 0) {
-                    this.error("'" + name + "." + m_name + "' is declared private and has no body; a private abstract method cannot be implemented")
+                    this.error("'" + name + "." + m_name + "' is declared " + m_vis + " and has no body; a " + m_vis + " abstract method cannot be implemented")
                 }
-                this.mark_private_member(name, qualified, m_name)
+                this.mark_restricted_member(name, qualified, m_name, m_vis)
             }
             mi = mi + 1
         }
     }
 
-    /// Write one private-member entry under both the bare and qualified keys.
-    fun mark_private_member(bare: String, qualified: String, member: String) {
-        this.private_members.set(bare + "#" + member, "private")
-        this.private_members.set(qualified + "#" + member, "private")
-        this.private_member_names.set(member, true)
+    /// Does this visibility restrict member access at all? The two that do are
+    /// `private` and `protected`; `public` and `internal` do not.
+    ///
+    /// `internal` is deliberately NOT a member restriction. On a member it means
+    /// package scope, and package scope for members is not part of Kotlin parity
+    /// as scoped here (§6a covers `internal` at the top level only) — so treating
+    /// it as restricting would enforce a rule this design never specified. It
+    /// parses and is recorded at the top level; on a member it is accepted and
+    /// means public, which is the same reading Phase 4 gave it.
+    fun is_restricting_visibility(vis: String): Bool {
+        return vis == "private" or vis == "protected"
     }
 
-    /// Is `member` private as declared directly on the class `class_name` names?
-    fun is_private_member(class_name: String, member: String): Bool {
+    /// Write one restricted-member entry under both the bare and qualified keys.
+    fun mark_restricted_member(bare: String, qualified: String, member: String, vis: String) {
+        this.member_visibility.set(bare + "#" + member, vis)
+        this.member_visibility.set(qualified + "#" + member, vis)
+        this.restricted_member_names.set(member, true)
+    }
+
+    /// The restriction on `member` as declared directly on the class `class_name`
+    /// names — "private", "protected", or "" when it is unrestricted there.
+    fun member_restriction(class_name: String, member: String): String {
         var key: String = this.qualified_class_key(class_name) + "#" + member
-        if (this.private_members.has(key)) return true
+        if (this.member_visibility.has(key)) { return this.member_visibility.get(key) }
         // The bare key as a fallback, for a receiver type that resolved to a
         // class the current module did not declare and did not import under a
         // prefix the lookup above could reconstruct.
-        return this.private_members.has(this.generic_base(class_name) + "#" + member)
+        var bare_key: String = this.generic_base(class_name) + "#" + member
+        if (this.member_visibility.has(bare_key)) { return this.member_visibility.get(bare_key) }
+        return ""
     }
 
-    /// Which class in `class_name`'s ancestry declares `member` private, or "".
+    /// Is `member` restricted at all as declared directly on `class_name`?
+    fun is_private_member(class_name: String, member: String): Bool {
+        return this.member_restriction(class_name, member).length() > 0
+    }
+
+    /// Does `class_name` DECLARE `member` in its own body — field or method?
+    ///
+    /// Own-only, which is what makes it usable as the stopping condition for the
+    /// ancestry walk below. Both tables it reads are populated from a ClassDecl's
+    /// own `fields`/`methods` lists and never from an ancestor's, so a subclass
+    /// that merely inherits a name answers false here. (Codegen prepends parent
+    /// fields for layout; the checker's tables do not, and this depends on that.)
+    ///
+    /// Tries the qualified key before the bare one, the same order and for the
+    /// same reason as member_restriction: two modules may declare a same-named
+    /// class, and the qualified key is the one that says which.
+    fun class_declares_member(class_name: String, member: String): Bool {
+        var qualified: String = this.qualified_class_key(class_name)
+        if (this.env.class_fields.has(qualified) or this.class_method_names.has(qualified)) {
+            if (this.list_has_string(this.get_receiver_fields(qualified), member)) { return true }
+            if (this.list_has_string(this.get_receiver_methods(qualified), member)) { return true }
+        }
+        var bare: String = this.generic_base(class_name)
+        if (this.list_has_string(this.get_receiver_fields(bare), member)) { return true }
+        if (this.list_has_string(this.get_receiver_methods(bare), member)) { return true }
+        return false
+    }
+
+    /// Which class in `class_name`'s ancestry restricts `member`, or "".
     ///
     /// The ancestry has to be searched, not just the receiver's own class: a
     /// member is inherited by name, so `this.secret` inside a subclass of the
     /// class that declared `secret` private reads a private member without ever
     /// naming the declaring class. Kotlin rejects exactly that — its `private`
-    /// does not extend to subclasses; `protected` is the modifier that does, and
-    /// it is Phase 5b. Checking only the receiver's own class would let any
+    /// does not extend to subclasses, and `protected` is the modifier that does.
+    /// Both are found by this one walk; the difference between them is decided by
+    /// the CALLER, from the restriction this returns alongside the owner, not by
+    /// searching differently. Checking only the receiver's own class would let any
     /// `class Child extends Base {}` launder every private field Base has.
     ///
-    /// Breadth-first with a visited set, matching inherited_method_names, so a
-    /// diamond visits a shared ancestor once and a cyclic `extends` terminates
-    /// rather than hanging the checker.
+    /// The walk stops at the class the DISPATCH would pick — the first ancestor
+    /// that declares `member` at all — and then reports whether *that* class
+    /// restricts it. It does not hunt for a restricting ancestor. That
+    /// distinction is the whole of §11 decision 2 and it is measurable, not
+    /// theoretical: given
+    ///
+    ///     interface A { protected fun tag(): Int { return 1 } }
+    ///     interface B { fun tag(): Int { return 2 } }
+    ///     class C extends Holder, B, A { }
+    ///
+    /// `C().tag()` runs B's body and returns 2 — B is the earlier base, and
+    /// codegen resolves in declaration order. A "find any restricting ancestor"
+    /// search refused the call anyway, citing `A.tag`: a diagnostic about a
+    /// modifier on a declaration whose body never executes, and one that could
+    /// not be silenced by any edit at the call site. Worse, it made `protected`
+    /// on a widely-inherited interface a breaking change for every existing
+    /// multiple-inheritance user — precisely the outcome §11 decision 2 rejects
+    /// erroring-at-the-collision for.
+    ///
+    /// So visibility and dispatch must answer from the same class, and dispatch
+    /// is not negotiable — it is what actually runs. Codegen resolves
+    /// **depth-first pre-order in declaration order** (verified: with `A extends
+    /// A2` supplying a body, `extends Holder, A, B` runs A2's, not B's), so this
+    /// walk is depth-first pre-order in declaration order too, and both halves of
+    /// each answer come from one place rather than being re-derived (M1).
+    ///
+    /// Returns "" when no ancestor declares the member, which is also the answer
+    /// for an unrestricted one — the caller cannot distinguish them and does not
+    /// need to, since both mean "nothing here refuses".
+    ///
+    /// The visited set makes a diamond visit a shared ancestor once and a cyclic
+    /// `extends` terminate rather than hanging the checker.
     fun private_declaring_class(class_name: String, member: String): String {
         var base: String = this.generic_base(class_name)
-        if (this.is_private_member(base, member)) { return base }
-        var visited: List<String> = [base]
-        var work: List<String> = []
-        if (this.class_parents.has(base)) {
-            var seed: List<String> = this.class_parents.get(base)
-            var si: Float = 0
-            while (si < seed.length()) {
-                work.push(seed[si])
-                si = si + 1
-            }
-        }
-        while (work.length() > 0) {
-            var cur: String = work.pop()
-            if (!this.list_has_string(visited, cur)) {
-                visited.push(cur)
-                if (this.is_private_member(cur, member)) { return cur }
-                if (this.class_parents.has(cur)) {
-                    var ups: List<String> = this.class_parents.get(cur)
-                    var ui: Float = 0
-                    while (ui < ups.length()) {
-                        if (!this.list_has_string(visited, ups[ui])) { work.push(ups[ui]) }
-                        ui = ui + 1
-                    }
-                }
-            }
+        var owner: String = this.dispatch_declaring_class(base, member)
+        if (owner.length() == 0) { return "" }
+        if (this.is_private_member(owner, member)) { return owner }
+        return ""
+    }
+
+    /// The class whose declaration of `member` wins, searched the way codegen
+    /// resolves it: depth-first pre-order over `class_parents` in declaration
+    /// order. Recursion carries the pre-order for free; an explicit stack would
+    /// have to push the bases reversed to get the same order, which is the kind
+    /// of detail that silently rots. Returns "" if no ancestor declares it.
+    ///
+    /// `visited` is threaded through by the caller rather than rebuilt per level,
+    /// so a diamond costs one visit and a cycle terminates.
+    fun dispatch_declaring_class(cls: String, member: String): String {
+        var visited: List<String> = []
+        return this.dispatch_declaring_class_from(cls, member, visited)
+    }
+
+    fun dispatch_declaring_class_from(cls: String, member: String, visited: List<String>): String {
+        if (this.list_has_string(visited, cls)) { return "" }
+        visited.push(cls)
+        if (this.class_declares_member(cls, member)) { return cls }
+        if (!this.class_parents.has(cls)) { return "" }
+        var parents: List<String> = this.class_parents.get(cls)
+        var i: Float = 0
+        while (i < parents.length()) {
+            var found: String = this.dispatch_declaring_class_from(parents[i], member, visited)
+            if (found.length() > 0) { return found }
+            i = i + 1
         }
         return ""
     }
@@ -1896,6 +2008,18 @@ class NullChecker {
     /// and one method calling another all satisfy that; a free function in the
     /// same file does not, which is the deliberate asymmetry with module-level
     /// `private`.
+    ///
+    /// `protected` is that same rule with one clause added: a SUBCLASS of the
+    /// declaring class may also access it. That single extra clause is the whole
+    /// of Phase 5b's semantics, which is why it lives here rather than in a
+    /// second checking function — the ancestry walk, the unresolved-receiver
+    /// fallback and the diagnostic shape are all shared, and duplicating them to
+    /// vary one comparison is how the two would drift apart.
+    ///
+    /// Which class "declared the member" is answered by private_declaring_class,
+    /// which resolves it the way dispatch does rather than by hunting for a
+    /// restricting ancestor — see its comment for why that difference is
+    /// load-bearing under multiple inheritance.
     fun check_member_visibility(obj_type: String, member: String, what: String) {
         var base: String = this.generic_base(obj_type)
         // An unresolved receiver: allow the access and say that it was not
@@ -1911,21 +2035,36 @@ class NullChecker {
         // through one would bury the signal in noise and teach readers to ignore
         // the category.
         if (base.length() == 0 or base == "Any" or !this.env.class_fields.has(this.qualified_class_key(base))) {
-            if (this.private_member_names.has(member)) {
+            if (this.restricted_member_names.has(member)) {
                 this.warn("cannot determine the class of the receiver; visibility of '" + member + "' not checked")
             }
             return nil
         }
         var owner: String = this.private_declaring_class(base, member)
         if (owner.length() == 0) { return nil }
-        // Inside the declaring class body — the whole extent of class-private.
+        // Inside the declaring class body — the whole extent of class-private, and
+        // the first clause of protected.
         if (this.current_class.length() > 0
             and this.generic_base(this.current_class) == owner) { return nil }
+        var restriction: String = this.member_restriction(owner, member)
+        // Protected's extra clause: a subclass of the declaring class. Asked via
+        // inherits_from, which since Phase 3b searches the whole inheritance DAG,
+        // so a member protected on a SECOND or third base is answerable — the case
+        // that made protected unimplementable before that widening (§5b). The
+        // question is about the class the code sits in, not the receiver's type: a
+        // subclass method may touch a protected member on any instance of the
+        // declaring class, which is Kotlin's rule and the one that makes the
+        // modifier useful for template-method shapes.
+        if (restriction == "protected"
+            and this.current_class.length() > 0
+            and this.inherits_from(this.generic_base(this.current_class), owner)) { return nil }
         var where: String = " from outside the class"
         if (this.current_class.length() > 0) {
             where = " from class '" + this.current_class + "'"
         }
-        this.error("private " + what + " '" + owner + "." + member + "' is not accessible" + where)
+        // Name the modifier that actually refused, so the reader can tell a
+        // subclass-reachable member from one that is not.
+        this.error(restriction + " " + what + " '" + owner + "." + member + "' is not accessible" + where)
     }
 
     /// Which class declares the `init` that constructing `class_name` will
@@ -1974,17 +2113,34 @@ class NullChecker {
     /// prefix at the use site and so can also police a construction inside an
     /// imported module's own body; this pass only ever checks the main program's
     /// bodies, so the two agree here.
+    ///
+    /// A `protected init` is this rule plus subclasses, keeping the two modifiers
+    /// MONOTONE: everything `private` permits, `protected` permits too. Kotlin's
+    /// `protected` is not a superset of its `private` on the file axis, but that
+    /// axis is where this constructor rule already departs from Kotlin on purpose
+    /// (module-scoped, for the factory pattern), and making `protected` the
+    /// narrower of the two there would be a trap — an author widening `private
+    /// init` to `protected init` to reach subclasses would silently lose the
+    /// same-module factory that was the reason to restrict the constructor at all.
     fun check_constructor_visibility(class_name: String) {
         var owner: String = this.constructor_owner(class_name)
         if (owner.length() == 0) { return nil }
-        if (!this.is_private_member(owner, "init")) { return nil }
+        var restriction: String = this.member_restriction(owner, "init")
+        if (restriction.length() == 0) { return nil }
         // Declared by the module being checked: same module, so allowed —
         // including from a free function, which is the factory.
         if (this.local_classes.contains(owner)) { return nil }
         // Inside the class body itself, whichever module that body is in.
         if (this.current_class.length() > 0
             and this.generic_base(this.current_class) == owner) { return nil }
-        this.error("private constructor '" + owner + ".init' is not accessible outside the module that declares '" + owner + "'")
+        // Protected's extra clause, as in check_member_visibility: a subclass may
+        // construct. This is what lets a subclass in another module exist at all
+        // when its base restricts construction — `parents[0]`'s init is the one
+        // forwarded, so without it the subclass could not be built by anyone.
+        if (restriction == "protected"
+            and this.current_class.length() > 0
+            and this.inherits_from(this.generic_base(this.current_class), owner)) { return nil }
+        this.error(restriction + " constructor '" + owner + ".init' is not accessible outside the module that declares '" + owner + "'")
     }
 
     /// The assignment-target half of check_member_visibility: `obj.field = v`.
