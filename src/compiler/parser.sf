@@ -2,6 +2,7 @@
 
 import "./ast.sf" as AST
 import "./lexer.sf" as Lexer
+import "./diag.sf" as Diag
 
 class Parser {
     var tokens: List<Lexer.Token>
@@ -295,7 +296,14 @@ class Parser {
     /// Print `message` located at `s`, with the source line and a caret under the
     /// span's first character. Shared by parse_error and any future
     /// located-warning path so the two cannot render differently.
+    ///
+    /// Also records into the shared Diag sink so parser errors reach --json and the
+    /// LSP as data. The *printed* form is left exactly as it was — `[line N, col M]
+    /// Error: ...`, the one format today's editor client scrapes — because changing
+    /// it here would break that client before the LSP rewrite (WS3) can catch up.
+    /// The sink is the forward path; the print is the compatibility path.
     fun report_at(s: AST.Span, label: String, message: String) {
+        Diag.record_error("parser", s, message)
         IO.println("[" + this.span_prefix(s) + "] " + label + ": " + message)
         if (this.source.length() == 0) { return }
         if (!AST.span_is_real(s)) { return }

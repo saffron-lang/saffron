@@ -8,6 +8,105 @@
 
 import "./ast.sf" as AST
 
+// --- Accumulating sink ---
+//
+// Every diagnostic the compiler raises is recorded here as well as printed, so a
+// caller that wants them as data (--json, an LSP) reads the list instead of
+// re-parsing stdout. Scraping stdout is exactly what made the editor integration
+// brittle: `server.ts` matched the *parser's* `[line N, col M]` format, which the
+// checker and codegen never emit, so type errors could not reach the editor at
+// all. One sink, read once, ends that.
+//
+// A Diagnostic deliberately does NOT carry its file. A span is meaningful only
+// against the source it was lexed from, and in a multi-module compile that source
+// is held per unit by the driver; main.sf attaches the file when it serializes.
+// Same reasoning as the note on `enum Span` in ast.sf.
+enum Severity {
+    SevError,
+    SevWarning,
+    // The I9 fall-through channel. Kept distinct from SevError so that "the
+    // compiler reported success right up to the assembler" (BUGS #37) cannot
+    // recur silently — an internal fault reads differently from a user's mistake.
+    SevInternal
+}
+
+enum Diagnostic {
+    // `phase` is one of "parser"/"checker"/"codegen"/"resolve" — the producer,
+    // for grouping in output. `span` is span_none() when the producer has no
+    // source region to offer (a great many checker errors are about expressions,
+    // whose spans do not exist until the expression nodes carry them).
+    Diag(severity: Severity, phase: String, span: AST.Span, message: String)
+}
+
+var _sink: List<Diagnostic> = []
+var _had_error: Bool = false
+
+/// Clear the sink. A process that checks or formats several files in one run must
+/// call this per file, or diagnostics from one leak into the next — the same
+/// sticky-global trap that `parser.sf::_had_error` and `codegen.sf::__codegen_errors`
+/// fall into. Reset is the caller's responsibility because only the caller knows
+/// where one unit of work ends and the next begins.
+fun reset_sink() {
+    _sink = []
+    _had_error = false
+}
+
+/// Every diagnostic recorded since the last `reset_sink`, in emission order.
+fun diagnostics(): List<Diagnostic> {
+    return _sink
+}
+
+/// True if any error (not warning) has been recorded since the last reset. This
+/// is the collected replacement for each phase's private `has_errors` flag.
+fun sink_had_error(): Bool {
+    return _had_error
+}
+
+fun severity_label(s: Severity): String {
+    return match (s) {
+        SevError => "error"
+        SevWarning => "warning"
+        SevInternal => "internal compiler error"
+    }
+}
+
+// --- Record primitives (no printing) ---
+//
+// These only append to the sink. A phase that already owns its console output —
+// the checker prints its errors in a batch from error_report() — records through
+// these and keeps its printing exactly as it was, so console output does not
+// change while the data channel comes online. `span` is span_none() where the
+// producer has no region yet (most checker errors are about expressions, whose
+// spans arrive in a later stage).
+fun record_error(phase: String, s: AST.Span, msg: String) {
+    _sink.push(Diagnostic.Diag(Severity.SevError, phase, s, msg))
+    _had_error = true
+}
+
+fun record_warn(phase: String, s: AST.Span, msg: String) {
+    _sink.push(Diagnostic.Diag(Severity.SevWarning, phase, s, msg))
+}
+
+// --- Record + print helpers ---
+//
+// For a phase that prints at the call site (parser, codegen). Each records into
+// the sink AND renders the located form, so switching a call site over preserves
+// its console output while making the same diagnostic available as data.
+
+/// Record + print a located error.
+fun emit_error_at(file: String, source: String, s: AST.Span, phase: String, msg: String) {
+    record_error(phase, s, msg)
+    report(file, source, s, "error", msg)
+}
+
+/// Record + print a located warning, subject to the verbosity gate.
+fun emit_warn_at(file: String, source: String, s: AST.Span, phase: String, msg: String) {
+    record_warn(phase, s, msg)
+    if (_verbosity >= 1) {
+        report(file, source, s, "warning", msg)
+    }
+}
+
 var _verbosity: Float = 1
 var _internal_all: Bool = false
 var _internal_codegen: Bool = false

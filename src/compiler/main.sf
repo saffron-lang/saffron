@@ -9,6 +9,7 @@ import "./parser.sf" as Parser
 import "./checker.sf" as Checker
 import "./resolve.sf" as Resolve
 import "./codegen.sf" as Codegen
+import "./diag.sf" as Diag
 
 @extern("void exit(i32)")
 fun c_exit(code: Int) {}
@@ -1132,6 +1133,15 @@ fun main(): Int {
         var exe_dir: String = dir_of(exe_path)
         stdlib_dir = exe_dir + "/../src/lib"
     }
+
+    // Start of one compile: clear the diagnostic sink so nothing from a previous
+    // file in the same process leaks in. The sink is a module global (a located
+    // diagnostic has to be reachable from every phase without threading a handle
+    // through all of them), and a module global that is never reset is the same
+    // sticky-state trap as parser._had_error and codegen.__codegen_errors. Only
+    // the driver knows where one unit of work ends and the next begins, so the
+    // reset lives here.
+    Diag.reset_sink()
 
     // Lex and parse the main file
     record_file_package(input_path)

@@ -3,6 +3,7 @@
 // Blocks compilation on errors by default (use --no-check to bypass).
 
 import "./ast.sf" as AST
+import "./diag.sf" as Diag
 
 // The one spelling of "this file provably belongs to no package", shared by both
 // sides of the package seam: main.sf produces it when a file sits under no
@@ -391,12 +392,35 @@ class NullChecker {
         this.entry_aliases = {}
     }
 
+    // The checker prints its diagnostics in a batch from error_report() at the
+    // end of the walk, not at the call site, so these only accumulate. Each also
+    // records into the shared Diag sink so --json and the LSP can read checker
+    // errors as data — which they never could before, since the client scraped
+    // stdout for the *parser's* line/col format that the checker does not emit.
+    //
+    // `error(msg)` records with no span: most checker errors are about
+    // expressions, and expression spans do not exist yet. `error_at(span, msg)`
+    // is the located sibling — call it wherever a declaration span is in hand
+    // (WS1a put spans on every declaration node), and the diagnostic reaches the
+    // editor with a jump target.
     fun error(msg: String) {
         this.errors.push(msg)
+        Diag.record_error("checker", AST.span_none(), msg)
+    }
+
+    fun error_at(s: AST.Span, msg: String) {
+        this.errors.push(msg)
+        Diag.record_error("checker", s, msg)
     }
 
     fun warn(msg: String) {
         this.warnings.push(msg)
+        Diag.record_warn("checker", AST.span_none(), msg)
+    }
+
+    fun warn_at(s: AST.Span, msg: String) {
+        this.warnings.push(msg)
+        Diag.record_warn("checker", s, msg)
     }
 
     fun check_unused_in_scope() {
@@ -2224,7 +2248,7 @@ class NullChecker {
                     // synthetic NilLit initializer and doc "@type_alias"; that nil is
                     // an implementation artifact, not a real assignment, so skip it.
                     if (doc != "@type_alias" and !this.is_nullable_type(type_ann_node) and this.is_nil_init(init)) {
-                        this.error(name + ": cannot assign nil to non-nullable " + type_ann_str)
+                        this.error_at(__ns, name + ": cannot assign nil to non-nullable " + type_ann_str)
                     }
                     // Provable-scalar-mismatch check. The old code stored the
                     // annotation and never looked at the initializer's type, so
@@ -2236,7 +2260,7 @@ class NullChecker {
                     // subtype test would reject `var xs: List<Int> = [1,2,3]`);
                     // tightening those is a separate, measured step.
                     if (doc != "@type_alias" and this.scalar_mismatch(type_ann_str, init_type)) {
-                        this.error(name + ": cannot assign " + init_type + " to " + type_ann_str)
+                        this.error_at(__ns, name + ": cannot assign " + init_type + " to " + type_ann_str)
                     }
                     this.env.define_var(name, type_ann_node)
                 } else if (init_type != "Any") {
@@ -2244,7 +2268,7 @@ class NullChecker {
                     this.env.define_var(name, init_type_node)
                 } else {
                     // Cannot infer type — warning (not blocking)
-                    this.warn(name + ": cannot infer type, add explicit annotation")
+                    this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
