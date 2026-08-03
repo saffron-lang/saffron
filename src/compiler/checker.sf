@@ -175,6 +175,14 @@ class NullChecker {
     var warnings: List<String>
     var current_func_ret: AST.Type
     var current_class: String
+    // How many enclosing loops the walk is currently inside. A `break` or
+    // `continue` is only legal at depth > 0. Incremented around a `While` body
+    // (for-in desugars to While in the parser, so it is covered too) and RESET
+    // to 0 across every function and lambda boundary: a loop does not carry into
+    // a function declared in its body, so `while (c) { fun f() { break } }` must
+    // reject the break. This is BUGS #6 — the runtime nodes existed and the
+    // checker ignored them.
+    var loop_depth: Float
     // Every declared base of each class that has one, in source order. This was
     // `Map<String, String>` — one parent — which is why `class Duck extends
     // Flyable, Swimmable, Walkable` was invisible past Flyable: conformance only
@@ -360,6 +368,7 @@ class NullChecker {
         this.warnings = []
         this.current_func_ret = AST.Type.NilType
         this.current_class = ""
+        this.loop_depth = 0
         this.class_parents = {}
         this.class_method_names = {}
         this.class_type_params = {}
@@ -2265,6 +2274,10 @@ class NullChecker {
                 // so those checks see a real node instead of falling through to the
                 // first match arm.
                 this.current_func_ret = this.parse_type_node(ret_type)
+                // A function body starts a fresh loop context: a `break` here is
+                // not inside any loop the declaration happens to sit in (#6).
+                var fd_saved_loop: Float = this.loop_depth
+                this.loop_depth = 0
                 this.env.push_scope()
                 var j: Float = 0
                 while (j < params.length()) {
@@ -2277,6 +2290,7 @@ class NullChecker {
                 this.check_stmts(body)
                 this.check_unused_in_scope()
                 this.env.pop_scope()
+                this.loop_depth = fd_saved_loop
                 this.current_func_ret = old_ret
             }
             Return(value) => {
@@ -2307,7 +2321,9 @@ class NullChecker {
             While(cond, body) => {
                 this.infer_expr(cond)
                 this.env.push_scope()
+                this.loop_depth = this.loop_depth + 1
                 this.check_stmts(body)
+                this.loop_depth = this.loop_depth - 1
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
@@ -2359,8 +2375,16 @@ class NullChecker {
                 this.current_class = saved_class
             }
             EnumDecl(n, v, d, e_vis) => {}
-            Break => {}
-            Continue => {}
+            Break => {
+                if (this.loop_depth <= 0) {
+                    this.error("break: 'break' outside of a loop")
+                }
+            }
+            Continue => {
+                if (this.loop_depth <= 0) {
+                    this.error("continue: 'continue' outside of a loop")
+                }
+            }
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
                 this.env.push_scope()
                 this.check_stmts(try_body)
@@ -2813,6 +2837,10 @@ class NullChecker {
     fun check_lambda_body(params: List<AST.Param>, body: List<AST.Stmt>) {
         var saved_ret: AST.Type = this.current_func_ret
         this.current_func_ret = AST.Type.AnyType
+        // A lambda is a function boundary too: a loop enclosing the lambda does
+        // not license a `break` in its body (#6).
+        var lam_saved_loop: Float = this.loop_depth
+        this.loop_depth = 0
         this.env.push_scope()
         var li: Float = 0
         while (li < params.length()) {
@@ -2824,6 +2852,7 @@ class NullChecker {
         }
         this.check_stmts(body)
         this.env.pop_scope()
+        this.loop_depth = lam_saved_loop
         this.current_func_ret = saved_ret
     }
 

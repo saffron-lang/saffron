@@ -1,0 +1,22 @@
+// Expected error: break: 'break' outside of a loop
+//
+// BUGS #6 — the checker used to ignore Break/Continue entirely, so a `break`
+// with no enclosing loop compiled clean and emitted a jump to a label that was
+// never created. The checker now tracks loop depth and rejects this.
+//
+// This must include the function-boundary case: the `break` below is lexically
+// inside a function that is itself declared inside a loop, but a loop does not
+// carry into a nested function, so it is still outside any loop.
+
+fun f() {
+    break
+}
+
+fun main() {
+    var i: Int = 0
+    while (i < 3) {
+        f()
+        i = i + 1
+    }
+}
+main()
