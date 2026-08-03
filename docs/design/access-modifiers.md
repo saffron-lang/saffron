@@ -211,6 +211,14 @@ Parser touch points:
 
 All three require Phase 2's module plumbing.
 
+**Verified against the built compiler at `7df04b9`, so Phase 5 starts from measurement rather than from this section's guesses:**
+
+- All three paths currently compile clean (`import { exported } from "..."`, `ModA.exported()`, and a bare `exported()` after only an `as ModA` import). So all three are genuinely live and reachable, and none is already denied by some unrelated existing check — each needs its own arm and its own fail test.
+- `Ref.slot` does carry what path 3 needs, and it is the *defining* module's prefix: `resolve.sf:469`/`:472` set it from `this.globals.get(name)` / `this.funcs.get(name)`, both populated with `current_prefix` at `:127`/`:130`/`:178`. Resolve runs **before** the checker (`main.sf:1438-1444`), so the checker sees `Ref`, not `Variable`, and the comparison the section describes is available. The checker's `Ref` arm (`checker.sf:1704`) currently discards `rslot` entirely — that is the hook.
+- **The blocker is registration, not lookup.** `register_decl` records module identity for `ClassDecl` only. Its `FunDecl` and `EnumDecl` arms ignore the visibility binding, and its `VarDecl` and `TypeAlias` arms are `=> {}` outright. So there is no `decl_module_file` entry for a top-level `fun`, `var`, `enum` or `type` to compare a use site against. Phase 5's first commit is extending registration to those four kinds — reusing `register_class_identity`'s shape, not inventing a second one.
+- **Phase 5's enforcement cannot land before Phase 4 merges**, and this is a hard ordering, not a preference: `private fun helper()` at top level is still a parse error on `main` (`[codegen] Error: undefined variable 'private'` — the modifier lexes as an expression). Phase 4 owns the parser half. Until it merges there is no way to write a Phase 5 fail test, which is the same "annotations nothing checks / checks with no inputs" ambiguity that kept Phase 1's leak pass from landing early. The package *plumbing* was parallelisable; the enforcement is not.
+- `internal` already reports `'internal' is not implemented yet; use 'private' or 'public'` from Phase 4's parser — a real diagnostic with a span, not a silent accept. That is the right placeholder for Phase 5 to replace.
+
 **Class fields and methods.** Support `private` = class-private. Note the deliberate asymmetry with §2: a same-module *free function* reading a private field is **rejected**, which is why the 24 underscore fields in `http/server.sf`/`pantry_config.sf`/`sorted_set.sf` must stay unannotated. Module-private *fields* are out of scope for v1 (§9).
 
 **Constructors (`private init`).** Supported, meaning: the class cannot be constructed from outside its module. `register_decl` already registers the class constructor as a function returning the class type (`checker.sf:770`), and after resolve a class name in call position becomes `Ref("func", Name, prefix)` — `resolve_variable` checks `funcs` before `types` — so the prefix needed for the check is already in hand.
@@ -313,10 +321,28 @@ Field layout is deliberately unchanged — only `parents[0]` contributes fields,
 
 **This phase reached the promotion gate without crossing it.** Per #96/#100 it is not truly landed until gen2 is promoted; that is a separate, explicitly-approved ceremony.
 
-**Phase 3 — widen the AST, promotion-gated.** One commit per node, smallest-first, each with **all** its match arms updated in the same commit (`Param` 34, `FunDecl` 44, `ClassDecl` 67, then `EnumDecl`/`VarDecl`/`TypeAlias`). Extend `test/pass/enum_wide_payload.sf` to a seven-field variant, since it exists as the regression test for exactly this hazard. Bootstrap with stage 2 after each. Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.**
+**Phase 3 — widen the AST, promotion-gated. ✅ DONE and merged to `main` (`85f410b`, artifacts `1226958`).** One commit per node, smallest-first, each with **all** its match arms in the same commit: `TypeAlias` 2→3 (15 sites), `EnumDecl` 3→4 (39), `VarDecl` 4→5 (54), `FunDecl` 5→6 (52), `Param` 3→4 (65), `ClassDecl` 6→7 (71). `test/pass/enum_wide_payload.sf` gained a `SevenMixed` variant with `ClassDecl`'s exact payload shape (two interior `List`s, two trailing `String`s). Bootstrap with stage 2 after each, `SKIP_GEN4` never set.
 
-> ### ⟵ PROMOTION POINT
-> After Phase 3, run the full ceremony:
+The arm counts predicted above were low across the board — the real site counts are the ones just listed. Three findings, each of which corrected a premise in this document or in `CLAUDE.md`:
+
+- **The field goes LAST on every node, and the position is the whole safety argument.** Appending leaves every pre-existing field at its old index, so an arm that gets missed merely lacks `visibility`. Inserting first or mid-node would shift `name` and `docstring` — both `String` — and a missed arm would read a *plausible wrong string*, which is #96's exact mechanism. Do not reorder these nodes later.
+- **`src/compiler/codegen.sf` past line 557 is live source, not a skeleton.** The class closes there; everything after is top-level free functions that `sed` copies through verbatim, holding 42 `ClassDecl`, 12 `EnumDecl` and 4 `VarDecl` sites on its own. `CLAUDE.md` claimed only `*_body.sf` files affect the build; corrected in `a55f4ae`. Following the old claim would have skipped all 58 sites — the single highest-risk item in the phase.
+- **`Param` names two unrelated nodes.** `src/lib/llvm/function.sf:7` declares an independent 2-field `class Param` for LLVM function parameters, spelled `Func.Param(...)` at 55 sites. It must not be widened. `tools/arity_check.py` (committed) excludes it by file *and* by qualifier.
+
+Two construction sites needed judgement rather than a literal: `parser.sf`'s `inject_field_defaults` and `checker.sf`'s block-parameter inference both **rebuild** an existing node, so both carry the original's visibility across. A hardcoded `"public"` at either would silently strip `private init` the moment Phase 4's parser starts producing it. The rule for the remaining ~50 literals: am I creating a declaration the user never wrote, or reconstructing one they did?
+
+Verified: failure name sets byte-identical, 26 = 26, 171 passed on both sides, both measured in detached `/tmp` worktrees (`11d4f94` vs `f7f9569`) per Phase 0; gen4 fixed point confirmed by grepping the log rather than trusting exit 0; `build/stage2/saffronc` unchanged. One real merge conflict, in `checker.sf`'s `register_fun_param_sigs`, where `main` had extracted a `fun_param_sig_of` helper on the same two lines this phase widened — both changes wanted, resolved by combination rather than choice. This is the second time the one hand-resolved hunk of a phase merge was in `checker.sf` and had to be *combined*.
+
+Because gen2 must be able to *read* the widened payloads before compiler source relies on them, **this is where promotion happens.** The parser writes `"public"` at every site for now; there is no syntax yet.
+
+> ### ⟵ PROMOTION POINT — ✅ CROSSED (`332aafb`, 2026-08-02)
+> The checked-in gen2 can now read all six widened declaration nodes, which is what makes Phases 3 and 3b landed rather than merely merged. Every criterion was checked rather than assumed: both bootstrap stages with stage 2 confirmed *present in the log* (not inferred from exit 0), `hello_bootstrap.sf`, the #100 class-plus-import check, and a full suite whose failure **name set** is byte-identical to the pre-promotion baseline at `f7f9569` — 171 passed, 26 failed, 14 skipped.
+>
+> Recovery path, recorded because this binary is the sole root of trust and cannot be regenerated: the previous gen2 is blob `ab69bef8`, reachable as `1226958:build/stage2/saffronc`.
+>
+> Everything from Phase 4 on is now unblocked. Compiler source still uses no modifier — that is Phase 7 and stays deferred.
+>
+> The ceremony that was run:
 > ```
 > ./bootstrap.sh                              # both stages, no SKIP_GEN4
 > tools/saffron run test/hello_bootstrap.sf
@@ -327,9 +353,22 @@ Field layout is deliberately unchanged — only `parents[0]` contributes fields,
 > ```
 > This is a ceremony with a decision attached, not a build step. It also must not be done while someone else has `build/` in flight.
 
-**Phase 4 — lexer + parser + class-member enforcement (post-promotion).** Soft keywords; statement dispatch; the class-body loop (watching the non-advancing-token hang from §5); enforcement for private fields, methods and `init`. Land the Phase 1 leak pass here, with tests. Class-member visibility needs no module plumbing, so it is the narrowest useful slice and ships first.
+**Phase 4 — lexer + parser + class-member enforcement (post-promotion). ← in progress.** Soft keywords; statement dispatch; the class-body loop (watching the non-advancing-token hang from §5); enforcement for private fields, methods and `init`. Land the Phase 1 leak pass here, with tests. Class-member visibility needs no module plumbing, so it is the narrowest useful slice and ships first.
+
+**It can be *built* before the promotion, but not *landed*.** The distinction matters and is worth stating, because "post-promotion" reads as "cannot start". Phase 4 makes the parser accept modifiers in *user programs*; it does not put a modifier in compiler source, which is Phase 7 and deferred. So gen2 compiles Phase 4's source fine and its work can proceed concurrently with the promotion decision. What it cannot do is *rely* on the widened payloads being readable by the checked-in gen2 — per #100 that is exactly what promotion buys, so Phase 4 merges after the gate, not before.
 
 **Phase 5 — module-level enforcement (post-promotion, needs Phase 2).** Top-level `private`, all three access paths (named import, alias-qualified, bare cross-module). This is where Phase 2 pays off.
+
+**Phase 5's plumbing slice is done and landed (`c8153d8`), ahead of the enforcement itself.** Phase 2 declared `decl_module_package` and deliberately never wrote to it, with a comment forbidding the shortcut: package membership must come from `main.sf`'s `pantry.toml` reading, and re-deriving it from the module prefix string is the M1 antipattern. That seam is now closed. `main.sf` gains `package_roots_joined(module_file_paths)` — a newline-joined list of owning package **roots**, indexed by the same `i` as `prefixes_joined` and `module_boundaries` — and `check_errors_with_module_packages` decodes it and sets `current_package` in exactly the place that already sets `current_prefix`. `register_class_identity` records it under the same qualified key as `decl_module_file`, so the two answers about one declaration cannot drift.
+
+Four choices in it that a later reader should not undo:
+
+- **`module_file_paths` is a parallel list, pushed in lockstep at all three push sites, not derived afterwards from `loaded_file_paths()`.** That map is in *load* order and holds files that are not modules, so recovering the correspondence later would re-derive what the walk already knew.
+- **Newline, not `"|"`, as the separator.** These entries are filesystem paths and `"|"` is legal in one. It is safe for `prefixes_joined` only because prefixes are identifiers.
+- **The value is a package root, never the declared name** — same reason `same_package` compares roots: two distinct packages in this tree both declare `name = "saffron"`.
+- **The packageless marker has exactly one definition**, `Checker.no_package_marker()`, which `main.sf`'s `_no_package_marker()` delegates to. Two literals that must stay equal is a silent-drift hazard here: a mismatch compiles clean and simply makes every `internal` check answer "different package". Relatedly, a missing or short root list yields the marker, so the degraded path **denies** `internal` rather than granting it — which is what keeps `check_errors_with_imports` valid and conservative.
+
+This was the piece of Phase 5 that needs no new syntax, which is why it could run concurrently with Phase 4 rather than waiting behind it. What remains for Phase 5 proper is the enforcement: the three access paths, and the same-file/same-package tests that read these two maps.
 
 **Phase 6 — annotate the stdlib (post-promotion).** The 156 top-level underscore functions and the 66 class-private-safe underscore fields. Opt-in, incremental, one module per commit. This is the feature's real proving ground.
 
@@ -348,11 +387,12 @@ Phase 2   file identity in checker        DONE  merged fcf0bc1   ─┐ ran in
 Phase 2b  file → package mapping          DONE  merged 29b4b8f   ─┤ parallel,
 Phase 3b  ClassDecl.parents: List<String> DONE  merged dc42fbc   ─┘ 3 worktrees
                     │
-Phase 3   widen declaration nodes for visibility     ← in progress
+Phase 3   widen declaration nodes for visibility  DONE  merged 85f410b
                     │
-            ⟵ GEN2 PROMOTION ⟶   (covers 3b and 3 together)
+            ⟵ GEN2 PROMOTION ⟶   DONE  332aafb  (covered 3b and 3 together)
                     │
 Phase 4   parser + class-member enforcement + leak pass (public/private)
+          ← in progress, and now landable
 Phase 5   package-level enforcement (internal)   ← needs 2b
 Phase 5b  protected                              ← needs 3b
 Phase 6   annotate the stdlib
@@ -360,9 +400,16 @@ Phase 6   annotate the stdlib
 
 **What can be parallelised, and what cannot.** Phases 2, 2b and 3b were genuinely independent — different files, no shared tables — and were run concurrently in three worktrees, then merged with one hand-resolved hunk (the `ClassDecl` arm of `check_stmt`, where Phase 2's prefix-keyed sets and Phase 3b's list-valued parents are complementary and had to be *combined*, not chosen between). Failure name sets went 32 → 30 with zero regressions.
 
-Everything from Phase 3 onward is **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase can start before it. Parallelising across the gate would produce two incompatible gen2 candidates; do not attempt it. Phase 3 additionally cannot be parallelised *with* anything that writes match arms on these nodes — an agent editing a `FunDecl(` arm while Phase 3 changes its arity is #96's exact mechanism.
+Phase 3 was **serialised by the promotion gate**: a single checked-in gen2 is the root of trust, so two agents cannot both be mid-promotion, and no post-promotion phase could start before it. Parallelising across the gate would have produced two incompatible gen2 candidates. Phase 3 additionally could not be parallelised *with* anything that writes match arms on these nodes — an agent editing a `FunDecl(` arm while Phase 3 changes its arity is #96's exact mechanism.
 
-Since 3b and 3 both widen declaration nodes and 3b stopped at the gate, **one promotion covers both.** Promoting after 3b alone would spend the ceremony twice for no benefit.
+Since 3b and 3 both widened declaration nodes and 3b stopped at the gate, **one promotion covered both.** Promoting after 3b alone would have spent the ceremony twice for no benefit.
+
+**With the gate crossed (`332aafb`), the serialisation is lifted.** Phases 4, 5, 5b and 6 need no further promotion — none of them widens a declaration node, and none puts a modifier in compiler source (that is Phase 7, deferred). So they can run concurrently, subject to two real couplings rather than the gate:
+
+- **5b (`protected`) reads what 4 writes.** Both touch the same class-member access check. Runnable in parallel, but expect the hand-resolved hunk to be exactly there, and expect it to need *combining* — that has now been the shape of the one conflict in three successive phase merges.
+- **6 (annotate the stdlib) is the proving ground for 4 and 5, so it cannot precede them meaningfully.** Annotating before enforcement exists means annotations nothing checks, which is the same "did the check run or find nothing?" ambiguity that kept Phase 1's leak pass from landing early. Start 6 only once 4 and 5 enforce.
+
+One caveat that outlives the gate: a phase that *does* end up widening a declaration node re-opens a promotion of its own. Nothing in 4, 5, 5b or 6 is expected to, but if one finds it needs to, that is a stop-and-report, not a judgement call to make mid-phase.
 
 ## 8. Test plan
 

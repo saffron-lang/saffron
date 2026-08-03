@@ -4,6 +4,21 @@
 
 import "./ast.sf" as AST
 
+// The one spelling of "this file provably belongs to no package", shared by both
+// sides of the package seam: main.sf produces it when a file sits under no
+// pantry.toml, the checker stores it in decl_module_package, and every
+// same-package test compares against it. Defined once here, and main.sf's
+// _no_package_marker() delegates, because two independent literals that must
+// stay equal is a silent-drift hazard — a mismatch would not fail to compile, it
+// would quietly make every `internal` check answer "different package".
+//
+// A tagged marker rather than "" so a reader can distinguish "provably no
+// package" from "not recorded yet" (invariant I2 of
+// docs/design/compiler-rewrite.md: unknown must not be spelled as something
+// concrete). It cannot collide with a real package root, which is always an
+// absolute path and so always starts with "/".
+fun no_package_marker(): String { return "nopkg" }
+
 class Scope {
     var vars: Map<String, AST.Type>
     var narrowed: Map<String, AST.Type>
@@ -211,6 +226,19 @@ class NullChecker {
     // Resolver.current_prefix, and "" for the main program. Every declaration
     // registered while this is set is recorded as belonging to that module.
     var current_prefix: String
+    // The owning package ROOT (the directory holding the pantry.toml) of the
+    // module whose declarations are being registered right now, or the
+    // packageless marker when that module belongs to no package. Set alongside
+    // current_prefix by check_errors_with_modules from what main.sf read out of
+    // the manifests — never derived from current_prefix, which carries no package
+    // information at all.
+    //
+    // The ROOT and not the declared name: this tree has two distinct packages
+    // both named "saffron" (the repo root and src/compiler/), so a name-keyed
+    // comparison would call src/compiler/parser.sf and src/lib/io.sf
+    // same-package when they are not. main.sf's `same_package` compares roots
+    // for exactly this reason and this side must agree with it.
+    var current_package: String
     // Owning module prefix per declared class/interface/actor name, keyed by the
     // *qualified* name (prefix + bare name) so two modules declaring the same
     // class are two entries rather than one overwritten one.
@@ -224,15 +252,21 @@ class NullChecker {
     //                               derives the prefix from the file path, so
     //                               the file prefix already is the file's
     //                               identity and no second notion is needed.
-    //   package-scope ("internal") → decl_module_package, the seam. NOT
-    //                               populated in Phase 2: the authority for
-    //                               package membership is main.sf's pantry.toml
-    //                               reading (_is_package_entry / the [package]
-    //                               name field), which is not threaded here yet.
-    //                               A later phase fills this in from that
-    //                               reading and must not re-derive package
-    //                               membership from the prefix string — that
-    //                               re-derivation is the M1 antipattern.
+    //   package-scope ("internal") → decl_module_package, populated from
+    //                               current_package. The authority for package
+    //                               membership stays main.sf's pantry.toml
+    //                               reading: it computes the owning package root
+    //                               per module and hands the answer across the
+    //                               seam. This side stores it and never
+    //                               re-derives package membership from the
+    //                               prefix string — that re-derivation is the M1
+    //                               antipattern, and it could not work anyway,
+    //                               since a prefix says nothing about which
+    //                               manifest is nearest the file.
+    //
+    // Value is a package ROOT directory, or the packageless marker "nopkg" for a
+    // module under no manifest. Kept tagged rather than "" so a reader can tell
+    // "provably no package" from "not recorded" (invariant I2).
     var decl_module_file: Map<String, String>
     var decl_module_package: Map<String, String>
     // Bare class/interface/actor names declared by two different modules with
@@ -305,6 +339,7 @@ class NullChecker {
         this.actor_classes = {}
         this.ambiguous_enums = []
         this.current_prefix = ""
+        this.current_package = no_package_marker()
         this.decl_module_file = {}
         this.decl_module_package = {}
         this.ambiguous_classes = []
@@ -1219,9 +1254,11 @@ class NullChecker {
     fun register_class_identity(name: String, fields_str: String) {
         var qualified: String = this.current_prefix + name
         this.decl_module_file.set(qualified, this.current_prefix)
-        // The package seam. Left unset on purpose in Phase 2 — see the field's
-        // comment: main.sf's pantry.toml reading is the authority and is not
-        // threaded here yet.
+        // The package seam, now filled: current_package is what main.sf read out
+        // of the manifests for the module being registered. Keyed by the same
+        // qualified name as decl_module_file so the two answers about one
+        // declaration cannot drift apart.
+        this.decl_module_package.set(qualified, this.current_package)
         this.env.class_fields.set(qualified, fields_str)
         // A declaration in the module under check wins its bare name outright.
         // It is not one of two rival imported declarations that the checker has
@@ -4040,8 +4077,34 @@ fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>):
 // With an empty boundary list this degrades to the old flat behaviour rather
 // than failing, which is what makes check_errors_with_imports above still valid.
 fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): String {
+    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker())
+}
+
+// The `internal` (package-scope) half of module identity: same walk as
+// check_errors_with_modules, plus the owning package root of each module.
+//
+// `package_roots_joined` is main.sf's package_roots_joined() — newline-joined,
+// indexed by the SAME i as `prefixes_joined` and `boundaries`. Newline and not
+// "|" because these entries are filesystem paths and "|" is legal in one.
+//
+// It is a separate list rather than a field packed into the prefix string
+// because package membership is not recoverable from a prefix: the prefix comes
+// from the file path shape, the package from the nearest pantry.toml above the
+// file. Only main.sf has read those manifests, so main.sf is the authority and
+// this function is a consumer of its answer (M1 — a consumer must not re-derive
+// what the producer already knows).
+//
+// A short or empty list is not an error: every module whose entry is missing
+// gets the packageless marker, which denies `internal` access rather than
+// granting it. That is what keeps check_errors_with_modules above — and every
+// caller that has no manifest information at all — valid and conservative.
+fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String): String {
     var checker: NullChecker = NullChecker()
     var prefixes: List<String> = prefixes_joined.split("|")
+    var pkg_roots: List<String> = []
+    if (package_roots_joined.length() > 0) {
+        pkg_roots = package_roots_joined.split("\n")
+    }
     if (boundaries.length() > 1) {
         // Walk module by module, restoring each module's prefix first, so every
         // declaration is registered as belonging to the module that declared it.
@@ -4053,6 +4116,11 @@ fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, 
                 checker.current_prefix = prefixes[bi]
             } else {
                 checker.current_prefix = ""
+            }
+            if (bi < pkg_roots.length()) {
+                checker.current_package = pkg_roots[bi]
+            } else {
+                checker.current_package = no_package_marker()
             }
             var si: Float = start
             while (si < end) {
@@ -4069,8 +4137,11 @@ fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, 
         }
     }
     // The main program is its own module, and it is not prefixed — same
-    // convention as Resolve.resolve_main.
+    // convention as Resolve.resolve_main. Its package is passed separately
+    // because it is not in the boundary list: `boundaries` covers the imported
+    // modules only.
     checker.current_prefix = ""
+    checker.current_package = program_package
     checker.check_program(program)
     return checker.error_report()
 }

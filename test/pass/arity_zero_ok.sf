@@ -1,0 +1,60 @@
+// Companion to test/fail/arity_zero_overapplied.sf (BUGS #113). Tightening the
+// arity check so that 0 is a real arity must not make correct 0-arity calls
+// error: `expected` of 0 with 0 args is the common case, and it has to stay
+// silent. Also covers the shapes that surround a 0-arity declaration --
+// a 0-arity function used as a first-class value, a nested 0-arity closure, a
+// 0-arity method, and a 0-arity function with a default-valued sibling.
+import "@test" as Test
+
+var trace: List<String> = []
+
+fun zero() {
+    trace.push("zero")
+}
+
+fun zero_returning(): Int {
+    return 7
+}
+
+zero()
+Test.assert_eq(trace.length(), 1, "0-arity call runs")
+Test.assert_eq(zero_returning(), 7, "0-arity call with a return value")
+
+// A 0-arity function referenced as a value, then called through the binding.
+var alias = zero
+alias()
+Test.assert_eq(trace.length(), 2, "0-arity call through a function value")
+
+// A 0-arity nested function (closure) called from its enclosing scope.
+fun make_counter(): Int {
+    var seen: Int = 0
+    fun bump() {
+        seen = seen + 1
+    }
+    bump()
+    bump()
+    return seen
+}
+Test.assert_eq(make_counter(), 2, "0-arity nested function")
+
+// A 0-arity method: registered arity is 1 because of the implicit self, so the
+// call site passes 0 user arguments against a recorded arity of 1.
+class Box {
+    var n: Int
+    fun init() {
+        this.n = 3
+    }
+    fun get(): Int {
+        return this.n
+    }
+}
+Test.assert_eq(Box().get(), 3, "0-arity method")
+
+// A function whose only parameter has a default may be called with 0 args.
+fun greet(name: String = "world"): String {
+    return "hello " + name
+}
+Test.assert_eq(greet(), "hello world", "all-default params called with 0 args")
+Test.assert_eq(greet("saffron"), "hello saffron", "all-default params called with 1 arg")
+
+Test.summary()

@@ -46,7 +46,15 @@ The pipeline is: **Lexer → Parser → Type Checker → LLVM IR Codegen → cla
 - **Runtime** (`src/runtime/`) — `runtime.sf` (Saffron-level runtime, incl. NaN-box tagging), `gc.ll`, and four IR bases: `base.ll` (bootstrap), `base_nanbox.ll` (native), `wasm_base.ll` (wasm64), `wasm_base_32.ll` (wasm32). Host-only C helpers: `async_native.c`, `socket_native.c`, `watch_native.c`, `process_native.c`
 - **Standard library** — Saffron stdlib in `src/lib/`
 
-Only `src/compiler/codegen/*_body.sf` files affect the build — they are sed-assembled into `codegen.sf` at `@codegen-split:` markers. The non-`_body` `.sf` files in that directory are inactive mirrors.
+The `src/compiler/codegen/*_body.sf` files are sed-assembled into `codegen.sf` at
+its `@codegen-split:` markers, so they hold the *class body*. But `codegen.sf`
+itself is live source, not a skeleton: everything past the class's closing brace
+(currently line 557) is top-level free functions that sed copies through
+verbatim, and that tail alone holds ~58 AST pattern-match sites. When you change
+an AST node's shape, `codegen.sf` needs the same sweep as every `*_body.sf`.
+There are no inactive mirrors in `codegen/` any more — the non-`_body` copies
+were deleted, and `bootstrap.sh` now fails the assembly if a `*_body.sf` has no
+marker or a marker has no file.
 
 ### Adding a language feature (the full workflow)
 
@@ -480,18 +488,37 @@ build/
 └── stage4/            ← gen4: gen3's own output, the fixed-point check (not
                          checked in, not used for anything but verification)
 src/compiler/
-├── codegen.sf         ← main class (assembled from codegen/ by bootstrap)
-├── codegen/*_body.sf  ← actual compilation input (sed-assembled into codegen.sf)
-├── codegen/*.sf       ← extend fun source (for future direct use)
+├── codegen.sf         ← the Codegen class's shell up to line 557, PLUS live
+│                        top-level free functions after it
+├── codegen/*_body.sf  ← the class body (sed-assembled into codegen.sf)
 ├── parser.sf          ← parser (compiled directly)
 ├── lexer.sf           ← lexer (compiled directly)
 └── main.sf            ← entry point with import resolution
 ```
 
-The bootstrap uses `sed` to assemble `codegen/*_body.sf` files into the class at `@codegen-split:` markers. Changes to `codegen/*.sf` (the extend-fun versions) do NOT affect bootstrap — only `*_body.sf` files matter.
+The bootstrap `sed`-assembles each `codegen/*_body.sf` into the class at its
+`@codegen-split:` marker and copies the rest of `codegen.sf` through unchanged.
+Both halves are compiled, so a sweep over AST node shapes must cover
+`codegen.sf` as well as the `*_body.sf` files.
 
 ## Known Issues
 
-See `BUGS.md` for the full list. Remaining critical bugs:
-- **#2**: Forward references in nested closures (design limitation)
-- **#6**: No `break`/`continue` (infrastructure exists but not yet connected to type checker)
+`BUGS.md` is the list. Its `## Open` heading carries the current count and the
+open numbers; trust that over any summary here, including this one. Do not read
+the count by measuring the section — `## Resolved` keeps closed entries in the
+file for their narratives, so the file is long by design.
+
+The two long-standing design limitations:
+- **#2**: forward references in nested closures — compile-time local resolution,
+  same as Lua/Python
+- **#6**: no `break`/`continue` type checking — the runtime nodes exist, the
+  checker ignores them
+
+Two more worth knowing before you trust a measurement or a clean compile:
+- **#118**: a nonexistent member of an imported module compiles cleanly and emits
+  invalid IR, so a typo'd `Module.thing` is not an error
+- **#119**: `saffronc` picks its input by looking for `.sf` in the *last* matching
+  argument, so an output path containing `.sf` is taken as the input and the real
+  input is never read — silently, with exit 0. Any ad-hoc sweep whose output names
+  embed `.sf` measures nothing. `tools/saffron` and `tools/run_tests.sh` are
+  unaffected; they write `output.ll` and `neg_<name>.ll`.
