@@ -3,7 +3,7 @@
 ## Open
 
 **17 open entries:** #2, #6, #49, #65, #66, #75, #107, #115, #117, #123, #128,
-#129, #130, #131, #132, #134, #135. Next free number is **#136**.
+#129, #130, #131, #132, #134, #135. Next free number is **#137**.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -1232,6 +1232,34 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 136. FIXED — a semicolon inside a block EXPRESSION was a parse error
+
+```saffron
+var r = { var q = 5; q }   // Error: expected a literal, name or '(' here
+```
+
+The parser desugars a block expression `{ stmts...; value }` via a loop at
+`parser.sf:930` that, unlike every other statement loop in the file, never
+drained the `;` separator before calling `parse_stmt`, so the bare `;` was handed
+to `parse_stmt`. `{ 1; 2 }`, `{ 7; }` and `{ ; 7 }` all failed the same way. The
+multi-line form worked only because newlines are not tokens — which is exactly
+what hid it, since a multi-statement block is naturally written across lines, and
+semicolons work fine in a `fun` body (`parse_block_stmts` at `parser.sf:3213`
+already had the skip).
+
+Surfaced by the abb4fbf branch evaluation, which bisected the *visible* error to
+`3138807` (the #76 checker-recursion fix): that commit added the
+`_ => { this.parse_error(...) }` arm to the primary-expression match and so
+turned this pre-existing silent-garbage path into a hard error. The missing `;`
+skip itself is older. Distinct from #129 (a `this`-initial statement swallowing
+an infix operator — no `this` here) and #128.
+
+Fixed by mirroring `parse_block_stmts`: drain `;` at the top of the loop and
+re-check `}`/eof after the drain so a trailing `;` closes the block (yielding nil)
+rather than demanding another statement. Regression test
+`test/pass/block_expr_semicolon.sf`, 6 assertions covering single/multiple/
+leading/trailing semicolons, two values, and the still-working multi-line form.
 
 ### 133. FIXED — a variable used only inside an `and`/`or` operand was reported unused
 
