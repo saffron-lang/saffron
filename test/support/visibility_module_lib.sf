@@ -20,3 +20,17 @@ internal fun mod_packaged(): Int { return 3 }
 // modifier exists to allow. Its own visibility does not leak the private helper
 // because the helper's *type* is not exposed, only called.
 public fun mod_use_secret(): Int { return mod_secret() + 10 }
+
+// Module-level VARIABLES, one per visibility. A bare READ of these (`Lib.name`,
+// not `Lib.name()`) is a MemberAccess, a different checker path from the
+// function CALL the tests above cover — and until the infer_member_access fix it
+// was the path that parsed a `private`/`internal` module var clean and exported
+// it anyway. These back test/fail/visibility_module_private_var_*.sf and
+// test/pass/visibility_module_var_ok.sf.
+public var mod_pub_var: Int = 100
+private var mod_secret_var: Int = 200
+internal var mod_packaged_var: Int = 300
+
+// A public accessor for the private var, so the pass test can prove the private
+// var still WORKS when read from within its own module.
+public fun mod_read_secret_var(): Int { return mod_secret_var }

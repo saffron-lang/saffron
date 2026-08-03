@@ -1,0 +1,13 @@
+// The legal reads of module-level variables, proving the infer_member_access fix
+// narrows access rather than breaking it:
+//   - a public module var read through the alias,
+//   - an internal module var read from the same package (every test/ file is in
+//     the root package, same as the fixture),
+//   - the private module var reached only through its own module's public accessor.
+import "@test" as T
+import "../support/visibility_module_lib.sf" as Lib
+
+T.assert_eq(Lib.mod_pub_var, 100, "public module var is readable through the alias")
+T.assert_eq(Lib.mod_packaged_var, 300, "internal module var is readable from the same package")
+T.assert_eq(Lib.mod_read_secret_var(), 200, "private module var is reachable via its module's public accessor")
+T.summary()
