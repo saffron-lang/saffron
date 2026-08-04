@@ -532,6 +532,54 @@
         this.last_type = AST.Type.StringType
         return sg_local
     }
+    // An UNRESOLVED receiver is not a list. Everything above this point handled a
+    // receiver whose static type is known — Map, a getItem class, String — and the
+    // list path below is what is left, so it has been acting as the default for
+    // "no idea what this is". It calls __list_length on the value as given, which
+    // inttoptr's a NaN-tagged String and reads character bytes as a list header:
+    // SIGSEGV. That default is the shared root of BUGS #29, #93, #94 and #95, each
+    // fixed by adding one more static type above it; this routes the leftover case
+    // to __any_index_get, which discriminates on the GC type tag at runtime the way
+    // __any_length already does for `.length()` (BUGS #152).
+    //
+    // `Any` is INCLUDED. It is tempting to exclude it on the theory that an
+    // untyped receiver reaching a subscript is usually a List, and keeping it on
+    // the static path costs nothing — that was the first version of this fix, and
+    // it left the bug in place for the exact chain that reported it. `Any` is not
+    // a hint that the value is a List; it is the compiler saying it does not know,
+    // which is precisely when a runtime tag check is required. It is also what
+    // this very arm returns, so an unannotated `a[i][j]` feeds `Any` straight back
+    // in and the second subscript would take the crashing path.
+    //
+    // Only the List and Tuple spellings keep the static path, so nothing whose
+    // representation is actually known changes shape. String and Map were both
+    // handled above and never arrive here.
+    var ig_obj_type_str: String = this.type_to_string(obj_type)
+    var ig_unresolved: Bool = !ig_obj_type_str.starts_with("List") and !ig_obj_type_str.starts_with("Tuple")
+    if (ig_unresolved) {
+        // The subscript goes over still NaN-boxed. __any_index_get needs the tag
+        // to treat a Map key as a key rather than an ordinal, and it untags for
+        // the List/String cases itself — codegen cannot make that choice here
+        // precisely because it does not know the receiver.
+        var ai_idx: String = this.gen_arg_value(index)
+        this.called_functions.push("__any_index_get")
+        // The auto-declare in output_body.sf defaults to arity 1, so a two-argument
+        // runtime helper that is not in runtime_declares() gets a `declare i64
+        // @__any_index_get(i64)` that contradicts its definition and fails to link —
+        // the BUGS #85 shape. Record the real arity instead of relying on the default.
+        this.called_function_arity.set("__any_index_get", 2)
+        var ai_res: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(ai_res, "i64", "__any_index_get", "i64 " + obj + ", i64 " + ai_idx))
+        } else {
+            this.emit_indent(ai_res + " = call i64 @__any_index_get(i64 " + obj + ", i64 " + ai_idx + ")")
+        }
+        // Any, not the receiver's type: this is an *element*, and claiming the
+        // container's type would misroute the next dispatch — the same reasoning
+        // the getItem arm above records for its fallback.
+        this.last_type = AST.Type.AnyType
+        return ai_res
+    }
     var idx_tagged: String = this.gen_arg_value(index)
     // Untag the index for arithmetic and runtime call. A Float index is
     // converted, not bit-reinterpreted (BUGS #52).
