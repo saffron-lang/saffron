@@ -608,9 +608,23 @@ has never actually been checked — and a hand-built gen4 segfaults on
   the repo. A diff is either an intended improvement or a regression, and it is
   *visible in review*. Today an IR change is invisible unless a test's exit code
   moves — which is exactly how #36's 96 silent fall-throughs went unnoticed.
-- **A fall-through counter.** #36 and #37 both used "count of silent
-  fall-throughs across the suite" as the metric (96 → 8 → 7). Make it a
-  first-class, asserted-zero build statistic instead of an ad hoc measurement.
+- **A fall-through counter.** ✅ **Done for the `Int` fallback, 2026-08-04.** #36
+  and #37 both used "count of silent fall-throughs across the suite" as the
+  metric (96 → 8 → 7). It is now a first-class, asserted-zero build statistic:
+  `bootstrap.sh`'s STAGE 2 passes `--report-unresolved` on the gen4 `main.sf`
+  compile — which already compiles the whole compiler, so the measurement is
+  free — and **fails the bootstrap if the count is not 0**.
+
+  Two details worth copying when the next counter gets this treatment. It reads
+  the compiler's own printed total rather than `grep -c`-ing the report lines, so
+  the number cannot drift from what the channel recorded. And a *missing* total
+  fails too: "the statistic disappeared" and "the statistic is zero" must not
+  look the same, which is mechanism M2's mistake one level up. This is also what
+  lets `record_unresolved` become `record_error` later without a flag day — the
+  build already can't regress past zero.
+
+  The remaining counter of this shape is the non-exhaustive `match` fall-through
+  (~100 sites, BUGS #76): still measured by hand.
 - **Differential testing against a reference interpreter.** Write a simple
   tree-walking interpreter over HIR — a few thousand lines, no codegen, no
   tagging, obviously correct. Every `test/pass/*.sf` runs both ways and outputs
