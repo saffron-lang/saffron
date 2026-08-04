@@ -542,10 +542,37 @@
                     if (this.current_prefix.length() > 0) {
                         this.called_function_arity.set(this.current_prefix + child_full, fwd_arity)
                     }
+                    // Both symbols must carry the module prefix, exactly as
+                    // gen_function does for every other class symbol (output_body.sf:2
+                    // — emit_name = current_prefix + name). This is the one site that
+                    // emitted a class symbol without going through it, so a module
+                    // class inheriting from another module class defined `@Sub__init`
+                    // and called `@Base__init` while the real bodies were
+                    // `@m3_Base__init`: `opt` rejected the IR with "use of undefined
+                    // value '@Base__init'" and, because that is a compiler-bug path
+                    // rather than a diagnostic, the program never ran (BUGS #151).
+                    // Register the prefix mapping too, so a call site that resolves
+                    // the bare name reaches the emitted symbol.
+                    // Resolve each class through class_struct_names rather than
+                    // pasting current_prefix on: the parent may live in a DIFFERENT
+                    // module than the child, in which case the child's prefix is the
+                    // wrong one for it. That table is the same resolution the
+                    // hierarchy registration above (class_parent_of) uses, so the
+                    // symbol and the dispatch tables agree.
+                    var fwd_child_c: String = name
+                    if (this.class_struct_names.has(name)) { fwd_child_c = this.class_struct_names.get(name) }
+                    var fwd_parent_c: String = cur_parent
+                    if (this.class_struct_names.has(cur_parent)) { fwd_parent_c = this.class_struct_names.get(cur_parent) }
+                    var fwd_child_sym: String = fwd_child_c + "__" + mname
+                    var fwd_parent_sym: String = fwd_parent_c + "__" + mname
+                    if (fwd_child_sym != child_full) {
+                        this.known_functions.push(fwd_child_sym)
+                        this.func_prefix_map.set(child_full, fwd_child_sym)
+                    }
                     this.emit("")
-                    this.emit("define i64 @" + child_full + "(" + fwd_params_def + ") {")
+                    this.emit("define i64 @" + fwd_child_sym + "(" + fwd_params_def + ") {")
                     this.emit("entry:")
-                    this.emit("  %r = call i64 @" + parent_full + "(" + fwd_params_call + ")")
+                    this.emit("  %r = call i64 @" + fwd_parent_sym + "(" + fwd_params_call + ")")
                     this.emit("  ret i64 %r")
                     this.emit("}")
                 }
