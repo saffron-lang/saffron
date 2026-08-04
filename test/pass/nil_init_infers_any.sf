@@ -1,0 +1,78 @@
+// BUGS #155 — `var x = nil` typed x as the singleton `Nil` permanently, so the
+// variable could never hold anything else.
+//
+// The failure was not a silent wrong answer: the later `x = 5` was accepted
+// *silently*, and then every USE of x was a hard compile error — "cannot call
+// .to_string() on nullable 'x' (type Nil)". A correct program was rejected.
+//
+// What made it airtight rather than merely annoying: the diagnostic's own advice
+// did not work. `if (x != nil)` narrows Nil by removing Nil, which leaves Nil,
+// so the suggested guard could not rescue it. There was no spelling that kept
+// the bare initializer and compiled.
+//
+// The fix routes a `Nil` initializer into the existing cannot-infer branch, which
+// stores `Any`. That is the honest answer, not a workaround: a bare `nil` says
+// nothing about what the variable is for. Codegen had already reached the same
+// judgment independently — merge_entry_type folds an observed "Nil" into "Any".
+import "@test" as Test
+
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun to_string(): String { return "Box(${this.n})" }
+}
+
+fun main() {
+    // The reported case: declare bare, assign later, then USE it. The use is
+    // what used to fail, so a test that only assigns would have passed while
+    // broken.
+    var x = nil
+    x = 5
+    Test.assert_eq("${x}", "5", "an Int assigned to a nil-initialized var is usable")
+
+    var y = nil
+    y = "hello"
+    Test.assert_eq("${y}", "hello", "and so is a String")
+
+    // Any-typed, so it routes to runtime dispatch — a class instance works too,
+    // which also proves this composes with the BUGS #115 tag switch.
+    var b = nil
+    b = Box(7)
+    Test.assert_eq("${b}", "Box(7)", "and a class instance formats via runtime dispatch")
+
+    // The guard the old diagnostic recommended must now actually work.
+    var g = nil
+    g = 42
+    if (g != nil) {
+        Test.assert_eq("${g}", "42", "a nil guard narrows to something usable")
+    } else {
+        Test.assert(false, "the nil guard must not take the else branch")
+    }
+
+    // Still nil until assigned: widening the static type must not change the
+    // runtime value.
+    var untouched = nil
+    Test.assert(untouched == nil, "an unassigned nil-initialized var is still nil")
+
+    // `is Nil` must keep answering correctly. This is the one case that
+    // genuinely wants the singleton (test/pass/first_class_types.sf asserts
+    // `x is Nil` on exactly this shape), and it is why widening to Any is safe
+    // rather than lossy.
+    var probe = nil
+    Test.assert(probe is Nil, "a nil-initialized var still satisfies `is Nil`")
+
+    // Reassignment does not make the old type linger.
+    var reused = nil
+    reused = 1
+    reused = "now a string"
+    Test.assert_eq("${reused}", "now a string", "an Any slot accepts a second, different type")
+
+    // The annotated spelling was the workaround and must stay correct.
+    var ann: Int|Nil = nil
+    ann = 5
+    if (ann != nil) {
+        Test.assert_eq("${ann}", "5", "the annotated nullable spelling is unchanged")
+    }
+
+    Test.summary()
+}
