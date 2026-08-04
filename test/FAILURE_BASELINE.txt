@@ -37,6 +37,12 @@
 # the alias/type-re-export fix now #149), pass/data_equality (structural ==
 # reaching more shapes), and test_lib_repro. No regressions: the 11 remaining
 # names are a strict subset of the previous 16.
+#
+# Updated 2026-08-03 at the origin/main merge (86ab8e6): 278 passed, 9 failed,
+# 14 skipped, 1 known-fail. origin/main's `\xNN` escape-decode fix (#152, was
+# origin's #146 before the collision renumber) fixed test_base64 and test_log,
+# both removed below. No regressions: the 9 remaining names are a strict subset
+# of the previous 11.
 
 async
 docstrings
@@ -46,6 +52,4 @@ pass/deep_deserialize
 pass/expressions
 pass/overloading
 pass/varargs
-test_base64
 test_glob
-test_log
