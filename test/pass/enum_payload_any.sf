@@ -1,0 +1,154 @@
+// enum_payload_any.sf — a payload-carrying enum names itself on every formatter
+// path, not only the one that goes through an explicit .to_string().
+//
+// The payload half of BUGS #154. Before the fix, `IO.println("${list_of_enums}")`
+// printed `[5.21502e-310, 5.21502e-310]`: the heap `[tag, f0, ...]` array was
+// allocated with __sf_malloc, so it had no GC header, so __val_class_tag could not
+// identify it, so __any_to_string fell through to its float arm and formatted the
+// address as a subnormal double. Interpolating the value DIRECTLY was correct the
+// whole time, because the lexer's `"${e}"` desugaring inserts a `.to_string()` call
+// and the static type is in hand there — the same two-paths-one-right shape as
+// #115 for classes.
+//
+// So the assertions below are deliberately about the paths that have NO static
+// type: a list element, a map value, and an `Any` parameter. Those are the three
+// that converge on __any_to_string. Asserting on `"${Shape.Circle(1)}"` alone
+// would have passed before the fix and proved nothing.
+//
+// Payload enums only. A fieldless variant is still broken by design (it is the
+// immediate `tag << 56`, with no allocation to carry a header) and
+// test/oracle_enum_println.sf is where that is recorded.
+
+import "@test" as Test
+
+enum Shape {
+    Circle(r: Float),
+    Rect(w: Int, h: Int),
+    Named(name: String),
+    Nothing
+}
+
+// A no-field variant of an enum that HAS payload variants is still heap-allocated
+// — get_max_fields is per-enum, not per-variant — so it carries a header and is
+// named like the rest. This is the case a partial fix is most likely to miss.
+var shapes: List<Shape> = [Shape.Circle(1), Shape.Rect(2, 3), Shape.Named("box"), Shape.Nothing]
+
+Test.assert_eq("${shapes}", "[Circle(1), Rect(2, 3), Named(box), Nothing]", "enums in a list name themselves")
+
+var by_name: Map<String, Shape> = {"r": Shape.Rect(4, 5)}
+Test.assert_eq("${by_name}", "{r: Rect(4, 5)}", "an enum as a map value names itself")
+
+// An `Any` parameter erases the static type, so this reaches __any_to_string with
+// nothing but the value — exactly what the GC tag is for.
+fun describe(x: Any): String {
+    return "${x}"
+}
+Test.assert_eq(describe(Shape.Circle(2.5)), "Circle(2.5)", "an enum passed as Any names itself")
+Test.assert_eq(describe(Shape.Nothing), "Nothing", "a fieldless variant of a payload enum, as Any")
+
+// The direct path was already correct and must stay correct: a fix that changed the
+// representation could plausibly break it, and then both paths would agree while
+// both were wrong.
+Test.assert_eq("${Shape.Rect(2, 3)}", "Rect(2, 3)", "direct interpolation still works")
+Test.assert_eq(Shape.Circle(1).to_string(), "Circle(1)", "explicit to_string still works")
+
+// The representation change must not disturb the two operations that read the
+// payload array's shape. `==` is the sharper of the two: ensure_enum_eq bails to
+// "unequal" unless both operands' upper 16 bits are zero, so the allocation has to
+// stay a BARE pointer — NaN-tagging it would make every payload enum unequal to
+// itself while still printing correctly.
+Test.assert(Shape.Rect(2, 3) == Shape.Rect(2, 3), "structural == on payload enums")
+Test.assert(!(Shape.Rect(2, 3) == Shape.Rect(3, 2)), "== distinguishes field order")
+Test.assert(!(Shape.Circle(1) == Shape.Rect(2, 3)), "== distinguishes variants")
+
+// match reads the tag from slot 0 of the same array, so it would break if the
+// header were placed after the user pointer rather than before it.
+var area: Int = match (shapes[1]) {
+    Rect(w, h) => w * h
+    _ => 0
+}
+Test.assert_eq(area, 6, "match still destructures the payload")
+
+var which: String = match (shapes[3]) {
+    Nothing => "none"
+    _ => "other"
+}
+Test.assert_eq(which, "none", "match still recognises a no-field variant")
+
+// A nested enum payload: the outer to_string calls the inner's, and the inner value
+// is now a header-carrying pointer read out of the outer's slot.
+enum Wrap {
+    One(s: Shape),
+    Two(a: Shape, b: Shape)
+}
+Test.assert_eq("${Wrap.One(Shape.Circle(1))}", "One(Circle(1))", "nested enum payload")
+Test.assert_eq(describe(Wrap.Two(Shape.Rect(1, 2), Shape.Nothing)), "Two(Rect(1, 2), Nothing)", "nested enum payload via Any")
+
+// Payload enums are now GC-traced (tag >= 10 routes to trace_instance, which scans
+// size/8 slots). Allocate enough garbage to force collections while holding live
+// enums, so a mis-traced payload would surface as a corrupted read rather than
+// passing by luck.
+var kept: List<Shape> = []
+var i: Int = 0
+while (i < 400) {
+    var g = Shape.Named("garbage")
+    if (i % 100 == 0) { kept.push(Shape.Rect(i, i + 1)) }
+    i = i + 1
+}
+Test.assert_eq(kept.length(), 4, "kept four survivors")
+Test.assert_eq("${kept[0]}", "Rect(0, 1)", "a live enum survives collections")
+Test.assert_eq("${kept[3]}", "Rect(300, 301)", "the last survivor is intact too")
+
+// The sharpest test in this file, and the one that found two real bugs the rest of
+// it missed. A recursive enum formatted at depth N allocates ~2^N StringBuilders,
+// so it crosses the GC threshold DURING a single to_string() — which is the only
+// way to exercise whether the values being formatted are rooted. Two were not:
+//
+//   1. gen_enum_construct allocated the payload array and THEN evaluated the
+//      arguments, so a nested constructor's allocation could reclaim the array
+//      being filled. Harmless under __sf_malloc (never reclaimed), a dangling
+//      pointer under __gc_alloc.
+//   2. emit_enum_to_string held `%self` and its StringBuilder only in LLVM
+//      registers. An i64 parameter is not an alloca, so the param-rooting loop in
+//      output_body.sf had nothing to push, and a collection mid-format freed the
+//      array being read — a null deref at `L__to_string + 16`.
+//
+// Both were latent before payload enums were collectable at all, so they belong to
+// this fix. Comparing against an independently built expected string rather than a
+// length is deliberate: the first symptom of #1 was a string of the RIGHT length
+// with the wrong bytes, because the buffer was freed and partly rewritten.
+enum Tree {
+    Leaf(v: Int),
+    Node(a: Tree, b: Tree)
+}
+
+fun grow(d: Int): Tree {
+    if (d <= 0) { return Tree.Leaf(1) }
+    return Tree.Node(grow(d - 1), grow(d - 1))
+}
+
+fun want(d: Int): String {
+    if (d <= 0) { return "Leaf(1)" }
+    return "Node(" + want(d - 1) + ", " + want(d - 1) + ")"
+}
+
+// The receiver stays a TEMPORARY — `grow(d).to_string()`, never `var t = grow(d)` —
+// because a local would be rooted by output_body.sf and would hide bug 2 entirely.
+// But the RESULT goes into a local before the assertion, and that is not a
+// convenience: writing `assert_eq(grow(d).to_string(), want(d), "...${d}")` leaves
+// argument 0 in an LLVM register while argument 1 and the message interpolation
+// allocate thousands of strings, so a collection there frees it. That is BUGS #156,
+// it is not specific to enums, and the identical shape built out of CLASSES —
+// GC-headered since long before #154 — corrupts the same way. Storing both operands
+// first tests what this file is about instead of re-failing a separate open bug.
+// (Not #63: that one was the *moving* nursery, is closed, and retiring the nursery
+// removed the move without supplying the missing root.)
+var d: Int = 1
+while (d <= 7) {
+    var got: String = grow(d).to_string()
+    var exp: String = want(d)
+    Test.assert_eq(got, exp, "recursive enum formats exactly at depth ${d}")
+    d = d + 1
+}
+
+Test.summary()

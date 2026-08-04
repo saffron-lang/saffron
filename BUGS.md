@@ -2,8 +2,13 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155.
-Next free number is **#156**.
+**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #156.
+Next free number is **#157**.
+
+#156 was found by #154's own regression test and is filed separately on purpose:
+it is an argument-temp rooting hole in codegen, reproducible with classes, and
+#63 — which reads like the same bug — is closed and was about the *moving*
+nursery. Retiring that nursery removed the move, not the missing root.
 
 #154 and #155 were filed on the same day on two lines of work that had not yet
 met — origin/main's "an enum inside a printed collection prints a bit pattern"
@@ -536,6 +541,94 @@ a one-line edit.
 
 ---
 
+### 156. OPEN — a live object held only in an LLVM SSA temp is *freed* by the non-moving collector; `f(Box(7), allocating())` reads a dead object
+
+**Severity: high.** Silent data corruption with no crash and no diagnostic, on the
+ordinary form `f(alloc_expr, allocating_expr)`.
+
+This is **not** #63, and the distinction is the reason it needs its own number.
+#63 was the *moving* minor collector invalidating an SSA temp — it closed by
+retiring the nursery, so there is no move left to invalidate anything. The
+observation #63 left behind in its resolution notes ("values in SSA temps are not
+roots, so no moving collector can be correct against this codegen") turns out to
+understate the problem: with the nursery gone, the mark-sweep major collector
+does not move the object, it **frees** it, because the shadow stack never learned
+about it either. Retiring the nursery narrowed #63's window; it did not close
+this one.
+
+**Reproduction** — deterministic, 51 corrupted reads out of 200:
+
+```saffron
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun churn(n: Int): Int {
+    var s: String = ""
+    var i: Int = 0
+    while (i < n) { s = "x" + i.to_string(); i = i + 1 }
+    return s.length()
+}
+
+fun take(b: Box, ignored: Int): Int { return b.v }
+
+var bad: Int = 0
+var t: Int = 0
+while (t < 200) {
+    var got: Int = take(Box(7), churn(300))   // Box(7) live only in a register
+    if (got != 7) { bad = bad + 1 }
+    t = t + 1
+}
+IO.println("mismatches=${bad}")   // mismatches=51
+```
+
+**Cause.** Argument 0 is evaluated to an SSA temp, then argument 1 runs and
+allocates. `output_body.sf:489` roots a *parameter* by pushing the address of its
+alloca, and locals get root slots the same way — but an argument value that is
+still mid-call-setup has no alloca and no slot, so `__gc_collect` cannot see it
+and sweeps it. `take`'s `b.v` then reads freed memory.
+
+**Two controls, both clean, which is what pins it:**
+
+| control | mismatches |
+|---|---|
+| default | 51 / 200 |
+| `__gc_disable()` | **0** |
+| hoist both arguments into locals first (`var b = Box(7)` / `var c = churn(300)`) | **0** |
+
+The second row rules out an arithmetic or dispatch bug. The third is the shape of
+the fix and also the workaround available today: a local gets a root slot, an
+argument temp does not.
+
+**It is not enum-specific, and that matters for #154.** Found while writing
+`test/pass/enum_payload_any.sf`, where making payload enums GC-collectable exposed
+it — but the identical shape built out of **classes**, which have carried GC headers
+since long before #154, corrupts the same way. At depth 9 a recursive
+`assert_eq(grow(d).to_string(), want(d), "depth ${d}")` over classes returns a
+string whose tail reads `Node(Node(Leaf(1), 0)), 0)` — live subtrees replaced by
+`0`. The emitted IR shows the window plainly:
+
+```llvm
+%t15 = call i64 @__rt_tag_ptr(i64 %t14)   ; argument 0, live only in a register
+%t16 = load i64, i64* @__g_d
+%t17 = call i64 @want(i64 %t16)            ; allocates thousands of strings
+```
+
+Enums merely fail one depth earlier than classes because their allocation per node
+is larger. `test/pass/enum_payload_any.sf` therefore hoists both operands into
+locals rather than asserting on the raw call — a test that failed here would be
+reporting this entry while claiming to be about #154.
+
+**Fix.** Give argument temps root slots for the duration of call setup: spill each
+evaluated argument to an alloca and `__gc_push_root` it before evaluating the next,
+popping after the call. The blocker noted while fixing #154 is real and needs
+solving first — there is no entry-block alloca facility in this codegen, so an
+alloca emitted in a loop body grows the stack every iteration. Either add one, or
+reuse a fixed-size per-frame argument spill area.
+
+---
+
 ### 155. OPEN — no `return` is checked against its function's declared return type, so `fun make(): Box { return "s" }` compiles and segfaults
 
 **Severity: high.** Silent wrong type across a declared boundary, and the crash
@@ -594,14 +687,21 @@ wrong diagnostic sweep.
 
 ---
 
-### 154. An enum inside a printed collection still prints a bit pattern
+### 154. An enum inside a printed collection still prints a bit pattern — PAYLOAD HALF FIXED, fieldless half open
 
-**Severity: medium.** Silent wrong answer, but narrower than it looks: only
-*inside* a collection. This is the residual of #105 and #115 — both entries
-describe it, but it lived in a paragraph of a *resolved* entry, which is a place
-nothing looks. Hence a number.
+**Severity: medium as filed; now low.** Silent wrong answer, but narrower than it
+looks: only *inside* a collection. This is the residual of #105 and #115 — both
+entries describe it, but it lived in a paragraph of a *resolved* entry, which is a
+place nothing looks. Hence a number.
 
-Verified at HEAD, not inherited from those notes:
+**Status 2026-08-04: the payload half is fixed** exactly as the plan below
+prescribed, and the fieldless half is open and will stay open until the value
+representation changes. The entry keeps its number rather than splitting, because
+the two halves share one repro and one mechanism; what differs is only whether the
+value is allocated. The fix is described after the original analysis, so the
+reasoning that predicted it stays readable next to what it predicted.
+
+Verified when filed (the payload lines are now correct — see the Fix section):
 
 ```saffron
 enum Color { Red, Green }
@@ -655,6 +755,86 @@ wrong.
 `test/oracle_enum_println.sf` records the current output and is the regression
 test; it has shown these subnormals unchanged across both the #105 and #115 fixes,
 which is how the residual stayed measured rather than assumed.
+
+**The fix (payload half, 2026-08-04).** Three edits, in the order that matters:
+
+1. `codegen.sf` gains `enum_type_ids: Map<String, Float>` beside `class_type_ids`,
+   drawing from the **same** `next_class_type_id` counter. Sharing the counter is
+   the point, not an economy: `__val_class_tag` answers with one number space, so
+   an enum tag that duplicated a class tag would make `__val_to_string` call the
+   wrong `to_string` — a silent wrong answer strictly worse than the bit pattern
+   it replaced.
+2. `emit_enum_payload_alloc` (`stmts_body.sf`) centralises the allocation choice
+   that used to be three independent `__sf_malloc` call sites — two in
+   `gen_enum_construct`, one in `emit_enum_constructor`. It emits `__gc_alloc`
+   with the enum's tag when there is one, and falls back to the old `__sf_malloc`
+   under `identity_mode` or for an unregistered enum. One helper rather than three
+   edits, so the header decision cannot drift between construction paths.
+3. `emit_val_to_string`'s switch gains an arm per registered enum, and
+   `register_enum_tag` is called from the **prescan** (`output_body.sf`'s
+   `EnumDecl` arm) as well as from `gen_enum_decl` and `register_enum_variants`.
+   The prescan call is the one that is easy to omit and fatal to omit: without it
+   a construction site lowered before its `enum` declaration gets no tag, which is
+   the #33/#36/#37 ordering hazard.
+
+Two asymmetries had to be respected, and each would have produced a plausible
+wrong fix:
+
+- **An enum `to_string` returns a RAW `char*`; a class `to_string` returns a
+  NaN-TAGGED pointer.** The evidence is at the existing call sites — the two enum
+  ones wrap the result in `__rt_tag_ptr` (`methods_body.sf:1787`, `:3653`) and the
+  class ones do not. So the enum arms in `__val_to_string` must *not* apply
+  `__val_untag_ptr`, which every class arm does. Applying it uniformly is the #102
+  mistake mirrored.
+- **The payload pointer must stay BARE.** `ensure_enum_eq` bails to "unequal"
+  unless both operands' `lshr 48` is zero, so NaN-tagging the allocation would
+  make every payload enum unequal to itself while printing perfectly.
+  `__val_class_tag` accepts a bare pointer (`upper == 0`) precisely so a
+  GC-headered value need not be tagged to be identified.
+
+The tag is **8 bits** — `__gc_pack_info` stores `tag << 8` and `__gc_info_tag`
+reads it back with `and 255` — so `register_enum_tag` refuses past 255 rather than
+wrapping. Refusing degrades to the old bit-pattern print; wrapping would collide
+with class tag 10 and call a wrong `to_string`. GC tracing needed no work:
+`__gc_mark_drain` routes any `tag >= 10` to `trace_instance`, and slot 0 (the
+small variant tag) is rejected by `__gc_is_heap_ptr`'s alignment and 4 GB floor,
+so scanning `size/8` slots as values is already safe.
+
+**wasm64 is excluded, not overlooked.** `wasm_base.ll`'s `__gc_alloc` discards its
+`%type_tag` and its `__val_class_tag` returns 0 unconditionally. Native
+(`base_nanbox.ll`, 24-byte header) and wasm32 (`wasm_base_32.ll`, 16-byte header)
+both have real headers and both were verified end to end.
+
+Verified: native and wasm32 both go from `[5.21502e-310, ...]` / `[0, 0, 0]` to
+`[Circle(1), Rect(2, 3), Nothing]`; `==` and `match` unchanged; `./bootstrap.sh`
+green through stage 2 gen4 including the zero-`Int`-fallback assertion; the suite's
+failure *set* byte-identical to `test/FAILURE_BASELINE.txt`. `identity_mode` is
+excluded exactly as `emit_reflect_helpers` is, so **the bootstrap never exercises
+this path** — it was tested with gen3-compiled user programs, which is the only way
+it could be.
+
+`test/pass/enum_payload_any.sf` is the regression test. It asserts on the three
+paths that have no static type — a list element, a map value, an `Any` parameter —
+because those are the ones that converge on `__any_to_string`; asserting on
+`"${Shape.Circle(1)}"` would have passed before the fix and proved nothing. Five of
+its first sixteen assertions failed before the change and all sixteen pass after.
+
+It has 23 assertions now, and the extra seven are the ones that earned their keep:
+a 400-iteration GC stress loop and a recursive `Tree` formatted byte-exactly against
+an independently built expected string. Those found the two rooting bugs listed
+above, which the sixteen never reached — an enum whose to_string does not itself
+allocate past the threshold never triggers a collection mid-format. They also found
+#156, which is *not* fixed here: the recursive assertions hoist both operands into
+locals, because passing them directly leaves argument 0 unrooted across argument 1's
+allocation. That is an argument-temp rooting hole in codegen, reproducible with
+classes, and it is filed separately rather than papered over silently.
+
+**What remains open** is the fieldless half, unchanged from the analysis above, and
+`test/oracle_enum_println.sf` still fails on exactly one line for it (line 22,
+`[Color.Red, Color.Blue]` → `[0, 4.77831e-299]`). That test stays in the baseline
+for that line, so the movement here is *inside* one name — two failing lines to one
+— which an unchanged failure set does not show. Closing it needs an enum-bearing
+NaN-box tag, not another formatter arm.
 
 ---
 
@@ -6082,6 +6262,11 @@ the full explanation of why it is off. Two notes for whoever revives it:
   SSA temps are not roots, so no moving collector can be correct against this
   codegen. Sink the receiver load below all allocating argument code first
   (`methods_body.sf` / `expr_body.sf`), or make the young generation non-moving.
+  **That blocker is now its own open entry, #156** — and retiring the nursery did
+  not close it. With no move left, the non-moving major collector *frees* the
+  unrooted temp instead of relocating it, so `f(Box(7), allocating())` still reads
+  a dead object 51 times in 200. Fixing #156 is a precondition for reviving the
+  nursery, not a separate cleanup.
 - The forwarding pass has its own tag bug on top of that — see #101 and the
   comment in `__gc_minor_visit_slot`.
 

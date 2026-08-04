@@ -1,0 +1,79 @@
+// arg_temp_rooted.sf — an object constructed as argument 0 must survive argument 1
+// allocating. BUGS #156, and this test is expected to FAIL until it is fixed
+// (run_tests.sh lists it under KNOWN_FAIL, so its failure is an `xfail` and its
+// eventual success is an `xpass` that tells you to close the entry).
+//
+// The shape is the ordinary one — `f(Box(7), something_that_allocates())` — not a
+// contrived stress. Argument 0 is evaluated into an LLVM SSA temp, then argument 1
+// runs and allocates. output_body.sf roots a local or a parameter by pushing the
+// address of its alloca, but an argument value mid-call-setup has neither, so
+// __gc_collect never sees it and sweeps it while it is still live.
+//
+// Not BUGS #63: that one was the *moving* minor collector relocating an SSA temp,
+// and it closed by retiring the nursery. With no move left, the non-moving major
+// collector frees the temp instead of relocating it. Retiring the nursery narrowed
+// #63's window without supplying the missing root.
+//
+// Two controls, both clean, are recorded in the #156 entry and pin the cause:
+// __gc_disable() gives 0 mismatches, and hoisting both arguments into locals gives
+// 0 mismatches. The second is the shape of the fix — a local gets a root slot, an
+// argument temp does not — and is the workaround available today.
+//
+// Classes, deliberately, not enums. This was found while making payload enums
+// GC-collectable for #154, but it is not enum-specific and a test written with
+// enums would invite the reading that #154 caused it. Classes have carried GC
+// headers since long before #154.
+
+import "@test" as Test
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+// Allocates enough strings to cross the collection threshold. The return value is
+// deliberately uninteresting — this exists only to collect while Box(7) is in flight.
+fun churn(n: Int): Int {
+    var s: String = ""
+    var i: Int = 0
+    while (i < n) {
+        s = "x" + i.to_string()
+        i = i + 1
+    }
+    return s.length()
+}
+
+fun take(b: Box, ignored: Int): Int {
+    return b.v
+}
+
+// 200 iterations rather than one: a single call may or may not straddle a
+// collection, so a one-shot version of this test would pass by luck. Counting
+// mismatches instead of asserting per-iteration also makes the failure legible —
+// 51 of 200 says "collections", where a bare assert would just say "wrong".
+var mismatches: Int = 0
+var t: Int = 0
+while (t < 200) {
+    var got: Int = take(Box(7), churn(300))
+    if (got != 7) { mismatches = mismatches + 1 }
+    t = t + 1
+}
+
+Test.assert_eq(mismatches, 0, "an argument temp survives a later argument's allocation")
+
+// The control, in the test itself: the identical work with both arguments hoisted
+// into locals must pass. If this half ever fails, the cause is not #156 and the
+// diagnosis above is wrong.
+var hoisted_mismatches: Int = 0
+var u: Int = 0
+while (u < 200) {
+    var b: Box = Box(7)
+    var c: Int = churn(300)
+    var got2: Int = take(b, c)
+    if (got2 != 7) { hoisted_mismatches = hoisted_mismatches + 1 }
+    u = u + 1
+}
+
+Test.assert_eq(hoisted_mismatches, 0, "control: rooted locals are unaffected")
+
+Test.summary()
