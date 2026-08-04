@@ -1,16 +1,88 @@
-//! Code formatter for Saffron — takes a parsed AST and emits consistently styled source.
+//! Source-faithful code formatter for Saffron.
 //!
-//! Usage:
-//!   import "@formatter" as Fmt
-//!   import "./lexer.sf" as Lexer
-//!   import "./parser.sf" as Parser
-//!   var tokens = Lexer.lex(source)
-//!   var ast = Parser.parse(tokens)
-//!   var formatted = Fmt.format_program(ast)
+//!   import "@formatter" as Formatter
+//!   var pretty: String = Formatter.format_source(IO.read_file(path))
+//!
+//! ## Why this reads the SOURCE and not the AST
+//!
+//! This file used to be an AST printer (`format_program(stmts)`), and it
+//! corrupted every non-trivial file it touched. The losses were not bugs in the
+//! printer — they are structural, and no amount of patching an AST printer
+//! recovers them, because the information is destroyed *before* the AST exists:
+//!
+//!   * `// line` and `/* block */` comments are discarded by
+//!     `lexer.sf`'s `skip_whitespace()`. They are never tokenized, so they are
+//!     not in the token stream, let alone the tree. (Only `///` and `//!` become
+//!     tokens.) Round-tripping a commented file deleted every comment.
+//!   * `"hi ${name}"` is desugared *in the lexer*: `read_string` synthesizes
+//!     `(`, `+`, `.to_string()` tokens, and the AST holds only the resulting
+//!     `Binary` tree. Printing that tree emits
+//!     `"hi " + name.to_string() + ""` — different source, and no way back.
+//!   * `for (x in xs)` is desugared by the parser into a `Block` holding
+//!     `__for_src_N` / `__for_i_N` temporaries and a `while`. Printing the tree
+//!     emits the desugaring, complete with compiler-internal names.
+//!   * `import`, `actor`, `interface` and `type` aliases survive only as
+//!     `@`-prefixed docstring metadata on ordinary nodes, so an AST printer
+//!     either drops them (turning an `actor` into a `class`, a `type` alias into
+//!     a `var`, an `import` into `nil`) or has to re-derive syntax from a
+//!     side channel.
+//!
+//! So the formatter keeps the original source text and rewrites *only the
+//! whitespace between lexical pieces*. Every comment, every `${...}`, every
+//! piece of syntactic sugar is copied byte-for-byte out of the input, because it
+//! is never taken apart in the first place. Fidelity is a property of the
+//! construction, not of a checklist of cases the printer remembers to handle.
+//!
+//! ## Why the scanner lives here and not in lexer.sf
+//!
+//! The alternative was an opt-in comment-retention mode in `lexer.sf` (a flag,
+//! default off, emitting comments as tokens). Rejected on two grounds:
+//!
+//!   1. It would not be sufficient. Retaining comments still leaves
+//!      interpolation desugared — `read_string` throws the raw `${...}` text
+//!      away — so the lexer would need a *second* retention mode for raw string
+//!      text as well. Two flags threaded through the one file that every
+//!      bootstrap depends on, to serve one consumer.
+//!   2. `lexer.sf` is load-bearing for the bootstrap, and a formatter is not
+//!      worth any risk to it. A scanner here cannot change compile output at
+//!      all: `lexer.sf` is untouched, so a bootstrap is byte-identical to
+//!      today's by construction rather than by test.
+//!
+//! The cost is a second, smaller scanner that must agree with `lexer.sf` about
+//! where pieces begin and end. It is deliberately *coarser*: it only needs piece
+//! boundaries, never values, so it has no number parsing, no escape decoding and
+//! no keyword table. Where the two could disagree the text is still copied
+//! verbatim, so a disagreement can only shift a space, never change a token.
+//!
+//! ## What it normalizes, and what it deliberately leaves alone
+//!
+//! Normalized: indentation (4 spaces per open-delimiter depth), runs of blank
+//! lines (collapsed to one), trailing whitespace, line endings (LF), the final
+//! newline, and horizontal spacing where the rule is unambiguous.
+//!
+//! Left alone: line breaks (the source's own line structure is preserved — this
+//! is a re-indenter, not a re-wrapper), and spacing around `<`, `>`, `|`, `&`,
+//! `^`, `<<`, `>>`, `++`, `--`. Those are genuinely ambiguous without a parser:
+//! `List<String>` and `a < b` are the same two tokens, as are `Int|Nil` and
+//! `a | b`. For those the source's own spelling decides — one blank stays one
+//! blank, none stays none — which is correct for both readings.
+//!
+//! Every rule is idempotent by construction: output spacing is either "" or a
+//! single " ", indentation is derived from delimiter depth (never from the
+//! previous text), and blank runs are already at their fixed point. So
+//! `format_source(format_source(x)) == format_source(x)`.
 
-import "../compiler/ast.sf" as AST
-
-// --- Helpers ---
+// --- Piece kinds -------------------------------------------------------------
+//
+// Floats rather than an enum: nothing outside this file matches on them, and a
+// new enum in the stdlib is a new arity to sweep for no benefit.
+//
+//   0 punctuation / operator
+//   1 word (identifier or keyword)
+//   2 number
+//   3 string literal (verbatim, `${...}` and all)
+//   4 line comment (`//`, `///`, `//!`) — runs to end of line
+//   5 block comment (`/* ... */`, nesting)
 
 fun make_indent(level: Float): String {
     var sb: StringBuilder = StringBuilder()
@@ -22,462 +94,561 @@ fun make_indent(level: Float): String {
     return sb.to_string()
 }
 
-fun escape_string(s: String): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < s.length()) {
-        var ch: String = s.char_at(i)
-        if (ch == "\"") {
-            sb.append("\\\"")
-        } else if (ch == "\\") {
-            sb.append("\\\\")
-        } else if (ch == "\n") {
-            sb.append("\\n")
-        } else if (ch == "\t") {
-            sb.append("\\t")
-        } else if (ch == "\r") {
-            sb.append("\\r")
-        } else {
-            sb.append(ch)
-        }
-        i = i + 1
-    }
-    return sb.to_string()
+fun _is_digit(ch: String): Bool {
+    return "0123456789".contains(ch)
 }
 
-fun is_top_level_decl(stmt: AST.Stmt): Bool {
-    return match (stmt) {
-        FunDecl(name, params, ret_type, body, doc, f_vis) => true
-        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => true
-        EnumDecl(name, variants, doc, e_vis) => true
-        ExprStmt(expr) => false
-        VarDecl(name, type_ann, init, doc, v_vis) => false
-        Return(value) => false
-        If(cond, then_b, else_b) => false
-        While(cond, body) => false
-        Block(stmts) => false
-        Break => false
-        Continue => false
-        TryCatch(tb, cn, cb, fb) => false
-        Throw(value) => false
-    }
+fun _is_alpha(ch: String): Bool {
+    return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(ch)
 }
 
-// --- Expression Formatting ---
-
-fun format_expr(expr: AST.Expr): String {
-    return match (expr) {
-        IntLit(v) => v.floor().to_string()
-        FloatLit(v) => v
-        BoolLit(v) => {
-            var r: String = "false"
-            if (v) { r = "true" }
-            r
-        }
-        StringLit(s) => "\"" + escape_string(s) + "\""
-        NilLit => "nil"
-        Variable(name) => name
-        Binary(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
-        Unary(op, right) => op + format_expr(right)
-        Call(callee, args) => format_expr(callee) + "(" + format_exprs(args) + ")"
-        Assign(name, value) => name + " = " + format_expr(value)
-        Logical(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
-        MemberAccess(obj, field) => format_expr(obj) + "." + field
-        Match(subject, arms) => format_match(subject, arms)
-        EnumConstruct(enum_name, variant, args) => {
-            var s: String = enum_name + "." + variant
-            if (args.length() > 0) {
-                s = s + "(" + format_exprs(args) + ")"
-            }
-            s
-        }
-        Lambda(params, ret_type, body) => format_lambda(params, ret_type, body)
-        GetField(obj, field) => format_expr(obj) + "." + field
-        SetField(obj, field, value) => format_expr(obj) + "." + field + " = " + format_expr(value)
-        This => "this"
-        ListLit(elements) => "[" + format_exprs(elements) + "]"
-        IndexGet(obj, index) => format_expr(obj) + "[" + format_expr(index) + "]"
-        IndexSet(obj, index, value) => format_expr(obj) + "[" + format_expr(index) + "] = " + format_expr(value)
-        MethodCall(obj, method, args) => format_expr(obj) + "." + method + "(" + format_exprs(args) + ")"
-        MapLit => "{}"
-        BlockExpr(stmts, value) => format_block_expr(stmts, value)
-        IsCheck(value, type_name) => format_expr(value) + " is " + type_name
-    }
+fun _is_alnum(ch: String): Bool {
+    return _is_digit(ch) or _is_alpha(ch)
 }
 
-fun format_exprs(exprs: List<AST.Expr>): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < exprs.length()) {
-        if (i > 0) { sb.append(", ") }
-        sb.append(format_expr(exprs[i]))
-        i = i + 1
-    }
-    return sb.to_string()
+/// Keywords and soft keywords that are NOT values.
+///
+/// Two rules read this list. A keyword takes a space before a following `(`
+/// (`if (x)`, not `if(x)`), and a keyword is not the end of a value, so a `-`
+/// after one is unary (`return -1`) rather than binary. `this`, `true`, `false`
+/// and `nil` are keywords to the lexer but ARE values, so they are deliberately
+/// absent — see `_is_value_end`.
+///
+/// Soft keywords (`actor`, `interface`, `type`, and the access modifiers) are
+/// here too. They lex as identifiers, and including them costs nothing: none of
+/// them is ever a call target, so the space-before-`(` rule cannot misfire.
+fun _is_keyword(text: String): Bool {
+    if (text == "if") { return true }
+    if (text == "else") { return true }
+    if (text == "while") { return true }
+    if (text == "for") { return true }
+    if (text == "in") { return true }
+    if (text == "match") { return true }
+    if (text == "return") { return true }
+    if (text == "throw") { return true }
+    if (text == "try") { return true }
+    if (text == "catch") { return true }
+    if (text == "finally") { return true }
+    if (text == "and") { return true }
+    if (text == "or") { return true }
+    if (text == "is") { return true }
+    if (text == "as") { return true }
+    if (text == "var") { return true }
+    if (text == "let") { return true }
+    if (text == "fun") { return true }
+    if (text == "enum") { return true }
+    if (text == "class") { return true }
+    if (text == "import") { return true }
+    if (text == "yield") { return true }
+    if (text == "from") { return true }
+    if (text == "extends") { return true }
+    if (text == "actor") { return true }
+    if (text == "interface") { return true }
+    if (text == "type") { return true }
+    if (text == "private") { return true }
+    if (text == "public") { return true }
+    if (text == "internal") { return true }
+    if (text == "protected") { return true }
+    return false
 }
 
-fun format_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
-    var sb: StringBuilder = StringBuilder()
-    sb.append("match (")
-    sb.append(format_expr(subject))
-    sb.append(") {\n")
-    var i: Float = 0
-    while (i < arms.length()) {
-        var arm: AST.MatchArm = arms[i]
-        var pat_str: String = match (arm) { Arm(pattern, body) => format_pattern(pattern) }
-        var body_str: String = match (arm) { Arm(pattern, body) => format_expr(body) }
-        sb.append("        ")
-        sb.append(pat_str)
-        sb.append(" => ")
-        sb.append(body_str)
-        sb.append("\n")
-        i = i + 1
+/// True when a piece can end a value expression — the test that decides whether
+/// the next `-`/`+`/`*`/`!` is binary or unary, and whether a following `(`/`[`
+/// is a call/index (no space) or a grouped sub-expression after a keyword.
+fun _is_value_end(text: String, kind: Float): Bool {
+    if (kind == 2) { return true }
+    if (kind == 3) { return true }
+    if (kind == 1) {
+        // The four value keywords. `this.x`, `true.to_string()`, `nil` in a
+        // comparison: all of these end a value.
+        if (text == "this") { return true }
+        if (text == "true") { return true }
+        if (text == "false") { return true }
+        if (text == "nil") { return true }
+        return !_is_keyword(text)
     }
-    sb.append("    }")
-    return sb.to_string()
+    if (text == ")") { return true }
+    if (text == "]") { return true }
+    if (text == "}") { return true }
+    return false
 }
 
-fun format_pattern(pat: AST.Pattern): String {
-    return match (pat) {
-        VariantPattern(variant, bindings) => {
-            var s: String = variant
-            if (bindings.length() > 0) {
-                s = s + "(" + join_strings(bindings) + ")"
-            }
-            s
-        }
-        WildcardPattern => "_"
-        LiteralPattern(value) => format_expr(value)
-    }
+/// Operators that get exactly one space on each side when used as binaries.
+///
+/// `<`, `>`, `|`, `&`, `^`, `<<`, `>>`, `++` and `--` are deliberately NOT here.
+/// The first six are unresolvably ambiguous without a parser (`List<String>` vs
+/// `a < b`; `Int|Nil` vs `a | b`), and `++`/`--` are affixes that must stay glued
+/// to their operand. All of those fall through to the preserve-collapse rule,
+/// which reproduces whichever reading the source spelled.
+fun _is_spaced_op(text: String): Bool {
+    if (text == "+") { return true }
+    if (text == "-") { return true }
+    if (text == "*") { return true }
+    if (text == "/") { return true }
+    if (text == "%") { return true }
+    if (text == "=") { return true }
+    if (text == "==") { return true }
+    if (text == "!=") { return true }
+    if (text == "<=") { return true }
+    if (text == ">=") { return true }
+    if (text == "+=") { return true }
+    if (text == "-=") { return true }
+    if (text == "*=") { return true }
+    if (text == "/=") { return true }
+    if (text == "%=") { return true }
+    if (text == "=>") { return true }
+    if (text == "->") { return true }
+    return false
 }
 
-fun join_strings(strs: List<String>): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < strs.length()) {
-        if (i > 0) { sb.append(", ") }
-        sb.append(strs[i])
-        i = i + 1
-    }
-    return sb.to_string()
+/// Operators that can appear in prefix position, where they bind tight to their
+/// operand (`-1`, `!ok`, `~bits`, `*rest` in a destructuring pattern).
+fun _is_prefix_op(text: String): Bool {
+    if (text == "-") { return true }
+    if (text == "+") { return true }
+    if (text == "!") { return true }
+    if (text == "~") { return true }
+    if (text == "*") { return true }
+    return false
 }
 
-fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
-    var sb: StringBuilder = StringBuilder()
-    sb.append("fun (")
-    sb.append(format_params(params))
-    sb.append(")")
-    if (ret_type != "Nil" and ret_type.length() > 0) {
-        sb.append(": ")
-        sb.append(ret_type)
-    }
-    if (body.length() == 1) {
-        // Single-expression lambda: fun (x) => expr
-        var single: AST.Stmt = body[0]
-        var expr_str: String = match (single) {
-            Return(value) => " => " + format_expr(value)
-            ExprStmt(expr) => " => " + format_expr(expr)
-            VarDecl(n, t, i, d, v_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            FunDecl(n, p, r, b, d, f_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            EnumDecl(n, v, d, e_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            ClassDecl(n, tps, ps, f, m, d, c_vis) => " {\n    " + format_stmt(single, 1) + "}"
-            If(c, t, e) => " {\n    " + format_stmt(single, 1) + "}"
-            While(c, b) => " {\n    " + format_stmt(single, 1) + "}"
-            Block(s) => " {\n    " + format_stmt(single, 1) + "}"
-            Break => " {\n    break\n}"
-            Continue => " {\n    continue\n}"
-            TryCatch(tb, cn, cb, fb) => " {\n    " + format_stmt(single, 1) + "}"
-            Throw(v) => " {\n    " + format_stmt(single, 1) + "}"
-        }
-        sb.append(expr_str)
-    } else {
-        sb.append(" {\n")
-        sb.append(format_stmts(body, 1))
-        sb.append("}")
-    }
-    return sb.to_string()
+fun _is_closer(text: String): Bool {
+    return text == "}" or text == ")" or text == "]"
 }
 
-fun format_block_expr(stmts: List<AST.Stmt>, value: AST.Expr): String {
-    var sb: StringBuilder = StringBuilder()
-    sb.append("{\n")
-    sb.append(format_stmts(stmts, 1))
-    sb.append("    ")
-    sb.append(format_expr(value))
-    sb.append("\n}")
-    return sb.to_string()
+fun _delim_delta(text: String): Float {
+    if (text == "{" or text == "(" or text == "[") { return 1 }
+    if (text == "}" or text == ")" or text == "]") { return -1 }
+    return 0
 }
 
-// --- Parameter Formatting ---
-
-fun format_params(params: List<AST.Param>): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < params.length()) {
-        if (i > 0) { sb.append(", ") }
-        var p: AST.Param = params[i]
-        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-        var ptype: String = match (p) { Param(n, t, d, p_vis) => t }
-        var pdefault: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
-        sb.append(pname)
-        if (ptype.length() > 0 and ptype != "Any") {
-            sb.append(": ")
-            sb.append(ptype)
-        }
-        // Check if default value is not nil
-        var default_str: String = format_expr(pdefault)
-        if (default_str != "nil") {
-            sb.append(" = ")
-            sb.append(default_str)
-        }
-        i = i + 1
-    }
-    return sb.to_string()
+/// A piece that continues the previous line rather than starting a statement.
+/// When one of these opens a line it gets one extra indent level, so a wrapped
+/// method chain or a wrapped conjunction reads as subordinate:
+///
+///     var x = foo()
+///         .bar()
+///
+/// Derived from delimiter depth like every other indent, so it is idempotent.
+fun _is_continuation(text: String): Bool {
+    if (text == ".") { return true }
+    if (text == "and") { return true }
+    if (text == "or") { return true }
+    if (text == "+") { return true }
+    return false
 }
 
-// --- Statement Formatting ---
+// --- Verbatim extent scanners ------------------------------------------------
+//
+// These answer "where does this piece end", never "what does it mean". A string
+// literal's extent is the only genuinely recursive case: `${...}` can contain a
+// nested string, which can itself interpolate. `_scan_string` and `_scan_interp`
+// therefore call each other, exactly as lexer.sf's `read_string` and
+// `read_interpolation` do.
 
-fun format_stmt(stmt: AST.Stmt, indent: Float): String {
-    var pad: String = make_indent(indent)
-    return match (stmt) {
-        ExprStmt(expr) => pad + format_expr(expr) + "\n"
-        VarDecl(name, type_ann, init, doc, v_vis) => {
-            var sb: StringBuilder = StringBuilder()
-            sb.append(pad)
-            sb.append("var ")
-            sb.append(name)
-            if (type_ann.length() > 0 and type_ann != "Any") {
-                sb.append(": ")
-                sb.append(type_ann)
-            }
-            var init_str: String = format_expr(init)
-            if (init_str != "nil") {
-                sb.append(" = ")
-                sb.append(init_str)
-            }
-            sb.append("\n")
-            sb.to_string()
-        }
-        FunDecl(name, params, ret_type, body, doc, f_vis) => {
-            var sb: StringBuilder = StringBuilder()
-            // Docstring
-            if (doc.length() > 0 and !doc.starts_with("@")) {
-                sb.append(pad)
-                sb.append("/// ")
-                sb.append(doc)
-                sb.append("\n")
-            }
-            sb.append(pad)
-            sb.append("fun ")
-            sb.append(name)
-            sb.append("(")
-            sb.append(format_params(params))
-            sb.append(")")
-            if (ret_type != "Nil" and ret_type.length() > 0) {
-                sb.append(": ")
-                sb.append(ret_type)
-            }
-            sb.append(" {\n")
-            sb.append(format_stmts(body, indent + 1))
-            sb.append(pad)
-            sb.append("}\n")
-            sb.to_string()
-        }
-        EnumDecl(name, variants, doc, e_vis) => {
-            var sb: StringBuilder = StringBuilder()
-            if (doc.length() > 0 and !doc.starts_with("@")) {
-                sb.append(pad)
-                sb.append("/// ")
-                sb.append(doc)
-                sb.append("\n")
-            }
-            sb.append(pad)
-            sb.append("enum ")
-            sb.append(name)
-            sb.append(" {\n")
-            var i: Float = 0
-            while (i < variants.length()) {
-                var v: AST.Variant = variants[i]
-                var vname: String = match (v) { Variant(n, f) => n }
-                var vfields: String = match (v) { Variant(n, f) => f }
-                sb.append(make_indent(indent + 1))
-                sb.append(vname)
-                if (vfields.length() > 0) {
-                    sb.append("(")
-                    sb.append(vfields)
-                    sb.append(")")
-                }
-                if (i < variants.length() - 1) {
-                    sb.append(",")
-                }
-                sb.append("\n")
+/// The index just past the string literal starting at `start` (which must be its
+/// opening `"`). An unterminated literal ends at end-of-source rather than
+/// looping; the compiler reports it, the formatter just copies what is there.
+fun _scan_string(src: String, start: Float): Float {
+    var i: Float = start + 1
+    while (i < src.length()) {
+        var ch: String = src.char_at(i)
+        if (ch == "\\") {
+            // Skip the escape *and* what it escapes, so `"\\"` and `"\""` end
+            // where the source says they do.
+            i = i + 2
+        } else if (ch == "\"") {
+            return i + 1
+        } else if (ch == "$") {
+            if (i + 1 < src.length() and src.char_at(i + 1) == "{") {
+                i = _scan_interp(src, i + 2)
+            } else {
                 i = i + 1
             }
-            sb.append(pad)
-            sb.append("}\n")
-            sb.to_string()
+        } else {
+            i = i + 1
         }
-        ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
-            var sb: StringBuilder = StringBuilder()
-            if (doc.length() > 0 and !doc.starts_with("@")) {
-                sb.append(pad)
-                sb.append("/// ")
-                sb.append(doc)
-                sb.append("\n")
-            }
-            sb.append(pad)
-            sb.append("class ")
-            sb.append(name)
-            if (parents.length() > 0) {
-                sb.append(" extends ")
-                // Every base, comma-joined, matching the surface syntax. Printing
-                // only parents[0] would have the formatter silently delete the
-                // 2nd and 3rd interface of a `extends A, B, C` on reformat.
-                var pi: Float = 0
-                while (pi < parents.length()) {
-                    if (pi > 0) { sb.append(", ") }
-                    sb.append(parents[pi])
-                    pi = pi + 1
-                }
-            }
-            sb.append(" {\n")
-            // Fields
-            var fi: Float = 0
-            while (fi < fields.length()) {
-                var f: AST.Param = fields[fi]
-                var fname: String = match (f) { Param(n, t, d, p_vis) => n }
-                var ftype: String = match (f) { Param(n, t, d, p_vis) => t }
-                sb.append(make_indent(indent + 1))
-                sb.append("var ")
-                sb.append(fname)
-                if (ftype.length() > 0 and ftype != "Any") {
-                    sb.append(": ")
-                    sb.append(ftype)
-                }
-                sb.append("\n")
-                fi = fi + 1
-            }
-            // Blank line between fields and methods if both exist
-            if (fields.length() > 0 and methods.length() > 0) {
-                sb.append("\n")
-            }
-            // Methods
-            var mi: Float = 0
-            while (mi < methods.length()) {
-                sb.append(format_stmt(methods[mi], indent + 1))
-                if (mi < methods.length() - 1) {
-                    sb.append("\n")
-                }
-                mi = mi + 1
-            }
-            sb.append(pad)
-            sb.append("}\n")
-            sb.to_string()
+    }
+    return i
+}
+
+/// The index just past the `}` closing an interpolation whose body starts at
+/// `start` (i.e. just after `${`). Braces nest, and a string inside recurses.
+fun _scan_interp(src: String, start: Float): Float {
+    var depth: Float = 1
+    var i: Float = start
+    while (i < src.length()) {
+        var ch: String = src.char_at(i)
+        if (ch == "\"") {
+            i = _scan_string(src, i)
+        } else if (ch == "{") {
+            depth = depth + 1
+            i = i + 1
+        } else if (ch == "}") {
+            depth = depth - 1
+            i = i + 1
+            if (depth == 0) { return i }
+        } else {
+            i = i + 1
         }
-        Return(value) => {
-            var val_str: String = format_expr(value)
-            if (val_str == "nil") {
-                pad + "return\n"
+    }
+    return i
+}
+
+/// The index just past the block comment starting at `start` (its `/`). Nesting
+/// matches lexer.sf: `/* a /* b */ c */` is one comment.
+fun _scan_block_comment(src: String, start: Float): Float {
+    var i: Float = start + 2
+    var depth: Float = 1
+    while (i < src.length()) {
+        var ch: String = src.char_at(i)
+        if (ch == "/" and i + 1 < src.length() and src.char_at(i + 1) == "*") {
+            depth = depth + 1
+            i = i + 2
+        } else if (ch == "*" and i + 1 < src.length() and src.char_at(i + 1) == "/") {
+            depth = depth - 1
+            i = i + 2
+            if (depth == 0) { return i }
+        } else {
+            i = i + 1
+        }
+    }
+    return i
+}
+
+// --- The formatter -----------------------------------------------------------
+
+class SourceFormatter {
+    var src: String
+    var out: StringBuilder
+    var pos: Float
+    // Open-delimiter depth. Clamped at 0 so unbalanced input (a file that does
+    // not parse — which an editor asks to format constantly) still produces
+    // output rather than negative indentation.
+    var depth: Float
+    var at_line_start: Bool
+    var started: Bool
+    // The previous significant piece, and two facts about it that the spacing
+    // rules need but cannot re-derive from its text alone.
+    var prev_text: String
+    var prev_kind: Float
+    var prev_prefix: Bool
+    var prev_binary: Bool
+    // Set by `skip_blanks`: how many newlines, and whether any blank at all,
+    // separated the previous piece from the one about to be emitted.
+    var pend_nl: Float
+    var pend_sp: Bool
+
+    fun init(src: String) {
+        this.src = src
+        this.out = StringBuilder()
+        this.pos = 0
+        this.depth = 0
+        this.at_line_start = true
+        this.started = false
+        this.prev_text = ""
+        this.prev_kind = 0
+        this.prev_prefix = false
+        this.prev_binary = false
+        this.pend_nl = 0
+        this.pend_sp = false
+    }
+
+    /// Advance past spaces, tabs, CRs and newlines, recording in `pend_nl` /
+    /// `pend_sp` what was there. Comments are NOT skipped — they are pieces.
+    fun skip_blanks() {
+        this.pend_nl = 0
+        this.pend_sp = false
+        while (this.pos < this.src.length()) {
+            var ch: String = this.src.char_at(this.pos)
+            if (ch == "\n") {
+                this.pend_nl = this.pend_nl + 1
+                this.pos = this.pos + 1
+            } else if (ch == " " or ch == "\t" or ch == "\r") {
+                this.pend_sp = true
+                this.pos = this.pos + 1
             } else {
-                pad + "return " + val_str + "\n"
+                return nil
             }
         }
-        If(cond, then_branch, else_branch) => {
-            var sb: StringBuilder = StringBuilder()
-            sb.append(pad)
-            sb.append("if (")
-            sb.append(format_expr(cond))
-            sb.append(") {\n")
-            sb.append(format_stmts(then_branch, indent + 1))
-            sb.append(pad)
-            sb.append("}")
-            if (else_branch.length() > 0) {
-                sb.append(" else {\n")
-                sb.append(format_stmts(else_branch, indent + 1))
-                sb.append(pad)
-                sb.append("}")
+    }
+
+    /// Consume one significant piece starting at the cursor and return its kind.
+    /// The caller slices the text out of `src` — this never builds it.
+    fun scan_piece(): Float {
+        var ch: String = this.src.char_at(this.pos)
+
+        if (ch == "/" and this.pos + 1 < this.src.length()) {
+            var nx: String = this.src.char_at(this.pos + 1)
+            if (nx == "/") {
+                // Line comment, doc comment (`///`) and module doc (`//!`) are
+                // all one piece that runs to the newline. The distinction only
+                // matters to the compiler; here they are text.
+                while (this.pos < this.src.length() and this.src.char_at(this.pos) != "\n") {
+                    this.pos = this.pos + 1
+                }
+                return 4
             }
-            sb.append("\n")
-            sb.to_string()
-        }
-        While(cond, body) => {
-            var sb: StringBuilder = StringBuilder()
-            sb.append(pad)
-            sb.append("while (")
-            sb.append(format_expr(cond))
-            sb.append(") {\n")
-            sb.append(format_stmts(body, indent + 1))
-            sb.append(pad)
-            sb.append("}\n")
-            sb.to_string()
-        }
-        Block(stmts) => {
-            var sb: StringBuilder = StringBuilder()
-            sb.append(pad)
-            sb.append("{\n")
-            sb.append(format_stmts(stmts, indent + 1))
-            sb.append(pad)
-            sb.append("}\n")
-            sb.to_string()
-        }
-        Break => pad + "break\n"
-        Continue => pad + "continue\n"
-        TryCatch(try_body, catch_name, catch_body, finally_body) => {
-            var sb: StringBuilder = StringBuilder()
-            sb.append(pad)
-            sb.append("try {\n")
-            sb.append(format_stmts(try_body, indent + 1))
-            sb.append(pad)
-            sb.append("} catch (")
-            sb.append(catch_name)
-            sb.append(") {\n")
-            sb.append(format_stmts(catch_body, indent + 1))
-            sb.append(pad)
-            sb.append("}")
-            if (finally_body.length() > 0) {
-                sb.append(" finally {\n")
-                sb.append(format_stmts(finally_body, indent + 1))
-                sb.append(pad)
-                sb.append("}")
+            if (nx == "*") {
+                this.pos = _scan_block_comment(this.src, this.pos)
+                return 5
             }
-            sb.append("\n")
-            sb.to_string()
         }
-        Throw(value) => pad + "throw " + format_expr(value) + "\n"
+
+        if (ch == "\"") {
+            this.pos = _scan_string(this.src, this.pos)
+            return 3
+        }
+
+        if (_is_digit(ch)) {
+            this.scan_number()
+            return 2
+        }
+
+        if (_is_alpha(ch)) {
+            while (this.pos < this.src.length() and _is_alnum(this.src.char_at(this.pos))) {
+                this.pos = this.pos + 1
+            }
+            return 1
+        }
+
+        this.scan_operator()
+        return 0
+    }
+
+    /// Consume a numeric literal. Coarser than lexer.sf's `read_number`: it does
+    /// not compute a value, so it only has to agree about the extent.
+    ///
+    /// A `.` is part of the number ONLY when a digit follows, which is where this
+    /// and the lexer differ: the lexer reads `3.floor()` as `TkFloat("3.")` plus
+    /// `floor`, this reads `3` `.` `floor`. Both copy the same eight bytes; the
+    /// only consequence is that the `.`-tightening rule applies, which is what
+    /// `3.floor()` wants anyway. Requiring the digit also keeps `0..5` as
+    /// `0` `.` `.` `5` rather than swallowing a dot.
+    fun scan_number() {
+        // Hex: 0x / 0X followed by hex digits.
+        if (this.src.char_at(this.pos) == "0" and this.pos + 1 < this.src.length()) {
+            var x: String = this.src.char_at(this.pos + 1)
+            if (x == "x" or x == "X") {
+                this.pos = this.pos + 2
+                while (this.pos < this.src.length() and "0123456789abcdefABCDEF".contains(this.src.char_at(this.pos))) {
+                    this.pos = this.pos + 1
+                }
+                return nil
+            }
+        }
+        while (this.pos < this.src.length() and _is_digit(this.src.char_at(this.pos))) {
+            this.pos = this.pos + 1
+        }
+        if (this.pos + 1 < this.src.length()) {
+            if (this.src.char_at(this.pos) == "." and _is_digit(this.src.char_at(this.pos + 1))) {
+                this.pos = this.pos + 1
+                while (this.pos < this.src.length() and _is_digit(this.src.char_at(this.pos))) {
+                    this.pos = this.pos + 1
+                }
+            }
+        }
+        // Exponent, with the same "at least one digit" requirement the lexer has,
+        // so `2E` leaves the `E` to the identifier scanner.
+        if (this.pos < this.src.length()) {
+            var e: String = this.src.char_at(this.pos)
+            if (e == "e" or e == "E") {
+                var off: Float = 1
+                if (this.pos + 1 < this.src.length()) {
+                    var sgn: String = this.src.char_at(this.pos + 1)
+                    if (sgn == "+" or sgn == "-") { off = 2 }
+                }
+                if (this.pos + off < this.src.length() and _is_digit(this.src.char_at(this.pos + off))) {
+                    this.pos = this.pos + off + 1
+                    while (this.pos < this.src.length() and _is_digit(this.src.char_at(this.pos))) {
+                        this.pos = this.pos + 1
+                    }
+                }
+            }
+        }
+    }
+
+    /// Consume one operator or delimiter, maximal-munch over the two-character
+    /// forms lexer.sf recognizes. An unknown character becomes a one-character
+    /// piece and is still copied verbatim — the formatter never drops bytes, even
+    /// ones the compiler would reject.
+    fun scan_operator() {
+        var a: String = this.src.char_at(this.pos)
+        var b: String = ""
+        if (this.pos + 1 < this.src.length()) { b = this.src.char_at(this.pos + 1) }
+        var two: String = a + b
+        if (two == "==" or two == "!=" or two == "<=" or two == ">=" or two == "<<"
+            or two == ">>" or two == "=>" or two == "->" or two == "+=" or two == "-="
+            or two == "*=" or two == "/=" or two == "%=" or two == "++" or two == "--") {
+            this.pos = this.pos + 2
+            return nil
+        }
+        this.pos = this.pos + 1
+    }
+
+    /// The whitespace to put between the previous piece and this one, when both
+    /// are on the same output line: "" or exactly one " ".
+    ///
+    /// Rules are tried in order; the first that matches wins. The last one is the
+    /// preserve-collapse fallback, which reproduces the source's own choice
+    /// (any blank becomes one blank, no blank stays none). Everything the rules
+    /// above it do not claim is therefore left as written, which is what makes
+    /// the ambiguous operators (`<`, `|`, ...) come out right.
+    fun space_before(text: String, kind: Float): String {
+        var pt: String = this.prev_text
+
+        // `@extern(...)`: the `@` belongs to the name after it.
+        if (pt == "@") { return "" }
+        // Member access binds tight on both sides.
+        if (pt == "." or text == ".") { return "" }
+        // Nothing before a separator or a closer.
+        if (text == "," or text == ";" or text == ")" or text == "]") { return "" }
+        // Nothing after an opener.
+        if (pt == "(" or pt == "[") { return "" }
+        // A prefix operator is glued to its operand: `-1`, `!ok`, `*rest`.
+        if (this.prev_prefix) { return "" }
+
+        // `(`: a call/index/grouping after a value is tight (`f(x)`, `(a)(b)`);
+        // after a keyword it is spaced (`if (x)`, `fun (y)`).
+        if (text == "(") {
+            if (kind == 0) {
+                if (this.prev_kind == 1 and _is_keyword(pt)) { return " " }
+                if (_is_value_end(pt, this.prev_kind)) { return "" }
+            }
+        }
+        // `[`: an index after a value is tight (`xs[0]`); a list literal after a
+        // keyword or operator is spaced by the rules below or by the fallback.
+        if (text == "[") {
+            if (_is_value_end(pt, this.prev_kind)) { return "" }
+        }
+        // A block or map literal always gets a space before its brace, except
+        // right after an opener (handled above): `) {`, `= {`, `else {`.
+        if (text == "{") { return " " }
+        // One space after a separator or a type colon.
+        if (pt == "," or pt == ";" or pt == ":") { return " " }
+        // No space before a type colon: `name: String`, not `name : String`.
+        if (text == ":") { return "" }
+        // One space after a binary operator, and one before one.
+        if (this.prev_binary) { return " " }
+        if (kind == 0 and _is_spaced_op(text)) {
+            if (!_is_prefix_op(text)) { return " " }
+            if (_is_value_end(pt, this.prev_kind)) { return " " }
+        }
+
+        // Preserve-collapse.
+        if (this.pend_sp) { return " " }
+        return ""
+    }
+
+    fun emit(text: String, kind: Float) {
+        var nl: Float = this.pend_nl
+        if (!this.started) {
+            // Leading blank lines are dropped; the first piece opens the file.
+            this.started = true
+            this.at_line_start = true
+            nl = 0
+        } else if (nl > 0) {
+            // At most one blank line survives, so `nl` caps at 2.
+            if (nl > 2) { nl = 2 }
+            var k: Float = 0
+            while (k < nl) {
+                this.out.append("\n")
+                k = k + 1
+            }
+            this.at_line_start = true
+        }
+
+        if (this.at_line_start) {
+            // Indentation comes from delimiter depth and nothing else — never
+            // from the input's own indentation, which is the whole point, and
+            // never from the previous output line, which is what makes it
+            // idempotent. A line opening with a closer dedents by one so `}`
+            // lines up with the statement that opened the block.
+            var d: Float = this.depth
+            if (_is_closer(text)) { d = d - 1 }
+            if (_is_continuation(text)) { d = d + 1 }
+            if (d < 0) { d = 0 }
+            this.out.append(make_indent(d))
+        } else {
+            this.out.append(this.space_before(text, kind))
+        }
+
+        // The one line that carries the fidelity guarantee: the piece goes out
+        // exactly as it came in. Comments, `${...}`, escapes, `actor`, `type`,
+        // `import`, a `for-in` header — none of it was ever decomposed, so none
+        // of it can be lost or rewritten here.
+        this.out.append(text)
+
+        this.at_line_start = false
+        this.depth = this.depth + _delim_delta(text)
+        if (this.depth < 0) { this.depth = 0 }
+
+        // Record what the next piece needs to know about this one. A prefix
+        // operator is one in prefix position: `_is_prefix_op` says it *can* be,
+        // and a preceding non-value says it *is*.
+        var was_prefix: Bool = false
+        var was_binary: Bool = false
+        if (kind == 0) {
+            var after_value: Bool = _is_value_end(this.prev_text, this.prev_kind)
+            if (_is_prefix_op(text) and !after_value) {
+                was_prefix = true
+            } else if (_is_spaced_op(text)) {
+                was_binary = true
+            }
+        }
+        this.prev_text = text
+        this.prev_kind = kind
+        this.prev_prefix = was_prefix
+        this.prev_binary = was_binary
+    }
+
+    fun run(): String {
+        while (true) {
+            this.skip_blanks()
+            if (this.pos >= this.src.length()) { break }
+            var start: Float = this.pos
+            var kind: Float = this.scan_piece()
+            // A scanner that failed to advance would spin forever. It cannot
+            // happen — every branch consumes at least one character — but a
+            // formatter that hangs on a malformed file is worse than one that
+            // truncates, so make the invariant explicit.
+            if (this.pos <= start) { this.pos = start + 1 }
+            this.emit(this.src.slice(start, this.pos), kind)
+        }
+        if (!this.started) {
+            // Empty or whitespace-only input formats to nothing, not to a stray
+            // newline — so an empty file is already formatted.
+            return ""
+        }
+        return this.out.to_string() + "\n"
     }
 }
 
-fun format_stmts(stmts: List<AST.Stmt>, indent: Float): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < stmts.length()) {
-        sb.append(format_stmt(stmts[i], indent))
-        i = i + 1
-    }
-    return sb.to_string()
-}
+// --- Entry points ------------------------------------------------------------
 
-// --- Top-Level Entry Point ---
-
-/// Format a list of parsed statements into consistently styled source code.
+/// Reformat Saffron source text.
 ///
-/// Style rules:
-///   - 4 spaces per indent level
-///   - Opening brace on same line
-///   - Closing brace on own line
-///   - Space around operators, after commas, after colons in type annotations
-///   - One statement per line
-///   - Blank line between top-level declarations
-fun format_program(stmts: List<AST.Stmt>): String {
-    var sb: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < stmts.length()) {
-        sb.append(format_stmt(stmts[i], 0))
-        // Add blank line after top-level declarations
-        if (is_top_level_decl(stmts[i]) and i < stmts.length() - 1) {
-            sb.append("\n")
-        }
-        i = i + 1
-    }
-    return sb.to_string()
+/// Comments, string interpolation and every piece of syntactic sugar are copied
+/// verbatim from `source`; only the whitespace between lexical pieces is
+/// rewritten. Idempotent: formatting formatted source returns it unchanged.
+///
+/// Does not require the input to parse. An editor asks for formatting while the
+/// file is half-typed more often than not, and this only needs piece boundaries.
+fun format_source(source: String): String {
+    var f: SourceFormatter = SourceFormatter(source)
+    return f.run()
 }
+
+/// True when `source` is already in formatted form — the predicate behind
+/// `saffronc format --check`.
+fun is_formatted(source: String): Bool {
+    return format_source(source) == source
+}
+
+// `format_program(stmts)` — the AST printer this file used to be — is
+// deliberately gone rather than deprecated. It silently deleted comments,
+// rewrote `"${x}"` into a concatenation, printed the `for-in` desugaring
+// including its `__for_i_N` temporaries, and turned `actor`/`type`/`import`
+// declarations into `class`/`var`/`nil`. Every caller of such a function is a
+// caller that corrupts source, so leaving it importable would only preserve the
+// hazard. Nothing in the tree referenced it. Use `format_source`.

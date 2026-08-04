@@ -1,0 +1,121 @@
+// Test: the formatter changes whitespace and nothing else.
+//
+// This is the regression test for the whole reason src/lib/formatter.sf was
+// rewritten. It used to be an AST printer, and an AST printer cannot be faithful
+// here no matter how carefully it is written, because the information is
+// destroyed before the AST exists: `//` and `/* */` comments are dropped by the
+// lexer's skip_whitespace, `"${x}"` is desugared by read_string into
+// `"" + x.to_string() + ""`, and `for (x in xs)` is desugared by the parser into
+// a while-loop over `__for_i_N` temporaries. Printing that tree emitted all
+// three losses at once.
+//
+// The check below is deliberately not "do comments survive?" plus a list of
+// other cases to remember. It is the general property that implies all of them:
+// strip every space, tab, CR and LF from the input and from the output, and the
+// two must be byte-identical. Anything the formatter deleted, invented or
+// rewrote — a comment, a `${`, a desugared temporary — shows up as a difference,
+// including the cases nobody thought to enumerate.
+//
+// Paired with an idempotence check, because a formatter that is faithful but not
+// a fixed point still makes `--check` lie and makes format-on-save churn a diff
+// forever.
+import "@test" as T
+import "@formatter" as Formatter
+import "io" as IO
+
+/// Everything except whitespace, in order. Two sources with the same value here
+/// differ only in spacing.
+fun strip_ws(s: String): String {
+    var out: String = ""
+    var i: Float = 0
+    while (i < s.length()) {
+        var c: String = s.slice(i, i + 1)
+        if (c != " " and c != "\t" and c != "\n" and c != "\r") {
+            out = out + c
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// A file with one of each hazard, inline rather than read from disk so the test
+// is self-contained and so a reader can see exactly what is being protected.
+// Built by concatenation: a `${` written literally in this file would be
+// interpolated by the lexer before the formatter ever saw it, which is the very
+// desugaring under test.
+var dollar: String = "$"
+var sample: String = ""
+    + "//! module doc\n"
+    + "\n"
+    + "// a line comment\n"
+    + "/* a block comment\n"
+    + "   spanning lines */\n"
+    + "import \"@test\" as T\n"
+    + "\n"
+    + "/// doc comment on a class\n"
+    + "actor Counter {\n"
+    + "var count: Int   // trailing comment\n"
+    + "fun init() { this.count = 0 }\n"
+    + "}\n"
+    + "\n"
+    + "type Alias = Int\n"
+    + "\n"
+    + "fun greet(name: String): String {\n"
+    + "return \"hi " + dollar + "{name}!\"\n"
+    + "}\n"
+    + "\n"
+    + "fun walk(xs: List<Int>) {\n"
+    + "for (x in xs) { IO.println(x) }\n"
+    + "}\n"
+
+var formatted: String = Formatter.format_source(sample)
+
+// The core property. If this fails, the formatter is corrupting source.
+T.assert_eq(strip_ws(formatted), strip_ws(sample),
+    "formatting changes whitespace only")
+
+// Idempotence: formatted source is already a fixed point, which is what makes
+// `format --check` and format-on-save meaningful.
+T.assert_eq(Formatter.format_source(formatted), formatted,
+    "formatting is idempotent")
+
+// `is_formatted` is the predicate behind `--check`; it must agree with the
+// fixed-point property above rather than reimplementing it.
+T.assert(Formatter.is_formatted(formatted),
+    "is_formatted is true for formatted source")
+
+// Spot checks. These are all implied by the strip_ws equality, but named
+// individually so a failure says which hazard came back rather than only that
+// something did. Each was a real loss in the AST-printer version.
+T.assert(formatted.contains("// a line comment"), "line comment survives")
+T.assert(formatted.contains("/* a block comment"), "block comment survives")
+T.assert(formatted.contains("//! module doc"), "module doc survives")
+T.assert(formatted.contains("/// doc comment on a class"), "doc comment survives")
+T.assert(formatted.contains(dollar + "{name}"), "string interpolation is not desugared")
+T.assert(formatted.contains("actor Counter"), "actor stays an actor, not a class")
+T.assert(formatted.contains("type Alias"), "type alias stays a type, not a var")
+T.assert(formatted.contains("for (x in xs)"), "for-in is not replaced by its desugaring")
+T.assert(!formatted.contains("__for_i"), "no compiler-internal temporaries leak in")
+T.assert(formatted.contains("import \"@test\""), "import survives")
+
+// Real source as well as the fixture: the compiler's own lexer is the largest
+// and most syntactically varied file to hand, and it is the file whose comments
+// the formatter must never touch.
+//
+// Guarded on existence rather than read unconditionally, because run_tests.sh
+// does not chdir — it invokes tests with the caller's working directory — so a
+// relative path resolves only when the suite is run from the repo root. Skipping
+// is right here and would be wrong for the assertions above: those are the
+// contract and must run everywhere, while this one is extra coverage over a file
+// that happens to be nearby.
+var lexer_path: String = "src/compiler/lexer.sf"
+if (IO.file_exists(lexer_path)) {
+    var real: String = IO.read_file(lexer_path)
+    var real_fmt: String = Formatter.format_source(real)
+    T.assert_eq(strip_ws(real_fmt), strip_ws(real),
+        "lexer.sf: formatting changes whitespace only")
+    T.assert_eq(Formatter.format_source(real_fmt), real_fmt,
+        "lexer.sf: formatting is idempotent")
+}
+
+T.summary()

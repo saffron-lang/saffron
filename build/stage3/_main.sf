@@ -4,11 +4,14 @@
 // Type checking is enabled by default; --no-check disables it.
 
 import "os" as OS
+import "./ast.sf" as AST
+import "@formatter" as Formatter
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
 import "./resolve.sf" as Resolve
 import "./_codegen.sf" as Codegen
+import "./diag.sf" as Diag
 
 @extern("void exit(i32)")
 fun c_exit(code: Int) {}
@@ -234,7 +237,6 @@ fun _canon_dir(dir: String): String {
 var _pkg_dir_cache: Map<String, String> = {}
 // loaded file path → tagged package entry
 var _file_to_package: Map<String, String> = {}
-
 fun _package_entry_for_dir(dir: String): String {
     if (_pkg_dir_cache.has(dir)) { return _pkg_dir_cache.get(dir) }
 
@@ -470,18 +472,98 @@ fun resolve_import_or_die(base_path: String, import_path: String, stdlib_dir: St
 
 fun get_stmt_doc(stmt: AST.Stmt): String {
     return match (stmt) {
-        VarDecl(n, t, init, d, v_vis) => d
-        FunDecl(n, p, r, b, d, f_vis) => d
+        VarDecl(n, t, init, d, v_vis, __ns, __fs) => d
+        FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => d
         _ => ""
     }
 }
 
 fun get_stmt_name(stmt: AST.Stmt): String {
     return match (stmt) {
-        VarDecl(n, t, init, d, v_vis) => n
-        FunDecl(n, p, r, b, d, f_vis) => n
+        VarDecl(n, t, init, d, v_vis, __ns, __fs) => n
+        FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => n
         _ => ""
     }
+}
+
+// Append one symbol's JSON to `acc`, prefixing a comma when `acc` is non-empty.
+// Drops the symbol silently when symbol_json returns "" (a synthetic span, no
+// jump target — see Diag.symbol_json), so `acc` never carries a stray comma or
+// an empty `{}`.
+fun push_symbol(acc: String, name: String, kind: String, s: AST.Span): String {
+    var j: String = Diag.symbol_json(name, kind, s)
+    if (j.length() == 0) { return acc }
+    if (acc.length() == 0) { return j }
+    return acc + "," + j
+}
+
+// The top-level declarations of `program`, plus the members that belong under
+// them (enum variants, class/interface/actor methods), as a JSON array body —
+// the elements only, no surrounding brackets, so the caller wraps it.
+//
+// Only *declarations* become symbols. Import nodes are skipped: they carry a
+// synthesized name (`_import_…`) and a span that points at the `import` keyword,
+// not at anything the user would rename or jump to. Everything else is matched by
+// its exact field arity — a short arm here would bind the wrong field as the name
+// (BUGS #96's shape), so the counts mirror ast.sf's enum precisely.
+//
+// Symbol `kind` uses the vocabulary the editor client's SaffronSymbol expects:
+// class/interface come from ClassDecl.introducer (the parser records which
+// keyword was written — an outline cannot label the entry without it), and a
+// class's methods are emitted as children with kind "method".
+fun collect_symbols_json(program: List<AST.Stmt>): String {
+    var acc: String = ""
+    var i: Float = 0
+    while (i < program.length()) {
+        var stmt: AST.Stmt = program[i]
+        if (!is_import_stmt(stmt)) {
+            acc = match (stmt) {
+                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns)
+                FunDecl(n, p, r, b, d, f_vis, ns, fs) => push_symbol(acc, n, "function", ns)
+                EnumDecl(n, variants, d, e_vis, ns, fs) => {
+                    var a2: String = push_symbol(acc, n, "enum", ns)
+                    var vi: Float = 0
+                    while (vi < variants.length()) {
+                        a2 = match (variants[vi]) {
+                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns)
+                        }
+                        vi = vi + 1
+                    }
+                    a2
+                }
+                ClassDecl(n, tp, parents, fields, methods, d, c_vis, ns, fs, introducer) => {
+                    var kind: String = "class"
+                    if (introducer == "interface") { kind = "interface" }
+                    var a3: String = push_symbol(acc, n, kind, ns)
+                    var mi: Float = 0
+                    while (mi < methods.length()) {
+                        a3 = match (methods[mi]) {
+                            FunDecl(mn, mp, mr, mb, md, m_vis, mns, mfs) => push_symbol(a3, mn, "method", mns)
+                            _ => a3
+                        }
+                        mi = mi + 1
+                    }
+                    a3
+                }
+                _ => acc
+            }
+        }
+        i = i + 1
+    }
+    return acc
+}
+
+// The one line of stdout in --json mode: {file, diagnostics, symbols}, matching
+// the editor client's CheckOutput. `symbols_body` is the pre-rendered element
+// list from collect_symbols_json (captured before the resolve pass rewrote the
+// program), and diagnostics come from the sink, which by this point holds every
+// error and warning every phase raised. This is the whole output — the caller
+// prints it and exits without writing IR.
+fun emit_json(file: String, symbols_body: String) {
+    var out: String = "{\"file\":" + Diag.json_escape(file)
+    out = out + ",\"diagnostics\":" + Diag.diagnostics_to_json(file)
+    out = out + ",\"symbols\":[" + symbols_body + "]}"
+    IO.println(out)
 }
 
 fun is_import_stmt(stmt: AST.Stmt): Bool {
@@ -943,7 +1025,17 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
                 ma_prefix = path_based_prefix(ma_path, ma_full, stdlib_dir)
                 path_to_prefix.set(ma_full, ma_prefix)
             }
-            // Map alias → path-based prefix (alias is just source-level sugar)
+            // Map alias → path-based prefix (alias is just source-level sugar).
+            //
+            // First-writer-wins, and deliberately so now: this map is the
+            // whole-program fallback for the callers that record no declaring
+            // file (the hard-wired IO/GC/Reflect entries and the older non-flat
+            // entry points). The scoped map below is what a same-named alias in
+            // two files resolves through, so a collision here is no longer a
+            // wrong answer — it is just a fallback that the scoped lookup
+            // overrides. An earlier version of this branch raised a hard error
+            // on disagreement; the file-local fix (BUGS #123) makes that error
+            // wrong, since disagreeing is now the legal, working case.
             if (!all_aliases.has(ma)) {
                 all_aliases.set(ma, ma_prefix)
             }
@@ -995,8 +1087,168 @@ fun module_prefix_from_file(file_path: String): String {
     return name + "_"
 }
 
+// =============================================================================
+// `saffronc format` — the formatter subcommand
+// =============================================================================
+//
+// A SUBCOMMAND, not a flag, and it has to be dispatched before the normal
+// argument parse rather than inside it. Without the early check `saffronc format
+// foo.sf` reads `format` as the input path (positionals[0]) and `foo.sf` as the
+// output — i.e. it tries to compile a file named `format` and would happily
+// clobber the user's source with LLVM IR. The pre-parse dispatch below is what
+// makes that impossible.
+//
+// Contract, in the order the safety matters:
+//   * stdout is the default. `saffronc format f.sf` prints and touches nothing.
+//   * `--write` is required to modify a file, and modifies only the paths named
+//     on the command line. There is no directory walk and no glob: the shell
+//     supplies the file list, so there is no code path that can rewrite the tree.
+//   * `--check` writes nothing at all and exits 1 if any named file would change.
+//   * `--write` and `--check` together is rejected rather than silently resolved,
+//     because either resolution is a plausible reading of the request.
+//
+// It does not run the parser, the checker or codegen. Formatting is a
+// whitespace rewrite over the source text (see src/lib/formatter.sf), so it works
+// on a file that does not compile — which is the state an editor formats in most
+// of the time.
+
+/// `format --check` for one file: report whether it would change. Returns true
+/// when reformatting is needed.
+fun format_check_one(path: String, quiet: Bool): Bool {
+    var source: String = IO.read_file(path)
+    if (Formatter.is_formatted(source)) { return false }
+    if (!quiet) { IO.println(path) }
+    return true
+}
+
+/// Body of the `format` subcommand. `argv` is the full process argv; the caller
+/// has already established that argv[1] == "format". Returns the process exit
+/// code.
+fun run_format(argv: List<String>): Int {
+    var write_mode: Bool = false
+    var check_mode: Bool = false
+    var paths: List<String> = []
+
+    // Start at 2: argv[0] is the executable and argv[1] is the `format` word.
+    // Unknown flags are an error, not something to ignore — a mistyped `--wrote`
+    // silently degrading to "print to stdout" is how a user loses an edit they
+    // believe they made.
+    var i: Float = 2
+    while (i < argv.length()) {
+        var arg: String = argv[i]
+        if (arg == "--write" or arg == "-w") {
+            write_mode = true
+        } else if (arg == "--check") {
+            check_mode = true
+        } else if (arg == "--stdlib" or arg == "--lib-path" or arg == "--target") {
+            // Accepted and skipped along with their value, so a caller can pass
+            // the same flags it passes to a compile without special-casing
+            // `format`. The formatter resolves no imports, so they are unused.
+            i = i + 1
+        } else if (arg.starts_with("-")) {
+            IO.println("saffronc format: unknown option: " + arg)
+            IO.println("Usage: saffronc format [--write|-w] [--check] <file.sf>...")
+            return 2
+        } else {
+            paths.push(arg)
+        }
+        i = i + 1
+    }
+
+    if (write_mode and check_mode) {
+        IO.println("saffronc format: --write and --check are mutually exclusive")
+        return 2
+    }
+
+    if (paths.length() == 0) {
+        IO.println("saffronc format: no input file")
+        IO.println("Usage: saffronc format [--write|-w] [--check] <file.sf>...")
+        IO.println("  (default: print the formatted source to stdout and change nothing)")
+        return 2
+    }
+
+    // Printing to stdout only makes sense for one file — concatenating several
+    // reformatted files into one stream produces something that is not a valid
+    // file and cannot be split apart again. Multiple paths therefore require
+    // --write or --check, which are per-file operations.
+    if (paths.length() > 1 and !write_mode and !check_mode) {
+        IO.println("saffronc format: refusing to concatenate " + paths.length().floor().to_string()
+            + " files on stdout — pass --write to rewrite them in place, or --check to test them")
+        return 2
+    }
+
+    // Every path is checked for existence up front, before anything is written.
+    // A five-file --write that fails on the third would otherwise leave the run
+    // half-applied.
+    var pi: Float = 0
+    while (pi < paths.length()) {
+        if (!OS.file_exists(paths[pi])) {
+            IO.println("saffronc format: cannot open input file: " + paths[pi])
+            return 1
+        }
+        pi = pi + 1
+    }
+
+    if (check_mode) {
+        var need: Float = 0
+        var ci: Float = 0
+        while (ci < paths.length()) {
+            if (format_check_one(paths[ci], false)) { need = need + 1 }
+            ci = ci + 1
+        }
+        if (need > 0) {
+            IO.println(need.floor().to_string() + " file(s) would be reformatted")
+            return 1
+        }
+        return 0
+    }
+
+    var wi: Float = 0
+    while (wi < paths.length()) {
+        var path: String = paths[wi]
+        var source: String = IO.read_file(path)
+        var formatted: String = Formatter.format_source(source)
+        if (write_mode) {
+            // Only write when the bytes actually differ, so a formatted tree
+            // keeps its mtimes and a --write in a build script is a no-op rather
+            // than a source of spurious rebuilds.
+            if (formatted != source) {
+                IO.write_file(path, formatted)
+                IO.println("formatted " + path)
+            }
+        } else {
+            // No trailing newline of our own: format_source already ends the
+            // output with exactly one, and IO.print does not add another. Using
+            // println here would append a second newline to every formatted file
+            // that a shell then captured — and `saffronc format f.sf > f.sf`
+            // would not be a fixed point.
+            IO.print(formatted)
+        }
+        wi = wi + 1
+    }
+    return 0
+}
+
 fun main(): Int {
     var args: List<String> = OS.args()
+
+    // Subcommand dispatch, BEFORE the flag/positional parse below. See the
+    // comment block above `run_format`: `format` has to be recognised here or
+    // the normal parse takes it as the input path. This mirrors how
+    // --dump-packages exits early without reaching codegen, except that it must
+    // happen before argument parsing rather than after, because it changes what
+    // the remaining arguments mean.
+    if (args.length() > 1) {
+        if (args[1] == "format") {
+            var fmt_rc: Int = run_format(args)
+            // c_exit, not `return`: a `return` from main() does not set the
+            // process exit status (the driver discards it), which is the same
+            // trap the no-input-file path documents below. --check's exit code is
+            // its entire output contract, so this one cannot afford to be wrong.
+            if (fmt_rc != 0) { c_exit(fmt_rc) }
+            return 0
+        }
+    }
 
     // Parse flags
     var run_checker: Bool = true
@@ -1014,12 +1266,26 @@ fun main(): Int {
     // how it is observable and testable at all; test/pass/package_map_test.sf
     // drives it.
     var dump_packages: Bool = false
+    // --json makes the compiler emit one JSON object — {file, diagnostics,
+    // symbols} matching the editor client's CheckOutput — as the ONLY thing on
+    // stdout, and write no IR. It is the structured replacement for scraping the
+    // human diagnostic format: the client used to regex the parser's `[line N,
+    // col M]` lines, which the checker and codegen never produced, so type and
+    // codegen errors could not reach the editor at all. With --json every phase's
+    // diagnostics come through the sink as data, and declaration spans (WS1a) ride
+    // along as `symbols` so hover/definition finally have something to resolve
+    // against. Implies a check pass; forces console diagnostics quiet so nothing
+    // non-JSON lands on stdout.
+    var json_mode: Bool = false
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg == "--no-check") {
             run_checker = false
+        }
+        if (arg == "--json") {
+            json_mode = true
         }
         if (arg == "--no-resolve") {
             run_resolve = false
@@ -1058,6 +1324,13 @@ fun main(): Int {
             }
         }
         i = i + 1
+    }
+    // --json implies a check pass (there is nothing structured to report without
+    // it) and silences every phase's console diagnostics so the JSON object is
+    // the only thing on stdout. Both are set here, once, before any file work.
+    if (json_mode) {
+        run_checker = true
+        Diag.set_quiet(true)
     }
     // Also read SAFFRON_LIB_PATH env var (colon-separated, like PATH)
     var env_lib_path: String = OS.env("SAFFRON_LIB_PATH")
@@ -1127,6 +1400,7 @@ fun main(): Int {
     if (positionals.length() == 0) {
         IO.println("saffronc: no input file")
         IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... [--dump-packages] <input.sf> [output.ll]")
+        IO.println("       saffronc format [--write|-w] [--check] <file.sf>...")
         // `return 1` from main() does NOT set the process exit status — the
         // driver ignores it — so this path used to exit 0 after printing the
         // usage text. c_exit is the only thing that actually fails.
@@ -1145,6 +1419,16 @@ fun main(): Int {
     // corrosive to measurement: a typo'd path in a sweep looked like a clean
     // compile. Diagnose it here, where the path is first known.
     if (!OS.file_exists(input_path)) {
+        if (json_mode) {
+            // The client keys diagnostics by file, so a missing input is reported
+            // as a located-nowhere diagnostic on that file rather than a bare
+            // non-JSON line it could not parse. reset_sink first: nothing has run
+            // yet, but the record path is the sink, and JSON reads the sink.
+            Diag.reset_sink()
+            Diag.record_error("driver", AST.span_none(), "cannot open input file: " + input_path)
+            emit_json(input_path, "")
+            c_exit(1)
+        }
         IO.println("saffronc: cannot open input file: " + input_path)
         c_exit(1)
     }
@@ -1157,13 +1441,39 @@ fun main(): Int {
         stdlib_dir = exe_dir + "/../src/lib"
     }
 
+    // Start of one compile: clear the diagnostic sink so nothing from a previous
+    // file in the same process leaks in. The sink is a module global (a located
+    // diagnostic has to be reachable from every phase without threading a handle
+    // through all of them), and a module global that is never reset is the same
+    // sticky-state trap as parser._had_error and codegen.__codegen_errors. Only
+    // the driver knows where one unit of work ends and the next begins, so the
+    // reset lives here.
+    Diag.reset_sink()
+
     // Lex and parse the main file
     record_file_package(input_path)
     var source: String = IO.read_file(input_path)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse_with_source(tokens, source)
 
+    // Symbols are collected from the freshly-parsed program, BEFORE the resolve
+    // pass rewrites Variable→Ref and the checker runs — those passes are about
+    // meaning, not surface declarations, and a declaration's name/span is fixed
+    // at parse time. Collecting here also means a file that fails to type-check
+    // still yields an outline, which is exactly when an editor most needs one.
+    var json_symbols: String = ""
+    if (json_mode) {
+        json_symbols = collect_symbols_json(program)
+    }
+
     if (Parser.had_error()) {
+        // A parse error is terminal, but in --json the errors are already in the
+        // sink (parser.report_at records unconditionally). Emit them plus whatever
+        // symbols parsed before the failure, rather than the bare exit the console
+        // path takes.
+        if (json_mode) {
+            emit_json(input_path, json_symbols)
+        }
         c_exit(1)
     }
 
@@ -1526,10 +1836,23 @@ fun main(): Int {
         } else {
             checker_errors = Checker.check_errors_only(program)
         }
-        if (checker_errors.length() > 0) {
+        if (checker_errors.length() > 0 and !json_mode) {
             IO.println(checker_errors)
             c_exit(1)
         }
+    }
+
+    // --json is a check-only endpoint: emit the {diagnostics, symbols} object and
+    // stop. No codegen, no IR — an editor asking "what's wrong and what's here?"
+    // does not want a build. The sink now holds every parser and checker
+    // diagnostic; symbols were captured off the pre-resolve program above. Exit is
+    // non-zero when any error was recorded so a caller that keys off the code
+    // still learns pass/fail, while the client (which reads stdout in both cases)
+    // gets identical JSON either way.
+    if (json_mode) {
+        emit_json(input_path, json_symbols)
+        if (Diag.sink_had_error()) { c_exit(1) }
+        return 0
     }
 
     var ir: String = ""

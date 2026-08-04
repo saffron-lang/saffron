@@ -1,4 +1,4 @@
-// BUGS #152: indexing a receiver whose static type is UNRESOLVED fell through to
+// BUGS #153: indexing a receiver whose static type is UNRESOLVED fell through to
 // gen_index_get's list path, which calls __list_length/__list_get on the value as
 // given. On a NaN-tagged String that inttoptr's a tagged value and reads character
 // bytes as a list header — SIGSEGV, no diagnostic.

@@ -301,7 +301,7 @@ private fun _ignore_matches(pattern: String, path: String): Bool {
 /// entry as a `[root, dirs, files]` triple, so `entry[0]` and `entry[2]` indexed
 /// into a *filename string* and yielded single characters. That crashed rather than
 /// merely returning nothing, because subscripting a NaN-tagged String hit the list
-/// path in codegen (BUGS #152), which is what hid the logic error for so long: the
+/// path in codegen (BUGS #153), which is what hid the logic error for so long: the
 /// segfault looked like the whole story.
 ///
 /// So do the descent here. `**` is documented, exercised by `test_glob`, and cannot

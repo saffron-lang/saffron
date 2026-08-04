@@ -13,6 +13,40 @@ build/guard.sf
 build/guard.ll
 build/guard_lib/
 
+# stage4_test/ predates stage4/ above and nothing references it any more.
+build/stage4_test/
+
+# bootstrap.sh's final smoke test: it compiles test/hello_bootstrap.sf and runs
+# the result on every run, so both are outputs rather than inputs.
+build/hello_bootstrap
+build/hello_bootstrap.ll
+
+# gen3. Never an input: bootstrap.sh only ever `clang -o`s it (lines 224, 267),
+# and reads gen2 at build/stage2/saffronc instead. Tracking it meant every
+# bootstrap dirtied the tree and every merge conflicted on an 830KB binary.
+#
+# build/ as a whole must still NOT be ignored. build/stage2/saffronc is the sole
+# root of trust for the bootstrap chain, and build/stage3/*.ll is a live recovery
+# path — bootstrap.sh:176 links gen3 from those checked-in artifacts whenever
+# gen2 cannot compile current source. A fresh clone therefore has no gen3 and
+# must run ./bootstrap.sh first; the tests that shell out to build/saffronc carry
+# a harness guard that fails loudly rather than passing vacuously without it.
+build/saffronc
+
+# One-off compiler copies, referenced nowhere.
+build/saffronc2
+build/saffronc_promoted
+
+# Scratch binaries and demo output that accumulated in the build root.
+build/test_array_pattern
+build/test_array_pattern.ll
+build/app.ll
+build/app.wasm
+build/pantry
+build/pantry.dSYM/
+build/wasm_demo/
+build/wasm_counter/
+
 # Sub-agent scratch space. The worktrees are nested git repos, so a plain
 # `git add -A` stages them as gitlinks — a clone would then carry dangling
 # submodule pointers to paths that only ever existed on one machine.

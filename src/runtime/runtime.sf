@@ -973,7 +973,7 @@ fun __any_iter_get(v: Int, index: Int): Int {
 // String that reads character bytes as a list header — SIGSEGV. That is the same
 // fall-through that produced BUGS #29, #93, #94 and #95, one static type at a
 // time; routing the unresolved case at runtime closes the class of bug rather
-// than the next instance of it (BUGS #152).
+// than the next instance of it (BUGS #153).
 fun __any_index_get(v: Int, index_boxed: Int): Int {
     var as_map: Int = __rt_as_map_ptr(v)
     if (as_map != 0) {
