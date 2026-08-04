@@ -2,8 +2,12 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132.
-Next free number is **#154**.
+**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132, #155.
+Next free number is **#156**.
+
+#154 is taken by the lsp-symbol-payload worktree (a `match` above its enum
+declaration). #155 was chosen by running the `grep -h "Next free number"` across
+worktrees that the note below prescribes — #154 read free in this tree alone.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -607,6 +611,64 @@ written to be adoptable by `run_tests.sh` unchanged.
 The flag was left as-is deliberately: it may be load-bearing for legitimate host
 imports (`js_log_str` is one), so tightening it is its own measured change rather than
 a one-line edit.
+
+---
+
+### 155. OPEN — no `return` is checked against its function's declared return type, so `fun make(): Box { return "s" }` compiles and segfaults
+
+**Severity: high.** Silent wrong type across a declared boundary, and the crash
+lands in the caller. Found while surveying `FunDecl.ret_type` for rewrite stage 3.
+
+The `Return` arm of `check_stmt` (`checker.sf:2574`) infers the value's type and
+then asks exactly one question: is a *nullable* value being returned from a
+non-nullable slot. It never compares two concrete types. So every one of these
+compiles with zero diagnostics:
+
+```saffron
+fun f(): String { return 42 }
+fun f(): Int    { return "hi" }
+fun f(): Bool   { return 42 }
+fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
+```
+
+The class-typed case is the one that crashes:
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n } }
+
+fun make(): Box { return "not a box" }
+var b = make()
+IO.println("n=${b.get()}")         // segfault
+```
+
+The checker binds `b` to `Box` on the declaration's authority, codegen emits a
+direct `Box__get` call with a field load, and the receiver is a `String` pointer.
+
+**The material for the fix already exists.** `scalar_mismatch(annotated, actual)`
+(`checker.sf:890`) answers precisely this question for `VarDecl` — two distinct
+concrete scalars, with `Int`→`Float` widening and anything touching `Any`/`Nil`
+allowed — and `is_subtype_node` (`checker.sf:1005`) handles the class/interface
+case. Neither is called from the `Return` arm.
+
+**Why it survived this long, and the trap in fixing it.** The parser defaults an
+omitted return type to a *real type name*: `"Nil"` for `FunDecl`
+(`parser.sf:2561`), `"Int"` for `Lambda` (`parser.sf:1646`). Both spellings are
+indistinguishable from an annotation the author wrote, so turning on a strict
+return check would immediately reject every unannotated `fun f() { return 42 }` —
+`"Nil"` vs `Int` — and every unannotated lambda returning anything but an integer.
+BUGS #147's write-up under `## Resolved` is the same defect one node over, and the
+`## Resolved` entry for the use-recording walk already notes it clears
+`current_func_ret` for exactly this reason: "a walk that exists to record uses must
+not start enforcing a return type nobody wrote."
+
+So the honest ordering is the one stage 1 used: **make the sentinel
+distinguishable first, then turn on the check.** `ret_type` becomes an `AST.Type`
+with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work —
+and only then can the `Return` arm tell "the author declared `Nil`" from "nobody
+declared anything." Enforcing before that would be a large, noisy, and partly
+wrong diagnostic sweep.
 
 ---
 
