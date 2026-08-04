@@ -121,7 +121,7 @@ enum Token {
 // make the lexer's compilation depend on the AST for no other reason.
 
 // `\xNN` needs to turn a byte VALUE into a one-character String, and the
-// language has no primitive for that (BUGS #146) — which is exactly why
+// language has no primitive for that (BUGS #152) — which is exactly why
 // src/lib/base64.sf builds a 128-character ASCII table out of `\x` escapes,
 // src/lib/url.sf has a 100-branch if-chain, and src/lib/bytes.sf gives up and
 // returns "?". So the lexer allocates the two bytes itself.

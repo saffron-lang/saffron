@@ -490,11 +490,68 @@ fun get_stmt_name(stmt: AST.Stmt): String {
 // Drops the symbol silently when symbol_json returns "" (a synthetic span, no
 // jump target — see Diag.symbol_json), so `acc` never carries a stray comma or
 // an empty `{}`.
-fun push_symbol(acc: String, name: String, kind: String, s: AST.Span): String {
-    var j: String = Diag.symbol_json(name, kind, s)
+fun push_symbol(acc: String, name: String, kind: String, s: AST.Span, visibility: String, container: String, detail: String, doc: String, full: AST.Span): String {
+    var j: String = Diag.symbol_json(name, kind, s, visibility, container, detail, clean_docstring(doc), full)
     if (j.length() == 0) { return acc }
     if (acc.length() == 0) { return j }
     return acc + "," + j
+}
+
+// A function's signature as a display string: `(a: Int, b: String): Ret`.
+//
+// For hover and completion detail. Built from the Param list the parser already
+// produced, so it reflects what was written rather than what inference concluded —
+// per-expression types are not available here (that is rewrite stage 3/4) and a
+// signature that silently differed from the source would be worse than none.
+//
+// A param whose type annotation is absent renders as just its name; `AnyType` is
+// what the parser fills in for an unannotated param, and printing ": Any" would
+// claim the author wrote an annotation they did not.
+fun render_signature(params: List<AST.Param>, ret_type: String): String {
+    var out: String = "("
+    var i: Float = 0
+    while (i < params.length()) {
+        if (i > 0) { out = out + ", " }
+        out = out + match (params[i]) {
+            Param(pn, pt, pd, p_vis, pns) => {
+                var rendered: String = pn
+                if (!is_any_type(pt)) { rendered = pn + ": " + AST.type_to_string(pt) }
+                rendered
+            }
+        }
+        i = i + 1
+    }
+    out = out + ")"
+    if (ret_type.length() > 0) { out = out + ": " + ret_type }
+    return out
+}
+
+// True for the type the parser substitutes when a param carries no annotation.
+// Distinguishing "unannotated" from "annotated as Any" is why this is a predicate
+// on the node rather than a string compare on the rendering.
+fun is_any_type(t: AST.Type): Bool {
+    return match (t) {
+        AnyType => true
+        _ => false
+    }
+}
+
+// The docstring field with parser markers stripped, or "" if that is all it held.
+//
+// `docstring` is an overloaded channel: the parser stores `@extend:<class>`,
+// `@actor` and `@type_alias` in it to mark nodes whose syntax the AST cannot
+// otherwise recover. Those are internal markers, not prose, and showing them as
+// hover documentation would leak compiler internals into the editor.
+//
+// `@actor` is a *prefix* on an otherwise real docstring (the parser writes
+// "@actor\n" then the author's text), so it is stripped rather than rejected —
+// dropping the whole string would lose a documented actor's documentation.
+fun clean_docstring(d: String): String {
+    if (d.starts_with("@extend:")) { return "" }
+    if (d.starts_with("@type_alias")) { return "" }
+    if (d.starts_with("@actor\n")) { return d.slice(7, d.length()) }
+    if (d == "@actor") { return "" }
+    return d
 }
 
 // The top-level declarations of `program`, plus the members that belong under
@@ -518,27 +575,44 @@ fun collect_symbols_json(program: List<AST.Stmt>): String {
         var stmt: AST.Stmt = program[i]
         if (!is_import_stmt(stmt)) {
             acc = match (stmt) {
-                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns)
-                FunDecl(n, p, r, b, d, f_vis, ns, fs) => push_symbol(acc, n, "function", ns)
+                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns, v_vis, "", t, d, fs)
+                FunDecl(n, p, r, b, d, f_vis, ns, fs) => push_symbol(acc, n, "function", ns, f_vis, "", render_signature(p, r), d, fs)
                 EnumDecl(n, variants, d, e_vis, ns, fs) => {
-                    var a2: String = push_symbol(acc, n, "enum", ns)
+                    var a2: String = push_symbol(acc, n, "enum", ns, e_vis, "", "", d, fs)
                     var vi: Float = 0
                     while (vi < variants.length()) {
+                        // A variant's container is its enum: `Some` alone does not
+                        // say which enum it belongs to, and several enums in a file
+                        // may declare the same variant name.
                         a2 = match (variants[vi]) {
-                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns)
+                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns, e_vis, n, vf, "", AST.span_none())
                         }
                         vi = vi + 1
                     }
                     a2
                 }
                 ClassDecl(n, tp, parents, fields, methods, d, c_vis, ns, fs, introducer) => {
+                    // `introducer` is the keyword the author actually wrote. Without
+                    // it all three parse to the same node and an outline would label
+                    // an actor and an interface both "class".
                     var kind: String = "class"
                     if (introducer == "interface") { kind = "interface" }
-                    var a3: String = push_symbol(acc, n, kind, ns)
+                    if (introducer == "actor") { kind = "actor" }
+                    var a3: String = push_symbol(acc, n, kind, ns, c_vis, "", "", d, fs)
+                    // Fields before methods, so the outline lists a class's state
+                    // above its behaviour — and so a field is renameable at all,
+                    // which it was not while only methods were emitted.
+                    var fi: Float = 0
+                    while (fi < fields.length()) {
+                        a3 = match (fields[fi]) {
+                            Param(fn, ft, fd, f_vis2, fns) => push_symbol(a3, fn, "field", fns, f_vis2, n, AST.type_to_string(ft), "", AST.span_none())
+                        }
+                        fi = fi + 1
+                    }
                     var mi: Float = 0
                     while (mi < methods.length()) {
                         a3 = match (methods[mi]) {
-                            FunDecl(mn, mp, mr, mb, md, m_vis, mns, mfs) => push_symbol(a3, mn, "method", mns)
+                            FunDecl(mn, mp, mr, mb, md, m_vis, mns, mfs) => push_symbol(a3, mn, "method", mns, m_vis, n, render_signature(mp, mr), md, mfs)
                             _ => a3
                         }
                         mi = mi + 1
@@ -1277,6 +1351,14 @@ fun main(): Int {
     // against. Implies a check pass; forces console diagnostics quiet so nothing
     // non-JSON lands on stdout.
     var json_mode: Bool = false
+    // --report-unresolved prints every place codegen's inference could not
+    // resolve a type and fell back to `Int`, plus a total at the end. That
+    // fallback is mechanism M2 in docs/design/compiler-rewrite.md and the root of
+    // BUGS #32/#33/#36/#146; stage 1 of that plan is to drive the count to zero
+    // and then make it fatal. Off by default so a green build stays quiet while
+    // the number comes down, and so the reports never contaminate stdout for a
+    // caller that is reading IR or JSON.
+    var report_unresolved: Bool = false
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
@@ -1286,6 +1368,9 @@ fun main(): Int {
         }
         if (arg == "--json") {
             json_mode = true
+        }
+        if (arg == "--report-unresolved") {
+            report_unresolved = true
         }
         if (arg == "--no-resolve") {
             run_resolve = false
@@ -1332,6 +1417,7 @@ fun main(): Int {
         run_checker = true
         Diag.set_quiet(true)
     }
+    Diag.set_report_unresolved(report_unresolved)
     // Also read SAFFRON_LIB_PATH env var (colon-separated, like PATH)
     var env_lib_path: String = OS.env("SAFFRON_LIB_PATH")
     if (env_lib_path.length() > 0) {
@@ -1399,7 +1485,7 @@ fun main(): Int {
 
     if (positionals.length() == 0) {
         IO.println("saffronc: no input file")
-        IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... [--dump-packages] <input.sf> [output.ll]")
+        IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... [--dump-packages] [--report-unresolved] <input.sf> [output.ll]")
         IO.println("       saffronc format [--write|-w] [--check] <file.sf>...")
         // `return 1` from main() does NOT set the process exit status — the
         // driver ignores it — so this path used to exit 0 after printing the
@@ -1860,6 +1946,16 @@ fun main(): Int {
         ir = Codegen.generate_with_modules_flat_opts4(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases)
     } else {
         ir = Codegen.generate_with_target_opts3(program, target, identity_mode, use_llvm_lib, emit_llvm_lib)
+    }
+
+    // The total, printed after codegen so it counts the whole compile rather than
+    // one module. Printed only under the flag — see the flag's declaration for
+    // why this does not fail the build yet. A total with no reports above it is
+    // still worth printing: "0" is the thing stage 1 is trying to reach, and a
+    // run that prints nothing at all is indistinguishable from a flag that did
+    // not take effect.
+    if (report_unresolved) {
+        IO.println("[codegen] unresolved inference fallbacks: " + Diag.unresolved_count().to_string())
     }
 
     if (Codegen.had_error()) {

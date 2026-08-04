@@ -5834,18 +5834,46 @@ class Codegen {
         this.emit_indent("store i64 " + extracted + ", i64* " + this.arm_slot_ref(bname))
     }
 
+    /// The declared type of one payload field of one enum variant, as a string.
+    ///
+    /// Five of the nine M2 fallbacks in docs/design/compiler-rewrite.md are the
+    /// five misses in this function, and each is a *different* failure to read
+    /// enum metadata, which is why each reports its own message instead of
+    /// sharing one "cannot infer". `Int` is still the value returned — see the
+    /// block comment above Diag.record_unresolved for why the conversion is
+    /// measure-then-fail rather than fail-now — but it is no longer silent, so
+    /// the count is a build statistic and a wrong answer here names itself.
     fun get_variant_field_type(enum_name: String, variant_name: String, field_idx: Float): String {
         var key: String = enum_name + "." + variant_name
-        if (!this.enum_variant_fields.has(key)) return "Int"
+        if (!this.enum_variant_fields.has(key)) {
+            Diag.record_unresolved("get_variant_field_type: variant not registered", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var fields: String = this.enum_variant_fields.get(key)
-        if (fields.length() == 0) return "Int"
+        if (fields.length() == 0) {
+            Diag.record_unresolved("get_variant_field_type: variant has no recorded fields", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var parts: List<String> = this.split_respecting_generics(fields, ",")
-        if (field_idx >= parts.length()) return "Int"
+        if (field_idx >= parts.length()) {
+            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + parts.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var field_def: String = parts[field_idx.floor()]
         var name_type: List<String> = field_def.split(":")
-        if (name_type.length() < 2) return "Int"
+        if (name_type.length() < 2) {
+            Diag.record_unresolved("get_variant_field_type: field definition has no name:type split", "'" + field_def + "' in " + key, "Int")
+            return "Int"
+        }
         var ftype: String = name_type[1]
         if (ftype == "String") return "String"
+        // `Int` was never in this list, so an honestly-Int field fell all the way
+        // through to the bottom and was answered by the *fallback* — the right
+        // value reached by the wrong route, and indistinguishable from a guess.
+        // 27 of the reports in test/pass/enum_payload_value_equality.sf alone were
+        // this. Answering it here is the difference the whole stage is about: two
+        // textually identical `Int`s, one a conclusion and one a shrug.
+        if (ftype == "Int") return "Int"
         // Float must stay Float. Collapsing it to Int made arithmetic on a
         // match binding emit integer ops against a NaN-boxed double, so
         // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
@@ -5853,6 +5881,42 @@ class Codegen {
         if (ftype == "Float" or ftype == "Number") return "Float"
         if (ftype == "Bool") return "Int"
         if (ftype.starts_with("List")) return "List<String>"
+        // Same accidental-correctness as `Int` above, one step further out: a
+        // field declared `Any` or `Nil` genuinely has no more specific codegen
+        // type than the i64 slot, so `Int` here is the answer and not a guess.
+        // `Map` is listed for the same reason `List` is — the payload is a
+        // pointer either way, and the element types are not consulted.
+        if (ftype == "Any" or ftype == "Nil") return "Int"
+        if (ftype.starts_with("Map")) return "Map<String, String>"
+        // Past the builtin spellings. The metadata was read fine; `ftype` is a
+        // name — an enum, a class, possibly module-qualified. Those used to
+        // collapse to `Int`, which is the M2 fallback in its purest form: the
+        // declared type was right there in the string and got thrown away. All
+        // 2350 remaining reports on the compiler's own source were this one arm,
+        // and every one of them named a type the codegen tables already know
+        // ('Expr', 'Span', 'Types.Value', ...).
+        //
+        // So answer with the name when the tables confirm it, and keep the
+        // report for the case where they do not. Enums are checked before
+        // classes because a generic enum's bare name is what enum_defs is keyed
+        // by, and because a name that is both would be a redeclaration the
+        // checker rejects earlier.
+        if (this.enum_defs.has(ftype)) { return ftype }
+        var vft_resolved: String = this.resolve_class_type(ftype)
+        if (vft_resolved.length() > 0) { return vft_resolved }
+        // A module-qualified enum: `AST.Span` is keyed in enum_defs by its bare
+        // name plus whatever prefix the declaring module got, neither of which is
+        // the spelling the field declaration used.
+        if (ftype.contains(".")) {
+            var vft_bare: String = ftype.slice(ftype.index_of(".") + 1, ftype.length())
+            if (this.enum_defs.has(vft_bare)) { return vft_bare }
+            if (this.current_prefix.length() > 0 and this.enum_defs.has(this.current_prefix + vft_bare)) {
+                return this.current_prefix + vft_bare
+            }
+        }
+        // Genuinely unknown: a type name no table in codegen has heard of. This
+        // is the residue stage 1 is meant to leave visible rather than paper over.
+        Diag.record_unresolved("get_variant_field_type: unknown declared type '" + ftype + "'", "field " + field_idx.floor().to_string() + " of " + key, "Int")
         return "Int"
     }
 
@@ -12561,6 +12625,12 @@ class Codegen {
                 var pop_inner: String = mc_obj_type.slice(5, mc_obj_type.length() - 1)
                 return pop_inner
             }
+            // The receiver is not a `List<T>` — a bare `List`, an `Any`, or a
+            // type this path never resolved. `.pop()` returns whatever the list
+            // holds, so there is nothing about `Int` that follows from a missing
+            // element type. Same shape as the `.get()` miss just above, which
+            // BUGS #37 already converted from a false "String" to "Any".
+            Diag.record_unresolved("get_expr_type: .pop() on a receiver with no element type", "'" + mc_obj_name + "' of type '" + mc_obj_type + "'", "Int")
             return "Int"
         }
         // reverse/copy/sort return the same list type as the receiver
@@ -12600,6 +12670,43 @@ class Codegen {
         var right_t: String = this.get_expr_type(bin_right)
         if (bin_op == "+" and (left_t == "String" or right_t == "String")) return "String"
         if (left_t == "Float" or right_t == "Float") return "Float"
+        // An overloaded operator. gen_binary resolves `Vec2 + Vec2` to a call to
+        // Vec2__add and reads its declared return type out of func_ret_types
+        // (expr_body.sf:835) — but this function did not, so it answered `Int`
+        // for an expression the emitter knew returned a Vec2. The two disagreed,
+        // which is M2's failure mode exactly: the information was present and a
+        // second consumer of it guessed instead. Mirror the emitter's lookup,
+        // gated on the same "names a declared class" test it uses.
+        var bin_method: String = this.op_to_method(bin_op)
+        if (bin_method.length() > 0 and this.class_fields.has(left_t)) {
+            if (this.class_methods.has(left_t)) {
+                var bin_methods: List = this.class_methods.get(left_t)
+                if (bin_methods.contains(bin_method)) {
+                    var bin_full: String = left_t + "__" + bin_method
+                    if (this.func_prefix_map.has(bin_full)) {
+                        bin_full = this.func_prefix_map.get(bin_full)
+                    } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions, this.current_prefix + bin_full)) {
+                        bin_full = this.current_prefix + bin_full
+                    }
+                    if (this.func_ret_types.has(bin_full)) {
+                        return this.type_to_string(this.func_ret_types.get(bin_full))
+                    }
+                    // Declared with no return annotation. The receiver's own
+                    // class is what gen_binary assumes in that case, so agree
+                    // with it rather than reporting a gap that is not one.
+                    return left_t
+                }
+            }
+        }
+        // Arithmetic where neither operand resolved to a representation. `Int` is
+        // right when both sides really are integers and it is reported anyway,
+        // because this function cannot tell the two apart: an unresolved operand
+        // spells itself "Any" or "", exactly like an operand nobody annotated.
+        // That makes this the noisiest of the nine, and deliberately so — every
+        // report here is a place where an operand's type was never established.
+        if (left_t != "Int" or right_t != "Int") {
+            Diag.record_unresolved("get_expr_type: binary '" + bin_op + "' with unresolved operands", "'" + left_t + "' " + bin_op + " '" + right_t + "'", "Int")
+        }
         return "Int"
     }
     if (ek == "logical") return "Bool"
@@ -13357,8 +13464,12 @@ class Codegen {
     // a local goes through gen_call's indirect path, which never consults a
     // field type at all. Bare `Fun` is the spelling `src/lib/heap.sf` uses for
     // its comparator, which is why that stdlib module could not link.
+    // try_get_field_type, not get_field_type: this is asking whether `method` is
+    // a function-typed FIELD rather than a real method, and "it is not a field"
+    // is the answer for every ordinary method call in the program. A miss here is
+    // not an inference gap, so it must not be reported as one.
     if (has_self and this.class_fields.has(ns)) {
-        var ft: String = this.get_field_type(ns, method)
+        var ft: String = this.try_get_field_type(ns, method)
         var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("Fun<") or ft == "Fun" or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
         if (is_fn_type) {
             // Check there's no actual method with this name
@@ -15684,9 +15795,11 @@ class Codegen {
                 __cmi2 = __cmi2 + 1
             }
         }
-        // Also allow callable fields (function-typed fields)
+        // Also allow callable fields (function-typed fields). Same existence
+        // probe as in gen_ns_method_call — the miss is the common case, so this
+        // uses try_get_field_type and stays out of the unresolved count.
         if (!__method_exists and this.class_fields.has(class_name)) {
-            var __ft: String = this.get_field_type(class_name, method)
+            var __ft: String = this.try_get_field_type(class_name, method)
             if (__ft.starts_with("Fun(") or __ft.contains("=>")) { __method_exists = true }
             var __fields_str: String = this.class_fields.get(class_name)
             if (__fields_str.contains(method + ":")) { __method_exists = true }
@@ -15911,6 +16024,38 @@ class Codegen {
     return result
     }
 
+    /// The declared type of `class_name.field`, or "" if there is no such field.
+    ///
+    /// This is `get_field_type` without the `Int` fallback, and it exists because
+    /// two of that function's callers use it as an EXISTENCE PROBE — "is `method`
+    /// actually a function-typed field rather than a method?" — where a miss is
+    /// the ordinary answer, not a failure. Routing those through the reporting
+    /// version made them 6270 of the 8620 reports on the compiler's own source:
+    /// noise that would have buried the ~2350 real ones.
+    ///
+    /// The distinction is the whole point of the exercise. A site that asks
+    /// "what type is this field?" and gets no answer has an inference gap worth
+    /// reporting; a site that asks "is there a field here at all?" does not. They
+    /// were the same call, which is why the gap was uncountable.
+    fun try_get_field_type(class_name: String, field: String): String {
+        var fields: String = ""
+        if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
+        if (fields.length() == 0) { return "" }
+        var parts: List<String> = this.split_respecting_generics(fields, ",")
+        var i: Float = 0
+        while (i < parts.length()) {
+            var fp: List<String> = parts[i].split(":")
+            if (fp[0] == field) {
+                if (fp.length() < 2) { return "" }
+                var ft: String = fp[1]
+                if (this.identity_mode and ft == "Float") { return "Int" }
+                return ft
+            }
+            i = i + 1
+        }
+        return ""
+    }
+
     fun get_field_type(class_name: String, field: String): String {
     // Tuple field access: Tuple<T0,T1,...> with _0, _1, ...
     if (class_name.starts_with("Tuple<") and field.starts_with("_") and field.length() >= 2) {
@@ -15948,7 +16093,10 @@ class Codegen {
     // .length() called on it. Spell the miss out instead.
     var fields: String = ""
     if (this.class_fields.has(__gft_lookup)) { fields = this.class_fields.get(__gft_lookup) }
-    if (fields.length() == 0) return "Int"
+    if (fields.length() == 0) {
+        Diag.record_unresolved("get_field_type: class has no registered fields", "'" + class_name + "." + field + "'", "Int")
+        return "Int"
+    }
     var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
     while (i < parts.length()) {
@@ -15961,6 +16109,12 @@ class Codegen {
         }
         i = i + 1
     }
+    // The class's fields were found and `field` is not among them. This is the
+    // read half of BUGS #148 seen from inside inference: the caller goes on to
+    // GEP index 0 and emit a load, so a nonexistent member reads a neighbouring
+    // slot. Reporting it here does not fix that — the caller still needs to stop
+    // — but it makes the miss countable instead of invisible.
+    Diag.record_unresolved("get_field_type: field not declared on class", "'" + class_name + "." + field + "'", "Int")
     return "Int"
     }
 

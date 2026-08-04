@@ -63,7 +63,12 @@ OPT="-O2"
 TARGET=""
 VERBOSE=false
 LIB_PATHS=()
-EXTRA_SAFFRONC_FLAGS=""
+# Extra flags handed to saffronc on every compile, from the environment. This
+# exists for measurement flags that no user of `saffron run` would ever type but
+# that a sweep over the whole corpus needs on every invocation — currently
+# --report-unresolved (see main.sf). It is an env var rather than a CLI flag so a
+# sweep sets it once for the whole run: SAFFRONC_FLAGS=--report-unresolved.
+EXTRA_SAFFRONC_FLAGS="${SAFFRONC_FLAGS:-}"
 MAX_MEMORY=""
 MAX_MEMORY_SET=false
 
@@ -222,7 +227,7 @@ compile_to_ir() {
         [[ -n "$lp" ]] && flags="$flags --lib-path $lp"
     done
     [[ "$VERBOSE" == true ]] && echo "  compile: $input -> $output"
-    "$SAFFRONC" --stdlib "$STDLIB" $flags "$input" "$output"
+    "$SAFFRONC" --stdlib "$STDLIB" $flags $EXTRA_SAFFRONC_FLAGS "$input" "$output"
 }
 
 # --- IR verification gate ---
@@ -325,7 +330,7 @@ build_project() {
     done
 
     [[ "$VERBOSE" == true ]] && echo "  compile: $entry"
-    "$SAFFRONC" $saffronc_flags "$entry" "$ll_path" || {
+    "$SAFFRONC" $saffronc_flags $EXTRA_SAFFRONC_FLAGS "$entry" "$ll_path" || {
         echo "saffron: compilation failed: $entry" >&2
         exit 1
     }
