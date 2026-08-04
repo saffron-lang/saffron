@@ -33,9 +33,22 @@ fun return_from_any(): Int {
     return x
 }
 
-// Unannotated functions (sentinel is "Nil", skipped by the check)
+// Unannotated functions. These carry `UnknownType` — "nobody declared a return
+// type" — which no check may fire on, because a function that declared nothing
+// constrains nothing. They used to carry the string "Nil", indistinguishable from
+// a real `: Nil` declaration, which is why the companion check in
+// test/fail/return_nil_declared.sf could not exist until FunDecl.ret_type became
+// an AST.Type node. This is the side that would break first if that guard were
+// dropped: several hundred functions in the compiler's own source look like this.
 fun unannotated() { return 42 }
 fun unannotated_str() { return "hello" }
+
+// The legitimate shapes of a `: Nil` function. `return nil`, a bare `return`, and
+// falling off the end are all "produces no value" and must stay accepted — the
+// error is reserved for returning a concrete value, which the fail-side test pins.
+fun nil_explicit(): Nil { return nil }
+fun nil_bare(): Nil { return }
+fun nil_implicit(): Nil { }
 
 fun main() {
     T.assert_eq(get_int(), 42, "Int return")
@@ -48,6 +61,13 @@ fun main() {
     T.assert_eq(concrete_into_nullable(), 42, "concrete into nullable")
     T.assert_eq(return_any(), 42, "Any return")
     T.assert_eq(return_from_any(), 99, "return from Any-typed local")
+    T.assert_eq(unannotated(), 42, "unannotated function returning a value")
+    T.assert_eq(unannotated_str(), "hello", "unannotated function returning a String")
+    // Calling these is the assertion: each must compile, and a `: Nil` function
+    // has no result to compare against.
+    nil_explicit()
+    nil_bare()
+    nil_implicit()
     T.summary()
 }
 
