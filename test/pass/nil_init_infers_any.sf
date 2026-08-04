@@ -1,5 +1,6 @@
-// BUGS #155 — `var x = nil` typed x as the singleton `Nil` permanently, so the
-// variable could never hold anything else.
+// BUGS #156 — `var x = nil` typed x as the singleton `Nil` permanently, so the
+// variable could never hold anything else. (Filed as #155; renumbered at merge
+// when origin/main turned out to own #155 for an unrelated bug.)
 //
 // The failure was not a silent wrong answer: the later `x = 5` was accepted
 // *silently*, and then every USE of x was a hard compile error — "cannot call

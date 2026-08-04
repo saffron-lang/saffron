@@ -114,10 +114,21 @@
         if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "Number" or type_str == "void") {
             return false
         }
-        if (type_str.length() == 0) {
-            return false
-        }
-        // Everything else (String, List, Map, Any, class types, etc.) is heap-allocated
+        // Everything else is heap-allocated: String, List, Map, Any, class types
+        // — and "", which means "we do not know this variable's type".
+        //
+        // That last case used to `return false` on its own line above, and was
+        // correct only because nothing ever passed "": an unannotated `var`
+        // arrived here spelled "Any". When the parser's no-annotation sentinel
+        // moved to "" (BUGS #147) the input started occurring, collect_vars
+        // pushed it verbatim, and every unannotated local silently lost its GC
+        // root. toml_test died with `IndexError: index -1 out of bounds
+        // (length 0)` on a list the collector had freed out from under it, ~40
+        // lines after the code that lost the root.
+        //
+        // Unknown must answer YES here. Over-rooting costs a shadow-stack slot
+        // and a conservative scan and is never wrong; under-rooting is memory
+        // corruption that surfaces nowhere near its cause.
         return true
     }
 

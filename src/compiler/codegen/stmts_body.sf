@@ -174,15 +174,19 @@
     }
 
     fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
+        // "" is the parser's "no annotation" sentinel and the only spelling that
+        // means infer. An explicit `: Any` is a real annotation and must NOT be
+        // overwritten by the initializer's type — that conflation was BUGS #147.
         var vtype: String = type_ann
-        if (vtype == "Any") {
+        var vt_infer: Bool = type_ann.length() == 0
+        if (vt_infer) {
             vtype = this.get_expr_type(init)
         }
         var val: String = this.gen_arg_value(init)
         // After gen_arg_value, last_type reflects the actual compiled expression type.
-        // Always use last_type when type_ann was "Any" (inference), since get_expr_type
-        // may fail for complex expressions involving variables not yet in typed_vars.
-        if (type_ann == "Any") {
+        // Always use last_type when inferring, since get_expr_type may fail for
+        // complex expressions involving variables not yet in typed_vars.
+        if (vt_infer) {
             var post_type: String = this.type_to_string(this.last_type)
             if (post_type != "Any") {
                 vtype = post_type

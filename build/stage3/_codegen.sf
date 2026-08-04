@@ -7407,15 +7407,19 @@ class Codegen {
     }
 
     fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
+        // "" is the parser's "no annotation" sentinel and the only spelling that
+        // means infer. An explicit `: Any` is a real annotation and must NOT be
+        // overwritten by the initializer's type — that conflation was BUGS #147.
         var vtype: String = type_ann
-        if (vtype == "Any") {
+        var vt_infer: Bool = type_ann.length() == 0
+        if (vt_infer) {
             vtype = this.get_expr_type(init)
         }
         var val: String = this.gen_arg_value(init)
         // After gen_arg_value, last_type reflects the actual compiled expression type.
-        // Always use last_type when type_ann was "Any" (inference), since get_expr_type
-        // may fail for complex expressions involving variables not yet in typed_vars.
-        if (type_ann == "Any") {
+        // Always use last_type when inferring, since get_expr_type may fail for
+        // complex expressions involving variables not yet in typed_vars.
+        if (vt_infer) {
             var post_type: String = this.type_to_string(this.last_type)
             if (post_type != "Any") {
                 vtype = post_type
@@ -9545,10 +9549,21 @@ class Codegen {
         if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "Number" or type_str == "void") {
             return false
         }
-        if (type_str.length() == 0) {
-            return false
-        }
-        // Everything else (String, List, Map, Any, class types, etc.) is heap-allocated
+        // Everything else is heap-allocated: String, List, Map, Any, class types
+        // — and "", which means "we do not know this variable's type".
+        //
+        // That last case used to `return false` on its own line above, and was
+        // correct only because nothing ever passed "": an unannotated `var`
+        // arrived here spelled "Any". When the parser's no-annotation sentinel
+        // moved to "" (BUGS #147) the input started occurring, collect_vars
+        // pushed it verbatim, and every unannotated local silently lost its GC
+        // root. toml_test died with `IndexError: index -1 out of bounds
+        // (length 0)` on a list the collector had freed out from under it, ~40
+        // lines after the code that lost the root.
+        //
+        // Unknown must answer YES here. Over-rooting costs a shadow-stack slot
+        // and a conservative scan and is never wrong; under-rooting is memory
+        // corruption that surfaces nowhere near its cause.
         return true
     }
 
