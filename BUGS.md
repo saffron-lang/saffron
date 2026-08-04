@@ -2,12 +2,15 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157.
-Next free number is **#160**. #158 is claimed but not present here: it is the lsp
-worktree's committed entry (the `match` above its enum declaration) and will arrive
-with that merge. A number can be taken without its text being in this file yet, so
-the next-free number is one past the highest *claimed*, not one past the highest
-written.
+**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158.
+Next free number is **#160**.
+
+#158 is the entry the previous revision of this header described as "claimed but
+not present" — the lsp worktree's `match`-above-its-enum bug. This is that merge,
+so it is now present and the claimed set and the written set agree again. The
+observation that made the placeholder necessary still holds and is worth keeping:
+a number can be taken without its text being in this file yet, so the next-free
+number is one past the highest *claimed*, not one past the highest written.
 
 **The fifth collision, and the first one the pre-commit re-read actually caught.**
 The rule at the end of the note below — re-read the next-free number from `main`
@@ -564,6 +567,61 @@ written to be adoptable by `run_tests.sh` unchanged.
 The flag was left as-is deliberately: it may be load-bearing for legitimate host
 imports (`js_log_str` is one), so tightening it is its own measured change rather than
 a one-line edit.
+
+---
+
+### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
+
+`enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the
+declaration (`codegen/stmts_body.sf:843` via `register_variant`), so the table is
+only correct for matches that appear after the enum in the file. A match above it
+asks `find_enum_for_variant` (`codegen/utils_body.sf:124`) for a variant that is
+not registered yet, gets `"Unknown"`, and falls into the unknown-enum branch at
+`codegen/match_body.sf:92`, which is documented as "just generate the first arm's
+body as default" — it GEPs the first arm's bindings out of the subject
+unconditionally and drops every other arm.
+
+The result is not a diagnostic and not a wrong branch. It is *no branch*: the
+emitted function has zero `icmp`/`br`/`switch` instructions and treats every
+input as the first arm's variant. If that arm has more fields than the value
+actually passed, the GEP reads past the allocation and the program segfaults on
+a load of whatever followed.
+
+Measured on `AST.expr_span` while adding it to `src/compiler/ast.sf` above
+`enum Expr`:
+
+```
+expr_span      : branches = 0     <- silently miscompiled
+type_to_string : branches = 15    <- same file, matches Type (declared above it)
+span_merge     : branches = 10    <- same file, matches Span (declared above it)
+```
+
+Calling it on a `Variable` (2 fields) through the first arm `Call` (3 fields)
+segfaulted; moving the function below `enum Expr` produced 10 branches and
+correct results for `Variable`, `Call` and a `Binary` falling through to `_`.
+
+Two things make this nastier than it looks:
+
+- **Declaration order is the only thing that matters, not scope.** Saffron
+  otherwise lets a function call another declared later in the file, so nothing
+  else in the language teaches you to expect this. Reordering two top-level
+  items — a mechanical, apparently meaningless edit — is the whole fix, and the
+  whole cause.
+- **Zero existing occurrences in the tree.** A scan of every `.sf` in `src/` and
+  `tools/` for a match arm naming a variant of an enum declared later in the same
+  file finds none, which is exactly why this has never been hit. It is a trap for
+  new code, not a live defect, so nothing regresses today and nothing will warn
+  the next person.
+
+The real fix is a prepass that registers every enum in the module before any body
+is generated. `register_external_enums` (`codegen/stmts_body.sf:1215`) is that
+prepass and **has no callers** — it is dead code. Either wire it up, or make
+`find_enum_for_variant` returning `"Unknown"` for a name that is a known variant
+somewhere a hard error instead of a silent fallthrough. The unknown-enum branch
+is legitimately needed for class patterns (`is Dog(d)`), so it cannot simply be
+deleted.
+
+---
 
 ---
 
