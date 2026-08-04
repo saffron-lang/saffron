@@ -95,6 +95,16 @@ elif ! command -v java >/dev/null && [[ -z "${JAVA_HOME:-}" ]]; then
 else
   log "gradle buildPlugin (intellij)"
   (cd "$EDITORS_DIR/intellij" && ./gradlew --console=plain buildPlugin)
+
+  # --test also runs the JetBrains Plugin Verifier, which is the only check that
+  # sees the failures compilation cannot: API that does not exist at the
+  # sinceBuild floor. It caught a PluginId.getId() call that compiled fine and
+  # would have thrown NoSuchFieldError on any IDE older than 2025.3. Off by
+  # default because it downloads a full IDE per verified version (GBs, slow).
+  if [[ "$RUN_TESTS" == "1" ]]; then
+    log "gradle verifyPlugin (intellij)"
+    (cd "$EDITORS_DIR/intellij" && ./gradlew --console=plain verifyPlugin)
+  fi
 fi
 
 log "done"
