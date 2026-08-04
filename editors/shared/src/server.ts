@@ -13,6 +13,7 @@ import {
   Hover,
   Location,
   MarkupKind,
+  Position,
   DocumentSymbolParams,
   DocumentSymbol,
   SymbolKind,
@@ -343,7 +344,110 @@ function getDepPath(pkgName: string): string | null {
   return depPathCache.get(pkgName) || null;
 }
 
-function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
+/** True when every character in `s` is one UTF-8 byte and one UTF-16 unit. */
+function isAscii(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 0x7f) return false;
+  }
+  return true;
+}
+
+/**
+ * Convert the compiler's 1-based BYTE column into an LSP `character`.
+ *
+ * The two are not the same unit, and nothing here was accounting for it.
+ * `AST.Span` documents `offset`/`len` as byte offsets and the lexer counts `col`
+ * in bytes to match; LSP positions are UTF-16 code units. So every byte a
+ * multi-byte character contributes beyond its UTF-16 width shifts the range
+ * right: three `é` (2 bytes each, 1 unit each) before the error put the squiggle
+ * 3 columns past the token it was about.
+ *
+ * ASCII lines are the overwhelming majority and cost nothing here: the fast path
+ * returns immediately when the line has no byte above 0x7F, so this only does
+ * work on the lines that actually need it.
+ *
+ * `lineText` is the raw line from the document. When it is unavailable the byte
+ * column is returned unchanged, which is exactly the old behaviour and correct
+ * for ASCII — a wrong-but-close range still beats dropping the diagnostic.
+ */
+function byteColumnToCharacter(lineText: string | undefined, byteCol: number): number {
+  const zero = Math.max(byteCol - 1, 0);
+  if (lineText === undefined || isAscii(lineText)) return zero;
+  // Walk characters, accumulating each one's UTF-8 width, until the byte budget
+  // is spent. `for...of` iterates by code POINT, so an astral character (4 UTF-8
+  // bytes, 2 UTF-16 units) advances both counters correctly, which a charCodeAt
+  // loop would get wrong on the surrogate pair.
+  let bytes = 0;
+  let units = 0;
+  for (const ch of lineText) {
+    if (bytes >= zero) break;
+    bytes += Buffer.byteLength(ch, "utf8");
+    units += ch.length;
+  }
+  return units;
+}
+
+/** The raw text of a 0-based line, or undefined if the line is out of range. */
+function lineTextAt(doc: TextDocument | undefined, line: number): string | undefined {
+  if (!doc) return undefined;
+  const lines = doc.getText().split("\n");
+  return line < lines.length ? lines[line] : undefined;
+}
+
+/**
+ * A range from a 1-based line, 1-based byte column and byte length.
+ *
+ * The END is computed by converting `byteCol + byteLen` rather than by adding a
+ * converted length to a converted start: the length is a byte count too, and
+ * adding it to a UTF-16 start silently widens the range over any multi-byte
+ * character inside the token (`café` is 5 bytes, 4 units).
+ */
+function byteRange(
+  doc: TextDocument | undefined,
+  line1: number,
+  col1: number,
+  byteLen: number,
+) {
+  const line = line1 - 1;
+  const text = lineTextAt(doc, line);
+  return {
+    start: { line, character: byteColumnToCharacter(text, col1) },
+    end: { line, character: byteColumnToCharacter(text, col1 + Math.max(byteLen, 1)) },
+  };
+}
+
+/**
+ * An LSP Position from one of the compiler's whole-file BYTE offsets.
+ *
+ * `doc.positionAt` takes a JS string index (UTF-16 units), so handing it
+ * `sym.start_offset` directly is the same unit error as the column one above —
+ * just measured from the start of the file instead of the start of a line, so it
+ * accumulates over every multi-byte character ABOVE the declaration, not merely
+ * the ones to its left. A doc comment with an en-dash in it is enough to shift
+ * the fold and the outline extent of everything below it.
+ *
+ * NOTE the asymmetry with the offsets in `scan.ts` (`occ.offset`), which are
+ * already string indices because the scanner walks the JS string. Those go to
+ * `positionAt` unconverted and correctly; only compiler-sourced offsets pass
+ * through here.
+ */
+function positionAtByteOffset(doc: TextDocument, byteOffset: number): Position {
+  const text = doc.getText();
+  // Fast path, and it is the usual one: with no byte above 0x7F the two units
+  // coincide exactly. Worth checking because onFoldingRange calls this twice per
+  // symbol, and the slow path below is a full walk of the document each time.
+  if (isAscii(text)) return doc.positionAt(byteOffset);
+  let bytes = 0;
+  let units = 0;
+  for (const ch of text) {
+    if (bytes >= byteOffset) break;
+    bytes += Buffer.byteLength(ch, "utf8");
+    units += ch.length;
+  }
+  return doc.positionAt(units);
+}
+
+function mapDiagnostics(raw: SaffronDiagnostic[], doc?: TextDocument): Diagnostic[] {
   // Only located diagnostics become in-file squiggles. An unlocated one (the
   // compiler emits `located:false` for the many checker errors that have no
   // source region yet) has no defensible place to point — putting it at 0:0
@@ -352,14 +456,10 @@ function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
   return raw
     .filter((d) => d.located && d.line !== undefined && d.column !== undefined)
     .map((d) => {
-      const line = d.line! - 1;
-      const col = d.column! - 1;
-      const len = Math.max(d.length ?? 1, 1);
       return {
-        range: {
-          start: { line, character: col },
-          end: { line, character: col + len },
-        },
+        // `doc` is optional and absent only where no buffer is open; byteRange
+        // then falls back to the byte column, which is exact for ASCII.
+        range: byteRange(doc, d.line!, d.column!, d.length ?? 1),
         severity:
           d.severity === "warning"
             ? DiagnosticSeverity.Warning
@@ -704,10 +804,7 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
     if (sym) {
       return {
         uri: params.textDocument.uri,
-        range: {
-          start: { line: sym.line - 1, character: sym.column - 1 },
-          end: { line: sym.line - 1, character: sym.column - 1 + sym.length },
-        },
+        range: symbolRange(sym, doc),
       };
     }
     return null;
@@ -740,10 +837,7 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
 
   return {
     uri: params.textDocument.uri,
-    range: {
-      start: { line: sym.line - 1, character: sym.column - 1 },
-      end: { line: sym.line - 1, character: sym.column - 1 + sym.length },
-    },
+    range: symbolRange(sym, doc),
   };
 });
 
@@ -754,7 +848,7 @@ async function checkAndPublish(doc: TextDocument): Promise<void> {
   // Only replace a prior clean/located result on a parseable payload. A null
   // (compiler crash) leaves the last good diagnostics in place rather than
   // flickering the squiggles off.
-  const diagnostics = result ? mapDiagnostics(result.diagnostics) : [];
+  const diagnostics = result ? mapDiagnostics(result.diagnostics, doc) : [];
   if (result) {
     connection.sendDiagnostics({ uri: doc.uri, diagnostics });
   }
@@ -822,13 +916,8 @@ const symbolKinds: Record<string, SymbolKind> = {
   actor: SymbolKind.Class,
 };
 
-function symbolRange(sym: SaffronSymbol) {
-  const line = sym.line - 1;
-  const col = sym.column - 1;
-  return {
-    start: { line, character: col },
-    end: { line, character: col + sym.length },
-  };
+function symbolRange(sym: SaffronSymbol, doc?: TextDocument) {
+  return byteRange(doc, sym.line, sym.column, sym.length);
 }
 
 connection.onDocumentSymbol(
@@ -846,12 +935,15 @@ connection.onDocumentSymbol(
     // could not express and a line-range heuristic would get wrong for a nested
     // declaration.
     const toSymbol = (sym: SaffronSymbol): DocumentSymbol => {
-      const selectionRange = symbolRange(sym);
+      const selectionRange = symbolRange(sym, doc);
       // range must CONTAIN selectionRange or clients drop the entry. The full
       // extent satisfies that when present; the name span trivially does when not.
       const range =
         sym.start_offset !== undefined && sym.end_offset !== undefined && doc
-          ? { start: doc.positionAt(sym.start_offset), end: doc.positionAt(sym.end_offset) }
+          ? {
+              start: positionAtByteOffset(doc, sym.start_offset),
+              end: positionAtByteOffset(doc, sym.end_offset),
+            }
           : selectionRange;
       const out: DocumentSymbol = {
         name: sym.name,
@@ -1302,8 +1394,8 @@ connection.onFoldingRanges(async (params: FoldingRangeParams): Promise<FoldingRa
   // single line and reads as a broken control.
   for (const sym of cached?.symbols ?? []) {
     if (sym.start_offset === undefined || sym.end_offset === undefined) continue;
-    const start = doc.positionAt(sym.start_offset);
-    const end = doc.positionAt(sym.end_offset);
+    const start = positionAtByteOffset(doc, sym.start_offset);
+    const end = positionAtByteOffset(doc, sym.end_offset);
     // endLine is inclusive in LSP and the extent's last line holds the closing
     // brace, which should stay visible when folded — so fold to the line above
     // it. A one-line declaration then has start === end and is dropped.
@@ -1503,6 +1595,9 @@ connection.onWorkspaceSymbol(
     // already-compiled files are free, and an empty result for an unopened file
     // is a smaller surprise than a multi-second freeze.
     for (const [uri, check] of fileCache) {
+      // fileCache can outlive an open buffer, so this may be undefined; that is
+      // the byte-column fallback case and it is exact for an ASCII file.
+      const cachedDoc = documents.get(uri);
       for (const sym of check.symbols) {
         // An empty query means "everything", which is what a client sends to
         // populate the picker before the user types.
@@ -1510,13 +1605,7 @@ connection.onWorkspaceSymbol(
         const symbol: WorkspaceSymbol = {
           name: sym.name,
           kind: symbolKinds[sym.kind] ?? SymbolKind.Variable,
-          location: {
-            uri,
-            range: {
-              start: { line: sym.line - 1, character: sym.column - 1 },
-              end: { line: sym.line - 1, character: sym.column - 1 + sym.length },
-            },
-          },
+          location: { uri, range: symbolRange(sym, cachedDoc) },
         };
         if (sym.container.length > 0) symbol.containerName = sym.container;
         results.push(symbol);

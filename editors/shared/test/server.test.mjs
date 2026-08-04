@@ -427,3 +427,83 @@ test("an EXPRESSION-level type error squiggles the expression", { skip: SKIP }, 
     "the squiggle covers the argument alone, not the whole call",
   );
 });
+
+// The compiler reports BYTE columns and offsets — `AST.Span` documents it and the
+// lexer counts `col` in bytes to match — while LSP `Position.character` is UTF-16
+// code units. Every byte a character contributes beyond its UTF-16 width pushes a
+// range right. Nothing else in this suite could see it, because every other
+// fixture here is pure ASCII, where the two units coincide exactly.
+//
+// The server does that conversion in two independent places and each can be right
+// while the other is wrong, so there is a test for each:
+//
+//   per-line byte COLUMN  — diagnostics, symbol name ranges, go-to-definition.
+//     Sensitive to multi-byte characters to the LEFT on the same line.
+//   whole-file byte OFFSET — documentSymbol extents and folding ranges, via
+//     start_offset/end_offset. Sensitive to multi-byte characters ANYWHERE
+//     ABOVE, since the count accumulates over the whole file.
+//
+// A fixture with non-ASCII on an earlier line does NOT test the column path: the
+// column is measured from the start of its own line, so it is unaffected. That
+// distinction is worth stating because the obvious single test covers only one of
+// the two conversions and passes regardless of the other.
+test("a non-ASCII line above does not shift a symbol extent", { skip: SKIP }, async () => {
+  // Three `★` (3 bytes, 1 unit each) above the class put the compiler's byte
+  // offsets 6 ahead of the string indices `positionAt` expects, so the outline
+  // extent and the fold both slide down/right by 6 units' worth of text.
+  const src = 'var label: String = "★★★"\nclass Widget {\n    var w: Int\n    fun init() { this.w = 1 }\n}\n';
+  const symUri = uri.replace("probe.sf", "utf8sym.sf");
+  fs.writeFileSync(fileURLToPath(symUri), src);
+  send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri: symUri, languageId: "saffron", version: 1, text: src } },
+  });
+  await new Promise((r) => setTimeout(r, 3000));
+  const syms = await request("textDocument/documentSymbol", { textDocument: { uri: symUri } });
+  const widget = syms.find((s) => s.name === "Widget");
+  assert.ok(widget, `expected a Widget symbol, got ${syms.map((s) => s.name).join(",")}`);
+
+  // Asserted against the text rather than as numbers, for the same reason as
+  // everywhere else here: an extent off by six reads as a plausible range.
+  const srcLines = src.split("\n");
+  assert.equal(
+    srcLines[widget.selectionRange.start.line].slice(
+      widget.selectionRange.start.character,
+      widget.selectionRange.end.character,
+    ),
+    "Widget",
+    "the name range lands on the class name",
+  );
+  // The extent must start at `class` — one unit-count error and it starts mid-token
+  // or on the line above.
+  assert.equal(widget.range.start.line, 1, "the extent begins on the class's own line");
+  assert.equal(widget.range.start.character, 0, "at column 0, where `class` starts");
+  assert.equal(widget.range.end.line, 4, "and ends on the closing brace's line");
+});
+
+test("a multi-byte character BEFORE the error on its own line", { skip: SKIP }, async () => {
+  // The column path: three 2-byte `é` to the left of the offending argument. If
+  // the byte column reached the client unconverted the squiggle would sit three
+  // characters right of `n`.
+  const bad = 'fun take(s: String): Int { return 1 }\nvar n: Int = 3\nvar r: Int = take(/* é é é */ n)\n';
+  const badUri = uri.replace("probe.sf", "utf8col.sf");
+  fs.writeFileSync(fileURLToPath(badUri), bad);
+  notifications.length = 0;
+  send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri: badUri, languageId: "saffron", version: 1, text: bad } },
+  });
+  await new Promise((r) => setTimeout(r, 3000));
+  const note = notifications
+    .filter((n) => n.method === "textDocument/publishDiagnostics" && n.params.uri === badUri)
+    .pop();
+  assert.ok(note, "the file got diagnostics");
+  const d = note.params.diagnostics.find((x) => /argument 1/.test(x.message));
+  assert.ok(d, `expected an argument-type error, got ${JSON.stringify(note.params.diagnostics)}`);
+  const line = bad.split("\n")[d.range.start.line];
+  assert.equal(
+    line.slice(d.range.start.character, d.range.end.character),
+    "n",
+    "three 2-byte characters to the left must not shift the range by three",
+  );
+});
