@@ -1,0 +1,23 @@
+// BUGS #148: reading a nonexistent member of a class instance must be a
+// compile error.
+//
+// This is the class-side twin of #118 (`Module.nope`), which closed the same
+// hole for module members only. The read below compiled clean, exited 0, and
+// codegen then read field 0 — so `b.nmae` printed `1`, the value of `v`, and a
+// typo silently became a working program that read the wrong field.
+//
+// The mechanism was get_class_field_type answering "not found" with "Any".
+// That is the honest widen for a receiver whose class cannot be pinned down,
+// and it is indistinguishable from a misspelling, so infer_member_access could
+// not tell the two apart. member_is_absent now asks the question separately,
+// and only where the answer is conclusive.
+class Box {
+    var v: Int
+    fun init() { this.v = 1 }
+}
+
+fun main(): Int {
+    var b: Box = Box()
+    IO.println(b.nmae)
+    return 0
+}

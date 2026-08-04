@@ -1,0 +1,55 @@
+// The other side of BUGS #148: every member read that IS legitimate must still
+// compile. The two test/fail/class_member_missing*.sf files prove the guard
+// fires; this one proves it is not a blunt instrument, and it exists because the
+// failure mode of an over-eager member-not-found check is far worse than the bug
+// it fixes — it rejects working programs, and the compiler's own source is the
+// largest working program in the tree.
+//
+// Each read below is a case where "the member is not in this class's field list"
+// is true or nearly true, and rejecting it would be wrong:
+
+import "@test" as Test
+
+class Base {
+    var owned: Int
+    fun init() { this.owned = 1 }
+    fun method_on_base(): Int { return this.owned }
+}
+
+// An inherited field and an inherited method are not in Child's own lists, so
+// the guard has to walk ancestry rather than consult one class. That is why
+// member_is_absent delegates to dispatch_declaring_class instead of testing
+// get_class_field_type directly.
+class Child extends Base {
+    var mine: Int
+    fun init() { this.owned = 2; this.mine = 3 }
+}
+
+// A method reference with no parens is a MemberAccess, NOT a MethodCall — the
+// two take different checker paths (infer_member_access vs infer_method_call).
+// The call path already rejected unknown methods correctly; only the bare-read
+// path was broken, which is exactly why this line belongs in the regression set:
+// a fields-only guard would read `c.method_on_base` as a missing field.
+var c: Child = Child()
+var bare_method_ref = c.method_on_base
+
+Test.assert_eq(c.mine, 3, "own field")
+Test.assert_eq(c.owned, 2, "inherited field")
+Test.assert_eq(c.method_on_base(), 2, "inherited method, called")
+
+// An `extend fun` member is registered nowhere the guard can see: it parses to a
+// FREE FunDecl whose only trace of the receiver is the docstring "@extend:Tagged".
+// The checker had zero @extend awareness before this fix, so the guard needed
+// extend_member_names to exist at all. See test/pass/extend_cross_module.sf for
+// the cross-module case.
+class Tagged {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+}
+
+extend fun Tagged.doubled(): Int { return this.n * 2 }
+
+var t: Tagged = Tagged(21)
+Test.assert_eq(t.doubled(), 42, "extend fun member, called")
+
+Test.summary()

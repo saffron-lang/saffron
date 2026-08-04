@@ -1,0 +1,20 @@
+// BUGS #148, the second half: the same bad read on a class that declares NO
+// fields.
+//
+// Worth its own file rather than a second read in class_member_missing.sf,
+// because it failed differently and it is the case that rules out the obvious
+// over-cautious fix. With no fields to index, codegen did not read field 0 — it
+// emitted IR that `opt` rejects, so the damage arrived a stage later than the
+// typo. A guard that bailed out whenever a class had an empty field list (which
+// looks like the same caution the ambiguous-class clause applies) would let
+// exactly this file back through. member_is_absent deliberately omits that
+// clause: its only caller has already established the class is registered.
+class Empty {
+    fun init() {}
+}
+
+fun main(): Int {
+    var e: Empty = Empty()
+    IO.println(e.gone)
+    return 0
+}
