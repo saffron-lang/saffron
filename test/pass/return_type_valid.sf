@@ -1,0 +1,54 @@
+// BUGS #155 companion: verify that the return-type check allows all legitimate
+// patterns. This test must COMPILE AND RUN — it is in test/pass/.
+
+import "@test" as T
+
+// Same-type returns (trivial)
+fun get_int(): Int { return 42 }
+fun get_str(): String { return "hello" }
+fun get_bool(): Bool { return true }
+fun get_float(): Float { return 3.14 }
+
+// Int→Float widening (allowed by scalar_mismatch)
+fun int_as_float(): Float { return 7 }
+
+// Int→String (allowed: NaN-box identity, raw pointer IS a String)
+// This is what lexer.sf:byte_to_char does.
+fun int_as_string(): String {
+    var buf: String = "x"
+    return buf
+}
+
+// Returning nil from a nullable function
+fun maybe_nil(): String|Nil { return nil }
+fun maybe_value(): String|Nil { return "got it" }
+
+// Returning a concrete from a nullable (String is subtype of String|Nil)
+fun concrete_into_nullable(): Int|Nil { return 42 }
+
+// Returning Any (always allowed — Any on either side skips the check)
+fun return_any(): Any { return 42 }
+fun return_from_any(): Int {
+    var x: Any = 99
+    return x
+}
+
+// Unannotated functions (sentinel is "Nil", skipped by the check)
+fun unannotated() { return 42 }
+fun unannotated_str() { return "hello" }
+
+fun main() {
+    T.assert_eq(get_int(), 42, "Int return")
+    T.assert_eq(get_str(), "hello", "String return")
+    T.assert_eq(get_bool(), true, "Bool return")
+    T.assert_eq(get_float(), 3.14, "Float return")
+    T.assert_eq(int_as_float(), 7, "Int→Float widening")
+    T.assert_eq(maybe_nil(), nil, "nil from nullable")
+    T.assert_eq(maybe_value(), "got it", "value from nullable")
+    T.assert_eq(concrete_into_nullable(), 42, "concrete into nullable")
+    T.assert_eq(return_any(), 42, "Any return")
+    T.assert_eq(return_from_any(), 99, "return from Any-typed local")
+    T.summary()
+}
+
+main()
