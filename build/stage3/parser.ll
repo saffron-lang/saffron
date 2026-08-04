@@ -707,20 +707,20 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.703 = private unnamed_addr constant [6 x i8] c"index\00"
 @.str.704 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
 @.str.705 = private unnamed_addr constant [10 x i8] c"__inc_idx\00"
-@.str.706 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.706 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.707 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.708 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.709 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.709 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.710 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.711 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.712 = private unnamed_addr constant [7 x i8] c"member\00"
 @.str.713 = private unnamed_addr constant [10 x i8] c"get_field\00"
 @.str.714 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.715 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
-@.str.716 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.716 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.717 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.718 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.719 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.719 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.720 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.721 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.722 = private unnamed_addr constant [2 x i8] c"_\00"
@@ -1191,7 +1191,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1187 = private unnamed_addr constant [2 x i8] c",\00"
 @.str.1188 = private unnamed_addr constant [2 x i8] c")\00"
 @.str.1189 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1190 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1190 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1191 = private unnamed_addr constant [2 x i8] c":\00"
 @.str.1192 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.1193 = private unnamed_addr constant [1 x i8] c"\00"
@@ -1206,10 +1206,10 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1202 = private unnamed_addr constant [2 x i8] c")\00"
 @.str.1203 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.1204 = private unnamed_addr constant [11 x i8] c"__destruct\00"
-@.str.1205 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1205 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1206 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1207 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1208 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1208 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1209 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1210 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1211 = private unnamed_addr constant [1 x i8] c"\00"
@@ -1414,7 +1414,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1410 = private unnamed_addr constant [2 x i8] c"]\00"
 @.str.1411 = private unnamed_addr constant [3 x i8] c"in\00"
 @.str.1412 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1413 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1413 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1414 = private unnamed_addr constant [11 x i8] c"__for_item\00"
 @.str.1415 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1416 = private unnamed_addr constant [7 x i8] c"public\00"
@@ -1439,7 +1439,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1435 = private unnamed_addr constant [2 x i8] c")\00"
 @.str.1436 = private unnamed_addr constant [10 x i8] c"__for_src\00"
 @.str.1437 = private unnamed_addr constant [8 x i8] c"__for_i\00"
-@.str.1438 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1438 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1439 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1440 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1441 = private unnamed_addr constant [4 x i8] c"Int\00"
@@ -1447,7 +1447,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1443 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1444 = private unnamed_addr constant [2 x i8] c"<\00"
 @.str.1445 = private unnamed_addr constant [7 x i8] c"length\00"
-@.str.1446 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1446 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1447 = private unnamed_addr constant [11 x i8] c"__iter_get\00"
 @.str.1448 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1449 = private unnamed_addr constant [7 x i8] c"public\00"
@@ -16454,7 +16454,7 @@ match.end1123:
   %t131 = load i64, i64* %recv_name
   %t132 = getelementptr [8 x i64], [8 x i64]* %t129, i64 0, i64 1
   store i64 %t131, i64* %t132
-  %t133 = getelementptr [4 x i8], [4 x i8]* @.str.706, i64 0, i64 0
+  %t133 = getelementptr [1 x i8], [1 x i8]* @.str.706, i64 0, i64 0
   %t134 = ptrtoint i8* %t133 to i64
   %t135 = getelementptr [8 x i64], [8 x i64]* %t129, i64 0, i64 2
   store i64 %t134, i64* %t135
@@ -16485,7 +16485,7 @@ match.end1123:
   %t154 = load i64, i64* %idx_name
   %t155 = getelementptr [8 x i64], [8 x i64]* %t152, i64 0, i64 1
   store i64 %t154, i64* %t155
-  %t156 = getelementptr [4 x i8], [4 x i8]* @.str.709, i64 0, i64 0
+  %t156 = getelementptr [1 x i8], [1 x i8]* @.str.709, i64 0, i64 0
   %t157 = ptrtoint i8* %t156 to i64
   %t158 = getelementptr [8 x i64], [8 x i64]* %t152, i64 0, i64 2
   store i64 %t157, i64* %t158
@@ -16796,7 +16796,7 @@ else1149:
   %t340 = load i64, i64* %mrecv_name
   %t341 = getelementptr [8 x i64], [8 x i64]* %t338, i64 0, i64 1
   store i64 %t340, i64* %t341
-  %t342 = getelementptr [4 x i8], [4 x i8]* @.str.716, i64 0, i64 0
+  %t342 = getelementptr [1 x i8], [1 x i8]* @.str.716, i64 0, i64 0
   %t343 = ptrtoint i8* %t342 to i64
   %t344 = getelementptr [8 x i64], [8 x i64]* %t338, i64 0, i64 2
   store i64 %t343, i64* %t344
@@ -16858,7 +16858,7 @@ endif1117:
   %t380 = load i64, i64* %val_name
   %t381 = getelementptr [8 x i64], [8 x i64]* %t378, i64 0, i64 1
   store i64 %t380, i64* %t381
-  %t382 = getelementptr [4 x i8], [4 x i8]* @.str.719, i64 0, i64 0
+  %t382 = getelementptr [1 x i8], [1 x i8]* @.str.719, i64 0, i64 0
   %t383 = ptrtoint i8* %t382 to i64
   %t384 = getelementptr [8 x i64], [8 x i64]* %t378, i64 0, i64 2
   store i64 %t383, i64* %t384
@@ -25699,7 +25699,7 @@ endif2228:
 else2227:
   br label %endif2225
 endif2225:
-  %t103 = getelementptr [4 x i8], [4 x i8]* @.str.1190, i64 0, i64 0
+  %t103 = getelementptr [1 x i8], [1 x i8]* @.str.1190, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   store i64 %t104, i64* %type_ann
   %t105 = load i64, i64* %self
@@ -25931,7 +25931,7 @@ endif2249:
   %t40 = load i64, i64* %tmp_name
   %t41 = getelementptr [8 x i64], [8 x i64]* %t38, i64 0, i64 1
   store i64 %t40, i64* %t41
-  %t42 = getelementptr [4 x i8], [4 x i8]* @.str.1205, i64 0, i64 0
+  %t42 = getelementptr [1 x i8], [1 x i8]* @.str.1205, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = getelementptr [8 x i64], [8 x i64]* %t38, i64 0, i64 2
   store i64 %t43, i64* %t44
@@ -26009,7 +26009,7 @@ while.body2256:
   %t96 = call i64 @__list_get(i64 %t90, i64 %t95)
   %t97 = getelementptr [8 x i64], [8 x i64]* %t88, i64 0, i64 1
   store i64 %t96, i64* %t97
-  %t98 = getelementptr [4 x i8], [4 x i8]* @.str.1208, i64 0, i64 0
+  %t98 = getelementptr [1 x i8], [1 x i8]* @.str.1208, i64 0, i64 0
   %t99 = ptrtoint i8* %t98 to i64
   %t100 = getelementptr [8 x i64], [8 x i64]* %t88, i64 0, i64 2
   store i64 %t99, i64* %t100
@@ -30652,7 +30652,7 @@ while.body2700:
   %t153 = call i64 @__list_get(i64 %t147, i64 %t152)
   %t154 = getelementptr [8 x i64], [8 x i64]* %t145, i64 0, i64 1
   store i64 %t153, i64* %t154
-  %t155 = getelementptr [4 x i8], [4 x i8]* @.str.1413, i64 0, i64 0
+  %t155 = getelementptr [1 x i8], [1 x i8]* @.str.1413, i64 0, i64 0
   %t156 = ptrtoint i8* %t155 to i64
   %t157 = getelementptr [8 x i64], [8 x i64]* %t145, i64 0, i64 2
   store i64 %t156, i64* %t157
@@ -31093,7 +31093,7 @@ entry:
   %t34 = load i64, i64* %list_var
   %t35 = getelementptr [8 x i64], [8 x i64]* %t32, i64 0, i64 1
   store i64 %t34, i64* %t35
-  %t36 = getelementptr [4 x i8], [4 x i8]* @.str.1438, i64 0, i64 0
+  %t36 = getelementptr [1 x i8], [1 x i8]* @.str.1438, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = getelementptr [8 x i64], [8 x i64]* %t32, i64 0, i64 2
   store i64 %t37, i64* %t38
@@ -31213,7 +31213,7 @@ entry:
   %t118 = load i64, i64* %item_name
   %t119 = getelementptr [8 x i64], [8 x i64]* %t116, i64 0, i64 1
   store i64 %t118, i64* %t119
-  %t120 = getelementptr [4 x i8], [4 x i8]* @.str.1446, i64 0, i64 0
+  %t120 = getelementptr [1 x i8], [1 x i8]* @.str.1446, i64 0, i64 0
   %t121 = ptrtoint i8* %t120 to i64
   %t122 = getelementptr [8 x i64], [8 x i64]* %t116, i64 0, i64 2
   store i64 %t121, i64* %t122

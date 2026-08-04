@@ -524,6 +524,13 @@ class NullChecker {
     // --- String → Type node conversion ---
 
     fun parse_type_node(s: String): AST.Type {
+        // "" is the "no annotation was written" sentinel (BUGS #147), not a type
+        // name. Without this arm it fell through to `ClassType("")` — a class with
+        // an empty name, which compares unequal to everything and would silently
+        // fail every subsequent check rather than reporting anything. Callers
+        // must not reach here with "", but answering Unknown makes a caller that
+        // does say so, per invariant I2, instead of inventing a class.
+        if (s.length() == 0) return AST.Type.UnknownType
         if (s == "Int" or s == "Number") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
@@ -639,11 +646,23 @@ class NullChecker {
             FloatType => false
             BoolType => false
             StringType => false
-            AnyType => false
+            // `Any` is the top type, so `nil` inhabits it — `var x: Any = nil` is
+            // the ordinary way to declare a slot that starts empty. This said
+            // `false` until BUGS #147, and no test caught it because the branch
+            // was unreachable: the parser spelled an omitted annotation as "Any",
+            // so the checker's "was an annotation written?" test (`!= "Any"`) sent
+            // every explicit `: Any` down the infer-from-initializer path, where
+            // this function is never called. Moving the sentinel to "" made the
+            // branch live and the compiler immediately rejected eight of its own
+            // `var llvm_end_bb: Any = nil` declarations.
+            AnyType => true
             ClassType(n) => false
             EnumType(n) => false
             GenericType(b, a) => false
             FuncType(p, r) => false
+            // Inference-only, and reached here only by a caller that should not
+            // have (see parse_type_node). `false` is the conservative answer: it
+            // reports rather than silently permitting a nil.
             UnknownType => false
             NeverType => false
         }
@@ -2454,7 +2473,14 @@ class NullChecker {
                 // and silently skipped the exhaustiveness check. Parse it first.
                 var type_ann_str: String = type_ann
                 var type_ann_node: AST.Type = this.parse_type_node(type_ann)
-                if (type_ann_str != "Any") {
+                // Emptiness, not `!= "Any"`. The parser now writes "" for an
+                // omitted annotation, so an explicit `: Any` reaches this branch
+                // and widens the binding as written. It used to fall to the
+                // infer-from-initializer branch below and bind the initializer's
+                // type instead, which meant `: Any` could not widen anything —
+                // BUGS #147, found because #139's documented workaround
+                // (`var data: Any = ...`) silently failed to launder.
+                if (type_ann_str.length() > 0) {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.
@@ -2580,7 +2606,19 @@ class NullChecker {
             }
             Return(value) => {
                 var val_type_node: AST.Type = this.infer_type(value)
-                if (!this.is_any_type(this.current_func_ret)) {
+                // `Any` on the VALUE side is excluded, not just on the return side.
+                // This check approximates the subtype rule, and is_subtype_node
+                // already admits Any in either position (checker.sf:1011-1012) —
+                // Any is the top type, and in identity mode most of the compiler's
+                // own typed functions return Any-inferred expressions. The
+                // exclusion became necessary when is_nullable_type started
+                // answering true for AnyType (BUGS #147): the predicate answers
+                // "does this type admit nil", which Any does, but that is a
+                // different question from "is a declared-nullable value being
+                // smuggled into a non-nullable slot", which is what this site
+                // asks. Without it, `return <Any expr>` from a `: Float` function
+                // became an error and lexer.sf stopped compiling.
+                if (!this.is_any_type(this.current_func_ret) and !this.is_any_type(val_type_node)) {
                     if (!this.is_nullable_type(this.current_func_ret) and this.is_nullable_type(val_type_node)) {
                         var val_str: String = this.type_to_str(val_type_node)
                         var ret_str: String = this.type_to_str(this.current_func_ret)

@@ -2,9 +2,29 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #147,
-#154. Next free number is **#156**.
+**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155.
+Next free number is **#157**.
 
+#154 and #155 were filed on the same day on two lines of work that had not yet
+met — origin/main's "an enum inside a printed collection prints a bit pattern"
+took #154, and this line's "no `return` is checked against its declared return
+type" took #155 after `grep -h "Next free number"` across worktrees showed #154
+already claimed (by the lsp-symbol-payload worktree, for a `match` above its enum
+declaration). This time the cross-worktree grep did its job: the two picked
+different numbers, so the merge only had to place both entries rather than
+renumber either. That is the note two collisions up working as intended.
+
+**And then #155 collided anyway, on the very next merge — the fourth collision.**
+The nil-initializer fix (`var x = nil` typed the variable `Nil` forever) was
+written on a worktree that read "next free is #156" from a header where #155 was
+still unclaimed, filed itself as #155, and was committed before the `no return`
+entry above landed on `main`. It is now **#156**, under `## Resolved`. The tie-break
+was the same as #152's and cost about as little: the `no return` entry was already
+pushed and cited from `main`, the nil entry existed only in one unpushed worktree,
+so the unpushed one moved. What makes this one worth recording separately is that
+the cross-worktree grep the note above credits **would not have caught it** — the
+number was genuinely free when it was read. The rule that does catch it is the one
+below: re-read from `main` immediately *before committing*, not when you start.
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
 five times at merge — #142 → #143 → #145 → #146 → #149 — each time origin/main
@@ -528,37 +548,61 @@ a one-line edit.
 
 ---
 
-### 147. OPEN — an explicit `: Any` annotation is indistinguishable from no annotation, so the initializer's type wins
+### 155. OPEN — no `return` is checked against its function's declared return type, so `fun make(): Box { return "s" }` compiles and segfaults
 
-**Severity: low.** Split out of #139, where it was point 1 ("it ignores explicit
-annotations"). It is real, and independent of that entry's actual cause.
+**Severity: high.** Silent wrong type across a declared boundary, and the crash
+lands in the caller. Found while surveying `FunDecl.ret_type` for rewrite stage 3.
 
-`parser.sf:2290` defaults an omitted annotation to the string `"Any"`:
-
-```saffron
-var type_ann: String = "Any"
-```
-
-and `checker.sf:2237` decides whether an annotation was written by comparing
-against that same default:
+The `Return` arm of `check_stmt` (`checker.sf:2574`) infers the value's type and
+then asks exactly one question: is a *nullable* value being returned from a
+non-nullable slot. It never compares two concrete types. So every one of these
+compiles with zero diagnostics:
 
 ```saffron
-if (type_ann_str != "Any") {
-    ... this.env.define_var(name, type_ann_node)
-} else if (init_type != "Any") {
-    this.env.define_var(name, init_type_node)     // <- an explicit `: Any` lands here
-}
+fun f(): String { return 42 }
+fun f(): Int    { return "hi" }
+fun f(): Bool   { return 42 }
+fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
 ```
 
-So `var x: Any = something_typed()` takes the inferred-from-initializer branch and
-binds the initializer's type, not `Any`. Writing `: Any` cannot widen a binding —
-the one thing an author writes it for. Under #139 that made the documented
-workaround (`var data: Any = ...`) fail to launder, which is how it was found.
+The class-typed case is the one that crashes:
 
-The fix is to stop overloading a value as the "absent" marker: an empty string, or
-a separate `has_annotation` flag on the AST node, distinguishes the two. Note the
-`type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
-one of the sites rewrite stage 3 has to touch.
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n } }
+
+fun make(): Box { return "not a box" }
+var b = make()
+IO.println("n=${b.get()}")         // segfault
+```
+
+The checker binds `b` to `Box` on the declaration's authority, codegen emits a
+direct `Box__get` call with a field load, and the receiver is a `String` pointer.
+
+**The material for the fix already exists.** `scalar_mismatch(annotated, actual)`
+(`checker.sf:890`) answers precisely this question for `VarDecl` — two distinct
+concrete scalars, with `Int`→`Float` widening and anything touching `Any`/`Nil`
+allowed — and `is_subtype_node` (`checker.sf:1005`) handles the class/interface
+case. Neither is called from the `Return` arm.
+
+**Why it survived this long, and the trap in fixing it.** The parser defaults an
+omitted return type to a *real type name*: `"Nil"` for `FunDecl`
+(`parser.sf:2561`), `"Int"` for `Lambda` (`parser.sf:1646`). Both spellings are
+indistinguishable from an annotation the author wrote, so turning on a strict
+return check would immediately reject every unannotated `fun f() { return 42 }` —
+`"Nil"` vs `Int` — and every unannotated lambda returning anything but an integer.
+BUGS #147's write-up under `## Resolved` is the same defect one node over, and the
+`## Resolved` entry for the use-recording walk already notes it clears
+`current_func_ret` for exactly this reason: "a walk that exists to record uses must
+not start enforcing a return type nobody wrote."
+
+So the honest ordering is the one stage 1 used: **make the sentinel
+distinguishable first, then turn on the check.** `ret_type` becomes an `AST.Type`
+with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work —
+and only then can the `Return` arm tell "the author declared `Nil`" from "nobody
+declared anything." Enforcing before that would be a large, noisy, and partly
+wrong diagnostic sweep.
 
 ---
 
@@ -628,7 +672,10 @@ which is how the residual stayed measured rather than assumed.
 
 ## Resolved
 
-### 155. FIXED — `var x = nil` typed the variable as the singleton `Nil` forever
+### 156. FIXED — `var x = nil` typed the variable as the singleton `Nil` forever
+
+**Filed as #155, renumbered to #156 at merge** — see the fourth-collision note
+under `## Open`. #155 is the unrelated `no return` / declared-return-type entry.
 
 ```saffron
 var x = nil
@@ -699,6 +746,93 @@ spelling; `first_class_types.sf` unchanged; the four bare `var x = nil` sites in
 the tree (two in `src/lib/template.sf`, plus two tests) all still behave — note
 `template.sf` only survived the bug by passing the value to a function instead of
 calling a method on it.
+
+---
+
+### 147. FIXED — an explicit `: Any` annotation was indistinguishable from no annotation, so the initializer's type won
+
+**Severity: low as filed; the fix uncovered three higher-severity defects it had
+been hiding.** Split out of #139, where it was point 1 ("it ignores explicit
+annotations").
+
+`parser.sf` defaulted an omitted annotation to the string `"Any"`, and the checker
+decided whether an annotation had been written by comparing against that same
+default:
+
+```saffron
+if (type_ann_str != "Any") {
+    ... this.env.define_var(name, type_ann_node)
+} else if (init_type != "Any") {
+    this.env.define_var(name, init_type_node)     // <- an explicit `: Any` landed here
+}
+```
+
+Two different facts, one spelling. `var x: Any = something_typed()` took the
+inferred-from-initializer branch and bound the initializer's type, so `: Any`
+could not widen a binding — the one thing an author writes it for. Under #139 that
+made the documented workaround (`var data: Any = ...`) fail to launder, which is
+how it was found.
+
+**The fix** moves the sentinel to `""`: the parser's default plus nine synthetic
+`VarDecl`s (the `x++` desugar's temporaries, destructuring binds, `for-in`'s item
+binding). Three annotations that genuinely *are* annotations were deliberately
+left alone — `VarDecl(mvar, "Map", ...)` and `VarDecl(idx_var, "Int", ...)`.
+Decision sites switched from `!= "Any"` to an emptiness test in `checker.sf` and
+`codegen/stmts_body.sf`, and `parse_type_node("")` now answers `UnknownType`
+rather than inventing `ClassType("")`.
+
+**What the sentinel move exposed.** Each of these was a latent defect that
+answered correctly only because the offending input never occurred — the same
+accidental correctness rewrite stage 1 was about. None was reachable while `"Any"`
+meant both things at once:
+
+1. **`is_nullable_type(AnyType)` answered `false`.** `Any` is the top type, so
+   `nil` inhabits it, but the branch was dead: every explicit `: Any` was read as
+   "no annotation", so the nil-init check never saw an `AnyType`. The moment it
+   did, the compiler rejected eight of its own `var llvm_end_bb: Any = nil`
+   declarations in `codegen/stmts_body.sf`.
+
+2. **The `Return` check tested nullability where it meant subtyping.** With
+   `AnyType` now nullable, `return <Any expr>` from a function declared `: Float`
+   became "cannot return nullable Any from function expecting Float", and
+   `lexer.sf` stopped compiling. `is_subtype_node` already admits `Any` in either
+   position (checker.sf:1011-1012); the Return site now excludes `Any` on the
+   value side too, matching it.
+
+3. **`is_gc_root_type("")` answered `false`, unrooting every unannotated local.**
+   This is the one that mattered. `collect_vars` pushes `type_ann` verbatim into
+   `var_types`, and an unannotated `var` used to arrive spelled `"Any"`, which
+   falls through to `true`. With `""` it took the `length() == 0 -> false` arm, so
+   codegen emitted neither `__gc_push_root` nor the zero-init store for those
+   allocas. `toml_test` died with `IndexError: index -1 out of bounds (length 0)`
+   on a list the collector had freed — roughly 40 lines past the code that lost
+   the root, and only once enough allocation had happened first, so every isolated
+   repro passed. Unknown must answer YES to "might this hold a heap pointer?":
+   over-rooting costs a shadow-stack slot and is never wrong, under-rooting is
+   memory corruption.
+
+Defect 3 was invisible to the bootstrap because GC roots are skipped entirely in
+identity mode. It was found by linking HEAD's gen3 from the checked-in
+`build/stage3/*.ll` artifacts, pointing `SAFFRONC` at it, and diffing its IR
+against the new compiler's for the same input — the missing `__gc_push_root` and
+`store i64 0` lines named the defect directly. Reach for that technique whenever a
+suite failure has no compile error attached.
+
+One process note, because it cost two bootstraps: the `GEN2_OK=false` fallback
+relinks gen3 from `build/stage3/*.ll`, which a previous run may have overwritten.
+A fix can then look *rejected* by a compiler that is really just the previous
+attempt. `git checkout -- build/stage3/` before re-bootstrapping.
+
+**Verified:** `test/pass/explicit_any_annotation.sf`, 14 assertions covering the
+widening case, dispatch on what the variable now holds (the shape that failed to
+compile at all), `var empty: Any = nil`, an `Any` value returned from a
+`Float`-typed function, the `x++` desugar, and — the other half — that an
+*omitted* annotation still infers. Bootstrap green through stage 2 (gen4 fixed
+point, 0 unresolved inference fallbacks). Suite failure set unchanged at the 8
+baseline names.
+
+`type_ann` is still a raw `String` on the AST, so this remains one of the sites
+rewrite stage 3 has to touch; the sentinel is at least unambiguous now.
 
 ---
 

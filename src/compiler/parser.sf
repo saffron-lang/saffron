@@ -796,11 +796,15 @@ class Parser {
         // MemberAccess/GetField arms below read the field name out of the original
         // target, and build_assign carries the rebuilt place's span into the write.
         var synth: AST.Span = AST.span_none()
-        // The `"Any"` in each VarDecl below is not a widened type — VarDecl's
-        // `type_ann` field is a String, and "Any" is the sentinel meaning "infer
-        // from the initializer", the same one parse_var_decl_with_doc writes for
-        // an unannotated `var`. The checker's VarDecl arm reads it that way. So
-        // these temporaries are typed as precisely as `var t = <expr>` is.
+        // The `""` in each VarDecl below is the sentinel meaning "infer from the
+        // initializer", the same one parse_var_decl_with_doc writes for an
+        // unannotated `var`. The checker's VarDecl arm reads it that way. So these
+        // temporaries are typed as precisely as `var t = <expr>` is.
+        //
+        // These said "Any" until BUGS #147, when the sentinel moved to "" so that
+        // an explicit `: Any` could be told apart from an omitted annotation. They
+        // must track the sentinel, not the spelling: leaving them as "Any" would
+        // have made every `x++` temporary carry a real widening annotation.
         //
         // The place to read from and write back to, rewritten over the hoisted
         // temporaries. For a plain variable there is nothing to hoist.
@@ -814,8 +818,8 @@ class Parser {
             }
             var recv_name: String = "__inc_recv" + uid
             var idx_name: String = "__inc_idx" + uid
-            stmts.push(AST.Stmt.VarDecl(recv_name, "Any", iobj, "", "public", synth, synth))
-            stmts.push(AST.Stmt.VarDecl(idx_name, "Any", iidx, "", "public", synth, synth))
+            stmts.push(AST.Stmt.VarDecl(recv_name, "", iobj, "", "public", synth, synth))
+            stmts.push(AST.Stmt.VarDecl(idx_name, "", iidx, "", "public", synth, synth))
             place = AST.Expr.IndexGet(AST.Expr.Variable(recv_name, synth), AST.Expr.Variable(idx_name, synth))
         } else if (ek == "member" or ek == "get_field") {
             var mobj: AST.Expr = match (target) { MemberAccess(o, f, __ms) => o
@@ -844,11 +848,11 @@ class Parser {
                 place = AST.Expr.GetField(AST.Expr.This, mfield, mfs)
             } else {
                 var mrecv_name: String = "__inc_recv" + uid
-                stmts.push(AST.Stmt.VarDecl(mrecv_name, "Any", mobj, "", "public", synth, synth))
+                stmts.push(AST.Stmt.VarDecl(mrecv_name, "", mobj, "", "public", synth, synth))
                 place = AST.Expr.MemberAccess(AST.Expr.Variable(mrecv_name, synth), mfield, mfs)
             }
         }
-        stmts.push(AST.Stmt.VarDecl(val_name, "Any", place, "", "public", synth, synth))
+        stmts.push(AST.Stmt.VarDecl(val_name, "", place, "", "public", synth, synth))
         var updated: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(val_name, synth), op, AST.Expr.IntLit(1))
         stmts.push(this.build_assign(place, updated))
         return AST.Expr.BlockExpr(stmts, AST.Expr.Variable(val_name, synth))
@@ -2393,7 +2397,17 @@ class Parser {
             var pat_val: AST.Expr = this.parse_expr()
             return AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, bindings), pat_val)
         }
-        var type_ann: String = "Any"
+        // "" means "no annotation was written", NOT "Any". This used to default to
+        // "Any", which made an explicit `var x: Any = f()` indistinguishable from
+        // an unannotated `var x = f()` — so the checker took the infer-from-
+        // initializer branch and bound the initializer's type, and `: Any` could
+        // not widen a binding, the one thing an author writes it for (BUGS #147).
+        //
+        // Every downstream reader already treated empty and "Any" alike (see the
+        // `vtype.length() == 0 or vtype == "Any"` guards in codegen.sf's global
+        // pre-scans), so "" is the value that was already safe to send; what was
+        // missing was the parser ever sending it.
+        var type_ann: String = ""
         if (this.match_kind(":")) {
             type_ann = this.parse_type()
         }
@@ -2441,11 +2455,11 @@ class Parser {
         var init: AST.Expr = this.parse_expr()
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, "", "public", AST.span_none(), AST.span_none()))
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "", init, "", "public", AST.span_none(), AST.span_none()))
         var i: Float = 0
         while (i < names.length()) {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name, AST.span_none()), AST.Expr.IntLit(i))
-            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, "", "public", AST.span_none(), AST.span_none()))
+            stmts.push(AST.Stmt.VarDecl(names[i], "", idx_expr, "", "public", AST.span_none(), AST.span_none()))
             i = i + 1
         }
         return AST.Stmt.Block(stmts)
@@ -3167,7 +3181,7 @@ class Parser {
             var desugar_body: List<AST.Stmt> = []
             var pdi: Float = 0
             while (pdi < pat_names.length()) {
-                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item", AST.span_none()), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "", AST.Expr.IndexGet(AST.Expr.Variable("__for_item", AST.span_none()), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
                 pdi = pdi + 1
             }
             pdi = 0
@@ -3250,7 +3264,7 @@ class Parser {
         var uid: String = this.next_for_uid()
         var list_var: String = "__for_src" + uid
         var idx_var: String = "__for_i" + uid
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "", "public", AST.span_none(), AST.span_none())
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "", iter_expr, "", "public", AST.span_none(), AST.span_none())
         var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "", "public", AST.span_none(), AST.span_none())
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "length", [], AST.span_none()))
         // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
@@ -3266,7 +3280,7 @@ class Parser {
         // variant deliberately: a variant would need arms at ~30 match sites,
         // and a missing arm yields an indeterminate value rather than an error
         // (BUGS #76), so the variant is the riskier encoding of the same thing.
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "__iter_get", [AST.Expr.Variable(idx_var, AST.span_none())], AST.span_none()), "", "public", AST.span_none(), AST.span_none())
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "__iter_get", [AST.Expr.Variable(idx_var, AST.span_none())], AST.span_none()), "", "public", AST.span_none(), AST.span_none())
         var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "+", AST.Expr.IntLit(1)), AST.span_none()))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)

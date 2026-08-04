@@ -74,7 +74,7 @@
 # A `passed` count that moves while the compiler does not is the clearest possible
 # case for this file's rule about comparing sets rather than totals.
 #
-# Confirmed 2026-08-04 after the BUGS #115 and #155 fixes: 294 passed, 8 failed,
+# Confirmed 2026-08-04 after the BUGS #115 and #156 fixes: 294 passed, 8 failed,
 # 14 skipped, 0 known-fail. The SET is unchanged. Two things about the counts are
 # worth spelling out because each looks like a result on its own:
 #
@@ -84,7 +84,7 @@
 #     KNOWN_FAIL list is now empty.
 #   - `passed` 291 -> 294 is three added tests, not three repairs:
 #     pass/list_lit_elem_type (#117, later strengthened), the strengthened
-#     oracle_println_class_not_bits (#115), and pass/nil_init_infers_any (#155).
+#     oracle_println_class_not_bits (#115), and pass/nil_init_infers_any (#156, filed as #155).
 #
 # oracle_enum_println stays on this list on purpose — it is the untouched enum half
 # of #115's problem, now filed as #154, and its output was byte-identical before
