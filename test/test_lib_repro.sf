@@ -5,6 +5,27 @@
 //
 // Original: src/lib/test.sf (legacy version before decorator-based rewrite)
 
+import "@async" as Async
+
+//
+// Two things here are load-bearing and must not be "simplified" away:
+//
+// 1. `import "@async" as Async` is required even though nothing in this file
+//    names `Async`. `Task.spawn` (in async_test below) lowers to a direct
+//    `call i64 @enqueue(...)` in expr_body.sf, but `enqueue` is an ordinary
+//    stdlib function in src/lib/scheduler.sf that only gets compiled and linked
+//    when something imports the module chain that defines it. Without this
+//    import the file compiles clean and then fails at LINK time with
+//    `Undefined symbols: "_enqueue", referenced from: _async_test`. See the
+//    BUGS entry for the Task.spawn/enqueue implicit dependency.
+//
+// 2. `caught_msg: Any|Nil` (below) is annotated rather than inferred. `var
+//    caught_msg = nil` makes the checker infer the *singleton* type `Nil` from
+//    the initializer and never widen it on later assignment, so the subsequent
+//    `${caught_msg}` was rejected with "cannot call .to_string() on nullable
+//    'caught_msg' (type Nil)" — note the type is `Nil`, not `String|Nil`.
+//    Keep the annotation until that checker bug is fixed.
+
 var passed = 0
 var failed = 0
 var total = 0
@@ -59,7 +80,8 @@ fun assert_throws(body: Any, msg: String) {
 
 fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
     total = total + 1
-    var caught_msg = nil
+    // Annotated, not inferred — see note 2 in the header comment.
+    var caught_msg: Any|Nil = nil
     try { body() } catch (e) { caught_msg = e }
     if (caught_msg == expected_msg) { passed = passed + 1 }
     else {

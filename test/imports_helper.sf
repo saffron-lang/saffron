@@ -1,0 +1,28 @@
+// Helper module for test/imports.sf: the relative-.sf-import leg of that test.
+//
+// test/imports.sf used to import test/inheritance.sf for this. It cannot: any
+// module that declares a subclass with an inherited-but-not-overridden method
+// emits an inheritance forwarder under an UNPREFIXED name (`define i64
+// @Child__m` calling `@Parent__m`, while the real bodies are
+// `@<prefix>_Parent__m`), so merely importing such a module fails LLVM
+// verification with "use of undefined value '@Parent__m'" — nothing has to call
+// the method, or even reference the module. That is a compiler bug in
+// src/compiler/codegen/stmts_body.sf, not a property of imports, so the import
+// test uses a hierarchy-free helper and inheritance.sf stays a standalone test
+// of inheritance.
+
+class Gadget {
+    var label: String
+    fun init(label: String) {
+        this.label = label
+    }
+    fun describe(): String {
+        return "gadget " + this.label
+    }
+}
+
+fun make_gadget(label: String): Gadget {
+    return Gadget(label)
+}
+
+var HELPER_VERSION: Int = 2

@@ -1,0 +1,66 @@
+// A re-exported type must be usable as a type annotation by the module's
+// consumers.
+//
+// `src/lib/ast.sf` re-exported the compiler's AST types with `var Expr =
+// Internal.Expr`. That looks like a type re-export and is not one: `var` binds
+// the name in the *value* namespace, so codegen resolved it as a function
+// reference and emitted `call i64 @compiler_ast_Expr()` — a symbol nothing
+// defines. The IR then failed `opt` with "use of undefined value", reported as
+// "this is a compiler bug, not an error in your program". It fired for every
+// program that so much as imported `@ast`, `@lexer` or `@lang`, whether or not
+// the program mentioned the re-exported name.
+//
+// The cost was not just the crash. Because no annotation could name the type,
+// every signature in `@ast` fell back to `Any`, which switched off exhaustive
+// match checking for its callers — that is how five non-exhaustive matches sat
+// unnoticed in tools/gen_docs.sf.
+//
+// `type X = Y` is the real alias form and puts the name where an annotation
+// resolves it. This test pins that down at both hops: `@ast` aliases the
+// compiler's definitions, and `@lang` aliases `@ast`'s aliases.
+import "@test" as Test
+import "@ast" as PubAst
+import "@parser" as Parser
+
+// The assertion that matters is that these signatures compile at all. Naming
+// PubAst.Stmt and PubAst.Span in parameter and return position is exactly what
+// the `var` form made impossible.
+fun located(stmt: PubAst.Stmt): String {
+    var s: PubAst.Span = PubAst.stmt_name_span(stmt)
+    return PubAst.stmt_name(stmt) + "@" + PubAst.span_to_string(s)
+}
+
+var stmts: List<PubAst.Stmt> = Parser.parse("fun hello() { }\nclass Widget { }\nenum Color { Red }")
+
+var fns: List<PubAst.Stmt> = PubAst.find_functions(stmts)
+Test.assert_eq(fns.length(), 1, "find_functions returns the one function")
+Test.assert_eq(located(fns[0]), "hello@1:5", "a re-exported Stmt/Span round-trips through a typed signature")
+
+var classes: List<PubAst.Stmt> = PubAst.find_classes(stmts)
+Test.assert_eq(PubAst.class_introducer(classes[0]), "class", "class_introducer reads through the alias")
+Test.assert_eq(located(classes[0]), "Widget@2:7", "declaration on line 2 is located on line 2")
+
+var enums: List<PubAst.Stmt> = PubAst.find_enums(stmts)
+Test.assert_eq(located(enums[0]), "Color@3:6", "enum name span survives the re-export")
+
+// Construction through the alias, not just annotation. The bogus call was
+// emitted for the *value* binding, so building a node via the alias is the
+// path that used to produce undefined-symbol IR.
+var built: PubAst.Expr = PubAst.Expr.Variable("x", PubAst.span_none())
+var built_name: String = match (built) {
+    Variable(n, sp) => n
+    _ => "<wrong>"
+}
+Test.assert_eq(built_name, "x", "a node built through the alias destructures correctly")
+Test.assert(!PubAst.span_is_real(PubAst.span_none()), "span_none is not a real span")
+
+// Expression spans through the public shim. `holder.slot` must locate `slot`
+// alone at col 8 — not the whole `holder.slot`, which would make a rename
+// rewrite the object too.
+var ex: PubAst.Expr = Parser.parse_expr("holder.slot")
+var field_span: PubAst.Span = PubAst.expr_name_span(ex)
+Test.assert(PubAst.span_is_real(field_span), "a parsed member access carries a real span")
+Test.assert_eq(PubAst.span_col(field_span), 8, "the span points at 'slot', not at 'holder'")
+Test.assert_eq(PubAst.span_len(field_span), 4, "and it is exactly as wide as 'slot'")
+
+Test.summary()

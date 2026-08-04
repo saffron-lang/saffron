@@ -178,6 +178,14 @@ for body in "$COMPILER_DIR"/codegen/*_body.sf; do
         || fail "ASSEMBLE" "codegen/${part}_body.sf is not read by the sed assembly above"
 done
 
+# _codegen.sf imports "./ast.sf" and "./diag.sf", resolved relative to its own
+# directory (build/stage3). Both must exist before the first codegen compile
+# below, not just before main.sf's compile — ast.sf survived only because a stale
+# copy was checked in, and diag.sf (added when codegen grew a diagnostics import)
+# had no such copy, so the assembled codegen failed to resolve it at stage 1.
+cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+cp "$COMPILER_DIR/diag.sf" "$BUILD_DIR/stage3/diag.sf"
+
 # Try gen2 first; if it fails (e.g. AST has new variants gen2 doesn't know),
 # fall back to linking from checked-in .ll artifacts compiled by gen3.
 GEN2_OK=true
@@ -204,6 +212,7 @@ if [[ "$GEN2_OK" == true ]]; then
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
     cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage3/resolve.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+    cp "$COMPILER_DIR/diag.sf" "$BUILD_DIR/stage3/diag.sf"
     # Rewrite the codegen import to use the assembled file
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     run_compile "STAGE 1" "main.sf (gen2)" "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
@@ -253,6 +262,7 @@ if [[ "$GEN2_OK" == false ]]; then
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
     cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage3/resolve.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+    cp "$COMPILER_DIR/diag.sf" "$BUILD_DIR/stage3/diag.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
     run_compile "STAGE 1" "main.sf (gen3)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
@@ -327,6 +337,7 @@ else
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage4/checker.sf"
     cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage4/resolve.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage4/ast.sf"
+    cp "$COMPILER_DIR/diag.sf" "$BUILD_DIR/stage4/diag.sf"
     cp "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/_codegen.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage4/_main.sf"
 

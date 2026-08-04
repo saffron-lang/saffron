@@ -1,6 +1,7 @@
 {
   "comments": {
-    "lineComment": "//"
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
   },
   "brackets": [
     ["{", "}"],
@@ -11,6 +12,7 @@
     { "open": "{", "close": "}" },
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
+    { "open": "/*", "close": " */", "notIn": ["string"] },
     { "open": "\"", "close": "\"", "notIn": ["string"] }
   ],
   "surroundingPairs": [
@@ -18,6 +20,23 @@
     ["[", "]"],
     ["(", ")"],
     ["\"", "\""]
+  ],
+  "onEnterRules": [
+    {
+      "comment": "Continue a /// doc comment on the next line.",
+      "beforeText": "^\\s*///.*$",
+      "action": { "indent": "none", "appendText": "/// " }
+    },
+    {
+      "comment": "Continue a //! module-doc comment on the next line.",
+      "beforeText": "^\\s*//!.*$",
+      "action": { "indent": "none", "appendText": "//! " }
+    },
+    {
+      "comment": "Inside a /* */ block, prefix continuation lines with ' * '.",
+      "beforeText": "^\\s*/\\*(?!.*\\*/).*$",
+      "action": { "indent": "none", "appendText": " * " }
+    }
   ],
   "indentationRules": {
     "increaseIndentPattern": "^.*\\{[^}\"']*$",

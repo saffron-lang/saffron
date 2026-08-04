@@ -1,0 +1,37 @@
+// Helper module for test/enum_cross_simple.sf.
+//
+// Exercises the simplest cross-module enum shape: an enum declared here,
+// constructed here, and returned across the module boundary to a caller that
+// only ever sees the value. The caller does not name the enum type, so this
+// covers enum construction + return without also requiring the importer to
+// resolve `Module.Enum.Variant` (that larger case is
+// test/cross_module_enum_tuple.sf).
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+/// Return a Direction chosen at runtime so the call cannot be folded away.
+fun heading(): Direction {
+    return Direction.North
+}
+
+/// Same enum, a variant carrying a payload, so the importer also sees a
+/// non-zero-arg variant come back across the boundary.
+enum Bearing {
+    Degrees(value: Int),
+    Unknown
+}
+
+fun bearing(): Bearing {
+    return Bearing.Degrees(0)
+}
+
+// The suite compiles and links every test/*.sf on its own, including helpers, so
+// a file of nothing but declarations emits no `__saffron_entry` and fails to link
+// with "undefined: _main". One top-level statement gives it an entry point.
+// test/relative_import_helper.sf carries a `var VERSION` for the same reason.
+var HELPER_KIND: String = "enum"
