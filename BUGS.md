@@ -2,8 +2,8 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147, #148, #151. Next free number is **#153**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147, #148. Next free number is **#153**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -11,12 +11,13 @@ five times at merge — #142 → #143 → #145 → #146 → #149 — each time o
 turned out to already own the number it had reached. The lesson below about
 reading the next-free number from `main` is exactly why.
 
-#144, #145, #146, #150 and #152 were each filed and fixed in the same sitting —
-the unused-variable warning firing on compiler-mandated match-arm bindings,
-call-site argument types never being checked at all, an inferred global read
-from inside a function being typed `Int`, interface-typed dispatch binding to
-the empty abstract stub, and the lexer silently discarding `\xNN` escapes — and
-all five are under `## Resolved`.
+#144, #145, #146, #150, #151 and #152 were each filed and fixed in the same
+sitting — the unused-variable warning firing on compiler-mandated match-arm
+bindings, call-site argument types never being checked at all, an inferred
+global read from inside a function being typed `Int`, interface-typed dispatch
+binding to the empty abstract stub, a cross-module subclass emitting an
+unprefixed inherited-method forwarder, and the lexer silently discarding `\xNN`
+escapes — and all six are under `## Resolved`.
 
 **#146 collided across two unpushed lines of work, and the escape fix moved to
 #152.** Two different bugs were both filed as #146: locally "an inferred global
@@ -30,7 +31,9 @@ carrying the number moves — the local entry keeps #146 and the lexer-escape
 entry is renumbered #152. Both were already FIXED and committed when they met,
 so neither could simply be renamed in place; the renumbering is recorded here
 because the escape bug is cited by number in prose (`lexer.sf`, updated to #152
-in this merge) rather than only in a heading.
+in this merge) rather than only in a heading. origin/main's own #151
+(cross-module subclass forwarder) did not collide — it landed after both #150
+and the escape fix, and keeps its number here.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -96,45 +99,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 151. A module class extending another module class emits an unprefixed inherited-method forwarder, so the IR references an undefined `@Base__init`
-
-**Severity: medium.** Not silent — it fails loudly — but it fails as a *compiler
-bug*, not a diagnostic, so the program never runs and the message points at LLVM
-rather than at the code. Two module classes are enough:
-
-```saffron
-// m3.sf
-class Base { var n: Int   fun init() { this.n = 0 }   fun bump() { this.n = this.n + 1 } }
-class Sub extends Base { fun bump() { this.n = this.n + 100 } }
-// main.sf
-import "./m3.sf" as Mod
-var s = Mod.Sub()
-```
-
-```
-saffron: this is a compiler bug, not an error in your program.
-  opt: output.ll:531:17: error: use of undefined value '@Base__init'
-```
-
-`Sub` declares no `init`, so the inherited-method loop in
-`gen_class_decl` (`codegen/stmts_body.sf`, the `parent_full` / `child_full` block
-around line 510) emits a thin forwarder for it. Every *other* class symbol is
-named by `gen_function`, which prefixes with `current_prefix`
-(`codegen/output_body.sf:2`). This is the one site that emits a `define` directly,
-and it used the bare names — so with prefix `m3_` the real bodies are
-`@m3_Base__init` and `@m3_Base__bump`, while the forwarder defines `@Sub__init`
-and calls `@Base__init`. Neither exists.
-
-The fix is to resolve both class names through `class_struct_names` — not to paste
-`current_prefix` on, because the parent may live in a *different* module than the
-child, in which case the child's prefix is the wrong one. That table is already
-the resolution the hierarchy registration a few lines above uses for
-`class_parent_of`, so the symbol and the dispatch tables agree by construction.
-
-Found while fixing #150, and independent of it: #150's `test_log` case does not
-subclass across the module boundary. Repro kept at `/tmp/ifmod/m3.sf`; a proper
-`test/pass/` case should land with the fix.
 
 ### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
 
@@ -985,6 +949,57 @@ with two commits and two test files citing it, and origin/main had since also fi
 on `main` after those. Four times bitten by the same per-worktree collision the note
 at the top of `## Open` warns about: read the next-free number from `main`, never
 from a worktree.
+
+### 151. FIXED — a module class extending another module class emits an unprefixed inherited-method forwarder, so the IR references an undefined `@Base__init`
+
+**Severity: medium.** Not silent — it fails loudly — but it fails as a *compiler
+bug*, not a diagnostic, so the program never runs and the message points at LLVM
+rather than at the code. Two module classes are enough:
+
+```saffron
+// m3.sf
+class Base { var n: Int   fun init() { this.n = 0 }   fun bump() { this.n = this.n + 1 } }
+class Sub extends Base { fun bump() { this.n = this.n + 100 } }
+// main.sf
+import "./m3.sf" as Mod
+var s = Mod.Sub()
+```
+
+```
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:531:17: error: use of undefined value '@Base__init'
+```
+
+`Sub` declares no `init`, so the inherited-method loop in
+`gen_class_decl` (`codegen/stmts_body.sf`, the `parent_full` / `child_full` block
+around line 510) emits a thin forwarder for it. Every *other* class symbol is
+named by `gen_function`, which prefixes with `current_prefix`
+(`codegen/output_body.sf:2`). This is the one site that emits a `define` directly,
+and it used the bare names — so with prefix `m3_` the real bodies are
+`@m3_Base__init` and `@m3_Base__bump`, while the forwarder defines `@Sub__init`
+and calls `@Base__init`. Neither exists.
+
+The fix is to resolve both class names through `class_struct_names` — not to paste
+`current_prefix` on, because the parent may live in a *different* module than the
+child, in which case the child's prefix is the wrong one. That table is already
+the resolution the hierarchy registration a few lines above uses for
+`class_parent_of`, so the symbol and the dispatch tables agree by construction.
+
+Found while fixing #150, and independent of it: #150's `test_log` case does not
+subclass across the module boundary. Repro kept at `/tmp/ifmod/m3.sf`; a proper
+`test/pass/` case should land with the fix.
+
+**Verification.** Bootstrap green through stage 2 (`gen3 compiles itself; gen4
+links and compiles`). `test/pass/cross_module_subclass.sf` — 9 assertions over the
+forwarded constructor, a two-level chain, and `List<Base>` dispatch — passes, and
+the emitted IR carries `@m3_Base__init` / `@m3_Sub__init` with matching call sites.
+Full suite 273 passed / 9 failed, the same nine failure *names* as after #150.
+
+The audit for siblings found none: the other direct `emit("define` sites are the
+`__class_*` / `__reflect_*` runtime helpers and `__saffron_entry`, all
+deliberately global, and the module-init functions build their own name from the
+prefix (`"__mod_init_" + prefix`), so they are unique by construction. The
+forwarder was the only class symbol not named by `gen_function`.
 
 ### 150. FIXED — a call through an interface-typed receiver bound to the interface's empty abstract stub, so it silently did nothing and returned 0
 

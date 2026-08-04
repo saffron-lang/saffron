@@ -1,0 +1,44 @@
+// Fixture for test/pass/cross_module_subclass.sf (BUGS #151). Both the base and
+// the subclass live HERE, in one imported module — that is the shape that broke.
+// The inherited-method forwarder emitted for Sub's undeclared `init` used bare
+// names, so the IR defined @Sub__init and called @Base__init while the real
+// bodies were @<prefix>Base__init.
+
+class Base {
+    var n: Int
+    var tag: String
+    fun init(tag: String) {
+        this.n = 0
+        this.tag = tag
+    }
+    fun bump() { this.n = this.n + 1 }
+    fun describe(): String { return this.tag + ":" + this.n.to_string() }
+}
+
+// Declares NO init and NO describe, so both are forwarded — init through the
+// arity-carrying path (it takes an argument, which is what made the dropped
+// prefix produce an undefined symbol rather than merely a wrong one).
+class Sub extends Base {
+    fun bump() { this.n = this.n + 100 }
+}
+
+// A two-level chain: Leaf inherits init through Sub's forwarder, so the
+// forwarder's own registered arity has to be prefixed too (the BUGS #87 path).
+class Leaf extends Sub {
+    fun bump() { this.n = this.n + 1000 }
+}
+
+// Dispatch over the base type, inside the module, so the #150 tables and the
+// #151 symbol names have to agree with each other.
+class Runner {
+    var items: List<Base>
+    fun init() { this.items = [] }
+    fun add(b: Base) { this.items.push(b) }
+    fun run_all() {
+        var i = 0
+        while (i < this.items.length()) {
+            this.items[i].bump()
+            i = i + 1
+        }
+    }
+}

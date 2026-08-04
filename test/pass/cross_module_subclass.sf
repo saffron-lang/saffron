@@ -1,0 +1,53 @@
+// BUGS #151: a module class extending another module class emitted an
+// inherited-method forwarder with UNPREFIXED symbol names, so the IR defined
+// `@Sub__init` and called `@Base__init` while the real bodies were
+// `@<prefix>Base__init`. opt rejected the module with "use of undefined value",
+// which surfaces as "this is a compiler bug, not an error in your program" — the
+// program never ran at all.
+//
+// Every other class symbol is named by gen_function, which prefixes with
+// current_prefix. The forwarder loop in codegen/stmts_body.sf was the one site
+// emitting a `define` directly, and it used the bare names.
+import "@test" as Test
+import "../fixtures/cross_module_subclass_lib.sf" as Lib
+
+// 1. The forwarded constructor. Before the fix this file did not compile at all,
+//    so every assertion below is also a check that the IR is valid.
+var b = Lib.Base("base")
+Test.assert_eq(b.describe(), "base:0", "base constructor and own method")
+
+// 2. Sub declares no init — it is forwarded — and the argument must survive.
+//    A forwarder with a dropped argument leaves the field zero, which is how the
+//    related BUGS #87 presented.
+var s = Lib.Sub("sub")
+Test.assert_eq(s.describe(), "sub:0", "forwarded init keeps its argument")
+
+// 3. The override runs, not the base's method.
+s.bump()
+Test.assert_eq(s.n, 100, "subclass override wins over the inherited body")
+
+// 4. An inherited, non-overridden method still reaches the base's body.
+Test.assert_eq(s.describe(), "sub:100", "inherited describe() reaches the base")
+
+// 5. Two-level chain: Leaf inherits init through Sub's forwarder, so the
+//    forwarder's own registered arity has to carry the prefix as well.
+var l = Lib.Leaf("leaf")
+Test.assert_eq(l.describe(), "leaf:0", "init forwarded through two levels")
+l.bump()
+Test.assert_eq(l.n, 1000, "grandchild override wins")
+
+// 6. Virtual dispatch over the base type from inside the module — this is where
+//    #151's symbol names and #150's dispatch tables have to agree.
+var r = Lib.Runner()
+var b2 = Lib.Base("b2")
+var s2 = Lib.Sub("s2")
+var l2 = Lib.Leaf("l2")
+r.add(b2)
+r.add(s2)
+r.add(l2)
+r.run_all()
+Test.assert_eq(b2.n, 1, "List<Base> dispatches to Base")
+Test.assert_eq(s2.n, 100, "List<Base> dispatches to Sub's override")
+Test.assert_eq(l2.n, 1000, "List<Base> dispatches to Leaf's override")
+
+Test.summary()
