@@ -341,10 +341,41 @@ else
     cp "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/_codegen.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage4/_main.sf"
 
+    # --report-unresolved rides along on this compile rather than costing its own.
+    # This step already compiles the whole compiler with gen3, which is exactly the
+    # input the statistic is defined over, and a second pass would add ~100s.
+    #
+    # Stage 1 of docs/design/compiler-rewrite.md drove codegen's `Int` inference
+    # fallbacks to zero on the compiler's own source (from 8620). Zero is not a
+    # milestone to note in a commit message and then lose: nothing else in the
+    # build would notice it returning to 2350, because every fallback still
+    # compiles fine — that silence is the whole defect M2 describes. So assert it.
+    # This is the "fall-through counter as a first-class, asserted-zero build
+    # statistic" that Tier 2 asks for, and it is the mechanism that lets
+    # record_unresolved become record_error later without a flag day.
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
-    run_compile "STAGE 2" "main.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
-        "$BUILD_DIR/stage4/_main.sf" "$BUILD_DIR/stage4/main.ll" \
-        || fail "STAGE 2" "gen3 rejects main.sf — it cannot compile itself"
+    UNRESOLVED_LOG="$BUILD_DIR/stage4/unresolved.log"
+    run_compile "STAGE 2" "main.sf (gen4)" "$GEN3" --identity-mode --report-unresolved \
+        --stdlib "$ROOT/src/lib" \
+        "$BUILD_DIR/stage4/_main.sf" "$BUILD_DIR/stage4/main.ll" > "$UNRESOLVED_LOG" 2>&1 \
+        || { cat "$UNRESOLVED_LOG"; fail "STAGE 2" "gen3 rejects main.sf — it cannot compile itself"; }
+
+    # Read the compiler's own count, not a grep -c of the report lines: the total
+    # is printed by main.sf from Diag.unresolved_count(), so it cannot drift from
+    # what the channel actually recorded.
+    UNRESOLVED_N=$(grep 'unresolved inference fallbacks:' "$UNRESOLVED_LOG" | tail -1 | sed 's/.*: //')
+    if [[ -z "$UNRESOLVED_N" ]]; then
+        # The flag produced no total at all. Treated as a failure rather than a
+        # pass, because "the statistic disappeared" and "the statistic is zero"
+        # must not look the same — that is the M2 mistake one level up.
+        cat "$UNRESOLVED_LOG"
+        fail "STAGE 2" "--report-unresolved printed no total; the measurement channel is broken (see $UNRESOLVED_LOG)"
+    fi
+    if [[ "$UNRESOLVED_N" != "0" ]]; then
+        grep '^\[codegen\] unresolved:' "$UNRESOLVED_LOG" | sed 's/^/  /' | head -40
+        fail "STAGE 2" "codegen fell back to \`Int\` $UNRESOLVED_N time(s) on the compiler's own source; stage 1 of docs/design/compiler-rewrite.md drove this to 0. Each line above is a place inference gave up. Full log: $UNRESOLVED_LOG"
+    fi
+    pass "STAGE 2" "0 unresolved inference fallbacks on the compiler's own source"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
     run_compile "STAGE 2" "runtime.sf (gen4)" "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
