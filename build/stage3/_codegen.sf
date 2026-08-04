@@ -130,6 +130,16 @@ class Codegen {
     // needs exactly that: to switch a call on the receiver's runtime tag it must
     // know which descendants change the method's behaviour.
     var class_own_methods: Map<String, List<String>>
+    // The methods a class DECLARES abstractly (bodyless). Deliberately disjoint
+    // from class_own_methods, which means "has a callable symbol of its own" —
+    // an abstract method has no body to dispatch to, so it must not be an
+    // answer to "who implements this". But gen_virtual_dispatch also used
+    // class_own_methods to decide "does the receiver's type know this method at
+    // all", and an interface answered no to that, so it bailed and left the
+    // static call to the interface's empty stub in place: every call through an
+    // interface-typed receiver was a silent no-op (BUGS #150). This table
+    // separates the two questions, keyed on the struct name like its sibling.
+    var class_own_abstract: Map<String, List<String>>
     var class_bare_of: Map<String, String>
     var llvm_module: LLVMMod.Module
     var llvm_func_builder: LLVMFunc.FunctionBuilder
@@ -206,6 +216,7 @@ class Codegen {
         this.class_parent_of = {}
         this.class_parents_of = {}
         this.class_own_methods = {}
+        this.class_own_abstract = {}
         this.class_bare_of = {}
         this.actor_classes = {}
         this.force_next_lambda_coro = false
@@ -7693,10 +7704,37 @@ class Codegen {
                     if (this.current_prefix.length() > 0) {
                         this.called_function_arity.set(this.current_prefix + child_full, fwd_arity)
                     }
+                    // Both symbols must carry the module prefix, exactly as
+                    // gen_function does for every other class symbol (output_body.sf:2
+                    // — emit_name = current_prefix + name). This is the one site that
+                    // emitted a class symbol without going through it, so a module
+                    // class inheriting from another module class defined `@Sub__init`
+                    // and called `@Base__init` while the real bodies were
+                    // `@m3_Base__init`: `opt` rejected the IR with "use of undefined
+                    // value '@Base__init'" and, because that is a compiler-bug path
+                    // rather than a diagnostic, the program never ran (BUGS #151).
+                    // Register the prefix mapping too, so a call site that resolves
+                    // the bare name reaches the emitted symbol.
+                    // Resolve each class through class_struct_names rather than
+                    // pasting current_prefix on: the parent may live in a DIFFERENT
+                    // module than the child, in which case the child's prefix is the
+                    // wrong one for it. That table is the same resolution the
+                    // hierarchy registration above (class_parent_of) uses, so the
+                    // symbol and the dispatch tables agree.
+                    var fwd_child_c: String = name
+                    if (this.class_struct_names.has(name)) { fwd_child_c = this.class_struct_names.get(name) }
+                    var fwd_parent_c: String = cur_parent
+                    if (this.class_struct_names.has(cur_parent)) { fwd_parent_c = this.class_struct_names.get(cur_parent) }
+                    var fwd_child_sym: String = fwd_child_c + "__" + mname
+                    var fwd_parent_sym: String = fwd_parent_c + "__" + mname
+                    if (fwd_child_sym != child_full) {
+                        this.known_functions.push(fwd_child_sym)
+                        this.func_prefix_map.set(child_full, fwd_child_sym)
+                    }
                     this.emit("")
-                    this.emit("define i64 @" + child_full + "(" + fwd_params_def + ") {")
+                    this.emit("define i64 @" + fwd_child_sym + "(" + fwd_params_def + ") {")
                     this.emit("entry:")
-                    this.emit("  %r = call i64 @" + parent_full + "(" + fwd_params_call + ")")
+                    this.emit("  %r = call i64 @" + fwd_parent_sym + "(" + fwd_params_call + ")")
                     this.emit("  ret i64 %r")
                     this.emit("}")
                 }
@@ -11545,8 +11583,13 @@ class Codegen {
                     // declares itself (BUGS #50 virtual dispatch), before any
                     // forwarder mixing. A bodyless method is abstract — it has no
                     // own symbol to dispatch to — so it does not count as "own".
+                    // It is still a DECLARATION, though, and class_own_abstract
+                    // records it so gen_virtual_dispatch can tell "the receiver's
+                    // type does not know this method" apart from "it knows it but
+                    // supplies no body" (BUGS #150).
                     this.class_bare_of.set(pr_type_name, pr_cname)
                     var pr_own: List<String> = []
+                    var pr_abs: List<String> = []
                     // Register all method names as ClassName__method
                     var pr_mi: Float = 0
                     while (pr_mi < pr_methods.length()) {
@@ -11554,6 +11597,8 @@ class Codegen {
                         if (pr_mname.length() > 0) {
                             if (this.get_fun_body(pr_methods[pr_mi]).length() > 0) {
                                 pr_own.push(pr_mname)
+                            } else {
+                                pr_abs.push(pr_mname)
                             }
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = this.current_prefix + pr_full
@@ -11567,6 +11612,7 @@ class Codegen {
                         pr_mi = pr_mi + 1
                     }
                     this.class_own_methods.set(pr_type_name, pr_own)
+                    this.class_own_abstract.set(pr_type_name, pr_abs)
                 }
                 EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis) => {
                     // Register enum variant constructor names AND variant tags
@@ -13059,6 +13105,31 @@ class Codegen {
         return ""
     }
 
+    // Does `struct_c`, or anything it inherits from, DECLARE `method` without a
+    // body? Searched over the ancestors too, so a class extending an interface
+    // that itself extends another interface still finds the declaration.
+    //
+    // The companion to effective_method_owner: that one answers "who supplies a
+    // body", this one "is the name known but bodyless". Together they let
+    // gen_virtual_dispatch distinguish an unrelated method from an abstract one
+    // (BUGS #150).
+    fun declares_abstract(struct_c: String, method: String): Bool {
+        if (this.class_own_abstract.has(struct_c)) {
+            var abs0: List<String> = this.class_own_abstract.get(struct_c)
+            if (abs0.contains(method)) { return true }
+        }
+        var anc: List<String> = this.all_ancestor_structs(struct_c)
+        var ai: Float = 0
+        while (ai < anc.length()) {
+            if (this.class_own_abstract.has(anc[ai])) {
+                var absn: List<String> = this.class_own_abstract.get(anc[ai])
+                if (absn.contains(method)) { return true }
+            }
+            ai = ai + 1
+        }
+        return false
+    }
+
     // BUGS #50. A call statically bound to <ns>__<method> is only right when the
     // receiver is exactly ns; a subclass in an ns-typed slot (or `this` inside an
     // inherited method) needs its own override. Emit a switch on the receiver's
@@ -13077,7 +13148,18 @@ class Codegen {
         if (this.class_struct_names.has(ns)) { struct_ns = this.class_struct_names.get(ns) }
         if (!this.class_type_ids.has(struct_ns)) { return "" }
         var ns_owner: String = this.effective_method_owner(struct_ns, method)
-        if (ns_owner.length() == 0) { return "" }
+        if (ns_owner.length() == 0) {
+            // No class at or above ns supplies a body. That is either "ns has
+            // nothing to do with this method" — bail, as before — or "ns declares
+            // it abstractly", which is an interface. The second case is exactly
+            // where dispatch matters MOST: the static call would go to the
+            // abstract method's stub, which codegen emits as a bare `ret i64 0`,
+            // so before BUGS #150 every call through an interface-typed receiver
+            // silently did nothing and returned 0. Fall through with ns_owner ""
+            // — no implementation to be equal to means every implementor below
+            // is an override, which is precisely right for an interface.
+            if (!this.declares_abstract(struct_ns, method)) { return "" }
+        }
         // Collect descendant structs whose effective owner differs from ns's.
         var arm_tags: List<String> = []
         var arm_syms: List<String> = []
@@ -17643,10 +17725,41 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
                         _ => []
                     }
+                    // The main program's classes get class_own_methods /
+                    // class_own_abstract / class_bare_of / a type tag in
+                    // generate()'s pre-pass (output_body.sf), but module classes
+                    // reach codegen only through THIS loop, which registered method
+                    // NAMES and nothing else — so no stdlib class was ever a BUGS
+                    // #50 dispatch candidate. A call through an interface- or
+                    // base-typed receiver whose type lives in an imported module
+                    // (e.g. @log's `List<Handler>`) found no owner and left the
+                    // static call to the abstract stub in place, silently
+                    // returning 0 (BUGS #150). Fill the same tables here, keyed on
+                    // the prefixed struct name — the same key class_struct_names
+                    // maps the bare name to further up in this function, which is
+                    // what gen_virtual_dispatch resolves the receiver through.
+                    // All writes are idempotent with the emit-time ones.
+                    var pr_own: List<String> = []
+                    var pr_abs: List<String> = []
+                    gen.class_bare_of.set(pr_type_name, pr_cname)
+                    // An interface is never instantiated, so gen_class_constructor
+                    // — the only other place a module class is tagged — is never
+                    // reached for it, and gen_virtual_dispatch bails when the
+                    // RECEIVER's type has no tag. Assign one here so the switch can
+                    // key on the interface.
+                    if (!gen.class_type_ids.has(pr_type_name)) {
+                        gen.class_type_ids.set(pr_type_name, gen.next_class_type_id)
+                        gen.next_class_type_id = gen.next_class_type_id + 1
+                    }
                     var pr_mj: Float = 0
                     while (pr_mj < pr_methods.length()) {
                         var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
                         if (pr_mname.length() > 0) {
+                            if (gen.get_fun_body(pr_methods[pr_mj]).length() > 0) {
+                                pr_own.push(pr_mname)
+                            } else {
+                                pr_abs.push(pr_mname)
+                            }
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = pr_prefix + pr_full
                             if (!gen.str_in_list(gen.known_functions,pr_full)) {
@@ -17658,6 +17771,8 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                         }
                         pr_mj = pr_mj + 1
                     }
+                    gen.class_own_methods.set(pr_type_name, pr_own)
+                    gen.class_own_abstract.set(pr_type_name, pr_abs)
                 }
             } else if (pr_kind2 == "enum") {
                 var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
