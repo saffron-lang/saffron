@@ -40,6 +40,12 @@ enum Diagnostic {
 
 var _sink: List<Diagnostic> = []
 var _had_error: Bool = false
+// The unresolved-inference channel's state. Declared here rather than beside its
+// functions further down so reset_sink() can clear it — see the block comment
+// above record_unresolved for what the channel is and why it does not fail a
+// build yet.
+var _unresolved: List<Diagnostic> = []
+var _report_unresolved: Bool = false
 
 /// Clear the sink. A process that checks or formats several files in one run must
 /// call this per file, or diagnostics from one leak into the next — the same
@@ -49,6 +55,7 @@ var _had_error: Bool = false
 fun reset_sink() {
     _sink = []
     _had_error = false
+    _unresolved = []
 }
 
 /// Every diagnostic recorded since the last `reset_sink`, in emission order.
@@ -175,7 +182,40 @@ fun diagnostics_to_json(file: String): String {
 /// column, length); `offset` is emitted too, unused by today's client but needed
 /// by a range-based editor operation, and a consumer ignores fields it does not
 /// read.
-fun symbol_json(name: String, kind: String, s: AST.Span): String {
+///
+/// `visibility` is the declared access modifier ("public"/"private"/"internal"/
+/// "protected"). It is always emitted, even though the parser defaults it to
+/// "public": an editor filtering completions by accessibility needs an answer for
+/// every symbol, and "absent" would have to be guessed back to "public" by every
+/// consumer independently.
+///
+/// `container` is the owning declaration's name for a member (a class's method, an
+/// enum's variant) and "" for a top-level declaration. The outline needs it to
+/// nest — a flat list cannot say which `init` belongs to which class, and there
+/// are usually several. Emitted as "" rather than omitted so the shape is uniform.
+///
+/// `detail` is a rendered signature for display (hover, completion detail,
+/// signature help) — "" when there is nothing useful to show. It is a *display*
+/// string, deliberately not a parseable type encoding: the comma-joined
+/// `"name:Type,…"` form the checker uses for `func_params` corrupts on
+/// `Map<String,Int>`, and inventing a second such encoding here would repeat that
+/// bug. A consumer that needs structure should get it from a typed field, not by
+/// splitting this.
+///
+/// `start_offset`/`end_offset` bracket the declaration's FULL extent, as byte
+/// offsets. Folding needs the extent; rename needs the name span; neither can be
+/// derived from the other, so both are emitted.
+///
+/// Offsets rather than line/column for the extent, deliberately. Computing an end
+/// *line* here would mean counting newlines, and this function holds no source
+/// text — only the driver does, per parse unit. The client does hold the buffer
+/// and converts an offset to a position exactly (`positionAt`), so handing it the
+/// offset is both cheaper and correct, where a guessed line would be a plausible
+/// lie of the kind `located:false` exists to avoid.
+///
+/// `doc` is the declaration's doc comment, or "" when it has none (or when its
+/// `docstring` field held a parser marker rather than prose — see the caller).
+fun symbol_json(name: String, kind: String, s: AST.Span, visibility: String, container: String, detail: String, doc: String, full: AST.Span): String {
     if (!AST.span_is_real(s)) { return "" }
     var out: String = "{\"name\":" + json_escape(name)
     out = out + ",\"kind\":" + json_escape(kind)
@@ -183,6 +223,17 @@ fun symbol_json(name: String, kind: String, s: AST.Span): String {
     out = out + ",\"column\":" + json_int(AST.span_col(s))
     out = out + ",\"offset\":" + json_int(AST.span_offset(s))
     out = out + ",\"length\":" + json_int(AST.span_len(s))
+    out = out + ",\"visibility\":" + json_escape(visibility)
+    out = out + ",\"container\":" + json_escape(container)
+    out = out + ",\"detail\":" + json_escape(detail)
+    out = out + ",\"doc\":" + json_escape(doc)
+    // The full extent is optional: a node whose span_merge inputs were all
+    // synthetic has none, and a folding range invented from a name span would
+    // fold one line and look broken. Absent means "no extent known".
+    if (AST.span_is_real(full)) {
+        out = out + ",\"start_offset\":" + json_int(AST.span_offset(full))
+        out = out + ",\"end_offset\":" + json_int(AST.span_offset(full) + AST.span_len(full))
+    }
     return out + "}"
 }
 
@@ -232,6 +283,78 @@ fun record_error(phase: String, s: AST.Span, msg: String) {
 
 fun record_warn(phase: String, s: AST.Span, msg: String) {
     _sink.push(Diagnostic.Diag(Severity.SevWarning, phase, s, msg))
+}
+
+// --- Unresolved-inference channel (stage 1 / invariant I2) ---
+//
+// The nine sites listed under M2 in docs/design/compiler-rewrite.md each mean "I
+// could not resolve this type", and each used to answer `Int`. That answer is a
+// *claim*, and it is what turned an inference gap into a wrong i64 rather than a
+// message: BUGS #32, #33, #36 and #146 are all one gap reached from four
+// symptoms.
+//
+// Converting them straight to a hard error is not yet possible — the compiler
+// compiles itself, and the compiler's own source reaches several of these sites
+// legitimately (an enum whose metadata a *later* module registers, a binary op
+// over two Any operands). So the conversion lands in two steps, and this is the
+// first: every such site reports through here, which
+//
+//   - records a SevInternal diagnostic, so --json and the LSP see it as data;
+//   - counts it, so the count is a measurable build statistic rather than an ad
+//     hoc grep (Tier 2's "fall-through counter" in the same document);
+//   - prints it only when asked (--report-unresolved), so a green build stays
+//     green and quiet while the number is being driven to zero.
+//
+// It deliberately does NOT set `_had_error`. A SevInternal that failed the build
+// today would fail the bootstrap, and then nobody could measure anything. The
+// second step — flipping this to `record_error` behind a flag that CI turns on —
+// is a one-line change once the count is zero, which is exactly the ordering
+// BUGS #37's write-up says was missing when 96 silent fall-throughs went
+// unnoticed.
+//
+// `_unresolved` and `_report_unresolved` are declared at the top of the file with
+// the rest of the module state, so that reset_sink() — which is above this
+// section — can clear the first without a forward reference.
+
+/// Print each unresolved-inference report as it happens. Off by default; the
+/// driver turns it on for --report-unresolved.
+fun set_report_unresolved(r: Bool) {
+    _report_unresolved = r
+}
+
+fun is_report_unresolved(): Bool {
+    return _report_unresolved
+}
+
+/// Report that inference could not resolve a type, and say what fallback was
+/// used in its place.
+///
+/// `site` is a stable identifier for the code location — "get_variant_field_type
+/// (variant not registered)", not a line number, which drifts. `what` names the
+/// thing whose type is unknown, in whatever terms the site has: an enum variant,
+/// a receiver spelling, a field name. Both go into the message, because the
+/// whole value of this channel over a bare counter is being able to tell the
+/// nine sites apart — five of them are in one function, each a *distinct*
+/// failure to read enum metadata.
+fun record_unresolved(site: String, what: String, fallback: String) {
+    var msg: String = "cannot infer type of " + what + " (" + site + "); assuming " + fallback
+    var d: Diagnostic = Diagnostic.Diag(Severity.SevInternal, "codegen", AST.span_none(), msg)
+    _unresolved.push(d)
+    _sink.push(d)
+    if (_report_unresolved and !_quiet) {
+        IO.println("[codegen] unresolved: " + msg)
+    }
+}
+
+/// How many unresolved-inference reports since the last reset. The number stage
+/// 1 exists to drive to zero.
+fun unresolved_count(): Float {
+    return _unresolved.length()
+}
+
+/// Every unresolved-inference report, in emission order.
+fun unresolved(): List<Diagnostic> {
+    return _unresolved
 }
 
 // --- Record + print helpers ---

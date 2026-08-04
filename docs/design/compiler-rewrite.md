@@ -94,6 +94,55 @@ hand. That is also why "make the `Int` fallback an error" is cheaper than the
 migration table implies — nine call sites, one hot function — while being no
 less valuable.
 
+#### Landed 2026-08-03: all nine report, and the count on the compiler is zero
+
+The nine sites now call `Diag.record_unresolved(site, what, fallback)`
+(`diag.sf`), which records a `SevInternal` into the shared sink and counts it.
+They still return `Int`. That ordering is deliberate and is the part worth
+keeping: the compiler self-hosts, so a fallback that failed the build today
+would fail the bootstrap, and nobody could measure anything. Flipping
+`record_unresolved` to `record_error` is a one-line change *once the count is
+zero* — which is the ordering BUGS #37 says was missing when 96 silent
+fall-throughs went unnoticed.
+
+Measuring it: `--report-unresolved` on `saffronc` prints one line per site plus a
+total, and `SAFFRONC_FLAGS=--report-unresolved` threads it through
+`tools/saffron` so a sweep sets it once for a whole corpus.
+
+The measurement immediately found real defects, which is the entire argument for
+doing this before the rest of the rewrite. On the compiler's own source the count
+went **8620 → 2350 → 0**:
+
+- **6270 were not gaps at all.** Two callers use `get_field_type` as an
+  *existence probe* — "is `method` a function-typed field rather than a method?"
+  — where a miss is the ordinary answer for every method call in the program.
+  Extracted `try_get_field_type` (returns `""`, no report) and pointed the probes
+  at it. A metric that counts its own control flow measures nothing.
+- **2350 were one real defect.** Every remaining report was
+  `get_variant_field_type` giving up on a declared type it had in hand: `Expr`
+  (989), `Span` (764), `Types.Value` (276), `Type` (191), and six more — *all*
+  names the codegen tables already knew. It now resolves through `enum_defs`,
+  `resolve_class_type`, and a prefix-stripped enum lookup before reporting.
+- **Two more were found by sweeping `test/pass`**, and both were the honest-vs-
+  dishonest `Int` distinction reappearing inside the conversion itself. `Int`,
+  `Any` and `Nil` were never in `get_variant_field_type`'s spelling list, so an
+  honestly-`Int` field reached the right answer *via the fallback* and got
+  counted as a guess (45 reports across two files). And `get_expr_type`'s binary
+  arm answered `Int` for `Vec2 + Vec2` while `gen_binary`, twenty lines away in
+  another file, resolved the same expression to `Vec2__add`'s declared return
+  type — two consumers of the same information, one of them guessing.
+
+What is left is residue that is honestly unknown, and it is documented rather
+than papered over: unresolved generic parameters (`T`, `E` in
+`get_variant_field_type` — a monomorphisation question, not a lookup failure) and
+`binary` over `Any` operands, where "Any" is genuinely how an unannotated operand
+spells itself. Both belong to stage 3/4, which is where types stop being strings.
+
+`test/pass/unresolved_inference_report.sf` pins the half a conversion like this
+can break — that all nine still return `Int` and therefore still compile and run
+as before. It deliberately does **not** assert the count: freezing it would make
+every legitimate improvement look like a regression.
+
 ### M3. Representation is a convention, not a type
 
 Every value is an `i64`. Whether a given `i64` is NaN-boxed, a raw integer, or a
@@ -608,9 +657,9 @@ resolve to exist first.
 
 | # | Stage | Retires | Notes |
 |---|---|---|---|
-| 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | Mechanical. No semantic change. Do first — it makes everything after it debuggable. |
-| 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Variants landed 2026-08-03**; the fallback conversion is what remains. Measured: 9 real fallbacks of 23 `return "Int"`, five of them in `get_variant_field_type` — see M2 above. Not a `replace_all`: the honest and dishonest `Int`s are textually identical. |
-| 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | Self-contained; the backend keeps its string paths until stage 4 flips them. |
+| 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
+| 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
+| 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
 | 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
@@ -622,6 +671,15 @@ resolve to exist first.
 
 Stages 0-2 and 9 are independent and can proceed concurrently. Stage 4 is the
 inflection point: after it, the "codegen guessed a type" bug class is gone.
+
+**Where the plan stands (2026-08-03).** Stages 0, 1 and 2 are landed. The next
+stage in the critical path is **3** (types as one interned enum), and it is the
+right next one for a reason stage 1 just demonstrated: every piece of stage 1's
+residue — `T`/`E` in `get_variant_field_type`, `Any` operands in `binary` — is a
+question a string type cannot answer. Stage 1 made those visible and countable;
+stage 3 is what makes them representable. Stage 9 (generated runtime) remains
+independent of everything and can be picked up in parallel at any time; stage 10
+is still blocked on the single `resolve_method_symbol` bug described below.
 
 ### What actually blocks stage 10 (measured 2026-08-02)
 
