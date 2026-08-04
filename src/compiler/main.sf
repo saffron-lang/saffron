@@ -507,7 +507,7 @@ fun push_symbol(acc: String, name: String, kind: String, s: AST.Span, visibility
 // A param whose type annotation is absent renders as just its name; `AnyType` is
 // what the parser fills in for an unannotated param, and printing ": Any" would
 // claim the author wrote an annotation they did not.
-fun render_signature(params: List<AST.Param>, ret_type: String): String {
+fun render_signature(params: List<AST.Param>, ret_type: AST.Type): String {
     var out: String = "("
     var i: Float = 0
     while (i < params.length()) {
@@ -522,7 +522,12 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
         i = i + 1
     }
     out = out + ")"
-    if (ret_type.length() > 0) { out = out + ": " + ret_type }
+    // A function with no declared return type renders without one, the same way
+    // an unannotated param renders as a bare name just above. `ret_type` used to
+    // be a String and the guard was `length() > 0`, which was never false — the
+    // parser substituted the literal "Nil", so every unannotated function's
+    // hover claimed `: Nil`. UnknownType makes the absence askable.
+    if (!is_unknown_type(ret_type)) { out = out + ": " + AST.type_to_source(ret_type) }
     return out
 }
 
@@ -532,6 +537,18 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
 fun is_any_type(t: AST.Type): Bool {
     return match (t) {
         AnyType => true
+        _ => false
+    }
+}
+
+// The same question for a *return* type, which the parser marks differently:
+// an omitted param annotation becomes AnyType, an omitted return annotation
+// becomes UnknownType. Two markers because the two positions differ — a param
+// with no annotation really does accept anything, while a function with no
+// declared result has a result nobody has stated (invariant I2).
+fun is_unknown_type(t: AST.Type): Bool {
+    return match (t) {
+        UnknownType => true
         _ => false
     }
 }
