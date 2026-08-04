@@ -3,12 +3,12 @@
 ## Open
 
 **11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139, #143. Next free number is **#146**.
+#139, #143. Next free number is **#147**.
 
-#144 and #145 were each filed and fixed in the same sitting — the
-unused-variable warning firing on compiler-mandated match-arm bindings, and
-call-site argument types never being checked at all — and both are under
-`## Resolved`.
+#144, #145 and #146 were each filed and fixed in the same sitting — the
+unused-variable warning firing on compiler-mandated match-arm bindings,
+call-site argument types never being checked at all, and the lexer silently
+discarding `\xNN` escapes — and all three are under `## Resolved`.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -679,6 +679,60 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 146. FIXED — the lexer silently dropped the backslash of every escape it did not know, so `"\x41"` was the three characters `x41`
+
+**Severity: high, and silent.** `read_string` (`src/compiler/lexer.sf`) handled
+`\n`, `\r`, `\t`, `\\` and `\"`, and ended with `else { result.append(esc) }` —
+the *letter*, without the backslash. So `"\x41"` did not fail to compile, and did
+not warn: it produced the literal text `x41`, three characters where the author
+wrote one byte.
+
+Two stdlib modules were built on the escape and were therefore wrong:
+
+- `src/lib/base64.sf:7` builds a 128-character byte->char table entirely out of
+  `\x` escapes. Every entry expanded to 3-4 junk characters, so `_byte_char`
+  returned the wrong character for every byte and `test_base64` failed with
+  `base64: non-ASCII character encountered` — `encode("f")` gave `LQ==` instead
+  of `Zg==`.
+- `src/lib/color.sf:3` and `src/lib/log.sf:486` write `\x1b[` for ANSI. Every
+  colored string emitted the literal text `x1b[31m` instead of an escape
+  sequence.
+
+**Fix, in two parts.** The lexer now decodes `\xNN` (and `\e`, and `\0`), which
+required solving a smaller problem first: **the language has no primitive that
+turns a byte value into a character.** That absence is why base64 builds a
+128-entry table at all, why `src/lib/url.sf:248` is a 100-branch if-chain, and
+why `src/lib/bytes.sf:58` gives up and returns `"?"` for anything
+non-printable. The lexer therefore allocates the two bytes itself via
+`rt_malloc` + `store8`. Not the GC: per BUGS #23 a NaN-tagged pointer is
+rejected by `__gc_is_heap_ptr`, so GC-allocating would have the collector sweep
+the string while live — `__str_get` (`runtime.sf:1476`) leaks its 2-byte buffer
+for exactly this reason and says so. One buffer leaks per `\x` escape in the
+source, bounded by the source text.
+
+`\x00` gets a diagnostic rather than a byte. A String is a NUL-terminated C
+string (`rt_strlen`), so a zero byte does not *store* a NUL — it **terminates
+the literal**, discarding everything after it. base64 demonstrates both halves
+of this: its table at :7 started at `\x00` and would have been one character
+long, while its sibling at :11 starts at `\x01` with a comment saying it does so
+"to avoid null-byte issues with strstr". One of the two authors knew. So the
+second part of the fix shifts `_ascii_full` to start at `\x01` like its twin,
+with `_byte_char` subtracting 1 — which also means the new warning does not fire
+on every compile that imports base64. Emitting a correct-but-noisy warning for a
+program that is now correct would have re-created the problem #144 just cleaned
+up.
+
+**Verified:** bootstrap green through Stage 2, `0` lexer warnings over the
+compiler's own source. `\x41\x42\x43` -> `ABC`, lowercase `\x7a` -> `z`, `\e`
+-> byte 27, and a malformed `\xzz` falls back to the old literal-text behaviour
+instead of inventing a byte. `test_base64` went from a hard failure to **20/20
+assertions passing**, and `@color` now emits real ANSI (`^[[31mRED^[[0m`).
+
+`test_log` still fails, and this was **not** its cause: it dies with
+`IndexError: index 0 out of bounds (length 0)`, a separate handler-registration
+bug. Fixing the escapes it uses did not change its result — worth stating,
+because "two tests use `\x1b`" made it look like one root cause.
 
 ### 145. FIXED — the checker never compared a call's arguments to the callee's parameter types
 
