@@ -120,6 +120,21 @@ enum Token {
 // (SOURCES=(lexer parser)). Importing ast.sf just to name a return type would
 // make the lexer's compilation depend on the AST for no other reason.
 
+// `\xNN` needs to turn a byte VALUE into a one-character String, and the
+// language has no primitive for that (BUGS #152) — which is exactly why
+// src/lib/base64.sf builds a 128-character ASCII table out of `\x` escapes,
+// src/lib/url.sf has a 100-branch if-chain, and src/lib/bytes.sf gives up and
+// returns "?". So the lexer allocates the two bytes itself.
+//
+// rt_malloc, not the GC: per BUGS #23 a NaN-tagged pointer is rejected by
+// __gc_is_heap_ptr, so GC-allocating here would have the collector sweep the
+// string while it is still live. __str_get (runtime.sf:1476) leaks its 2-byte
+// buffer for the same reason and says so; this leaks one buffer per `\x`
+// escape in the source text, which is bounded by the source and freed at exit.
+@extern("void* malloc(i64)")
+fun __lex_malloc(n: Int): Int
+@intrinsic fun __lex_store8(addr: Int, val: Int)
+
 class Lexer {
     var source: String
     var pos: Float
@@ -365,6 +380,61 @@ class Lexer {
         }
     }
 
+    // One hex digit's value, or -1 if `ch` is not a hex digit.
+    fun hex_digit_val(ch: String): Float {
+        var lower: String = ch.to_lower()
+        var d: Float = "0123456789".index_of(ch)
+        if (d >= 0) return d
+        var h: Float = "abcdef".index_of(lower)
+        if (h >= 0) return h + 10
+        return 0 - 1
+    }
+
+    // Consume up to `max` hex digits (already past the `\x`) and return the byte
+    // as a one-character String. `min` digits are required; short of that the
+    // escape is malformed and the literal text is returned so the source still
+    // round-trips rather than silently losing characters.
+    //
+    // `\0` passes min=max=0, i.e. no digits and a value of 0 — see below.
+    fun read_hex_escape(min: Float, max: Float): String {
+        var val: Float = 0
+        var digits: Float = 0
+        while (digits < max and this.pos < this.source.length()) {
+            var d: Float = this.hex_digit_val(this.peek())
+            if (d < 0) break
+            val = val * 16 + d
+            this.advance()
+            digits = digits + 1
+        }
+        if (digits < min) {
+            // Not a hex escape after all. Give back what was written, minus the
+            // backslash, matching the old catch-all behaviour for unknown
+            // escapes rather than inventing a byte.
+            return "x"
+        }
+        // A String is a NUL-terminated C string (rt_strlen), so an embedded 0
+        // byte does not store a NUL — it TERMINATES the literal early, silently
+        // discarding everything after it. Refusing to emit it is not pedantry:
+        // src/lib/base64.sf:7 builds its byte->char table starting at `\x00`
+        // and would get a 1-character table, while its sibling at :11 starts at
+        // `\x01` with a comment saying it does so "to avoid null-byte issues".
+        // One of the two authors knew. Warn so the next one does too.
+        if (val == 0) {
+            IO.println("[lexer] Warning: `\\0`/`\\x00` in a string literal is not representable — a String is NUL-terminated, so the literal would end here. Emitting byte 1 instead; use a List<Int> for binary data with zero bytes.")
+            val = 1
+        }
+        return this.byte_to_char(val)
+    }
+
+    // Turn a byte value into a one-character String. See the note above the
+    // class for why this allocates rather than indexing a table.
+    fun byte_to_char(b: Float): String {
+        var buf: Int = __lex_malloc(2)
+        __lex_store8(buf, b.floor())
+        __lex_store8(buf + 1, 0)
+        return buf
+    }
+
     fun read_string() {
         var result: StringBuilder = StringBuilder()
         var has_interp: Bool = false
@@ -384,6 +454,11 @@ class Lexer {
                 else if (esc == "t") { result.append("\t") }
                 else if (esc == "\\") { result.append("\\") }
                 else if (esc == "\"") { result.append("\"") }
+                else if (esc == "0") { result.append(this.read_hex_escape(0, 0)) }
+                else if (esc == "e") { result.append(this.byte_to_char(27)) }
+                else if (esc == "x" or esc == "X") {
+                    result.append(this.read_hex_escape(2, 2))
+                }
                 else { result.append(esc) }
             } else if (ch == "$") {
                 if (this.pos < this.source.length()) {

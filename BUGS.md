@@ -2,14 +2,35 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147, #148. Next free number is **#150**.
+**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147, #148, #151. Next free number is **#153**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
 five times at merge — #142 → #143 → #145 → #146 → #149 — each time origin/main
 turned out to already own the number it had reached. The lesson below about
 reading the next-free number from `main` is exactly why.
+
+#144, #145, #146, #150 and #152 were each filed and fixed in the same sitting —
+the unused-variable warning firing on compiler-mandated match-arm bindings,
+call-site argument types never being checked at all, an inferred global read
+from inside a function being typed `Int`, interface-typed dispatch binding to
+the empty abstract stub, and the lexer silently discarding `\xNN` escapes — and
+all five are under `## Resolved`.
+
+**#146 collided across two unpushed lines of work, and the escape fix moved to
+#152.** Two different bugs were both filed as #146: locally "an inferred global
+read from inside a function was typed `Int`" (commit `f0d52ab` plus a
+rebootstrap, and three test/fixture files naming the number in their headers),
+and on origin/main "the lexer silently dropped the backslash of every escape it
+did not know" (commit `1800720`, one comment reference in `lexer.sf`; the test
+that shipped alongside it, `test/pass/iface_dispatch.sf`, belongs to #150). Per
+the tie-break below — the side with fewer commits, comments and test names
+carrying the number moves — the local entry keeps #146 and the lexer-escape
+entry is renumbered #152. Both were already FIXED and committed when they met,
+so neither could simply be renamed in place; the renumbering is recorded here
+because the escape bug is cited by number in prose (`lexer.sf`, updated to #152
+in this merge) rather than only in a heading.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -75,6 +96,45 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 151. A module class extending another module class emits an unprefixed inherited-method forwarder, so the IR references an undefined `@Base__init`
+
+**Severity: medium.** Not silent — it fails loudly — but it fails as a *compiler
+bug*, not a diagnostic, so the program never runs and the message points at LLVM
+rather than at the code. Two module classes are enough:
+
+```saffron
+// m3.sf
+class Base { var n: Int   fun init() { this.n = 0 }   fun bump() { this.n = this.n + 1 } }
+class Sub extends Base { fun bump() { this.n = this.n + 100 } }
+// main.sf
+import "./m3.sf" as Mod
+var s = Mod.Sub()
+```
+
+```
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:531:17: error: use of undefined value '@Base__init'
+```
+
+`Sub` declares no `init`, so the inherited-method loop in
+`gen_class_decl` (`codegen/stmts_body.sf`, the `parent_full` / `child_full` block
+around line 510) emits a thin forwarder for it. Every *other* class symbol is
+named by `gen_function`, which prefixes with `current_prefix`
+(`codegen/output_body.sf:2`). This is the one site that emits a `define` directly,
+and it used the bare names — so with prefix `m3_` the real bodies are
+`@m3_Base__init` and `@m3_Base__bump`, while the forwarder defines `@Sub__init`
+and calls `@Base__init`. Neither exists.
+
+The fix is to resolve both class names through `class_struct_names` — not to paste
+`current_prefix` on, because the parent may live in a *different* module than the
+child, in which case the child's prefix is the wrong one. That table is already
+the resolution the hierarchy registration a few lines above uses for
+`class_parent_of`, so the symbol and the dispatch tables agree by construction.
+
+Found while fixing #150, and independent of it: #150's `test_log` case does not
+subclass across the module boundary. Repro kept at `/tmp/ifmod/m3.sf`; a proper
+`test/pass/` case should land with the fix.
 
 ### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
 
@@ -925,6 +985,134 @@ with two commits and two test files citing it, and origin/main had since also fi
 on `main` after those. Four times bitten by the same per-worktree collision the note
 at the top of `## Open` warns about: read the next-free number from `main`, never
 from a worktree.
+
+### 150. FIXED — a call through an interface-typed receiver bound to the interface's empty abstract stub, so it silently did nothing and returned 0
+
+This was written as #147 and renumbered once, following the tie-break in `## Open`:
+local `main` had already filed #147 (`: Any` annotation ignored), #148 (nonexistent
+class-member read) and #149 (the ide alias fix) while this worktree was branched
+from an origin/main that predated all three, and this entry had no commits or test
+files carrying its number yet. It moved; they did not.
+
+**Severity: high, and silent.** Given `interface H { fun handle(n) }`,
+`class M extends H { ... }`, and a receiver whose *static* type is `H` — an
+annotated `var h: H`, a parameter `fun f(h: H)`, or a `List<H>` element — the
+call `h.handle(1)` bound statically to `@H__handle`, which codegen emits as an
+empty stub (`ret i64 0`). The concrete `M.handle` never ran. No diagnostic, exit
+0. This affected **every** interface-based dispatch in the language, so any
+program using interfaces polymorphically was quietly wrong; it is the root cause
+of `test/test_log.sf`'s two failures, where a `Logger` fanned records out to a
+`List<Handler>` and every handler received nothing.
+
+Class virtual dispatch (`gen_virtual_dispatch`, BUGS #50) already handled this:
+it switches on the receiver's runtime class tag and calls the concrete override.
+Interfaces were excluded for two independent reasons, both found by tracing the
+emitted IR (a bare `call @H__handle` where a switch should have been):
+
+1. **A bodyless method is not "owned".** `output_body.sf` records only
+   body-carrying methods in `class_own_methods` — correct, since an abstract
+   method has no symbol to dispatch *to*. But `gen_virtual_dispatch` reused that
+   same table to answer a *different* question, "does the receiver's type know
+   this method at all", and an interface answered no, so dispatch bailed and left
+   the stub call. Fixed by adding a sibling table `class_own_abstract` (the
+   methods a class declares *without* a body) and a `declares_abstract` helper, so
+   the two questions are separated. When the receiver's type declares the method
+   abstractly, dispatch proceeds with `ns_owner == ""` — no default body means
+   every implementor is an override, exactly right for an interface.
+
+2. **Module classes were absent from the dispatch tables entirely.** The main
+   program's classes get `class_own_methods` / `class_own_abstract` /
+   `class_bare_of` / a type tag filled in `generate()`'s pre-pass. Imported
+   modules reach codegen through `generate_with_modules_flat_opts4`, whose class
+   pre-registration loop populated `class_fields` / `class_struct_names` /
+   `class_methods` but none of the BUGS #50 tables. So *no* stdlib class —
+   `@log`'s `Handler` among them — was ever a dispatch candidate, and
+   cross-module class virtual dispatch was broken too, not just interfaces.
+   Fixed by populating the same four tables in that loop, keyed on the prefixed
+   struct name (the same key `class_struct_names` maps the bare name to earlier
+   in that function, which is what `gen_virtual_dispatch` resolves the receiver
+   through), and assigning a type tag to every module ClassDecl — an interface
+   has no constructor, and `gen_class_constructor` is the only other place a
+   module class is tagged, so it otherwise never got one.
+
+   **`codegen.sf` has ~10 `generate*` entry points and only
+   `generate_with_modules_flat_opts4` is live.** This fix was written twice into
+   dead ones first — `generate_with_modules` (line 642) and
+   `generate_with_modules_flat_opts` (line 1186) both carry a near-identical
+   pre-registration loop, and editing either produces a fully green bootstrap
+   with zero behaviour change, which reads exactly like "the fix didn't work".
+   Confirm the entry point against `src/compiler/main.sf` before editing.
+
+**Regression test:** `test/pass/iface_dispatch.sf` — interface-typed local,
+interface-typed parameter, `List<Interface>` by index, a reassignable slot
+proving dispatch is on the runtime class not the first assignment, and a
+default (bodied) interface method to prove the fix does not force everything
+dynamic. `test/test_log.sf` also exercises the cross-module half.
+
+**Verification:** bootstrap green through STAGE 2 (`gen3 compiles itself; gen4
+links and compiles`), and the suite's failure *name set* is exactly the prior
+baseline minus `test_log` — 272 passed / 9 failed against 270 / 10, no
+regressions. `test/test_log.sf` went from two failing assertions plus an
+`IndexError` to all 23 passing.
+
+A *separate* pre-existing bug surfaced while tracing this and is filed as #151:
+cross-module **subclassing** (a module class extending another module class)
+emits an undefined `@Base__init`. `test_log` does not subclass across the
+boundary, so it is unaffected, and the two fixes are independent.
+
+### 152. FIXED — the lexer silently dropped the backslash of every escape it did not know, so `"\x41"` was the three characters `x41`
+
+**Severity: high, and silent.** `read_string` (`src/compiler/lexer.sf`) handled
+`\n`, `\r`, `\t`, `\\` and `\"`, and ended with `else { result.append(esc) }` —
+the *letter*, without the backslash. So `"\x41"` did not fail to compile, and did
+not warn: it produced the literal text `x41`, three characters where the author
+wrote one byte.
+
+Two stdlib modules were built on the escape and were therefore wrong:
+
+- `src/lib/base64.sf:7` builds a 128-character byte->char table entirely out of
+  `\x` escapes. Every entry expanded to 3-4 junk characters, so `_byte_char`
+  returned the wrong character for every byte and `test_base64` failed with
+  `base64: non-ASCII character encountered` — `encode("f")` gave `LQ==` instead
+  of `Zg==`.
+- `src/lib/color.sf:3` and `src/lib/log.sf:486` write `\x1b[` for ANSI. Every
+  colored string emitted the literal text `x1b[31m` instead of an escape
+  sequence.
+
+**Fix, in two parts.** The lexer now decodes `\xNN` (and `\e`, and `\0`), which
+required solving a smaller problem first: **the language has no primitive that
+turns a byte value into a character.** That absence is why base64 builds a
+128-entry table at all, why `src/lib/url.sf:248` is a 100-branch if-chain, and
+why `src/lib/bytes.sf:58` gives up and returns `"?"` for anything
+non-printable. The lexer therefore allocates the two bytes itself via
+`rt_malloc` + `store8`. Not the GC: per BUGS #23 a NaN-tagged pointer is
+rejected by `__gc_is_heap_ptr`, so GC-allocating would have the collector sweep
+the string while live — `__str_get` (`runtime.sf:1476`) leaks its 2-byte buffer
+for exactly this reason and says so. One buffer leaks per `\x` escape in the
+source, bounded by the source text.
+
+`\x00` gets a diagnostic rather than a byte. A String is a NUL-terminated C
+string (`rt_strlen`), so a zero byte does not *store* a NUL — it **terminates
+the literal**, discarding everything after it. base64 demonstrates both halves
+of this: its table at :7 started at `\x00` and would have been one character
+long, while its sibling at :11 starts at `\x01` with a comment saying it does so
+"to avoid null-byte issues with strstr". One of the two authors knew. So the
+second part of the fix shifts `_ascii_full` to start at `\x01` like its twin,
+with `_byte_char` subtracting 1 — which also means the new warning does not fire
+on every compile that imports base64. Emitting a correct-but-noisy warning for a
+program that is now correct would have re-created the problem #144 just cleaned
+up.
+
+**Verified:** bootstrap green through Stage 2, `0` lexer warnings over the
+compiler's own source. `\x41\x42\x43` -> `ABC`, lowercase `\x7a` -> `z`, `\e`
+-> byte 27, and a malformed `\xzz` falls back to the old literal-text behaviour
+instead of inventing a byte. `test_base64` went from a hard failure to **20/20
+assertions passing**, and `@color` now emits real ANSI (`^[[31mRED^[[0m`).
+
+`test_log` still fails, and this was **not** its cause: it dies with
+`IndexError: index 0 out of bounds (length 0)`, a separate handler-registration
+bug. Fixing the escapes it uses did not change its result — worth stating,
+because "two tests use `\x1b`" made it look like one root cause.
 
 ### 145. FIXED — the checker never compared a call's arguments to the callee's parameter types
 
