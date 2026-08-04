@@ -2,8 +2,8 @@
 
 ## Open
 
-**8 open entries:** #2, #49, #65, #75, #107, #131, #132, #147.
-Next free number is **#154**.
+**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #147,
+#154. Next free number is **#155**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -559,6 +559,70 @@ The fix is to stop overloading a value as the "absent" marker: an empty string, 
 a separate `has_annotation` flag on the AST node, distinguishes the two. Note the
 `type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
 one of the sites rewrite stage 3 has to touch.
+
+---
+
+### 154. An enum inside a printed collection still prints a bit pattern
+
+**Severity: medium.** Silent wrong answer, but narrower than it looks: only
+*inside* a collection. This is the residual of #105 and #115 — both entries
+describe it, but it lived in a paragraph of a *resolved* entry, which is a place
+nothing looks. Hence a number.
+
+Verified at HEAD, not inherited from those notes:
+
+```saffron
+enum Color { Red, Green }
+enum Shape { Circle(r: Number), Rect(w: Number, h: Number) }
+var c: Color = Color.Red
+var s: Shape = Shape.Circle(2)
+IO.println("${c}")                      // Red        — correct
+IO.println("${s}")                      // Circle(2)  — correct
+var cs: List<Color> = [Color.Red, Color.Green]
+IO.println("${cs}")                     // [0, 7.29112e-304]        — WRONG
+var ss: List<Shape> = [Shape.Circle(1), Shape.Rect(2, 3)]
+IO.println("${ss}")                     // [5.21502e-310, ...]      — WRONG
+```
+
+`Red` renders as `0` rather than as garbage only because tag 0 `<< 56` *is* zero;
+that is the same defect wearing a plausible-looking hat, which is worth knowing
+before someone reads `0` as a working case.
+
+**Why the direct case works and the element case does not.** #105 fixed direct
+`println` by having codegen route through the enum's own `to_string()` when the
+*static* type is a known enum, and interpolation was always correct because the
+lexer inserts an explicit `.to_string()`. Elements are different in kind: they are
+formatted by `__rt_elem_to_string` → `__any_to_string` at **runtime**, where no
+static type exists. So no static-type-driven fix can ever reach them.
+
+**The two halves are not equally fixable, and #115 is the reason we now know
+what separates them.** #115 closed exactly this shape for *classes* by generating
+a `__val_to_string` tag switch from codegen's tables and calling it from
+`__any_to_string`. The prerequisite for joining that switch is that the value be
+identifiable at runtime:
+
+- **Payload enums can join.** They are allocated, so give them a GC header —
+  `__gc_alloc` instead of `__sf_malloc` in `gen_enum_construct`
+  (`expr_body.sf`) — with tags drawn from the same allocator as
+  `next_class_type_id` so they cannot collide with class tags. Then
+  `emit_val_to_string`'s switch gains arms calling `emit_enum_to_string`'s
+  symbols. Note this is a **representation change**, not a formatting change: it
+  touches every enum allocation and every place that assumes the current layout,
+  which is why it did not ride along with #115.
+- **Fieldless enums cannot.** `tag << 56` is a bare immediate — no allocation, no
+  identity, nothing to key on. A bit-pattern heuristic was deliberately not
+  written for #115 and should not be written here either: mistaking a real double
+  for an enum is worse than visible garbage. Closing this half needs the value
+  representation itself to change (a NaN-box tag for enums), which is a much
+  larger decision than a bug fix.
+
+So this entry is honest about being *partly* fixable. Doing the payload half alone
+is legitimate and leaves the fieldless half visibly broken rather than subtly
+wrong.
+
+`test/oracle_enum_println.sf` records the current output and is the regression
+test; it has shown these subnormals unchanged across both the #105 and #115 fixes,
+which is how the residual stayed measured rather than assumed.
 
 ---
 
@@ -3213,14 +3277,17 @@ line-for-line, so the two paths cannot drift apart again.
 was open — see #107, which deliberately refused to record their output. That
 refusal is what made this fix a clean change rather than a suite-wide break.
 
-**Still open — an enum *inside* a printed collection.** `IO.println([Color.Red])`
-prints `[0, 4.77831e-299]`. Elements are formatted by `__rt_elem_to_string` →
-`__any_to_string` at *runtime*, where no static type exists, and a payload variant
-is allocated with `__sf_malloc` — no GC header — so the sentinel check
-`__rt_as_list_ptr` relies on can never identify it. That needs
-`src/runtime/runtime.sf` and/or `base_nanbox.ll`, not codegen. Note
+**Still open — an enum *inside* a printed collection. Now filed as #154.**
+`IO.println([Color.Red])` prints `[0, 4.77831e-299]`. Elements are formatted by
+`__rt_elem_to_string` → `__any_to_string` at *runtime*, where no static type
+exists, and a payload variant is allocated with `__sf_malloc` — no GC header — so
+the sentinel check `__rt_as_list_ptr` relies on can never identify it. Note
 `IO.println(xs[0])` is correct; only elements nested inside a printed collection
-are affected.
+are affected. #115 later fixed this exact shape for *classes* by generating a tag
+switch from codegen's tables, which is what established that payload enums can
+join the scheme (give them a GC header) while fieldless ones cannot (no
+allocation, no identity) — see #154, which was given its own number precisely
+because a residual described only in a resolved entry is invisible.
 
 ---
 
