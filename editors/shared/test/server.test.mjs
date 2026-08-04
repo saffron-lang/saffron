@@ -384,3 +384,46 @@ test("a type error is reported at its real line and column", { skip: SKIP }, asy
   assert.equal(d.range.start.character, 4, "the squiggle sits on `x`, not at column 0");
   assert.match(d.message, /Int/);
 });
+
+test("an EXPRESSION-level type error squiggles the expression", { skip: SKIP }, async () => {
+  // The case above is about a *declaration* (`var x`), which has had a span
+  // since WS1a. This one is about an expression, which did not: a wrong argument
+  // type is the most common type error there is and it used to arrive with no
+  // position at all, so the server had nothing to attach a range to and the
+  // squiggle could not be drawn. Asserting it here rather than only on the
+  // compiler side, because the compiler emitting an offset and the client
+  // turning that offset into the right zero-based line/character are two
+  // separate things that can each be wrong.
+  const bad = 'fun take(s: String): Int { return 1 }\nvar n: Int = 3\nvar r: Int = take(n)\n';
+  const badUri = uri.replace("probe.sf", "argerr.sf");
+  fs.writeFileSync(fileURLToPath(badUri), bad);
+  notifications.length = 0;
+  send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri: badUri, languageId: "saffron", version: 1, text: bad } },
+  });
+  await new Promise((r) => setTimeout(r, 3000));
+  const note = notifications
+    .filter((n) => n.method === "textDocument/publishDiagnostics" && n.params.uri === badUri)
+    .pop();
+  assert.ok(note, "the file got diagnostics");
+  const d = note.params.diagnostics.find((x) => /argument 1/.test(x.message));
+  assert.ok(d, `expected an argument-type error, got ${JSON.stringify(note.params.diagnostics)}`);
+
+  // Zero-based here, 1-based in the compiler's JSON: line 3 -> 2, column 19 ->
+  // 18. Getting this conversion wrong by one is the whole risk of the client
+  // half, and it is invisible in a screenshot.
+  assert.equal(d.range.start.line, 2, "on the line the call is on");
+  assert.equal(d.range.start.character, 18, "and on `n`, the offending argument");
+
+  // The range covers exactly the argument and nothing more. Sliced out of the
+  // document text rather than compared as numbers, for the same reason the
+  // compiler-side test slices: an end column that reads plausibly can still be
+  // one character long in the wrong place.
+  const line = bad.split("\n")[d.range.start.line];
+  assert.equal(
+    line.slice(d.range.start.character, d.range.end.character),
+    "n",
+    "the squiggle covers the argument alone, not the whole call",
+  );
+});
