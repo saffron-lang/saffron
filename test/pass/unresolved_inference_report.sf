@@ -1,0 +1,86 @@
+// Stage 1 of docs/design/compiler-rewrite.md (invariant I2): the nine places
+// where codegen's inference gives up and answers `Int` now report through
+// Diag.record_unresolved instead of doing it silently.
+//
+// This test is about the CODE those sites accept, not about the reports — a
+// `.sf` file cannot read the compiler's diagnostic sink. What it pins is the
+// half that a conversion like this can break: every one of the nine still
+// returns `Int` and therefore still compiles and runs exactly as before. The
+// reports are additive, and a report that changed a program's behaviour would
+// show up here as a wrong answer or a link failure.
+//
+// The report count itself is measured from outside, with
+//   SAFFRONC_FLAGS=--report-unresolved tools/saffron run <file>
+// which prints one line per site plus a total. That number is what stage 1
+// exists to drive to zero; it is deliberately not asserted here, because
+// freezing it would make every legitimate improvement look like a regression.
+
+import "@test" as T
+
+// --- get_variant_field_type: a variant field whose declared type this
+// --- function has no mapping for. `Point` is a class, so the fifth of the five
+// --- misses in that function fires, and the binding is typed Int.
+class Point {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) {
+        this.x = x
+        this.y = y
+    }
+    fun sum(): Int { return this.x + this.y }
+}
+
+enum Shape {
+    Dot(where: Point),
+    Line(from: Point, to: Point),
+    Empty
+}
+
+// A binding of an unmappable type is still usable as a value: it round-trips
+// through the payload slot untouched, which is what makes `Int` survivable here
+// rather than merely quiet.
+fun describe(s: Shape): Int {
+    return match (s) {
+        Dot(p) => 1
+        Line(a, b) => 2
+        Empty => 0
+    }
+}
+
+// --- binary with unresolved operands: two `Any` values added. This is the
+// --- noisiest of the nine and the one most likely to be a correct `Int`.
+fun add_any(a: Any, b: Any): Any {
+    return a + b
+}
+
+// --- .pop() on a receiver with no element type: a bare `List`, so there is no
+// --- `<T>` to read the element type out of.
+fun pop_untyped(): Any {
+    var bag: List = [7, 8, 9]
+    return bag.pop()
+}
+
+fun main() {
+    T.assert_eq(describe(Shape.Dot(Point(1, 2))), 1, "unmappable variant field type still matches")
+    T.assert_eq(describe(Shape.Line(Point(1, 2), Point(3, 4))), 2, "two unmappable fields still match")
+    T.assert_eq(describe(Shape.Empty), 0, "fieldless variant unaffected")
+
+    // The binding itself, used as a value. The payload slot holds whatever was
+    // constructed, so the Point survives the Int typing as long as nothing
+    // dispatches a method on it — which is exactly the boundary the report
+    // marks.
+    var dot: Shape = Shape.Dot(Point(10, 20))
+    var tag: Int = match (dot) {
+        Dot(p) => 1
+        Line(a, b) => 2
+        Empty => 0
+    }
+    T.assert_eq(tag, 1, "constructed variant round-trips through an Int-typed binding")
+
+    T.assert_eq(add_any(2, 3), 5, "binary over two Any operands still adds")
+    T.assert_eq(pop_untyped(), 9, "pop on a bare List still returns the last element")
+
+    T.summary()
+}
+
+main()
