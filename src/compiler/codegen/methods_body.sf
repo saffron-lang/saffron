@@ -129,11 +129,22 @@
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
     if (ek == "list_lit") {
+        // Same whitelist, same defect, second copy — see gen_list_lit (BUGS #117).
+        // These two must agree: this function decides what a nested list literal's
+        // element type is, and gen_list_lit decides what the list it emits is typed
+        // as. Fixing only one would leave `[[Pt(1)]]` disagreeing with `[Pt(1)]`.
         var list_elems: List<AST.Expr> = match (expr) { ListLit(e) => e   _ => [] }
         if (list_elems.length() > 0) {
             var first_type: String = this.get_expr_type(list_elems[0])
-            if (first_type == "String") return "List<String>"
-            if (first_type == "Int" or first_type == "Float") return "List<Int>"
+            var ll_homogeneous: Bool = true
+            var llk: Float = 1
+            while (llk < list_elems.length()) {
+                if (this.get_expr_type(list_elems[llk]) != first_type) { ll_homogeneous = false }
+                llk = llk + 1
+            }
+            if (ll_homogeneous and first_type.length() > 0 and first_type != "Any") {
+                return "List<" + first_type + ">"
+            }
         }
         return "List<Any>"
     }
@@ -336,6 +347,15 @@
                 }
             }
         }
+        // `Pt(1)` is class CONSTRUCTION, not a function call, so it is absent from
+        // func_ret_types and this arm used to fall through to "" — the caller then
+        // read that as "unknown". Every consumer that asks what a constructor
+        // expression evaluates to therefore had to already know, which is how
+        // gen_list_lit ended up unable to type `[Pt(1), Pt(2)]` (BUGS #117). The
+        // registry that answers this is right here; consult it.
+        if (this.class_fields.has(callee_name)) {
+            return callee_name
+        }
     }
     if (ek == "is_check") return "Bool"
     if (ek == "binary") {
@@ -440,13 +460,36 @@
     } else {
         this.emit_indent(list_val + " = call i64 @__list_new()")
     }
+    // The element type used to be recognised from a two-entry whitelist — String,
+    // or Int/Float collapsed to Int — and everything else stayed Any. A list of
+    // class instances therefore produced `List<Any>`, so `un[0].to_string()` had an
+    // untyped receiver, dispatch was dropped, and the raw pointer printed as a
+    // subnormal double (BUGS #117). Annotating the variable was the workaround.
+    //
+    // Take whatever type the element actually has instead of enumerating the ones
+    // we happen to know. Homogeneity is required: a `List<T>` that lies is worse
+    // than `List<Any>`, because Any routes to the runtime dispatch that already
+    // handles scalars, while a wrong T dispatches statically to the wrong class.
+    // Mixed lists stay Any, matching the checker's arm for the same expression.
+    //
+    // Float is no longer folded into Int. That fold predates the Int/Float split
+    // and is a lie the moment anything reads the element type back — except in
+    // identity mode, where the two really are one representation, and get_expr_type
+    // already answers "Int" for a float there.
     var elem_type: AST.Type = AST.Type.AnyType
     var i: Float = 0
     while (i < elements.length()) {
         if (i == 0) {
             var ft: String = this.get_expr_type(elements[0])
-            if (ft == "String") { elem_type = AST.Type.StringType }
-            else if (ft == "Int" or ft == "Float") { elem_type = AST.Type.IntType }
+            var homogeneous: Bool = true
+            var hj: Float = 1
+            while (hj < elements.length()) {
+                if (this.get_expr_type(elements[hj]) != ft) { homogeneous = false }
+                hj = hj + 1
+            }
+            if (homogeneous and ft.length() > 0 and ft != "Any") {
+                elem_type = this.str_to_type(ft)
+            }
         }
         var elem: String = this.gen_arg_value(elements[i])
         var discard_lp: String = this.fresh_local()

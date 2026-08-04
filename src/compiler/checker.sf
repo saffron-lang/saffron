@@ -3022,7 +3022,49 @@ class NullChecker {
                 this.infer_type(value)
             }
             This => AST.Type.ClassType(this.current_class)
-            ListLit(elements) => AST.Type.GenericType("List", [AST.Type.AnyType])
+            // `[Pt(1), Pt(2)]` without an annotation used to infer `List<Any>`
+            // unconditionally, so `un[0].to_string()` had an untyped receiver,
+            // dispatch failed, and the raw pointer was printed as a subnormal
+            // double — silently, with only a warning (BUGS #117). An annotation
+            // was the workaround, which is why `oracle_println_class_not_bits.sf`
+            // annotates its lists.
+            //
+            // Mirror the element type instead, exactly as the TupleLit arm below
+            // already does. Homogeneity is required: the type is taken from the
+            // first element and every other element must agree, because a `List<T>`
+            // that lies is worse than `List<Any>` — Any at least routes to the
+            // runtime dispatch that handles scalars correctly today, while a wrong
+            // T would statically dispatch to the wrong class. Mixed lists therefore
+            // stay Any, which is also what the checker can honestly say about them
+            // until there is a union-forming join.
+            //
+            // Walking the elements is load-bearing for a second reason: this arm
+            // used not to infer them at all, so a variable appearing ONLY inside a
+            // list literal was never marked used and drew a false "unused variable"
+            // warning — the same un-walked-subtree defect as #126 and #121.
+            ListLit(elements) => {
+                if (elements.length() == 0) {
+                    AST.Type.GenericType("List", [AST.Type.AnyType])
+                } else {
+                    var ll_first: AST.Type = this.infer_type(elements[0])
+                    var ll_first_str: String = this.type_node_to_string(ll_first)
+                    var ll_same: Bool = true
+                    var lli: Float = 1
+                    while (lli < elements.length()) {
+                        // Infer every element even once a mismatch is known, so the
+                        // walk's own bookkeeping (used-variable marking, nested
+                        // visibility checks) still happens for the whole literal.
+                        var ll_other: String = this.type_node_to_string(this.infer_type(elements[lli]))
+                        if (ll_other != ll_first_str) { ll_same = false }
+                        lli = lli + 1
+                    }
+                    if (ll_same) {
+                        AST.Type.GenericType("List", [ll_first])
+                    } else {
+                        AST.Type.GenericType("List", [AST.Type.AnyType])
+                    }
+                }
+            }
             // A tuple is a List at runtime (expr_body.sf gen_tuple), typed
             // `Tuple<T0,...>` by codegen so `._0` can find each element's type.
             // Mirror the element types here rather than collapsing to Any.

@@ -9132,6 +9132,113 @@ class Codegen {
         this.emit("  ret i1 0")
         this.emit("}")
         this.block_terminated = false
+
+        this.emit_val_to_string()
+    }
+
+    // BUGS #115. `IO.println(p)` on a class instance printed 5.21502e-310 — an
+    // address reinterpreted as a subnormal double — while `"${p}"` printed
+    // `Pt(3)` correctly. The interpolation path has the static type in hand and
+    // calls `Pt__to_string` directly; println and every list/map element read go
+    // through `__any_to_string`, whose last useful arm (`do_ptr`) hands back the
+    // pointer as-is because a hand-written .ll file cannot know that a value
+    // with GC type tag 12 should be formatted by `Pt__to_string`.
+    //
+    // The value IS identifiable — a class instance carries a GC header, and
+    // __val_class_tag reads it safely. What was missing is the tag -> symbol
+    // mapping, and that lives only here, in codegen's class_type_ids /
+    // class_own_methods. So the fix is a generated switch, emitted next to
+    // __class_parent_tag and __class_is_a from the very same tables, that
+    // __any_to_string consults before falling through to do_float.
+    //
+    // Contract with the caller, which is the part that is easy to get wrong:
+    // __any_to_string's arms all return a RAW char*, and a user to_string
+    // returns a NaN-TAGGED string (see the tail of any generated
+    // <Class>__to_string: __val_tag_ptr). So the tag has to come off here. #102
+    // was the mirror-image mistake — tagging a value that was already raw — and
+    // it segfaulted, so the direction matters more than the presence.
+    //
+    // Returning 0 for "not a class, or a class with no to_string" is what keeps
+    // this composable: 0 is the sentinel __any_to_string tests, so every value
+    // this cannot name falls through to the arms that were already there. A
+    // class without a to_string therefore keeps printing its bit pattern. That
+    // is a deliberate non-goal: inventing `<Pt object>` would be a new output
+    // format decided by a bug fix, and the field-by-field default belongs with
+    // whatever eventually gives enums the same treatment.
+    fun emit_val_to_string() {
+        // Only classes that supply a to_string body get an arm. effective_method_owner
+        // rather than a class_own_methods lookup, so a subclass that inherits
+        // to_string from its base dispatches to the base's symbol instead of
+        // falling into the default (the #135 shape: no forwarder is emitted for a
+        // method a class does not redeclare, so deriving the symbol from the
+        // concrete class would name something that does not exist).
+        var vts_names: List<String> = this.class_type_ids.keys()
+        var vts_tags: List<String> = []
+        var vts_syms: List<String> = []
+        var vi: Float = 0
+        while (vi < vts_names.length()) {
+            var vc: String = vts_names[vi]
+            var owner: String = this.effective_method_owner(vc, "to_string")
+            if (owner.length() > 0) {
+                var vbare: String = owner
+                if (this.class_bare_of.has(owner)) { vbare = this.class_bare_of.get(owner) }
+                var vtag: Float = this.class_type_ids.get(vc)
+                vts_tags.push(vtag.floor().to_string())
+                vts_syms.push(this.resolve_method_symbol(vbare, "to_string"))
+            }
+            vi = vi + 1
+        }
+        this.emit("")
+        this.emit("define i64 @__val_to_string(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        if (vts_tags.length() == 0) {
+            // No class in this program formats itself. The definition is still
+            // emitted: __any_to_string in base_nanbox.ll calls it unconditionally,
+            // so omitting it would be an undefined symbol in every program that
+            // declares no classes at all.
+            this.emit_terminator("ret i64 0")
+            this.emit("}")
+            this.block_terminated = false
+            return nil
+        }
+        var vts_tag_r: String = this.fresh_local()
+        this.emit_indent(vts_tag_r + " = call i64 @__val_class_tag(i64 %val)")
+        var vts_none: String = this.fresh_label("vts.none")
+        var vts_arms: List<String> = []
+        var vts_cases: String = ""
+        vi = 0
+        while (vi < vts_tags.length()) {
+            var albl: String = this.fresh_label("vts.c")
+            vts_arms.push(albl)
+            vts_cases = vts_cases + " i64 " + vts_tags[vi.floor()] + ", label %" + albl
+            vi = vi + 1
+        }
+        this.emit_terminator("switch i64 " + vts_tag_r + ", label %" + vts_none + " [" + vts_cases + " ]")
+        vi = 0
+        while (vi < vts_arms.length()) {
+            this.start_block(vts_arms[vi.floor()])
+            var sym: String = vts_syms[vi.floor()]
+            var sres: String = this.fresh_local()
+            this.emit_indent(sres + " = call i64 @" + sym + "(i64 %val)")
+            this.called_functions.push(sym)
+            // The tagged->raw step. Note %val is passed through unchanged: a
+            // method takes its receiver exactly as the value sits in the slot
+            // (see any generated call site — `call i64 @Pt__to_string(i64 %t8)`
+            // with no untag), and __val_class_tag already accepted both the
+            // tagged and the bare-pointer spelling, so no normalisation belongs
+            // between the tag read and the call.
+            var sptr: String = this.fresh_local()
+            this.emit_indent(sptr + " = call i8* @__val_untag_ptr(i64 " + sres + ")")
+            var sraw: String = this.ptr_to_val(sptr)
+            this.emit_terminator("ret i64 " + sraw)
+            vi = vi + 1
+        }
+        this.start_block(vts_none)
+        this.emit_terminator("ret i64 0")
+        this.emit("}")
+        this.block_terminated = false
     }
 
     fun emit_reflect_helpers() {
@@ -12465,11 +12572,22 @@ class Codegen {
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
     if (ek == "list_lit") {
+        // Same whitelist, same defect, second copy — see gen_list_lit (BUGS #117).
+        // These two must agree: this function decides what a nested list literal's
+        // element type is, and gen_list_lit decides what the list it emits is typed
+        // as. Fixing only one would leave `[[Pt(1)]]` disagreeing with `[Pt(1)]`.
         var list_elems: List<AST.Expr> = match (expr) { ListLit(e) => e   _ => [] }
         if (list_elems.length() > 0) {
             var first_type: String = this.get_expr_type(list_elems[0])
-            if (first_type == "String") return "List<String>"
-            if (first_type == "Int" or first_type == "Float") return "List<Int>"
+            var ll_homogeneous: Bool = true
+            var llk: Float = 1
+            while (llk < list_elems.length()) {
+                if (this.get_expr_type(list_elems[llk]) != first_type) { ll_homogeneous = false }
+                llk = llk + 1
+            }
+            if (ll_homogeneous and first_type.length() > 0 and first_type != "Any") {
+                return "List<" + first_type + ">"
+            }
         }
         return "List<Any>"
     }
@@ -12672,6 +12790,15 @@ class Codegen {
                 }
             }
         }
+        // `Pt(1)` is class CONSTRUCTION, not a function call, so it is absent from
+        // func_ret_types and this arm used to fall through to "" — the caller then
+        // read that as "unknown". Every consumer that asks what a constructor
+        // expression evaluates to therefore had to already know, which is how
+        // gen_list_lit ended up unable to type `[Pt(1), Pt(2)]` (BUGS #117). The
+        // registry that answers this is right here; consult it.
+        if (this.class_fields.has(callee_name)) {
+            return callee_name
+        }
     }
     if (ek == "is_check") return "Bool"
     if (ek == "binary") {
@@ -12776,13 +12903,36 @@ class Codegen {
     } else {
         this.emit_indent(list_val + " = call i64 @__list_new()")
     }
+    // The element type used to be recognised from a two-entry whitelist — String,
+    // or Int/Float collapsed to Int — and everything else stayed Any. A list of
+    // class instances therefore produced `List<Any>`, so `un[0].to_string()` had an
+    // untyped receiver, dispatch was dropped, and the raw pointer printed as a
+    // subnormal double (BUGS #117). Annotating the variable was the workaround.
+    //
+    // Take whatever type the element actually has instead of enumerating the ones
+    // we happen to know. Homogeneity is required: a `List<T>` that lies is worse
+    // than `List<Any>`, because Any routes to the runtime dispatch that already
+    // handles scalars, while a wrong T dispatches statically to the wrong class.
+    // Mixed lists stay Any, matching the checker's arm for the same expression.
+    //
+    // Float is no longer folded into Int. That fold predates the Int/Float split
+    // and is a lie the moment anything reads the element type back — except in
+    // identity mode, where the two really are one representation, and get_expr_type
+    // already answers "Int" for a float there.
     var elem_type: AST.Type = AST.Type.AnyType
     var i: Float = 0
     while (i < elements.length()) {
         if (i == 0) {
             var ft: String = this.get_expr_type(elements[0])
-            if (ft == "String") { elem_type = AST.Type.StringType }
-            else if (ft == "Int" or ft == "Float") { elem_type = AST.Type.IntType }
+            var homogeneous: Bool = true
+            var hj: Float = 1
+            while (hj < elements.length()) {
+                if (this.get_expr_type(elements[hj]) != ft) { homogeneous = false }
+                hj = hj + 1
+            }
+            if (homogeneous and ft.length() > 0 and ft != "Any") {
+                elem_type = this.str_to_type(ft)
+            }
         }
         var elem: String = this.gen_arg_value(elements[i])
         var discard_lp: String = this.fresh_local()

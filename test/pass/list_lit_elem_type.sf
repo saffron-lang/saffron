@@ -1,0 +1,67 @@
+// BUGS #117 — an unannotated list literal of class instances lost its element
+// type, so a method call on an element had an untyped receiver, dispatch was
+// dropped, and the raw pointer printed as 5.21502e-310.
+//
+// The element type is only inferred when every element agrees. A mixed literal
+// stays List<Any> on purpose: a wrong List<T> is worse than List<Any>, because
+// Any routes to runtime dispatch while a lying T dispatches statically into the
+// wrong class.
+import "@test" as Test
+
+class Pt {
+    var x: Int
+    fun init(x: Int) { this.x = x }
+    fun to_string(): String { return "Pt(${this.x})" }
+    fun doubled(): Int { return this.x * 2 }
+}
+
+// The reported case: no annotation, homogeneous class instances.
+var unannotated = [Pt(1), Pt(2)]
+Test.assert_eq(unannotated[0].to_string(), "Pt(1)", "unannotated class list keeps its element type")
+Test.assert_eq(unannotated[1].doubled(), 4, "and a non-to_string method dispatches too")
+
+// The annotated spelling was already correct; it must stay correct.
+var annotated: List<Pt> = [Pt(3)]
+Test.assert_eq(annotated[0].to_string(), "Pt(3)", "annotated class list unchanged")
+
+// Nested literals go through get_expr_type's own list_lit arm, a second copy of
+// the same inference. The two must agree or [[Pt]] disagrees with [Pt].
+var nested = [[Pt(7)]]
+var inner = nested[0]
+Test.assert_eq(inner[0].to_string(), "Pt(7)", "nested class list agrees with the flat case")
+
+// Scalars: the pre-#117 code special-cased String and Int only, so these are
+// the no-regression controls.
+var ints = [10, 20, 30]
+Test.assert_eq(ints[1], 20, "int list")
+var strs = ["ab", "cd"]
+Test.assert_eq(strs[0].to_upper(), "AB", "string list, method on element")
+var floats = [1.5, 2.5]
+Test.assert_eq(floats[0] + floats[1], 4.0, "float list is no longer folded to Int")
+var bools = [true, false]
+Test.assert_eq(bools[0].to_string(), "true", "bool list")
+var lol = [[1, 2], [3, 4]]
+var row = lol[1]
+Test.assert_eq(row[0], 3, "list of int lists")
+
+// An empty literal has no first element to mirror.
+var empty: List<Int> = []
+Test.assert_eq(empty.length(), 0, "empty list")
+
+// Mixed stays Any, which is the point: Any routes to runtime tag dispatch, so
+// both elements still format correctly even though the literal has no single
+// element type. (When this test was written the class element printed its bit
+// pattern — that was BUGS #115, fixed separately, and this assertion is now the
+// evidence the two fixes compose.)
+var mixed = [Pt(1), 2]
+Test.assert_eq(mixed[1], 2, "mixed literal falls back to List<Any>")
+Test.assert_eq("${mixed}", "[Pt(1), 2]", "and Any elements still format via runtime dispatch")
+
+// A variable used only inside a list literal drew a false "unused variable"
+// warning, because the checker's ListLit arm never walked its elements — the
+// same un-walked-subtree defect as #126 and #121. Fixed by the same change.
+var used_only_in_list = 5
+var holder = [used_only_in_list]
+Test.assert_eq(holder[0], 5, "element expressions are walked by the checker")
+
+Test.summary()
