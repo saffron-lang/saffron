@@ -10679,6 +10679,60 @@ class Codegen {
         }
     }
 
+    /// Second pass over global `var`s, typing the ones the FIRST pass had to give
+    /// up on: those whose type is only knowable from a *call* in the initializer.
+    ///
+    /// Two passes rather than one because of an ordering the first pass cannot
+    /// escape. Globals must be registered in `module_globals` and emitted as
+    /// `@__g_*` before any IR generation, but a call's type comes from
+    /// `func_ret_types`, which `prescan_decls` fills — and that runs *after* the
+    /// global pass at all three entry points. So the first pass sees an empty
+    /// `func_ret_types` and can only resolve literal shapes (list/map/string),
+    /// which is exactly what its `starts_with("List")` allowlist encodes.
+    ///
+    /// That allowlist is BUGS #146: `var b = make()` where `make(): Box` matched
+    /// nothing in it, so the global stayed out of `global_var_types`, dispatch fell
+    /// through to codegen's `Int` default, and every method on it was rejected with
+    /// "type 'Int' has no method 'bump'" — but only when read from inside a
+    /// function body. At top level the statement walk has already typed the
+    /// variable through `typed_vars`, and a *local* `var b = make()` is typed the
+    /// same way, which is why the bug needed the global-plus-function-body
+    /// combination to appear.
+    ///
+    /// Call this AFTER prescan_decls, for the same corpus and prefix. It only ever
+    /// adds: a global already typed by the first pass is left alone, so annotated
+    /// and literal-initialized globals cannot be perturbed by this pass at all.
+    fun prescan_global_call_types(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var si: Float = start
+        while (si < end) {
+            if (this.classify_stmt(stmts[si]) == "var") {
+                var name: String = this.get_var_name(stmts[si])
+                // Already decided — by an annotation, or by the first pass's
+                // literal inference. Never overwrite either.
+                if (name.length() > 0 and !this.global_var_types.has(prefix + name) and !this.global_var_types.has(name)) {
+                    var vtype: String = this.get_var_type(stmts[si])
+                    if (vtype.length() == 0 or vtype == "Any") {
+                        // Only a call's type is new information here; the literal
+                        // shapes were already resolved by the first pass, and
+                        // re-deriving them would just duplicate its allowlist.
+                        var init: AST.Expr = this.get_var_init(stmts[si])
+                        var ik: String = this.classify_expr(init)
+                        if (ik == "call" or ik == "method_call") {
+                            var ity: String = this.get_expr_type(init)
+                            if (ity.length() > 0 and ity != "Any" and ity != "Nil") {
+                                this.global_var_types.set(name, ity)
+                                if (prefix.length() > 0) {
+                                    this.global_var_types.set(prefix + name, ity)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            si = si + 1
+        }
+    }
+
     // --- Statement codegen ---
 
     // @codegen-split: output
@@ -12377,6 +12431,20 @@ class Codegen {
             var inner_resolved: String = this.resolve_class_type(inner_class)
             if (inner_resolved.length() > 0) {
                 mc_obj_type = this.get_field_type(inner_resolved, inner_field)
+            }
+        }
+        // Alias-qualified free function: `Lib.make()`. The parser builds this as a
+        // MethodCall whose receiver is a module alias, not a value, so none of the
+        // class lookups below can resolve it — the alias has no type. The `call`
+        // arm further down already handles this shape for a bare Call; without the
+        // same arm here, `var b = Lib.make()` typed as Any and dispatch fell
+        // through to Int (BUGS #146). Checked before the class lookups because a
+        // module alias is never a class instance, so there is nothing to lose by
+        // answering first.
+        if (mc_obj_name.length() > 0 and this.has_module_alias(mc_obj_name)) {
+            var alias_full: String = this.module_alias_prefix(mc_obj_name) + mc_method
+            if (this.func_ret_types.has(alias_full)) {
+                return this.type_to_string(this.func_ret_types.get(alias_full))
             }
         }
         // If object is a user class, look up method return type
@@ -16385,6 +16453,16 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         gen.prescan_decls(df_stmts, 0, df_stmts.length(), module_prefixes_list[df_mi])
         df_mi = df_mi + 1
     }
+    // Now that func_ret_types is populated, type the globals whose initializer is
+    // a call — the case the pass above could not see (BUGS #146). Second pass, not
+    // a reorder: the global pass must run before any IR generation and this one
+    // must run after prescan_decls, so the two cannot be one.
+    var dg_mi: Float = 0
+    while (dg_mi < module_stmts.length()) {
+        var dg_stmts: List<AST.Stmt> = module_stmts[dg_mi]
+        gen.prescan_global_call_types(dg_stmts, 0, dg_stmts.length(), module_prefixes_list[dg_mi])
+        dg_mi = dg_mi + 1
+    }
 
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
@@ -17065,6 +17143,15 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     // live for top-level functions: a caller declared above its callee inferred
     // Int for the result and every method on it silently fell through (#37).
     gen.prescan_decls(program, 0, program.length(), "")
+    // Second global pass, now that func_ret_types exists: type the globals whose
+    // initializer is a call (BUGS #146). Modules first, then the main program, in
+    // the same order as the prescan above.
+    var pg_mi: Float = 0
+    while (pg_mi < prefixes.length()) {
+        gen.prescan_global_call_types(all_stmts, boundaries[pg_mi], boundaries[pg_mi + 1], prefixes[pg_mi])
+        pg_mi = pg_mi + 1
+    }
+    gen.prescan_global_call_types(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []
@@ -17766,6 +17853,15 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
     // live for top-level functions: a caller declared above its callee inferred
     // Int for the result and every method on it silently fell through (#37).
     gen.prescan_decls(program, 0, program.length(), "")
+    // Second global pass, now that func_ret_types exists: type the globals whose
+    // initializer is a call (BUGS #146). Modules first, then the main program, in
+    // the same order as the prescan above.
+    var pg_mi: Float = 0
+    while (pg_mi < prefixes.length()) {
+        gen.prescan_global_call_types(all_stmts, boundaries[pg_mi], boundaries[pg_mi + 1], prefixes[pg_mi])
+        pg_mi = pg_mi + 1
+    }
+    gen.prescan_global_call_types(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []
