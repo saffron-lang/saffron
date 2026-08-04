@@ -508,18 +508,21 @@ open numbers; trust that over any summary here, including this one. Do not read
 the count by measuring the section — `## Resolved` keeps closed entries in the
 file for their narratives, so the file is long by design.
 
-The two long-standing design limitations:
+The one long-standing design limitation:
 - **#2**: forward references in nested closures — compile-time local resolution,
   same as Lua/Python
-- **#6**: no `break`/`continue` type checking — the runtime nodes exist, the
-  checker ignores them
 
-One open trap worth knowing before you trust a clean compile:
-- **#122**: *assigning* to a nonexistent module member (`Module.nope = 3`) still
-  compiles clean, exits 0, and emits IR that `opt` rejects. The read half of this
-  (#118) is fixed and now reports the missing member; the write half is not.
+#6 (`break`/`continue` outside a loop) and #122 (*assigning* to a nonexistent
+module member) were both described here as open and are both fixed — `break`
+outside a loop is now a checker error, and `Module.nope = 3` reports
+`no member 'nope' in module 'Iter'` and exits 1. This section had them wrong for a
+while, which is the argument for the paragraph above: read the state from
+`BUGS.md`'s `## Open`, and when a claim about the compiler matters, probe the
+binary. A four-line repro settles in seconds what a summary can be stale about for
+weeks — and prose is staler than a count, because nothing forces it to move when
+an entry closes.
 
-Both #118 and #119 are fixed, but the habit they should leave behind is worth
+#118 and #119 are fixed too, but the habit they should leave behind is worth
 keeping: a compiler that exits 0 is not evidence it read your file. #119 in
 particular made `saffronc in.sf out.sf.ll` compile the *output* path and exit 0,
 so ad-hoc sweeps reported nothing while appearing to report everything. When you
