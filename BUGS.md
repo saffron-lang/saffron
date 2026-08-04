@@ -3,9 +3,22 @@
 ## Open
 
 **13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #162. Next free number is **#163**. #161 is claimed but not present here: it
-is the `sfx` worktree's committed entry (a method call binding to a same-named
-class in another module) and will arrive with that merge.
+#160, #162. Next free number is **#164**.
+
+#163 is taken and is *not* in the list above because it is already fixed — three
+malformed-`import` defects, filed and resolved on sight, so it lives under
+Resolved. #161 is taken and not present here at all: it is the `sfx` worktree's
+committed entry (a method call binding to a same-named class in another module)
+and will arrive with that merge. Both are the ordinary case the rule below
+describes — the next-free number is one past the highest *claimed*, not one past
+the highest open or even the highest written.
+
+Worth recording how #162 and #163 avoided contesting each other, because it is
+the first time the scheme resolved a three-way overlap with no renumber at all:
+#163 was claimed *after* #161 and #162, saw both, and stepped over them to 163
+rather than treating an unpushed claim as free. The "unpushed side moves" rule
+would have let it take 162; it did not need to, and not exercising a tie-break
+you are entitled to is cheaper than winning it.
 
 **#162 is the sixth collision, and it was caught twice by the same grep.** It was
 filed as #156, which `main` had already taken for the `var x = nil` fix; the
@@ -30,7 +43,14 @@ fieldless variant is the immediate `tag << 56` with nothing to hang a header on,
 it needs an enum-bearing NaN-box tag rather than another formatter arm.
 
 **12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160. Next free number is **#161**.
+#160. Next free number is **#164**.
+
+#161 and #162 are claimed but not present here: #161 is the sfx line's
+cross-module method-binding bug and #162 is the saffron_154 line's SSA-temp GC
+bug, both committed there and unpushed when this entry was written. Per the
+rule below, whoever is unpushed moves — but both were claimed *before* #163,
+so #163 stepped over them rather than contesting either. #163 is resolved on
+sight and is filed under Resolved.
 
 #160 took its number without a collision — the first entry in a while to do so.
 The pre-commit re-read (see the note below) was run against `origin/main` and
@@ -1123,6 +1143,81 @@ semicolon alone.
 ---
 
 ## Resolved
+
+### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
+
+```saffron
+import { map } bananas "@iter"       // no `from` — accepted, exit 0
+import bananas as B                  // unquoted path — accepted, exit 0
+
+import { map } from "@iter"          // and this pair, both well-formed:
+import { filter } from "@iter"       // the second line ERASED `map`
+```
+
+Three separate defects with one shape: a malformed or unusual import line was
+accepted by the parser, produced no diagnostic, exited 0, and then failed
+downstream in a message that named a symbol the user never wrote.
+
+**The `from` slot was skipped without being read.** `parse_import`
+(`parser.sf:3044`) did `this.consume("}")` and then a bare `this.advance()` over
+whatever stood where `from` belongs. `from` is a soft keyword — the lexer has no
+token for it, so it arrives as `TkIdent("from")` and must be compared by text —
+which is why an unconditional advance looked plausible.
+
+Accepting it is worse than it sounds, because the *live* import resolution is not
+the parser. It is the text scanner `extract_named_imports` (`main.sf:777`), which
+keys on the literal `from `. So the two disagreed: the parser said fine, the
+scanner matched nothing and registered no names, `map` reached codegen as an
+undefined function — a **warning**, exit 0 — and the build died in the linker
+with `ld: symbol(s) not found for architecture arm64` for `_map`.
+
+**The path was defaulted rather than required.** Both forms read the path through
+`match (kind) { TkString(s) => s   _ => "" }` and carried on with `""`. So
+`import bananas as B` compiled clean, `extract_imports` (`main.sf:734`) keyed on
+`import "` and matched nothing, and every use of `B` became an undefined-variable
+error blaming the use site for a malformed import line three screens up.
+
+**Two named-import lines from the same module: the second erased the first.**
+`extract_named_imports` accumulates into a map keyed by module **path** and did
+`result.set(imp_path, trimmed_names)`. A second `import { ... } from "@iter"`
+replaced the first line's names outright. This one is the worst of the three,
+because the program is *valid*:
+
+```
+saffron: the compiler emitted invalid LLVM IR for prog.sf
+saffron: this is a compiler bug, not an error in your program.
+  error: use of undefined value '@map'
+```
+
+The compiler was right that it was a compiler bug, and wrong about everything a
+user could do with that.
+
+**Why none of this showed up.** A survey of every import in `src/`, `test/` and
+`tools/` finds exactly two shapes: `import "path"` (411 sites) and
+`import { names } from "path"` (7). Every one is well-formed, and no module is
+named-imported on two lines. The compiler's own source cannot reach any of the
+three paths, so bootstrap — including the gen4 fixed point — is fully green with
+all three present. This is the identity-mode blind spot in a new place: the
+source that exercises the compiler is not adversarial about its own syntax.
+
+**Fix.** `parse_import` requires `from` by text and reports through
+`parse_error_at` with the offending token's span; both forms require a non-empty
+string-literal path the same way; `extract_named_imports` merges into the
+existing list for a path instead of replacing it, de-duplicating names so a name
+repeated across two lines is not registered twice.
+
+The two new diagnostics are one-sided by construction — they fire only on a line
+that is already malformed — which is what makes them safe against 411 existing
+call sites.
+
+Tests: `test/fail/import_missing_from.sf` and `test/fail/import_unquoted_path.sf`
+(both rejected, exit 1), and `test/pass/import_forms_ok.sf`, which pins the
+let-through set: the alias form, the single-name form, the multi-name form, and
+two lines from one module all still resolve.
+
+Verified: bootstrap green including 0 unresolved inference fallbacks and the
+STAGE 2 gen4 fixed point; suite 308 passed, 8 failed, failure set identical by
+name to the 8-name baseline, comm-diffed both directions.
 
 ### 159. FIXED — a class or enum used as a condition was deterministically always false
 

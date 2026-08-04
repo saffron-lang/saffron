@@ -3052,15 +3052,50 @@ class Parser {
                 names.push(this.expect_ident())
             }
             this.consume("}")
+            // `from` is a soft keyword: the lexer has no token for it, so it
+            // arrives as TkIdent("from") and has to be checked by text. This used
+            // to be a bare `this.advance()`, which skipped whatever stood here
+            // without looking — so `import { map } bananas "@iter"` parsed clean.
+            //
+            // Accepting it silently is worse than it sounds, because the *live*
+            // import resolution is the text scanner `extract_named_imports`
+            // (main.sf:777), and that one requires the literal `from `. So the
+            // two disagreed: the parser said fine, the scanner found no `from`
+            // and registered no names, and `map` reached codegen as an undefined
+            // function — a *warning*, exit 0 — then failed at link time with
+            // `ld: symbol(s) not found`. A missing keyword surfaced as a linker
+            // error about a symbol the user never wrote.
+            if (!this.is_ident_named("from")) {
+                this.parse_error_at(this.current_span(),
+                    "expected 'from' after the imported names, but found '"
+                        + this.current_token_str() + "'")
+            }
             this.advance()
             var kind: Lexer.TokenKind = this.current_kind()
+            // The path must be a string literal for the same reason: the scanner
+            // reads the quoted text, so anything else silently imports nothing.
             var path: String = match (kind) { TkString(s) => s    _ => "" }
+            if (path.length() == 0) {
+                this.parse_error_at(this.current_span(),
+                    "expected a quoted module path after 'from', but found '"
+                        + this.current_token_str() + "'")
+            }
             this.advance()
             // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
             return AST.Stmt.ExprStmt(AST.Expr.NilLit)
         }
         var kind: Lexer.TokenKind = this.current_kind()
         var path: String = match (kind) { TkString(s) => s    _ => "" }
+        // Same hole as the named form above: the `match` defaulted the path to ""
+        // and the parser carried on, so `import bananas as B` compiled clean and
+        // exited 0. `extract_imports` (main.sf:734) keys on the literal
+        // `import "`, so an unquoted path resolved to nothing and every use of
+        // the alias became an undefined-variable or link error instead.
+        if (path.length() == 0) {
+            this.parse_error_at(this.current_span(),
+                "expected a quoted module path after 'import', but found '"
+                    + this.current_token_str() + "'")
+        }
         this.advance()
         if (this.match_kind_check("as") or this.is_ident_named("as")) {
             this.advance()
