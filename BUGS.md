@@ -3,7 +3,7 @@
 ## Open
 
 **9 open entries:** #2, #49, #65, #75, #107, #131, #132, #147,
-#154. Next free number is **#155**.
+#154. Next free number is **#156**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -627,6 +627,80 @@ which is how the residual stayed measured rather than assumed.
 ---
 
 ## Resolved
+
+### 155. FIXED — `var x = nil` typed the variable as the singleton `Nil` forever
+
+```saffron
+var x = nil
+x = 5                  // accepted SILENTLY — no error, no widening
+IO.println("${x}")     // ERROR: cannot call .to_string() on nullable 'x' (type Nil)
+```
+
+**Severity: medium**, and unusually clear-cut: this **rejected a correct
+program**. Not a silent wrong answer — the assignment was swallowed without
+complaint and then every *use* of the variable was a hard compile error, which is
+the worst pairing of the two failure modes. The write looks fine; the read is
+fatal.
+
+**What made it airtight rather than merely annoying: the diagnostic's own advice
+did not work.** "add a nil check first" is what the error says, and
+
+```saffron
+var b = nil
+b = 5
+if (b != nil) { IO.println("${b}") }   // STILL an error
+```
+
+fails too, because narrowing `Nil` by removing `Nil` leaves `Nil`. There was no
+spelling of the program that kept the bare initializer and compiled. The only way
+out was an annotation (`var c: Int|Nil = nil`), i.e. not using the feature.
+
+**One site, in `checker.sf`'s `VarDecl` arm.** `infer_type(NilLit)` correctly
+answers `NilType` — that arm is right about the *expression*. The defect was the
+declaration consuming it: the branch reads `init_type != "Any"` and stores
+whatever it got, so `Nil` was treated as a real inferred type rather than as the
+absence of one. Verified this is the only such site: the other two `VarDecl` arms
+are visibility passes, not inference.
+
+**Why `Any` and not something cleverer.** A bare `nil` initializer carries no
+information about what the variable is *for*, which is exactly what the existing
+cannot-infer branch already means — so `Nil` joins it. Two independent reasons
+this is the honest answer rather than a workaround:
+
+- **Codegen had already made the same call.** `merge_entry_type`
+  (`types_body.sf`) folds an observed `"Nil"` into `"Any"` for map entry types,
+  on the same reasoning. The checker was the outlier.
+- **A flow-sensitive "widen on first assignment" rule would be a bigger, worse
+  change.** It would make the declaration's type depend on a later statement,
+  and it still could not answer for a variable assigned in two branches with
+  different types. `Any` is what the language already says for "unknown".
+
+**The one case that genuinely wants the singleton still works.**
+`test/pass/first_class_types.sf` asserts `x is Nil` on exactly this shape. `is`
+answers correctly through an `Any` slot — verified, not assumed — so widening the
+*static* type loses nothing here, and the runtime value is of course still nil
+until assigned.
+
+**The warning got its own wording rather than reusing the branch's.** "cannot
+infer type, add explicit annotation" would be false: nothing failed, the
+initializer is explicit, and the message reads as a compiler shortcoming. It now
+says `x: initialized to nil with no type; annotate it (e.g. 'var x: Int|Nil =
+nil') to get a checked type` — the true statement, plus the actual advice, which
+is to name the type the variable will eventually hold. It stays a warning, not an
+error: `var x = nil` is legal and sometimes what you mean.
+
+Verified: bootstrap green through stage 2 (gen3→gen4 fixed point; only the three
+known benign gen2 `@extern private` lines, identical to the pre-change baseline
+log); `test/pass/nil_init_infers_any.sf` **8/8**, covering the reported case, a
+String, a class instance (which also shows this composes with #115's runtime tag
+switch), the nil guard that used to be unrescuable, an unassigned var still being
+nil, `is Nil`, two successive assignments of different types, and the annotated
+spelling; `first_class_types.sf` unchanged; the four bare `var x = nil` sites in
+the tree (two in `src/lib/template.sf`, plus two tests) all still behave — note
+`template.sf` only survived the bug by passing the value to a function instead of
+calling a method on it.
+
+---
 
 ### 115. FIXED — a class instance reaching a formatter printed its raw bit pattern
 

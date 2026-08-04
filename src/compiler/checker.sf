@@ -2478,10 +2478,32 @@ class NullChecker {
                         this.error_at(__ns, name + ": cannot assign " + init_type + " to " + type_ann_str)
                     }
                     this.env.define_var(name, type_ann_node)
-                } else if (init_type != "Any") {
+                } else if (init_type != "Any" and init_type != "Nil") {
                     // Inferred from initializer
                     this.env.define_var(name, init_type_node)
                 } else {
+                    // `init_type == "Nil"` joins the cannot-infer branch below
+                    // rather than being stored (BUGS #155). `var x = nil` used to
+                    // type x as the singleton Nil *permanently*: the later `x = 5`
+                    // was accepted silently, and then every use of x was a hard
+                    // error, "cannot call .to_string() on nullable 'x' (type Nil)".
+                    // A correct program was rejected, and the diagnostic's own
+                    // advice did not work — adding `if (x != nil)` narrows Nil by
+                    // removing Nil, which leaves Nil, so the guard could not
+                    // rescue it. There was no spelling of the program that both
+                    // kept the bare initializer and compiled.
+                    //
+                    // Any is the honest answer, not a workaround: a bare `nil`
+                    // initializer carries no information about what the variable
+                    // is *for*, which is exactly what this branch already means.
+                    // Codegen reached the same judgment independently —
+                    // merge_entry_type (types_body.sf) folds an observed "Nil"
+                    // into "Any" for the same reason.
+                    //
+                    // `is` still answers correctly, which is what makes this safe
+                    // for the one case that genuinely wants the singleton: an
+                    // Any-typed nil satisfies `x is Nil` (verified, not assumed —
+                    // test/pass/first_class_types.sf asserts it).
                     // Cannot infer type — warning (not blocking).
                     //
                     // Except for the parser's own temporaries. `x++` desugars to
@@ -2495,7 +2517,18 @@ class NullChecker {
                     // already exempt from the unused-variable warning at line 399
                     // for the same reason.
                     if (!name.starts_with("__")) {
-                        this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
+                        // A bare `nil` initializer gets its own wording. "cannot
+                        // infer type" would be false — nothing failed; the
+                        // initializer is explicit and says nothing about intent —
+                        // and "add explicit annotation" reads as a compiler
+                        // shortcoming rather than as the actual advice, which is to
+                        // name the type the variable will eventually hold.
+                        if (init_type == "Nil") {
+                            this.warn_at(__ns, name + ": initialized to nil with no type; "
+                                + "annotate it (e.g. 'var " + name + ": Int|Nil = nil') to get a checked type")
+                        } else {
+                            this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
+                        }
                     }
                     this.env.define_var(name, AST.Type.AnyType)
                 }
