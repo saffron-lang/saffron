@@ -997,6 +997,59 @@ class Codegen {
         }
     }
 
+    /// True when inference has not resolved this type — invariant I2's marker.
+    ///
+    /// Codegen needs this because a FunDecl's `ret_type` is now a node, and an
+    /// *omitted* return annotation is `UnknownType` rather than a sentinel type
+    /// name. The pre-registration sites used to ask `ret.length() > 0` of the
+    /// String they got back, which answered "is this a FunDecl at all" and could
+    /// not answer "did the author write an annotation" — the two questions the
+    /// old encoding conflated.
+    ///
+    /// Every variant is spelled out rather than using `_ =>`, because a wildcard
+    /// arm here would keep answering after a new variant is added to `Type`,
+    /// and answering wrongly (BUGS #76: a missing arm yields an indeterminate
+    /// value, so an over-broad one is the safer-looking of two bad options).
+    fun is_unknown_type(t: AST.Type): Bool {
+        return match (t) {
+            UnknownType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+            NeverType => false
+        }
+    }
+
+    /// The return type to record in `func_ret_types` for a declaration.
+    ///
+    /// `func_ret_types` is read at every call site to type that call's result,
+    /// and invariant I2 keeps `UnknownType` out of those readers. The old
+    /// encoding could not produce one: an omitted return annotation arrived here
+    /// as a sentinel *type name* — `"Nil"` for a FunDecl — so every reader saw a
+    /// real type whether or not the author wrote one. Collapsing back to Nil
+    /// leaves all of them seeing exactly what they saw before, which is what
+    /// keeps this migration confined to the parser and the checker.
+    ///
+    /// The collapse is the slice's remaining debt, not its intent. A later slice
+    /// teaches the call-site typing to ask "was anything declared?" rather than
+    /// reading a stand-in type, and this function goes away with the question.
+    /// Lambdas are the exception and are handled in `gen_function`: their omitted
+    /// annotation used a *different* sentinel, `"Int"`, whose whole effect was to
+    /// switch the implicit-return path on.
+    fun ret_type_for_registration(t: AST.Type): AST.Type {
+        if (this.is_unknown_type(t)) { return AST.Type.NilType }
+        return t
+    }
+
     fun is_list_type(t: AST.Type): Bool {
         return match (t) {
             GenericType(base, args) => base == "List"
@@ -5946,7 +5999,7 @@ class Codegen {
 
 
     // @codegen-split: closures
-    fun gen_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
+    fun gen_lambda(params: List<AST.Param>, ret_type: AST.Type, body: List<AST.Stmt>): String {
         // Find captured variables (free variables in body not in params)
         var param_names: List<String> = []
         var pi: Float = 0
@@ -6192,7 +6245,13 @@ class Codegen {
         return result
     }
 
-    fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>, boxed_caps: List<String>) {
+    /// A capturing lambda's body. `ret_type` is a node, as on gen_function, and
+    /// only its LLVM lowering is wanted here — every Saffron type is i64, so the
+    /// name is all `llvm_type` reads. There is no implicit-return branch in this
+    /// emitter: gen_stmts handles the body wholesale, and the lambda's last
+    /// expression is already a `Return` by the time the parser is done with the
+    /// `=>` form.
+    fun gen_closure_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>, captures: List<String>, boxed_caps: List<String>) {
         this.known_functions.push(name)
         // We are about to emit a function body, so `in_function` must be true for
         // the duration.
@@ -6227,7 +6286,7 @@ class Codegen {
         this.reset_locals()
         this.typed_vars = {}
         this.string_vars = []
-        var ret_llvm: String = this.llvm_type(ret_type)
+        var ret_llvm: String = this.llvm_type(this.type_to_string(ret_type))
         this.current_ret_type = ret_llvm
 
         // Check if this closure is a coroutine
@@ -7289,7 +7348,7 @@ class Codegen {
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+                    this.func_ret_types.set(emit_name, this.ret_type_for_registration(ret_type))
                     this.intrinsic_funcs.push(emit_name)
                 } else if (doc.starts_with("@inline")) {
                     // Mark function for alwaysinline attribute, then process normally
@@ -7315,7 +7374,7 @@ class Codegen {
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+                    this.func_ret_types.set(emit_name, this.ret_type_for_registration(ret_type))
                     this.extern_sigs.set(emit_name, c_sig)
                     this.extern_param_types.set(emit_name, this.param_types_csv(params))
                 } else if (doc.starts_with("@extend:")) {
@@ -7538,9 +7597,18 @@ class Codegen {
             while (ai < call_args.length()) {
                 var arg_kind: String = this.classify_expr(call_args[ai])
                 if (arg_kind == "lambda") {
-                    var lam_ret: String = match (call_args[ai]) { Lambda(p, r, b) => r   _ => "" }
-                    if (lam_ret.length() > 0 and lam_ret != "Int" and lam_ret != "Any") {
-                        return lam_ret
+                    // The two spellings excluded here were the *sentinels*: an
+                    // unannotated lambda carried "Int", and "Any" carries no
+                    // information a generic could be inferred from. With the node
+                    // encoding the first is UnknownType and states outright that
+                    // nothing was declared, so it is excluded by name rather than
+                    // by guessing from a type that happened to mean "absent".
+                    var lam_ret: AST.Type = match (call_args[ai]) { Lambda(p, r, b) => r   _ => AST.Type.UnknownType }
+                    if (!this.is_unknown_type(lam_ret)) {
+                        var lam_ret_str: String = this.type_to_string(lam_ret)
+                        if (lam_ret_str != "Int" and lam_ret_str != "Any") {
+                            return lam_ret_str
+                        }
                     }
                 }
                 if (arg_kind == "string") {
@@ -7919,11 +7987,12 @@ class Codegen {
         i = 0
         while (i < methods.length()) {
             var mname: String = this.get_fun_name(methods[i])
-            var mret: String = this.get_fun_ret(methods[i])
+            var mret: AST.Type = this.get_fun_ret(methods[i])
             var full_name: String = name + "__" + mname
             var prefixed_full: String = this.current_prefix + full_name
-            this.func_ret_types.set(prefixed_full, this.str_to_type(mret))
-            this.func_ret_types.set(full_name, this.str_to_type(mret))
+            var mret_reg: AST.Type = this.ret_type_for_registration(mret)
+            this.func_ret_types.set(prefixed_full, mret_reg)
+            this.func_ret_types.set(full_name, mret_reg)
             this.known_functions.push(prefixed_full)
             this.known_functions.push(full_name)
             this.func_prefix_map.set(full_name, prefixed_full)
@@ -7963,9 +8032,16 @@ class Codegen {
         }
     }
 
-    fun get_fun_ret(stmt: AST.Stmt): String {
+    /// The declared return type of a FunDecl, as a node.
+    ///
+    /// Every caller used to take the String this returned and immediately hand it
+    /// to `str_to_type`, so the migration to `AST.Type` deleted a round-trip
+    /// rather than adding one. The non-FunDecl fallback is UnknownType, which is
+    /// also what callers now test instead of the old `ret.length() > 0` — an
+    /// emptiness probe that could not tell "not a function" from "no annotation".
+    fun get_fun_ret(stmt: AST.Stmt): AST.Type {
         return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => r
-            _ => ""
+            _ => AST.Type.UnknownType
         }
     }
 
@@ -7978,7 +8054,7 @@ class Codegen {
     fun gen_class_method(class_name: String, method: AST.Stmt) {
         var mname: String = this.get_fun_name(method)
         var mparams: List<AST.Param> = this.get_fun_params(method)
-        var mret: String = this.get_fun_ret(method)
+        var mret: AST.Type = this.get_fun_ret(method)
         var mbody: List<AST.Stmt> = this.get_fun_body(method)
         var mdoc: String = this.get_fun_doc(method)
         var full_name: String = class_name + "__" + mname
@@ -10820,8 +10896,7 @@ class Codegen {
             this.known_functions.push(xemit)
             this.extern_sigs.set(xemit, c_sig)
             this.extern_param_types.set(xemit, this.param_types_csv(this.get_fun_params(stmt)))
-            var xret: String = this.get_fun_ret(stmt)
-            if (xret.length() > 0) { this.func_ret_types.set(xemit, this.str_to_type(xret)) }
+            this.func_ret_types.set(xemit, this.ret_type_for_registration(this.get_fun_ret(stmt)))
             return nil
         }
 
@@ -10844,12 +10919,14 @@ class Codegen {
         // gen_function runs falls back to Int and misdispatches every method on
         // the result (BUGS #33). gen_function still sets this, but only when it
         // reaches the declaration — too late for a caller appearing earlier.
-        var ret: String = this.get_fun_ret(stmt)
-        if (ret.length() > 0) {
-            this.func_ret_types.set(emit_name, this.str_to_type(ret))
-            if (prefix.length() > 0) {
-                this.func_ret_types.set(name, this.str_to_type(ret))
-            }
+        // No emptiness probe: `ret` is a node, and the old `length() > 0` was
+        // asking a question about a String that this call site could not fail —
+        // `stmt` is already known to be a FunDecl here. An omitted annotation
+        // registers as Nil, matching the stand-in the parser used to supply.
+        var ret: AST.Type = this.ret_type_for_registration(this.get_fun_ret(stmt))
+        this.func_ret_types.set(emit_name, ret)
+        if (prefix.length() > 0) {
+            this.func_ret_types.set(name, ret)
         }
     }
 
@@ -10967,7 +11044,32 @@ class Codegen {
     // --- Statement codegen ---
 
     // @codegen-split: output
-    fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
+    /// `ret_type` is an AST.Type node. Two derived strings are computed once, at
+    /// the top, because the two questions the old String answered are different
+    /// and the old encoding could only answer them together:
+    ///
+    ///   ret_name — the type's *name*, for llvm_type and for the "void" test.
+    ///     Faithful (`type_to_string`), and "Unknown" when nothing was declared.
+    ///   implicit_return — whether the body's last ExprStmt becomes the result.
+    ///
+    /// The second is the one that needed care. It used to be spelled
+    /// `ret_type != "Nil" and ret_type != "void"`, which read the *parser's
+    /// sentinel* rather than any property of the type — and the two sentinels
+    /// disagreed. A FunDecl with no annotation carried "Nil" and so had implicit
+    /// return SUPPRESSED; a Lambda with no annotation carried "Int" and so had it
+    /// ENABLED. Both are now UnknownType, so the distinction has to be restored
+    /// from something real, and the real difference is the construct: a lambda
+    /// body is an expression form and `fun () { 42 }` must keep yielding 42,
+    /// while `fun f() { 42 }` has always discarded it. `emit_name` already
+    /// carries that fact — gen_lambda names every lambda `__lambda_N` — so the
+    /// construct is recoverable without threading a flag through six callers.
+    /// Measured on the pre-migration binary before it was written down; see the
+    /// table in docs/design/compiler-rewrite.md.
+    fun gen_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>) {
+        var ret_name: String = this.type_to_string(ret_type)
+        var is_lambda_body: Bool = name.contains("__lambda")
+        var implicit_return: Bool = ret_name != "Nil" and ret_name != "void"
+        if (this.is_unknown_type(ret_type)) { implicit_return = is_lambda_body }
         var emit_name: String = this.current_prefix + name
         // Only the ENTRY module's `main` becomes __saffron_main. An imported
         // module is free to define a function called `main` (turmeric/prelude.sf
@@ -10982,9 +11084,15 @@ class Codegen {
             emit_name = name
         }
         this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+        // Same collapse as everywhere else, except that an unannotated *lambda*
+        // registered `Int` under the old encoding rather than `Nil`, and call-site
+        // typing reads this map. Preserving each construct's own former sentinel
+        // is what keeps the slice behaviour-neutral downstream.
+        var registered_ret: AST.Type = this.ret_type_for_registration(ret_type)
+        if (this.is_unknown_type(ret_type) and is_lambda_body) { registered_ret = AST.Type.IntType }
+        this.func_ret_types.set(emit_name, registered_ret)
         if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(name, this.str_to_type(ret_type))
+            this.func_ret_types.set(name, registered_ret)
             this.func_prefix_map.set(name, emit_name)
         }
         this.current_function_name = name
@@ -11072,7 +11180,7 @@ class Codegen {
             this.string_vars = []
             this.gc_root_count = 0
             this.reset_locals()
-            var ret_llvm2: String = this.llvm_type(ret_type)
+            var ret_llvm2: String = this.llvm_type(ret_name)
             var all_params: List<String> = []
             if (full_params.length() > 0) {
                 all_params = this.split_respecting_generics(full_params, ",")
@@ -11200,7 +11308,7 @@ class Codegen {
         this.reset_locals()
         this.string_vars = []
         this.typed_vars = {}
-        var ret_llvm: String = this.llvm_type(ret_type)
+        var ret_llvm: String = this.llvm_type(ret_name)
 
         // Parse params string "name:type,name:type"
         var param_list: List<String> = []
@@ -11480,7 +11588,7 @@ class Codegen {
         this.gc_root_count = gc_root_count
 
         // Generate body statements, treating last ExprStmt as implicit return
-        if (body.length() > 0 and ret_type != "Nil" and ret_type != "void") {
+        if (body.length() > 0 and implicit_return) {
             var last_stmt: AST.Stmt = body[body.length() - 1]
             var last_kind: String = this.classify_stmt(last_stmt)
             if (last_kind == "expr") {
@@ -11773,9 +11881,13 @@ class Codegen {
                         if (pr_doc.starts_with("@extern:")) {
                             this.extern_sigs.set(pr_emit, pr_doc.slice(8, pr_doc.length()))
                             this.extern_param_types.set(pr_emit, this.param_types_csv(pr_params))
-                            if (pr_ret.length() > 0) {
-                                this.func_ret_types.set(pr_emit, this.str_to_type(pr_ret))
-                            }
+                            // `pr_ret` is an AST.Type node now, so the old
+                            // `length() > 0` emptiness probe is gone: it was
+                            // asking whether a String had content, which was
+                            // always true here (this arm already matched a
+                            // FunDecl). An omitted annotation registers as Nil,
+                            // the same stand-in the old sentinel supplied.
+                            this.func_ret_types.set(pr_emit, this.ret_type_for_registration(pr_ret))
                         }
                     }
                 }
@@ -13287,26 +13399,24 @@ class Codegen {
                         var xmethods: List<String> = this.class_methods.get(xcls)
                         if (!this.str_in_list(xmethods, xname)) { xmethods.push(xname) }
                     }
-                    var xret: String = this.get_fun_ret(stmts[xi])
-                    if (xret.length() > 0) {
-                        this.func_ret_types.set(xprefixed, this.str_to_type(xret))
-                        this.func_ret_types.set(xfull, this.str_to_type(xret))
-                    }
+                    var xret: AST.Type = this.ret_type_for_registration(this.get_fun_ret(stmts[xi]))
+                    this.func_ret_types.set(xprefixed, xret)
+                    this.func_ret_types.set(xfull, xret)
                 }
             }
             xi = xi + 1
         }
     }
 
-    fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
+    fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: AST.Type, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
     // Use target class's prefix (not source file's prefix)
     var class_prefix: String = this.extend_class_prefix(ext_class, this.current_prefix)
     var prefixed: String = class_prefix + full_name
     this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
-    this.func_ret_types.set(prefixed, this.str_to_type(ret_type))
-    this.func_ret_types.set(full_name, this.str_to_type(ret_type))
+    this.func_ret_types.set(prefixed, this.ret_type_for_registration(ret_type))
+    this.func_ret_types.set(full_name, this.ret_type_for_registration(ret_type))
     this.func_prefix_map.set(full_name, prefixed)
     if (this.class_methods.has(ext_class)) {
         var methods: List = this.class_methods.get(ext_class)
@@ -14682,9 +14792,14 @@ class Codegen {
         var task_result_type: String = "Int"
         var spawn_expr_kind: String = this.classify_expr(args[0])
         if (spawn_expr_kind == "lambda") {
-            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
-            if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
-                task_result_type = lambda_ret
+            // Was `!= "Int"`, which meant "the parser did not fill in its
+            // unannotated-lambda sentinel". UnknownType says that outright, so a
+            // lambda genuinely declared `: Int` no longer falls into the
+            // body-inference branch below by sharing a spelling with absence.
+            var lambda_ret: AST.Type = match (args[0]) { Lambda(p, r, b) => r   _ => AST.Type.UnknownType }
+            var lambda_ret_str: String = this.type_to_string(lambda_ret)
+            if (!this.is_unknown_type(lambda_ret) and lambda_ret_str != "Any") {
+                task_result_type = lambda_ret_str
             } else {
                 // Infer from body: if body is [Return(Call(f, ...))] use f's return type
                 var lambda_body: List<AST.Stmt> = match (args[0]) { Lambda(p, r, b) => b   _ => [] }
