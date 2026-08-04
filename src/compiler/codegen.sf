@@ -107,6 +107,13 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
+    // GC type tag of each payload-carrying enum, drawn from the SAME counter as
+    // class_type_ids. Sharing the counter is the point, not an economy:
+    // __val_class_tag answers with one number space, so an enum tag that
+    // duplicated a class tag would make __val_to_string call the wrong
+    // to_string. Fieldless enums are absent — their value is the immediate
+    // `tag << 56`, which has no allocation to hang a header on (BUGS #154).
+    var enum_type_ids: Map<String, Float>
     // Parent of each class that has one. gen_class_decl_with_parents is *handed*
     // the parent name and used to discard it after inheriting fields and
     // methods, which made the hierarchy look unavailable to codegen (it is not
@@ -214,6 +221,7 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.enum_type_ids = {}
         this.class_parent_of = {}
         this.class_parents_of = {}
         this.class_own_methods = {}
@@ -1063,6 +1071,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }
@@ -1683,6 +1692,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     pr_vi = pr_vi + 1
                 }
                 gen.enum_defs.set(pr_ename, pr_vnames)
+                gen.register_enum_tag(pr_ename)
             }
             pr_si = pr_si + 1
         }
@@ -1750,6 +1760,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }
@@ -2493,6 +2504,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }

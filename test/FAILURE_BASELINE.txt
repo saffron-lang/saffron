@@ -74,6 +74,49 @@
 # A `passed` count that moves while the compiler does not is the clearest possible
 # case for this file's rule about comparing sets rather than totals.
 
+# Confirmed 2026-08-04 with the payload half of BUGS #154 (payload enums get a GC
+# header and an emit_val_to_string arm): 295 passed, 8 failed, 14 skipped, 1
+# known-fail (pass/arg_temp_rooted, BUGS #156 — see below). The SET
+# is unchanged and that is the expected result, not a null one — oracle_enum_println
+# stays on this list because its FIELDLESS half is still broken, so the file's own
+# rule applies in reverse here: an unchanged set does not mean nothing moved. What
+# moved is inside one name. That test went from two failing lines to one:
+# `[Nothing, Just(1)]` (payload variants in a list) is now correct, while
+# `[Red, Blue]` (fieldless) still prints `[0, 4.77831e-299]`. A fieldless variant is
+# the immediate `tag << 56` with no allocation to carry a header, so it cannot be
+# identified at runtime without guessing that some doubles are enums — see the
+# STATUS note at the top of test/oracle_enum_println.sf.
+#
+# The +4 over the 291 above is fully accounted for, and the accounting is the point:
+# +1 is test/pass/enum_payload_any.sf, this fix's regression test (5 of its first 16
+# assertions failed before the change; all 23 pass after, the extra 7 being the GC
+# stress and recursive-format cases added while fixing the rooting bugs the first
+# 16 did not reach). +2 are test/pass/explicit_any_annotation.sf
+# and test/pass/list_lit_elem_type.sf, which arrived with #147 and #117 — both
+# merged in after the 291 measurement, neither related to this change. The last +1
+# is not a new file at all: oracle_println_class_not_bits was the sole entry in
+# run_tests.sh's KNOWN_FAIL table, and #115's fix emptied that table, so it moved
+# from `known-fail` to `passed`.
+#
+# The KNOWN_FAIL table is non-empty again, with one entry: pass/arg_temp_rooted 156.
+# That test is new in this commit and fails BY DESIGN — it asserts the invariant
+# #156's fix must satisfy (an object constructed as argument 0 survives argument 1
+# allocating; currently 49-51 of 200 reads are corrupt). It reports as `xfail`, so
+# it does not fail the suite, and when #156 is fixed it reports `xpass`, which DOES
+# fail the suite until the entry is dropped. That is the intended ratchet, not an
+# exemption: parking a genuinely broken test here would be the misuse the table's
+# own comment warns against.
+#
+# Checkable rather than asserted: eligible files in test/{,pass/,fail/} went 314 →
+# 318. 314 = 291+8+14+1, and 318 = 295+8+14+1 with the last term being
+# pass/arg_temp_rooted. An earlier draft of this note guessed the delta was "two
+# that arrived with the same run's rebuild" and named a test file that did not exist
+# yet; a later one wrote ", 0 known-fail" and rested an argument on the table being
+# empty, which stopped being true in the same commit. Both were wrong, which is a
+# better argument for this file's compare-sets-not-totals rule than any of the green
+# runs above: the set diff was empty and correct the whole time the prose about the
+# totals was being invented and re-invented.
+
 async
 docstrings
 json
