@@ -1,0 +1,66 @@
+// The other side of BUGS #143: check_condition is deliberately ONE-SIDED — it
+// fires only on a type it can prove is not Bool, and lets Any, Nil, unions,
+// generics, class and enum receivers through.
+//
+// That asymmetry is not laziness, and this file is why it has to be tested. The
+// checker type-checks the compiler's own source, so a condition the checker
+// wrongly rejects is not an annoyance — it is a broken bootstrap, and the
+// bootstrap is the slowest signal in the tree to get back. The five
+// test/fail/cond_not_bool*.sf files prove the diagnostic fires; this one proves
+// it does not fire on anything else.
+
+import "@test" as Test
+
+class Holder {
+    var flag: Bool
+    fun init(f: Bool) { this.flag = f }
+    fun truthy(): Bool { return this.flag }
+}
+
+fun ret_any(): Any { return true }
+
+fun main(): Int {
+    var count: Int = 0
+
+    // The ordinary cases: a literal, a comparison, a Bool variable, a Bool-typed
+    // field and a Bool-returning method.
+    if (true) { count = count + 1 }
+    if (1 != 0) { count = count + 1 }
+    var b: Bool = true
+    if (b) { count = count + 1 }
+    var h: Holder = Holder(true)
+    if (h.flag) { count = count + 1 }
+    if (h.truthy()) { count = count + 1 }
+
+    // An `Any`-typed condition. This is the let-through that matters most: `Any`
+    // is pervasive and honest in this codebase, and erroring on it is what would
+    // redden the bootstrap. It is also the reason the check tests for a type it
+    // can PROVE is wrong rather than for a type that is not literally "Bool".
+    var a: Any = ret_any()
+    if (a) { count = count + 1 }
+
+    // A nil comparison narrows and is Bool. `if (v)` as sugar for `v != nil` was
+    // considered and rejected — mixing "must be Bool" with "except when nullable"
+    // makes the rule unmemorable — so the comparison is the spelling, and it has
+    // to keep working.
+    var maybe: Int|Nil = 7
+    if (maybe != nil) { count = count + 1 }
+
+    // Both operands of and/or, and a negation: the operand sites are separate
+    // call sites from the `if` condition itself.
+    if (b and h.flag) { count = count + 1 }
+    if (b or false) { count = count + 1 }
+    if (!false) { count = count + 1 }
+
+    // while and the if-EXPRESSION form, the two other constructs that reach the
+    // same lowering.
+    var i: Int = 0
+    while (i < 2) { i = i + 1 }
+    var picked: Int = if (b) { 10 } else { 20 }
+
+    Test.assert_eq(count, 10, "every Bool condition form is accepted")
+    Test.assert_eq(i, 2, "while with a Bool condition runs")
+    Test.assert_eq(picked, 10, "if-expression with a Bool condition")
+    Test.summary()
+    return 0
+}

@@ -1,0 +1,32 @@
+// BUGS #143: a non-`Bool` condition must be a compile error.
+//
+// Every condition funnels through codegen's `to_i1`, which is
+// `trunc i64 %v to i1` — the LOW BIT of the NaN-boxed value. That is correct for
+// a real Bool only by accident of the encoding: __val_tag_bool puts the truth
+// value in bit 0. For anything else it is arithmetic nonsense, and the failure
+// is silent:
+//
+//     if (42)  { }   // NOT taken — 42 is even
+//     if (43)  { }   // taken     — 43 is odd
+//     if ("x") { }   // the low bit of a heap address, so it could flip between
+//                    // runs as the allocator handed out a different pointer
+//
+// `0` being falsey was never a truthiness rule anyone implemented — it was
+// `0 & 1 == 0`.
+//
+// The fix is a checker diagnostic, not a change to `to_i1`: once the condition is
+// provably Bool, trunc is the correct lowering and stays. Truthiness was
+// considered and rejected — it would need a runtime __val_truthy call per
+// condition on all four IR bases, and it converts a type error into a silent
+// branch, which is the class of defect this entry is about.
+//
+// Int is used here as the plainest case. The other constructs that reach the
+// same lowering each get their own file, because one file can only prove that
+// *something* was rejected — with several bad conditions in one program, four of
+// the five could regress silently while the file still failed to compile.
+fun main(): Int {
+    if (42) {
+        IO.println("taken")
+    }
+    return 0
+}

@@ -1,0 +1,14 @@
+// BUGS #143, the `while` condition site. See test/fail/cond_not_bool.sf for the
+// mechanism.
+//
+// A String is used rather than an Int because it is the non-deterministic case:
+// the low bit of a heap pointer is allocator-dependent, so this loop could run or
+// not run between two runs of the same binary. That is the shape of the bug that
+// makes it worth a separate file — a wrong branch is bad, a wrong branch that
+// only sometimes happens is what survives a test suite.
+fun main(): Int {
+    while ("y") {
+        break
+    }
+    return 0
+}

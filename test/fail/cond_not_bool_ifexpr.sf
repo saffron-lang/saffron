@@ -1,0 +1,12 @@
+// BUGS #143, the if-EXPRESSION condition site. See test/fail/cond_not_bool.sf
+// for the mechanism.
+//
+// Separate from the `if` statement because it is a different checker arm
+// (IfExpr, not If) reached through infer_expr rather than check_stmt, and it was
+// the site most likely to be missed: the statement form is the one anybody
+// writing this fix would test by hand.
+fun main(): Int {
+    var v: Int = if (42) { 1 } else { 2 }
+    IO.println(v)
+    return 0
+}

@@ -2,8 +2,8 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#143, #147. Next free number is **#154**.
+**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147. Next free number is **#154**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -51,6 +51,20 @@ and the escape fix, and keeps its number here.
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
 a gap is cheaper than two entries sharing a number in the git history.
+
+**Reconciling two open lists at a merge is not a union.** The collisions above are
+all about the same number meaning two things; this is the opposite failure and it
+bites in the other direction. #143 was fixed in `2c34dc6`, and a merge on
+2026-08-03 put it back into the open count because the two sides' header lists
+disagreed and the union looked like the cautious resolution. It is not cautious —
+an entry in `## Open` that is already fixed sends the next reader to re-diagnose
+solved work, and the entry's own prescription still reads as a to-do list. Before
+adding a number to this header at a merge, check whether it has an entry under
+`## Resolved`, and when the lists disagree about a number, **probe the shipped
+compiler** rather than trusting either list. That is how #143 was caught: `if (42)`,
+`while ("y")`, `if (true and 42)`, `if ([1])` and the if-expression form all
+already errored. The count is bookkeeping and it drifts; the binary is the ground
+truth.
 
 **Read the next-free number from `main`, never from a worktree.** On 2026-08-03
 three separate worktrees each numbered a different bug #137, and two of them also
@@ -112,55 +126,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
-
-**Severity: high.** Silent wrong branch, no diagnostic, and for pointers the
-answer is not even deterministic across runs.
-
-Every condition site funnels through `to_i1` (`codegen/stmts_body.sf:1293`),
-which emits
-
-```llvm
-%t3 = trunc i64 %val to i1
-br i1 %t3, label %then, label %else
-```
-
-`trunc … to i1` keeps **the low bit of the NaN-boxed i64**. That is correct for a
-real `Bool` purely by accident of the encoding — `__val_tag_bool` returns
-`0x7FFA000000000001` for true and `…0000` for false, so the low bit happens to be
-the truth value. For anything else it is arithmetic nonsense:
-
-```saffron
-if (1)    { }   // taken     — 1 is odd
-if (42)   { }   // NOT taken — 42 is even
-if (0)    { }   // not taken — coincidentally "right"
-if ("x")  { }   // depends on the low bit of the string's pointer
-if ([])   { }   // likewise
-```
-
-So `if (42)` and `if (43)` disagree, and `if (some_string)` can flip between
-runs as the allocator hands out a different address. `0` being falsey is not a
-truthiness rule anyone implemented — it is `0 & 1 == 0`.
-
-The root cause is upstream of codegen: the checker's `If` and `While` arms
-(`checker.sf:2306` and `:2321`) call `infer_expr(cond)` and **discard the
-result**. Nothing ever requires the condition to be `Bool`, so a `Int`, `String`
-or `List` condition type checks clean and reaches `to_i1`. The ternary and the
-`and`/`or` operands reach the same helper (5 call sites total).
-
-**Resolution: require `Bool`.** Saffron is statically typed and already refuses
-`Float`→`Int` and narrows unions; a language that rejects `var i: Int = 2.5`
-should not accept `if (2.5)`. Python/JS-style truthiness was considered and
-rejected — it would need a runtime `__val_truthy` call per condition on all four
-IR bases, and it converts a type error into a silent branch, which is the class
-of defect this entry is about. `if (v)` on a nullable was also considered as
-sugar for `v != nil` and rejected for now: it is the one genuinely useful case,
-but mixing "must be Bool" with "except when nullable" is the kind of exception
-that makes the rule unmemorable. Write the comparison.
-
-The fix is a diagnostic in the checker, not a change to `to_i1`: once the
-condition is provably `Bool`, `trunc` is correct and stays.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -680,6 +645,91 @@ one of the sites rewrite stage 3 has to touch.
 ---
 
 ## Resolved
+
+### 143. FIXED — a non-`Bool` condition was lowered as its low bit, so `if (42)` was false and `if ("x")` depended on the allocator
+
+**Severity: high.** Silent wrong branch, no diagnostic, and for pointers the
+answer is not even deterministic across runs.
+
+Every condition site funnels through `to_i1` (`codegen/stmts_body.sf:1293`),
+which emits
+
+```llvm
+%t3 = trunc i64 %val to i1
+br i1 %t3, label %then, label %else
+```
+
+`trunc … to i1` keeps **the low bit of the NaN-boxed i64**. That is correct for a
+real `Bool` purely by accident of the encoding — `__val_tag_bool` returns
+`0x7FFA000000000001` for true and `…0000` for false, so the low bit happens to be
+the truth value. For anything else it is arithmetic nonsense:
+
+```saffron
+if (1)    { }   // taken     — 1 is odd
+if (42)   { }   // NOT taken — 42 is even
+if (0)    { }   // not taken — coincidentally "right"
+if ("x")  { }   // depends on the low bit of the string's pointer
+if ([])   { }   // likewise
+```
+
+So `if (42)` and `if (43)` disagree, and `if (some_string)` can flip between
+runs as the allocator hands out a different address. `0` being falsey is not a
+truthiness rule anyone implemented — it is `0 & 1 == 0`.
+
+The root cause is upstream of codegen: the checker's `If` and `While` arms
+(`checker.sf:2306` and `:2321`) call `infer_expr(cond)` and **discard the
+result**. Nothing ever requires the condition to be `Bool`, so a `Int`, `String`
+or `List` condition type checks clean and reaches `to_i1`. The ternary and the
+`and`/`or` operands reach the same helper (5 call sites total).
+
+**Resolution: require `Bool`.** Saffron is statically typed and already refuses
+`Float`→`Int` and narrows unions; a language that rejects `var i: Int = 2.5`
+should not accept `if (2.5)`. Python/JS-style truthiness was considered and
+rejected — it would need a runtime `__val_truthy` call per condition on all four
+IR bases, and it converts a type error into a silent branch, which is the class
+of defect this entry is about. `if (v)` on a nullable was also considered as
+sugar for `v != nil` and rejected for now: it is the one genuinely useful case,
+but mixing "must be Bool" with "except when nullable" is the kind of exception
+that makes the rule unmemorable. Write the comparison.
+
+The fix is a diagnostic in the checker, not a change to `to_i1`: once the
+condition is provably `Bool`, `trunc` is correct and stays.
+
+Fixed in `2c34dc6` by `Checker.check_condition`, exactly as prescribed above: the
+diagnostic is in the checker and `to_i1` is untouched. It is wired at all six
+condition sites — `If`, `While`, the `!` operand, both `and`/`or` operands (two
+separate calls, the right one inside the pushed narrowing scope), and `IfExpr`.
+`ctx` names the construct so the message says where, and Int/Float/String/List/Map
+each get a hint spelling the comparison to write.
+
+The check is one-sided, and that is the load-bearing part: it fires only on a type
+it can PROVE is not Bool (a scalar, or a List/Map by `generic_base`), and lets
+`Any`, `Nil`, unions, generics, class and enum receivers through. Erroring on an
+`Any` condition is what would redden the bootstrap, since the checker type-checks
+the compiler's own source — the same discipline `scalar_mismatch` and #145's
+`check_call_args` follow, and the same reason #56 warns against erroring on an
+unresolved receiver.
+
+**This entry sat in `## Open` for a day after it was already fixed**, and it was
+re-added to the open count at a merge on 2026-08-03 by someone reconciling two
+divergent header lists who took the union of both. It was found by probing the
+shipped compiler rather than by reading the list — `if (42)`, `while ("y")`,
+`if (true and 42)`, `if ([1])` and the if-expression form all already errored. The
+count is bookkeeping and drifts; the binary is the ground truth. Reconciling two
+open lists at a merge is exactly where a fixed entry gets resurrected, because the
+union is the safe-looking merge and it is wrong in this direction.
+
+There were no regression tests, which is how a fixed entry can quietly un-fix
+itself. Added: `test/fail/cond_not_bool.sf` (Int), `_while.sf` (String — the
+allocator-dependent case, so the branch could differ between two runs of one
+binary), `_ifexpr.sf` (a different checker arm, reached through `infer_expr`),
+`_logical.sf` (the `and` right operand, its own call site) and `_list.sf` (not a
+scalar, so it needs the separate List/Map clause). One file per construct on
+purpose: several bad conditions in a single file would still fail to compile while
+four of the five silently regressed. `test/pass/cond_bool_ok.sf` pins the
+let-through set, and it is the one that guards the bootstrap.
+
+---
 
 ### 148. FIXED — reading a nonexistent member of a CLASS instance compiled clean, then read field 0 or emitted invalid IR
 

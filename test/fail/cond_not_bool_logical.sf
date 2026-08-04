@@ -1,0 +1,15 @@
+// BUGS #143, the `and`/`or` operand sites. See test/fail/cond_not_bool.sf for
+// the mechanism.
+//
+// Both operands of a logical operator are conditions and reach the same low-bit
+// lowering (codegen/utils_body.sf calls to_i1 on each side), so `42 and true` was
+// false for exactly the reason `if (42)` was. The RIGHT operand is the one tested
+// here: the left is checked by the same call as an `if` condition, but the right
+// is checked inside a pushed narrowing scope, which is a separate call site and
+// could be missed on its own.
+fun main(): Int {
+    if (true and 42) {
+        IO.println("taken")
+    }
+    return 0
+}

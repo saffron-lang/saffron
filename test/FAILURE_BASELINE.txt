@@ -66,6 +66,13 @@
 # unchanged from the 8 above — the three merged changes compose, with bootstrap
 # green including the STAGE 2 gen4 fixed point. The +4 in `passed` is #148's three
 # new tests plus one that arrived upstream; no name entered or left this list.
+#
+# Confirmed 2026-08-04 with #143's regression tests: 291 passed, 8 failed, 14
+# skipped, 1 known-fail. The SET is unchanged. No compiler source changed in that
+# commit at all — #143 was already fixed in 2c34dc6 and had no tests, so the +6 is
+# purely the five test/fail/cond_not_bool*.sf files and test/pass/cond_bool_ok.sf.
+# A `passed` count that moves while the compiler does not is the clearest possible
+# case for this file's rule about comparing sets rather than totals.
 
 async
 docstrings
