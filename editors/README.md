@@ -36,6 +36,23 @@ The server shells out to the Saffron compiler in `--json` mode
   each with a name-span, powering the outline, hover, go-to-definition and
   completion.
 
+### Formatting
+
+`textDocument/formatting` shells out to `saffronc format` (no `--write`) with the
+**open buffer** staged to a temp file, and returns the result as a single
+whole-document `TextEdit`. It never writes your file: under format-on-save the
+buffer is ahead of disk, so `--write` would format stale text and lose the undo
+entry. A compiler too old to know the `format` subcommand yields *no edits*
+rather than an emptied buffer — silently leaving text alone is the only safe
+failure mode for a formatter. Already-formatted text also returns no edits, so
+saving a clean file does not mark it dirty.
+
+The formatter itself (`src/lib/formatter.sf`) only rewrites whitespace between
+lexical pieces; comments, `${...}` interpolation and every piece of syntactic
+sugar are copied verbatim from the input. `test/pass/formatter_fidelity.sf` is
+the regression test, and it asserts the general property (strip all whitespace
+from input and output — they must be byte-identical) rather than a list of cases.
+
 This replaced an older path that scraped the compiler's human-readable output
 with a regex; that regex only matched the *parser's* error format, so type and
 codegen errors never reached the editor. See `src/compiler/diag.sf` for the
