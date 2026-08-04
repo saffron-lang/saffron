@@ -553,6 +553,15 @@ fun f(): Bool   { return 42 }
 fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
 ```
 
+**Landed 2026-08-04 (second): the declared-`Nil` half**, the fourth case above.
+`fun f(): Nil { return 42 }` is now `return: cannot return Int from function
+declared ': Nil'`. It became expressible only after `FunDecl.ret_type` and
+`Lambda.ret_type` became `AST.Type` nodes with an explicit `UnknownType` — see
+"And the sentinel *was* in-band" below for what that unblocked and what it cost.
+`test/fail/return_nil_declared.sf` is the regression test; the legitimate shapes
+(`return nil`, bare `return`, falling off the end, and every unannotated function)
+are pinned in `test/pass/return_type_valid.sf`.
+
 **Landed 2026-08-04: the scalar-vs-scalar half.** The `Return` arm now calls
 `scalar_mismatch` (`checker.sf:890`), inheriting the same one-sided discipline
 `check_call_args` uses — it fires only on two *different concrete scalars*, and
@@ -571,8 +580,8 @@ Two exclusions are deliberate and both are documented at the site:
   `Int`→`Float` widening and disappears when I5 introduces `Ptr<T>`. The check
   found this on its first bootstrap: `STAGE 1` rejected `lexer.sf` with
   `cannot return Int from function expecting String`.
-- **The declared-`Nil` case is still unchecked**, because the sentinel problem
-  below is unsolved.
+- ~~**The declared-`Nil` case is still unchecked**, because the sentinel problem
+  below is unsolved.~~ Solved 2026-08-04; see above.
 
 **Still open: the class-typed case, which is the one that crashes.**
 
@@ -609,22 +618,40 @@ answer reliably for module-qualified names. `parse_type_node("AST.Type")` falls
 through to `ClassType("AST.Type")` while the value side infers `EnumType("Type")`
 — two spellings of one type, and `inherits_from` knows neither.
 
-**And the sentinel is still in-band.** The parser defaults an omitted return type
-to a *real type name*: `"Nil"` for `FunDecl` (`parser.sf:2561`), `"Int"` for
-`Lambda` (`parser.sf:1646`). Both are indistinguishable from an annotation the
-author wrote, so the declared-`Nil` case cannot be enforced without rejecting
-every unannotated `fun f() { return 42 }`. #147 under `## Resolved` is the same
-defect one AST node over, and `check_lambda_body` already sets
-`current_func_ret = AnyType` for exactly this reason — its comment says a walk
-that exists to record uses "must not start enforcing a return type nobody wrote."
+**And the sentinel *was* in-band — fixed 2026-08-04.** The parser used to default
+an omitted return type to a *real type name*: `"Nil"` for `FunDecl`, `"Int"` for
+`Lambda`. Both were indistinguishable from an annotation the author wrote, so the
+declared-`Nil` case could not be enforced without rejecting every unannotated
+`fun f() { return 42 }` — several hundred of them in the compiler's own source,
+which the checker type-checks, so the false positive broke the bootstrap outright.
+#147 under `## Resolved` is the same defect one AST node over, and
+`check_lambda_body` already set `current_func_ret = AnyType` for exactly this
+reason — a walk that exists to record uses "must not start enforcing a return type
+nobody wrote."
 
-So the ordering stands, and the scalar half was landable ahead of it only because
-`scalar_mismatch` already excludes `Nil` on both sides: **make the sentinel
-distinguishable first, then turn on the rest.** `ret_type` becomes an `AST.Type`
-with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work,
-~18 construction sites and ~65 destructure arms across 14 files — and only then
-can the `Return` arm tell "the author declared `Nil`" from "nobody declared
-anything."
+Both `ret_type` fields are now `AST.Type` with an explicit `UnknownType`
+(invariant I2), so the arm can tell "the author declared `Nil`" from "nobody
+declared anything." Three things that fell out of doing it, all worth keeping:
+
+- **The two sentinels meant opposite things.** Measured on the pre-migration
+  binary: `FunDecl`'s `"Nil"` *suppressed* implicit return, `Lambda`'s `"Int"`
+  *enabled* it. So `UnknownType` alone could not replace both — `gen_function`
+  recovers the distinction from the construct (`__lambda` in the emit name).
+  Collapsing them would have made every block-form lambda return 0 silently, with
+  no test naming it.
+- **The guard removed to enable the `: Nil` case had been shielding a second,
+  unrelated check.** The nullable-return test in the same arm was excluded from
+  unannotated functions only as a side effect of excluding real `: Nil` ones, so
+  dropping the outer guard produced `cannot return nullable Nil from function
+  expecting Unknown` — `Unknown` named as if the author had written it. This is
+  the inverse of #147's lesson: a sentinel blocks the checks that inspect it, and
+  sometimes the checks merely standing next to it.
+- **An LSP bug, incidentally.** `render_signature`'s `length() > 0` guard was
+  never false, so every unannotated function's hover claimed `: Nil`.
+
+What remains under this number is the class-typed segfault above, still gated on
+the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
+`Ptr<T>`.
 
 ---
 
