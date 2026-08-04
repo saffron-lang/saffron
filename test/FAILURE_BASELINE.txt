@@ -117,6 +117,26 @@
 # `pass/cond_class_enum_ok.sf` is the deliberate record of the let-through set
 # (interface-typed and union-typed conditions still compile), so the boundary is
 # asserted in a test rather than only argued in BUGS.md.
+#
+# Updated 2026-08-04 rebasing the lsp-symbol-payload line (located expression
+# diagnostics, WS1c) onto 9ca7def: the failure SET below is UNCHANGED — the diff
+# is empty in both directions, no name fixed and none regressed. The `passed`
+# total this line adds is its own new tests, not tests that started passing:
+# test/pass/located_checker_diagnostics.sf plus the editor-side additions.
+#
+# By now this file's own history has recorded FIVE different `passed` totals
+# against the very same 8-name set — 286, 291, 295, 296 and 299 — and not one of
+# the moves was a repair. Every one was tests arriving: #143's, #115/#117's, the
+# base's pass/explicit_any_annotation, #156/#157's pair, and #159's three. Five
+# totals, one set. If a sixth total shows up with no name entering or leaving the
+# list below, that is the normal case, not a surprise.
+#
+# The merge-check point two notes up applies to this rebase too, and did not merge
+# cleanly by accident: #159 added two `hint` branches to the very same
+# `check_condition` line this line converted from `error` to `error_at`. Git
+# flagged it, both sides were kept (the enum/class hints AND the span), and the
+# result was re-verified rather than assumed — which is the whole reason a conflict
+# is preferable to a silent auto-merge here.
 
 async
 docstrings
