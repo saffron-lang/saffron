@@ -89,6 +89,20 @@
 # oracle_enum_println stays on this list on purpose — it is the untouched enum half
 # of #115's problem, now filed as #154, and its output was byte-identical before
 # and after both fixes.
+#
+# Confirmed 2026-08-04 on the merged tree (#147 + #155 from main, #156 and #157
+# from this line): 296 passed, 8 failed, 14 skipped, 0 known-fail. The SET is
+# unchanged, and the +2 over the previous note are this line's two new tests
+# (pass/import_alias_punctuation for #157, and pass/nil_init_infers_any counted
+# once #156 landed) — no name entered or left.
+#
+# Worth recording that this run is a MERGE check, not just a change check. #147
+# moved the "was an annotation written?" sentinel from "Any" to "" in the same
+# checker VarDecl arm #156 rewrote, so the two could have composed badly while each
+# passed alone. They do not: 8/8 and 14/14 respectively, plus first_class_types
+# unchanged. An auto-merge that produces no conflict is not evidence the result is
+# correct — the two sides' tests have to be re-run together, which is what this
+# line records.
 
 async
 docstrings
