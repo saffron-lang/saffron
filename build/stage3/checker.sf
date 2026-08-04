@@ -106,6 +106,32 @@ class TypeEnv {
         return AST.Type.AnyType
     }
 
+    // The type `name` was DECLARED with, ignoring any narrowing in effect.
+    //
+    // `get_var_type` above consults `scope.narrowed` first, which is right for
+    // *reading* a variable — inside `if (x is String)`, `x` really is a String.
+    // It is wrong for checking an *assignment*, because narrowing describes what
+    // the variable currently holds, not what it is allowed to hold. Asking the
+    // narrowed type whether a store is legal rejects this:
+    //
+    //     var x: Any = f()
+    //     if (x is String) { x = 42 }      // legal: the binding is Any
+    //
+    // Narrowing is scoped to the `is` guard; the declaration is what constrains
+    // the store. Two questions, so two accessors — the same lesson the ret_type
+    // slice paid for, where one spelling carried two facts.
+    fun get_declared_var_type(name: String): AST.Type {
+        var i: Float = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: Scope = this.scopes[i]
+            if (scope.vars.has(name)) {
+                return scope.vars.get(name)
+            }
+            i = i - 1
+        }
+        return AST.Type.AnyType
+    }
+
     // True when `name` is bound as a variable in some enclosing scope. Distinct
     // from `get_var_type(name) == AnyType`, which cannot tell an unbound name
     // apart from one declared `Any` — both answer AnyType. A module alias is
@@ -155,10 +181,12 @@ class TypeEnv {
         this.funcs.set(name, ret_type)
     }
 
-    // String-based define_func for callers passing string ret types from AST
-    fun define_func_str(name: String, ret_type: String) {
-        this.funcs.set(name, this.parse_type_str(ret_type))
-    }
+    // `define_func_str` used to sit here — a parsing adapter over define_func,
+    // for "callers passing string ret types from AST". After the FunDecl.ret_type
+    // migration there are none: every caller holds the node. Deleted rather than
+    // kept for convenience, because an adapter that turns a string into a type is
+    // exactly the round-trip invariant I3 exists to remove, and leaving it would
+    // let a future caller reintroduce the string encoding one call at a time.
 
     fun parse_type_str(s: String): AST.Type {
         if (s == "Int" or s == "Number") return AST.Type.IntType
@@ -259,6 +287,11 @@ class NullChecker {
     //                 These get written into the lambda's own Param nodes.
     var fun_param_sigs: Map<String, String>
     var actor_classes: Map<String, Bool>
+    // Names declared with the `interface` soft keyword. `class`, `interface` and
+    // `actor` all parse to ClassDecl and register identically in class_fields, so
+    // without this the checker cannot tell an interface from a class. Populated in
+    // register_decl from ClassDecl's `introducer` field.
+    var interface_names: Map<String, Bool>
     // Bare enum names declared by two different modules with different variant
     // lists — see register_enum.
     var ambiguous_enums: List<String>
@@ -428,6 +461,7 @@ class NullChecker {
         this.receiver_params = {}
         this.fun_param_sigs = {}
         this.actor_classes = {}
+        this.interface_names = {}
         this.ambiguous_enums = []
         this.current_prefix = ""
         this.current_package = no_package_marker()
@@ -687,6 +721,32 @@ class NullChecker {
         }
     }
 
+    /// True for the type the parser substitutes when no annotation was written.
+    ///
+    /// This is the predicate that replaces "did the string equal `Nil`?" — the
+    /// question every consumer of `FunDecl.ret_type` used to ask, and got wrong
+    /// for anyone who actually wrote `: Nil`. Arms are spelled out rather than
+    /// using a `_` fallback so that a new Type variant is a compile error here
+    /// instead of silently answering false (BUGS #76).
+    fun is_unknown_type(t: AST.Type): Bool {
+        return match (t) {
+            UnknownType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(b, a) => false
+            UnionType(ts) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+            NeverType => false
+        }
+    }
+
     fun is_sendable(typ: String): Bool {
         if (typ == "Int" or typ == "Float" or typ == "Number") return true
         if (typ == "Bool") return true
@@ -934,6 +994,35 @@ class NullChecker {
         var provably_not_bool: Bool = false
         if (this.is_scalar_name(t)) { provably_not_bool = true }
         if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") { provably_not_bool = true }
+        // A declared class or enum is provable too, and it belongs on this side of
+        // the line rather than in the let-through set above. #143 grouped
+        // class/enum with Any and unions, but they are not the same kind of
+        // unknown: `Any` might hold a Bool at runtime, so erroring on it would
+        // reject correct code, whereas a variable whose static type is a class or
+        // enum can never be one. The lowering makes it worse than merely
+        // undiagnosed — `trunc i64 %v to i1` on a class instance reads the low bit
+        // of an 8-byte-aligned pointer, so it is not "wrong sometimes", it is
+        // DETERMINISTICALLY false. `if (my_box)` never runs its then-branch and
+        // never says why.
+        //
+        // Guarded on the registries, not on spelling: only names actually declared
+        // in this compilation register in class_fields / enum_variants. An
+        // unresolved name is left alone, per #56.
+        //
+        // Interfaces are deliberately NOT included even though they also register
+        // in class_fields, because an interface-typed slot's runtime value is some
+        // implementor, and nothing here can prove none of them is Bool-like.
+        // interface_names is the discriminator, and it had to be added: `class`,
+        // `interface` and `actor` all parse to ClassDecl, so before this the
+        // checker had no way to tell them apart.
+        //
+        // Union types (`Box|Nil`) stay let through, and that is the residual worth
+        // naming: `if (maybe_box)` reads as a nil test and is also always false.
+        // Proving a union means proving EVERY member non-Bool, which is a bigger,
+        // separate change to the union parsing here — and unlike this case it risks
+        // reddening the bootstrap, which type-checks the compiler's own source.
+        if (this.env.class_fields.has(t) and !this.interface_names.has(t)) { provably_not_bool = true }
+        if (this.env.enum_variants.has(t)) { provably_not_bool = true }
         if (!provably_not_bool) return
         var hint: String = ""
         if (t == "Int" or t == "Float") { hint = "; compare it, e.g. `x != 0`" }
@@ -941,7 +1030,16 @@ class NullChecker {
         else if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") {
             hint = "; test its size, e.g. `xs.length() > 0`"
         }
-        this.error(ctx + " condition must be Bool, got " + t + hint)
+        else if (this.env.enum_variants.has(t)) {
+            hint = "; match on it, or compare a variant, e.g. `c == " + t + ".Variant`"
+        }
+        else if (this.env.class_fields.has(t)) {
+            hint = "; test a field, or compare it, e.g. `x != nil`"
+        }
+        // The condition expression itself, which is what the message is about --
+        // and one span here locates all six callers (if, while, `!`, `and`,
+        // `or`, if-expression).
+        this.error_at(AST.expr_span(cond), ctx + " condition must be Bool, got " + t + hint)
     }
 
     // Check a call's argument types against the callee's declared parameter
@@ -988,7 +1086,11 @@ class NullChecker {
                 if (!this.is_type_param(ptype)) {
                     var atype: String = this.infer_expr(args[i])
                     if (this.scalar_mismatch(ptype, atype)) {
-                        this.error("argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
+                        // Point at the offending argument, not at the call: this
+                        // is the most common expression-level type error, and
+                        // without a span it reached the editor with no position
+                        // at all and so could not be shown in place.
+                        this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
                     }
                 }
             }
@@ -1258,12 +1360,17 @@ class NullChecker {
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
-                // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
-                // not an AST.Type node. type_node_to_string() matched a String
-                // against AST.Type patterns and fell through to the first arm, so
-                // every function's registered return type collapsed to Int — which
-                // silently defeated exhaustiveness on `match (some_call())`.
-                this.env.define_func_str(name, ret_type)
+                // ret_type is an AST.Type node now, so this registers it directly
+                // instead of round-tripping through a string. It used to be a raw
+                // String, and type_node_to_string() matched that String against
+                // AST.Type patterns, fell through to the first arm, and collapsed
+                // every function's registered return type to Int — which silently
+                // defeated exhaustiveness on `match (some_call())`.
+                //
+                // An unannotated function registers as UnknownType, which is the
+                // honest answer: nothing was declared. Callers that need a
+                // concrete type must infer it rather than read a sentinel.
+                this.env.define_func(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
                 // Module-level identity + visibility, so a cross-module reference
                 // to this function can be checked (§6a path 1/2/3). Public is not
@@ -1307,6 +1414,19 @@ class NullChecker {
             ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
+                }
+                // The keyword the author wrote. `interface` and `actor` are soft
+                // keywords, so all three shapes arrive as ClassDecl and register
+                // identically in class_fields — the checker previously could not
+                // tell them apart at all, and every arm here spelled the field
+                // `__intro` to say it was unused. check_condition needs the
+                // distinction: a class-typed condition is provably not Bool, while
+                // an interface-typed one holds some implementor and cannot be
+                // proven. Recording the parser's answer rather than re-deriving it
+                // from the "@actor" doc prefix is the point of #40's note where
+                // `introducer` was added.
+                if (__intro == "interface") {
+                    this.interface_names.set(name, true)
                 }
                 if (type_params.length() > 0) {
                     this.class_type_params.set(name, type_params.join(","))
@@ -1356,16 +1476,16 @@ class NullChecker {
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
-                    var method_ret: String = match (methods[mi]) {
+                    var method_ret: AST.Type = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
-                        _ => "Any"
+                        _ => AST.Type.AnyType
                     }
                     var method_params: List<AST.Param> = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                         _ => []
                     }
                     if (method_name.length() > 0) {
-                        this.env.define_func_str(name + "__" + method_name, method_ret)
+                        this.env.define_func(name + "__" + method_name, method_ret)
                         this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
                         // Same as the FunDecl arm: a method taking a callback has to
                         // be able to type a block passed to it (BUGS #86).
@@ -1402,9 +1522,9 @@ class NullChecker {
                                 FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                                 _ => []
                             }
-                            var am_ret: String = match (methods[ami]) {
+                            var am_ret: AST.Type = match (methods[ami]) {
                                 FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
-                                _ => "Nil"
+                                _ => AST.Type.NilType
                             }
                             var api: Float = 0
                             while (api < am_params.length()) {
@@ -1417,8 +1537,14 @@ class NullChecker {
                                 }
                                 api = api + 1
                             }
-                            var am_ret_str: String = am_ret
-                            if (am_ret_str != "Any" and am_ret_str != "Nil" and !this.is_sendable(am_ret_str)) {
+                            // "Unknown" joins Any and Nil in the skip list: an
+                            // unannotated actor method declares no return type, so
+                            // there is nothing to judge Sendable. Before ret_type
+                            // became a node an omitted annotation arrived here
+                            // spelled "Nil" and was skipped by accident; now it is
+                            // skipped on purpose.
+                            var am_ret_str: String = this.type_to_str(am_ret)
+                            if (am_ret_str != "Any" and am_ret_str != "Nil" and am_ret_str != "Unknown" and !this.is_sendable(am_ret_str)) {
                                 this.warn("actor '" + name + "' method '" + am_name + "' returns non-Sendable type '" + am_ret_str + "'")
                             }
                         }
@@ -1867,9 +1993,9 @@ class NullChecker {
                         FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mp
                         _ => []
                     }
-                    var m_ret: String = match (methods[mi]) {
+                    var m_ret: AST.Type = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mr
-                        _ => ""
+                        _ => AST.Type.UnknownType
                     }
                     if (m_name.length() > 0 and m_vis != "private") {
                         this.check_fun_leaks(this.exposure_label(m_vis) + " method '" + name + "." + m_name + "'",
@@ -1928,20 +2054,27 @@ class NullChecker {
     /// giving `Fun` a signature, which is a language change tracked by #56. The
     /// spelling "Fun" mentions no type name, so it simply finds nothing here;
     /// nothing suppresses it and nothing pretends to cover it.
-    fun check_fun_leaks(subject: String, params: List<AST.Param>, ret_type: String) {
+    fun check_fun_leaks(subject: String, params: List<AST.Param>, ret_type: AST.Type) {
         var pi: Float = 0
         while (pi < params.length()) {
             var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
             var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
             // AST.Param is the node for both a class field and a function
-            // parameter, so type_to_str is the one renderer for both — the raw
-            // String / AST.Type split that forces two entry points here is I3's
-            // complaint, and this feature consumes that debt rather than fixing it.
+            // parameter, and ret_type is now the same kind of node, so type_to_str
+            // is the single renderer for every position. The raw String / AST.Type
+            // split that used to force two entry points here was I3's complaint;
+            // the ret_type migration paid it off.
             this.check_leak(subject, "parameter " + (pi + 1).floor().to_string()
                 + " ('" + p_name + "')", this.type_to_str(p_type))
             pi = pi + 1
         }
-        this.check_leak(subject, "its return type", ret_type)
+        // An unannotated return type has nothing to leak — there is no name in the
+        // source for a privacy check to point at. Skipping UnknownType here is the
+        // same reasoning the L9 rule below applies to an inferred `var`: a
+        // diagnostic needs an anchor the user actually wrote.
+        if (!this.is_unknown_type(ret_type)) {
+            this.check_leak(subject, "its return type", this.type_to_str(ret_type))
+        }
     }
 
     /// L9: a public top-level `var`.
@@ -2504,11 +2637,35 @@ class NullChecker {
                         this.error_at(__ns, name + ": cannot assign " + init_type + " to " + type_ann_str)
                     }
                     this.env.define_var(name, type_ann_node)
-                } else if (init_type != "Any") {
+                } else if (init_type != "Any" and init_type != "Nil") {
                     // Inferred from initializer
                     this.env.define_var(name, init_type_node)
                 } else {
-                    // Cannot infer type — warning (not blocking).
+                    // `init_type == "Nil"` joins the cannot-infer branch below
+                    // rather than being stored (BUGS #156). `var x = nil` used to
+                    // type x as the singleton Nil *permanently*: the later `x = 5`
+                    // was accepted silently, and then every use of x was a hard
+                    // error, "cannot call .to_string() on nullable 'x' (type Nil)".
+                    // A correct program was rejected, and the diagnostic's own
+                    // advice did not work — adding `if (x != nil)` narrows Nil by
+                    // removing Nil, which leaves Nil, so the guard could not
+                    // rescue it. There was no spelling of the program that both
+                    // kept the bare initializer and compiled.
+                    //
+                    // Any is the honest answer, not a workaround: a bare `nil`
+                    // initializer carries no information about what the variable
+                    // is *for*, which is exactly what this branch already means.
+                    // Codegen reached the same judgment independently —
+                    // merge_entry_type (types_body.sf) folds an observed "Nil"
+                    // into "Any" for the same reason.
+                    //
+                    // `is` still answers correctly, which is what makes this safe
+                    // for the one case that genuinely wants the singleton: an
+                    // Any-typed nil satisfies `x is Nil` (verified, not assumed —
+                    // test/pass/first_class_types.sf asserts it).
+                    //
+                    // Either way this is a warning, not an error — both a bare nil
+                    // and a genuinely uninferrable initializer are legal.
                     //
                     // Except for the parser's own temporaries. `x++` desugars to
                     // a block holding `var __inc_N = <the place>`, and a field or
@@ -2521,16 +2678,26 @@ class NullChecker {
                     // already exempt from the unused-variable warning at line 399
                     // for the same reason.
                     if (!name.starts_with("__")) {
-                        this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
+                        // A bare `nil` initializer gets its own wording. "cannot
+                        // infer type" would be false — nothing failed; the
+                        // initializer is explicit and says nothing about intent —
+                        // and "add explicit annotation" reads as a compiler
+                        // shortcoming rather than as the actual advice, which is to
+                        // name the type the variable will eventually hold.
+                        if (init_type == "Nil") {
+                            this.warn_at(__ns, name + ": initialized to nil with no type; "
+                                + "annotate it (e.g. 'var " + name + ": Int|Nil = nil') to get a checked type")
+                        } else {
+                            this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
+                        }
                     }
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
             FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // Register method with class prefix if inside a class
-                var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {
-                    this.env.define_func_str(this.current_class + "__" + name, ret_type_str)
+                    this.env.define_func(this.current_class + "__" + name, ret_type)
                     this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
                     // Register generic type params for class methods
                     this.extract_and_register_generics(this.current_class + "__" + name, doc)
@@ -2547,11 +2714,16 @@ class NullChecker {
                     this.class_method_names.set(this.current_class, existing)
                 }
                 var old_ret: AST.Type = this.current_func_ret
-                // ret_type is a String; current_func_ret is an AST.Type node, and
-                // the Return arm feeds it to is_any_type/is_nullable_type. Parse it
-                // so those checks see a real node instead of falling through to the
-                // first match arm.
-                this.current_func_ret = this.parse_type_node(ret_type)
+                // ret_type is already an AST.Type, so it goes straight in — this
+                // used to parse a String, which is what made the Return arm's
+                // is_any_type/is_nullable_type calls fall through to the first
+                // match arm when the parse was wrong.
+                //
+                // An unannotated function therefore sets current_func_ret to
+                // UnknownType, and the Return arm's own guard excludes Unknown: a
+                // function that declared nothing constrains nothing. That is the
+                // distinction the old in-band "Nil" could not express.
+                this.current_func_ret = ret_type
                 // A function body starts a fresh loop context: a `break` here is
                 // not inside any loop the declaration happens to sit in (#6).
                 var fd_saved_loop: Float = this.loop_depth
@@ -2585,11 +2757,73 @@ class NullChecker {
                 // smuggled into a non-nullable slot", which is what this site
                 // asks. Without it, `return <Any expr>` from a `: Float` function
                 // became an error and lexer.sf stopped compiling.
-                if (!this.is_any_type(this.current_func_ret) and !this.is_any_type(val_type_node)) {
+                // `Unknown` on the return side is excluded for the same reason as
+                // `Any`, but it is a stronger claim: a function that declared no
+                // return type constrains nothing, so NO check below may fire on
+                // it. This guard is what the old encoding supplied by accident —
+                // an unannotated function arrived carrying the sentinel "Nil", and
+                // the outer `!is_nil_type_node` guard that used to wrap this whole
+                // block excluded it as a side effect of excluding real `: Nil`
+                // declarations. Removing that guard to enable the `: Nil` case
+                // (BUGS #155) therefore exposed the nullable check to every
+                // unannotated function in the compiler's own source, and lexer.sf
+                // stopped compiling with "cannot return nullable Nil from function
+                // expecting Unknown" — a diagnostic naming Unknown as if it were a
+                // type the author had written. Two facts that used to travel as one
+                // spelling now need two guards.
+                if (!this.is_any_type(this.current_func_ret) and !this.is_any_type(val_type_node) and !this.is_unknown_type(this.current_func_ret)) {
                     if (!this.is_nullable_type(this.current_func_ret) and this.is_nullable_type(val_type_node)) {
                         var val_str: String = this.type_to_str(val_type_node)
                         var ret_str: String = this.type_to_str(this.current_func_ret)
-                        this.error("return: cannot return nullable " + val_str + " from function expecting " + ret_str)
+                        this.error_at(AST.expr_span(value), "return: cannot return nullable " + val_str + " from function expecting " + ret_str)
+                    }
+                    // BUGS #155: check that the return value's type is compatible
+                    // with the declared return type. One check, deliberately
+                    // one-sided: scalar_mismatch fires only when BOTH sides are
+                    // concrete scalars and they differ (Int vs String, Bool vs Int).
+                    // It inherits check_call_args' discipline — Any, Nil, unions,
+                    // generics, class/enum types, and Int→Float widening all pass.
+                    //
+                    // A declared `: Nil` is now checked like any other annotation.
+                    // It could not be while an omitted return type arrived here
+                    // spelled "Nil" too — enforcing it would have rejected every
+                    // `fun f() { return 42 }`. ret_type is an AST.Type now and an
+                    // omitted annotation is UnknownType, so the two facts are
+                    // finally distinguishable and `fun f(): Nil { return 42 }` is
+                    // an error while an unannotated function still returns freely.
+                    // That was the half of BUGS #155 the scalar slice left open.
+                    var ret_s: String = this.type_to_str(this.current_func_ret)
+                    var val_s: String = this.type_to_str(val_type_node)
+                    // `: Nil` declares "this function produces no value", so
+                    // returning one is an error. scalar_mismatch cannot express
+                    // this — it allows Nil on either side, because for every OTHER
+                    // position Nil is the nullable check's business, not a scalar
+                    // comparison's. Handled here instead, and only for a concrete
+                    // scalar value: `return nil` is fine, and so is returning
+                    // something whose type nobody resolved.
+                    if (ret_s == "Nil" and this.is_scalar_name(val_s)) {
+                        this.error("return: cannot return " + val_s + " from function declared ': Nil'")
+                    }
+                    if (ret_s != "Unknown" and ret_s != "Never" and val_s != "Unknown" and val_s != "Never" and val_s != "Nil") {
+                        // Int→String is allowed: in the NaN-boxed runtime, an Int
+                        // that holds a heap address IS a valid String (a pointer to
+                        // a NUL-terminated buffer). lexer.sf:byte_to_char uses this
+                        // to return a malloc'd buffer from a `: String` function.
+                        // This is the identity-mode analog of Int→Float widening,
+                        // and will disappear when I5 introduces Ptr<T>.
+                        if (ret_s == "String" and val_s == "Int") {
+                            // allowed — raw pointer returned as String
+                        } else if (this.scalar_mismatch(ret_s, val_s)) {
+                            this.error("return: cannot return " + val_s + " from function expecting " + ret_s)
+                        }
+                        // NOTE: class-vs-scalar and scalar-vs-class checks are
+                        // deferred. They fire false positives on:
+                        //   - nullable unions ("String|Nil" not scalar → triggers)
+                        //   - type parameters ("T" not scalar → triggers)
+                        //   - inference gaps (module member types as raw names)
+                        // The segfault case (`: Box` returning a String) needs
+                        // either is_subtype or a class-name registry query, both
+                        // of which require the full resolve pass (I4) to be safe.
                     }
                 }
             }
@@ -3130,7 +3364,11 @@ class NullChecker {
                 var then_str: String = this.type_to_str(then_type)
                 var else_str: String = this.type_to_str(else_type)
                 if (then_str != else_str and then_str != "Any" and else_str != "Any" and then_str != "Nil" and else_str != "Nil") {
-                    this.error("if-expression branches have incompatible types: " + then_str + " vs " + else_str)
+                    // Point at the else value, not the whole expression: the then
+                    // branch sets the expectation and the else branch is what
+                    // departs from it. Arbitrary when both are odd, but a
+                    // consistent choice beats no location.
+                    this.error_at(AST.expr_span(else_val), "if-expression branches have incompatible types: " + then_str + " vs " + else_str)
                 }
                 then_type
             }
@@ -3145,7 +3383,7 @@ class NullChecker {
                 var try_str: String = this.type_to_str(try_type)
                 var catch_str: String = this.type_to_str(catch_type)
                 if (try_str != catch_str and try_str != "Any" and catch_str != "Any" and try_str != "Nil" and catch_str != "Nil") {
-                    this.error("try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
+                    this.error_at(AST.expr_span(catch_val), "try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
                 }
                 // A try body that diverges (throws) has no value — its value slot
                 // types as Nil. In that case the expression's type is whatever the
@@ -3712,11 +3950,41 @@ class NullChecker {
         return "Any"
     }
 
+    // An assignment used to ask exactly one question — is a nullable value
+    // escaping into a non-nullable binding — and never compared two concrete
+    // types. So `var x: String = "abc"` followed by `x = 42` compiled clean, and
+    // then `"${x}"` read the string pointer with `__val_untag_int` and segfaulted.
+    // This is the same defect BUGS #155 found in the `Return` arm, one statement
+    // kind over, and it takes the same fix: `scalar_mismatch`, whose one-sided
+    // discipline (fire only on two DIFFERENT concrete scalars; let Any, Nil,
+    // unions, generics, classes and enums through) is what makes it safe to turn
+    // on against the compiler's own source.
+    //
+    // The declared type is the one that constrains the store, so this asks
+    // `get_declared_var_type` rather than `get_var`; see the note there for the
+    // narrowing case it would otherwise reject.
     fun check_assign(name: String, value: AST.Expr, name_span: AST.Span): String {
         var val_type: String = this.infer_expr(value)
+        var decl_node: AST.Type = this.env.get_declared_var_type(name)
         var var_type: String = this.env.get_var(name)
-        if (var_type != "Any" and !this.is_nullable(var_type) and this.is_nullable(val_type)) {
-            this.error_at(name_span, name + ": cannot assign nullable " + val_type + " to non-nullable " + var_type)
+        // Ask the NODE whether the binding is nullable, not the rendered string.
+        //
+        // `env.get_var` renders through `AST.type_to_string`, which is deliberately
+        // lossy for diagnostics: it collapses `UnionType` to the literal "Union".
+        // `is_nullable` then split that on "|", found no "Nil" component, and
+        // reported a nullable binding as non-nullable — so `var n: String|Nil = "s"`
+        // followed by `n = nil` was rejected with "cannot assign nullable Nil to
+        // non-nullable Union", naming a type nobody wrote. The stored node was
+        // always correct; only the round-trip through a string lost the members.
+        // This is the same lossy-renderer defect the ret_type slice hit, which is
+        // why `type_to_source` exists — but a nullability question wants the node,
+        // not a faithful re-render.
+        if (var_type != "Any" and !this.is_nullable_type(decl_node) and this.is_nullable(val_type)) {
+            this.error_at(name_span, name + ": cannot assign nullable " + val_type + " to non-nullable " + AST.type_to_source(decl_node))
+        }
+        var decl_type: String = AST.type_to_string(decl_node)
+        if (this.scalar_mismatch(decl_type, val_type)) {
+            this.error_at(name_span, name + ": cannot assign " + val_type + " to " + decl_type + " variable")
         }
         return val_type
     }
@@ -4444,7 +4712,7 @@ class NullChecker {
     fun apply_fun_param_sig(args: List<AST.Expr>, arg_idx: Float, sig: String, callee: String) {
         var lambda: AST.Expr = args[arg_idx]
         var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p    _ => [] }
-        var ret_type: String = match (lambda) { Lambda(p, r, b) => r    _ => "Any" }
+        var ret_type: AST.Type = match (lambda) { Lambda(p, r, b) => r    _ => AST.Type.AnyType }
         var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b    _ => [] }
         if (params.length() == 0) return nil
 

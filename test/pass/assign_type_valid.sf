@@ -1,0 +1,114 @@
+// The legitimate side of the assignment type check. Every pattern here must stay
+// accepted; test/fail/assign_type_mismatch.sf pins the rejected ones.
+//
+// This file exists because the check is deliberately one-sided. `scalar_mismatch`
+// fires only on two DIFFERENT concrete scalars and lets everything uncertain
+// through — Any (the inferrer's "don't know"), Nil (the nullable check's
+// business), Int->Float widening, and every non-scalar, whose real subtype
+// relationships are not decidable from two type names alone.
+
+import "@test" as Test
+
+// --- Any is a real annotation and widens the binding. -----------------------
+// This is what BUGS #147 was about: an explicit `: Any` must not be collapsed
+// into the initializer's type, or it cannot do the one thing an author writes it
+// for. Reassigning across scalar kinds is legal here and only here.
+fun any_binding(): String {
+    var x: Any = 1
+    x = "reassigned"
+    return "${x}"
+}
+
+// --- Narrowing describes what a variable HOLDS, not what it may hold. -------
+// This case is the reason the check asks for the DECLARED type rather than the
+// narrowed one. Inside the guard the narrowed type is String, but the binding is
+// Any, so the store is legal. Reading the narrowed type here would reject it —
+// and `is`-guarded reassignment is a normal thing to write.
+fun narrowed_then_reassigned(v: Any): String {
+    var x: Any = v
+    if (x is String) {
+        x = 42
+    }
+    return "${x}"
+}
+
+// --- Int into Float is a widening, not a mismatch. --------------------------
+fun int_widens_to_float(): Float {
+    var f: Float = 1.5
+    f = 3
+    return f
+}
+
+// --- Same type, the ordinary case. ------------------------------------------
+fun same_type(): String {
+    var s: String = "a"
+    s = "b"
+    return s
+}
+
+// --- A nullable binding accepts a concrete value of its inner type. ---------
+// `String` is a subtype of `String|Nil`; the union is not a scalar, so
+// scalar_mismatch lets it through rather than guessing at the relationship.
+fun nullable_accepts_concrete(): Bool {
+    var n: String|Nil = nil
+    n = "now set"
+    return n != nil
+}
+
+// --- nil into a nullable binding. -------------------------------------------
+fun nullable_accepts_nil(): Bool {
+    var n: String|Nil = "set"
+    n = nil
+    return n == nil
+}
+
+// --- Class-typed bindings are let through. ----------------------------------
+// Not because class-vs-class is safe — it is exactly the case BUGS #155 defers
+// to the resolve pass (I4) — but because "not a scalar name" is not the same as
+// "a class", and approximating it produced three families of false positive.
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+}
+
+fun class_reassign(): Int {
+    var b: Box = Box(1)
+    b = Box(7)
+    return b.n
+}
+
+// --- Inference is a declaration, but same-type reassignment is fine. --------
+fun inferred_same_type(): String {
+    var z = "abc"
+    z = "def"
+    return z
+}
+
+// --- A module-level global, the pre-scan path. ------------------------------
+// Only the annotated-String global is asserted here. The `: Any` global belongs
+// with it conceptually, but reassigning one across scalar kinds still produces a
+// bit pattern at runtime — codegen's five global pre-scans collapse "" and "Any"
+// exactly the way the checker used to, so an explicit `: Any` global is typed
+// from its initializer and never widens. That is BUGS #160, filed from this
+// file; it is a codegen defect, not a checker one, and this check does not fire
+// on it either way.
+var g_str: String = "abc"
+
+fun globals(): String {
+    g_str = "still a string"
+    return g_str
+}
+
+Test.assert_eq(any_binding(), "reassigned", "explicit : Any widens on reassignment")
+// Passing a String takes the guard, so the `x = 42` inside it actually runs —
+// which is the store the check would reject if it read the narrowed type.
+Test.assert_eq(narrowed_then_reassigned("s"), "42", "is-narrowing does not constrain the store")
+Test.assert_eq(int_widens_to_float(), 3, "Int into Float is a widening")
+Test.assert_eq(same_type(), "b", "same-type reassignment")
+Test.assert(nullable_accepts_concrete(), "nullable binding accepts its inner type")
+Test.assert(nullable_accepts_nil(), "nullable binding accepts nil")
+Test.assert_eq(class_reassign(), 7, "class-typed reassignment is let through")
+Test.assert_eq(inferred_same_type(), "def", "inferred binding, same type")
+Test.assert_eq(globals(), "still a string", "an annotated module global reassigns")
+
+Test.summary()

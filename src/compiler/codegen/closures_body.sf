@@ -1,4 +1,4 @@
-    fun gen_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
+    fun gen_lambda(params: List<AST.Param>, ret_type: AST.Type, body: List<AST.Stmt>): String {
         // Find captured variables (free variables in body not in params)
         var param_names: List<String> = []
         var pi: Float = 0
@@ -244,7 +244,13 @@
         return result
     }
 
-    fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>, boxed_caps: List<String>) {
+    /// A capturing lambda's body. `ret_type` is a node, as on gen_function, and
+    /// only its LLVM lowering is wanted here — every Saffron type is i64, so the
+    /// name is all `llvm_type` reads. There is no implicit-return branch in this
+    /// emitter: gen_stmts handles the body wholesale, and the lambda's last
+    /// expression is already a `Return` by the time the parser is done with the
+    /// `=>` form.
+    fun gen_closure_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>, captures: List<String>, boxed_caps: List<String>) {
         this.known_functions.push(name)
         // We are about to emit a function body, so `in_function` must be true for
         // the duration.
@@ -279,7 +285,7 @@
         this.reset_locals()
         this.typed_vars = {}
         this.string_vars = []
-        var ret_llvm: String = this.llvm_type(ret_type)
+        var ret_llvm: String = this.llvm_type(this.type_to_string(ret_type))
         this.current_ret_type = ret_llvm
 
         // Check if this closure is a coroutine

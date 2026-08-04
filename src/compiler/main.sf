@@ -507,7 +507,7 @@ fun push_symbol(acc: String, name: String, kind: String, s: AST.Span, visibility
 // A param whose type annotation is absent renders as just its name; `AnyType` is
 // what the parser fills in for an unannotated param, and printing ": Any" would
 // claim the author wrote an annotation they did not.
-fun render_signature(params: List<AST.Param>, ret_type: String): String {
+fun render_signature(params: List<AST.Param>, ret_type: AST.Type): String {
     var out: String = "("
     var i: Float = 0
     while (i < params.length()) {
@@ -522,7 +522,12 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
         i = i + 1
     }
     out = out + ")"
-    if (ret_type.length() > 0) { out = out + ": " + ret_type }
+    // A function with no declared return type renders without one, the same way
+    // an unannotated param renders as a bare name just above. `ret_type` used to
+    // be a String and the guard was `length() > 0`, which was never false — the
+    // parser substituted the literal "Nil", so every unannotated function's
+    // hover claimed `: Nil`. UnknownType makes the absence askable.
+    if (!is_unknown_type(ret_type)) { out = out + ": " + AST.type_to_source(ret_type) }
     return out
 }
 
@@ -532,6 +537,18 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
 fun is_any_type(t: AST.Type): Bool {
     return match (t) {
         AnyType => true
+        _ => false
+    }
+}
+
+// The same question for a *return* type, which the parser marks differently:
+// an omitted param annotation becomes AnyType, an omitted return annotation
+// becomes UnknownType. Two markers because the two positions differ — a param
+// with no annotation really does accept anything, while a function with no
+// declared result has a result nobody has stated (invariant I2).
+fun is_unknown_type(t: AST.Type): Bool {
+    return match (t) {
+        UnknownType => true
         _ => false
     }
 }
@@ -803,6 +820,33 @@ fun extract_named_imports(source: String): Map<String, List<String>> {
     return result
 }
 
+// Pull the alias out of an `import "path" as Name` line.
+//
+// BUGS #157. Both callers used to write `line.slice(as_idx + 4,
+// line.length()).trim()` inline, which takes everything to end of line. `.trim()`
+// strips whitespace but not punctuation, so `import "@iter" as Iter;` produced the
+// alias `Iter;` — and then `Iter.map(...)` failed with "undefined variable
+// 'Iter'", a diagnostic blaming the user's spelling for the scanner's mistake.
+// A trailing comment (`as Iter // the iterator module`) broke it the same way.
+//
+// Stopping at the first character that cannot appear in an identifier fixes the
+// whole class rather than the semicolon alone. It is deliberately a shared helper:
+// the second caller is check_duplicate_aliases, where the inline version meant
+// `as X` and `as X;` hashed to different keys, so the duplicate-alias check
+// silently missed a real duplicate. One expression written twice was two bugs.
+fun extract_alias_from_line(line: String, as_idx: Float): String {
+    var rest: String = line.slice(as_idx + 4, line.length()).trim()
+    var end: Float = 0
+    while (end < rest.length()) {
+        var ch: String = rest.char_at(end)
+        var is_word: Bool = (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z")
+            or (ch >= "0" and ch <= "9") or ch == "_"
+        if (!is_word) { break }
+        end = end + 1
+    }
+    return rest.slice(0, end)
+}
+
 fun extract_import_aliases(source: String): Map<String, String> {
     var aliases: Map<String, String> = {}
     var lines: List<String> = source.split("\n")
@@ -822,8 +866,10 @@ fun extract_import_aliases(source: String): Map<String, String> {
             var imp_path: String = line.slice(path_start, path_end)
             var as_idx: Float = line.index_of(" as ")
             if (as_idx >= 0) {
-                var alias: String = line.slice(as_idx + 4, line.length()).trim()
-                aliases.set(alias, imp_path)
+                var alias: String = extract_alias_from_line(line, as_idx)
+                if (alias.length() > 0) {
+                    aliases.set(alias, imp_path)
+                }
             }
         }
         i = i + 1
@@ -925,7 +971,7 @@ fun check_duplicate_aliases(source: String, file_path: String) {
         if (line.starts_with("import \"")) {
             var as_idx: Float = line.index_of(" as ")
             if (as_idx >= 0) {
-                var alias: String = line.slice(as_idx + 4, line.length()).trim()
+                var alias: String = extract_alias_from_line(line, as_idx)
                 if (seen.has(alias)) {
                     IO.println("Error: duplicate import alias '" + alias + "' in " + file_path)
                     c_exit(1)
