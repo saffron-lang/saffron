@@ -955,6 +955,96 @@ fun __any_iter_get(v: Int, index: Int): Int {
     return __str_get(v, index)
 }
 
+// `obj[k]` where obj's static type is unresolved. The subscript sibling of
+// __any_iter_get, and deliberately NOT the same function: on a Map, `m["key"]`
+// is a key lookup, while for-in's element read is an ordinal walk yielding a
+// [key, value] pair. Sharing one helper would silently turn every unresolved
+// map subscript into a positional read.
+//
+// Takes the subscript still NaN-boxed, because which representation is correct
+// depends on the receiver, which is exactly what codegen did not know: a Map key
+// must stay boxed (__map_key_cmp reads the tag to tell "1" from 1), while a
+// List or String index has to be untagged for the arithmetic. Codegen cannot
+// pick, so it hands over the boxed value and this decides.
+//
+// Before this, gen_index_get's list path was the unguarded default: anything
+// that was not statically String, Map or a getItem class fell into
+// __list_length/__list_get, which inttoptr's the value as given. On a NaN-tagged
+// String that reads character bytes as a list header — SIGSEGV. That is the same
+// fall-through that produced BUGS #29, #93, #94 and #95, one static type at a
+// time; routing the unresolved case at runtime closes the class of bug rather
+// than the next instance of it (BUGS #152).
+fun __any_index_get(v: Int, index_boxed: Int): Int {
+    var as_map: Int = __rt_as_map_ptr(v)
+    if (as_map != 0) {
+        // Boxed, not untagged — see above.
+        return __map_get(as_map, index_boxed)
+    }
+    var idx: Int = __rt_untag_int(index_boxed)
+    var as_list: Int = __rt_as_list_ptr(v)
+    if (as_list != 0) {
+        // __list_get does its own bounds check and negative-index adjustment, so
+        // the length/select dance in codegen's static path is not repeated here.
+        return __list_get(as_list, idx)
+    }
+    // Same reasoning as __any_iter_get's tail: ask __rt_gc_tag_of rather than
+    // re-deriving the pointer-plausibility guards, and reject a verified GC
+    // object that is not a string, since reading a class instance as a char*
+    // faults or trips a bogus IndexError. Tag 0 means "not a GC pointer at all",
+    // which __str_get's own null check handles.
+    var gtag: Int = __rt_gc_tag_of(v)
+    if (gtag != 0 and gtag != 1) {
+        __not_indexable_error()
+        return __rt_nil()
+    }
+    return __str_get(v, idx)
+}
+
+// `obj[k]` where obj is neither a List, a String nor a Map. Fatal, like every
+// other runtime error. Distinct from __not_iterable_error only in its message:
+// this one is reachable from a subscript, where "for-in requires..." would name
+// a construct the user did not write.
+fun __not_indexable_error() {
+    // "TypeError: cannot index this value" — 34 chars plus the NUL.
+    var msg: Int = rt_malloc(35)
+    store8(msg, 84)       // T
+    store8(msg + 1, 121)  // y
+    store8(msg + 2, 112)  // p
+    store8(msg + 3, 101)  // e
+    store8(msg + 4, 69)   // E
+    store8(msg + 5, 114)  // r
+    store8(msg + 6, 114)  // r
+    store8(msg + 7, 111)  // o
+    store8(msg + 8, 114)  // r
+    store8(msg + 9, 58)   // :
+    store8(msg + 10, 32)  // (space)
+    store8(msg + 11, 99)  // c
+    store8(msg + 12, 97)  // a
+    store8(msg + 13, 110) // n
+    store8(msg + 14, 110) // n
+    store8(msg + 15, 111) // o
+    store8(msg + 16, 116) // t
+    store8(msg + 17, 32)  // (space)
+    store8(msg + 18, 105) // i
+    store8(msg + 19, 110) // n
+    store8(msg + 20, 100) // d
+    store8(msg + 21, 101) // e
+    store8(msg + 22, 120) // x
+    store8(msg + 23, 32)  // (space)
+    store8(msg + 24, 116) // t
+    store8(msg + 25, 104) // h
+    store8(msg + 26, 105) // i
+    store8(msg + 27, 115) // s
+    store8(msg + 28, 32)  // (space)
+    store8(msg + 29, 118) // v
+    store8(msg + 30, 97)  // a
+    store8(msg + 31, 108) // l
+    store8(msg + 32, 117) // u
+    store8(msg + 33, 101) // e
+    store8(msg + 34, 0)
+    __runtime_error_fatal(msg)
+}
+
 // `for (x in obj)` where obj is neither a List, a String nor a Map. Fatal, like
 // every other runtime error (they route to __runtime_error_fatal and are not
 // catchable).

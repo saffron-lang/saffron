@@ -1,0 +1,51 @@
+// BUGS #152: indexing a receiver whose static type is UNRESOLVED fell through to
+// gen_index_get's list path, which calls __list_length/__list_get on the value as
+// given. On a NaN-tagged String that inttoptr's a tagged value and reads character
+// bytes as a list header — SIGSEGV, no diagnostic.
+//
+// The list path had been the unguarded default for "no idea what this is", so the
+// same crash was fixed four times by adding one more static type above it (#29
+// String, #93 String|Nil for .length(), #94 getItem classes, #95 generic getItem).
+// The unresolved case now routes to __any_index_get, which discriminates on the GC
+// type tag at runtime the way __any_length already did for .length().
+//
+// The original repro was Glob.find_in, where IO.walk_dir's flat List<String> was
+// indexed as if it were os.walk's [root, dirs, files] triples: entry[2] is a
+// one-character String, and .length() on it crashed.
+import "@test" as Test
+
+// 1. The exact original shape: an unannotated chain ending in a String subscript,
+//    then a method call on the result. This is what segfaulted.
+var entries = IO.walk_dir("src/lib")
+Test.assert(entries.length() > 10, "walk_dir returned a populated list")
+var entry = entries[0]
+var ch = entry[2]
+Test.assert_eq(ch.length(), 1, "indexing an unresolved String yields one char")
+
+// 2. Reading every position of a short unresolved String, to prove the runtime
+//    dispatch picked __str_get and not a list read.
+var words: List<String> = ["abc"]
+var w = words[0]
+Test.assert_eq(w[0], "a", "unresolved String index 0")
+Test.assert_eq(w[1], "b", "unresolved String index 1")
+Test.assert_eq(w[2], "c", "unresolved String index 2")
+
+// 3. Negative indexing still works. __str_get does its own adjustment, so the
+//    length/select dance the static list path emits is correctly skipped.
+Test.assert_eq(w[-1], "c", "negative index on an unresolved String")
+
+// 4. A Map through an unresolved receiver must stay a KEY lookup, not an ordinal
+//    read. This is why __any_index_get is a separate helper from __any_iter_get,
+//    whose Map arm walks positions and yields [key, value] pairs.
+var maps: List<Map<String, Int>> = [{"x": 10, "y": 20}]
+var m = maps[0]
+Test.assert_eq(m["y"], 20, "unresolved Map subscript is a key lookup")
+Test.assert_eq(m["x"], 10, "unresolved Map subscript, first key")
+
+// 5. A List through an unresolved receiver still indexes positionally.
+var nested: List<List<Int>> = [[7, 8, 9]]
+var inner = nested[0]
+Test.assert_eq(inner[1], 8, "unresolved List index")
+Test.assert_eq(inner[-1], 9, "negative index on an unresolved List")
+
+Test.summary()

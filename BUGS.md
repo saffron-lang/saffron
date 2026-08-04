@@ -3,19 +3,20 @@
 ## Open
 
 **11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139, #143. Next free number is **#152**.
+#139, #143. Next free number is **#153**.
 
 This worktree branched from an origin/main that predates local `main`'s #147
 (`: Any` ignored), #148 (nonexistent class-member read) and #149 (the ide alias
 fix), none of them pushed yet. Merge those in before trusting this list; #150
 and #151 below are numbered around them.
 
-#144, #145, #146, #150 and #151 were each filed and fixed in the same sitting — the
+#144, #145, #146, #150, #151 and #152 were each filed and fixed in the same sitting — the
 unused-variable warning firing on compiler-mandated match-arm bindings,
 call-site argument types never being checked at all, the lexer silently
 discarding `\xNN` escapes, interface-typed dispatch binding to the empty abstract
-stub, and a cross-module subclass emitting an unprefixed forwarder — and all five
-are under `## Resolved`.
+stub, a cross-module subclass emitting an unprefixed forwarder, and an
+unresolved-type subscript falling through to the list path — and all six are under
+`## Resolved`.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -737,6 +738,84 @@ The audit for siblings found none: the other direct `emit("define` sites are the
 deliberately global, and the module-init functions build their own name from the
 prefix (`"__mod_init_" + prefix`), so they are unique by construction. The
 forwarder was the only class symbol not named by `gen_function`.
+
+### 152. FIXED — indexing a receiver whose static type is unresolved fell through to the list path, so `s[i]` on a NaN-tagged String segfaulted
+
+**Severity: high** — a silent SIGSEGV with no diagnostic, and the *fifth* symptom of
+one root cause.
+
+```saffron
+var entries = IO.walk_dir("src/lib")   // List<String>, but unannotated
+var entry = entries[0]                 // a String; static type now unresolved
+var x = entry[2]                       // a one-character String
+IO.println(x.length().to_string())     // SIGSEGV
+```
+
+`gen_index_get` (`codegen/methods_body.sf`) checks the receiver's static type in
+order: Tuple (rejected), Map, a class declaring `getItem`, String. Everything else
+falls into the list path, which calls `__list_length` / `__list_get` on the value as
+given — and those `inttoptr` it. For a List, stored untagged, that is correct. For a
+NaN-tagged String it reads character bytes as a list header.
+
+The list path was acting as the default for *"no idea what this is"*, and that is
+the shared root of four already-closed entries, each fixed by adding one more known
+type above it: **#29** (String), **#93** (`String|Nil` reaching `.length()`), **#94**
+(`getItem` classes), **#95** (generic `getItem`). `.length()` was given a runtime
+fallback — `__any_length`, which reads the GC type tag — but the subscript never was.
+
+Fixed by routing the unresolved case to a new `__any_index_get`, the subscript
+sibling of `__any_iter_get`. It is deliberately a *separate* helper: on a Map,
+`m["key"]` is a key lookup, while for-in's element read is an ordinal walk yielding
+a `[key, value]` pair, so sharing one function would silently turn every unresolved
+map subscript into a positional read. It takes the subscript still NaN-boxed,
+because which representation is correct depends on the receiver — a Map key must
+stay boxed for `__map_key_cmp` to tell `"1"` from `1`, a List/String index must be
+untagged — and the receiver is precisely what codegen did not know.
+
+`Any` routes to the runtime helper too. The first version of this fix excluded it,
+on the theory that an untyped receiver reaching a subscript is usually a List and
+that keeping it static costs nothing — and that version left the reported crash
+completely intact. `Any` is not a hint that the value is a List; it is the compiler
+saying it does not know, which is exactly the condition that requires a runtime tag
+check. It is also what the new arm *returns*, so under the exclusion an unannotated
+`a[i][j]` fed `Any` straight back in and the second subscript took the crashing path
+— the repro above is that shape, and it still segfaulted after a fully green
+bootstrap. The already-working `.length()` precedent (`methods_body.sf`, from #93)
+had it right: `if (obj_type == "Any" or length_unresolved)`.
+
+That is worth stating as a rule, because the reasoning is seductive and it is the
+same reasoning that produced #29/#93/#94/#95 one type at a time: only List and Tuple
+— spellings that pin the representation — may keep the static path. Every other
+answer, `Any` included, means *unknown*.
+
+**Two stdlib bugs were hiding behind the crash.** `IO.walk_dir` is a misnomer — it
+is `ls -1`, returning bare names for one directory with no descent, and a straight
+alias of `IO.list_dir`. Both stdlib callers were written against a Python `os.walk`
+that does not exist here, treating each entry as a `[root, dirs, files]` triple:
+`@glob`'s `find_in` and `@find`'s `FileFinder` therefore indexed into a *filename
+string*. `find_in` never matched anything and `**` could not have worked over a
+single non-recursive listing; `FileFinder.files()` returned garbage while its docs
+promised recursion. Both now do a real recursive descent via `IO.is_dir`. Separately
+`_ignore_matches` stripped a pattern's trailing slash *before* testing for a slash,
+so `build/` became `build`, took the basename branch, and was compared against
+`out.o` — the gitignore directory form never matched. That is why the fix is three
+files and not one: a correct compiler would have turned `test_glob`'s segfault into
+an assertion failure, not a pass.
+
+The lesson worth keeping: a crash this deterministic reads like the whole story, and
+here it was masking two logic errors in the caller. `test_glob` had been failing as
+`segfault` for long enough to be background noise.
+
+**Verification.** Bootstrap green through stage 2 (`gen3 compiles itself; gen4 links
+and compiles`) — stage 1 alone would not have been evidence, since the compiler's own
+source annotates its subscript receivers and never exercises the unresolved path.
+`test/pass/unresolved_index.sf` is the regression test: 10 assertions covering the
+original `walk_dir` chain, every position of an unresolved String, negative indices
+through both `__str_get` and `__list_get`, and an unresolved Map subscript asserting a
+*key* lookup rather than an ordinal read. `test/test_glob.sf` went from `segfault` to
+23/23. Suite 275 passed / 8 failed, with a failure name set identical to post-#151
+minus `segfault test_glob` — nothing added; `build/saffronc`'s md5 was unchanged
+across the run with no concurrent bootstrap.
 
 ### 150. FIXED — a call through an interface-typed receiver bound to the interface's empty abstract stub, so it silently did nothing and returned 0
 
