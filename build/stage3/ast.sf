@@ -187,7 +187,7 @@ enum Expr {
 /// takes the unknown-enum path, and compiles to an unconditional destructure of
 /// the first arm with no tag check at all — reading past the allocation and
 /// segfaulting on any variant with fewer fields. Moving this function up is a
-/// mechanical-looking edit that miscompiles it. See BUGS #156.
+/// mechanical-looking edit that miscompiles it. See BUGS #158.
 ///
 /// Every expression that carries a span answers with it; anything else answers
 /// `span_none()`, which `error_at` renders exactly as `error` did. So a caller
