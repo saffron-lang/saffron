@@ -1,0 +1,61 @@
+// Assigning a concrete scalar into a binding declared as a DIFFERENT concrete
+// scalar is an error. Before this check the assignment arm asked exactly one
+// question — is a nullable value escaping into a non-nullable binding — and never
+// compared two concrete types. So every case below compiled clean and then
+// segfaulted at the first read: the store wrote a tagged pointer and the load
+// untagged it as an Int (`__val_untag_int` on a string address), or vice versa.
+//
+// This is BUGS #155's defect one statement kind over. The `Return` arm had the
+// same shape and takes the same fix — `scalar_mismatch`, whose one-sided
+// discipline is what makes it safe to turn on against the compiler's own source:
+// it fires only on two DIFFERENT concrete scalars and lets Any, Nil, unions,
+// generics, class and enum types through. A false positive here is not merely
+// noise; the checker type-checks the compiler, so it breaks the bootstrap.
+//
+// The legitimate shapes — including the one that made this need a second scope
+// accessor, `if (x is String) { x = 42 }` on an `Any` binding — are pinned in
+// test/pass/assign_type_valid.sf.
+
+fun declared_string_gets_int() {
+    var x: String = "abc"
+    x = 42
+    IO.println("${x}")
+}
+
+fun declared_int_gets_string() {
+    var y: Int = 1
+    y = "str"
+    IO.println("${y}")
+}
+
+// The type came from the initializer rather than an annotation. Inference is
+// still a declaration: nothing widens the binding on reassignment, so this
+// segfaulted exactly like the annotated case.
+fun inferred_string_gets_int() {
+    var z = "abc"
+    z = 42
+    IO.println("${z}")
+}
+
+// Float into Int is a mismatch. The reverse, Int into Float, is a widening and
+// is allowed — see the pass file.
+fun declared_int_gets_float() {
+    var w: Int = 1
+    w = 2.5
+    IO.println("${w}")
+}
+
+// A module-level global, which reaches the check by a different path: codegen's
+// global pre-scans type these before any function body is compiled.
+var g_str: String = "abc"
+
+fun global_gets_int() {
+    g_str = 42
+    IO.println("${g_str}")
+}
+
+fun main() {
+    declared_string_gets_int()
+}
+
+main()

@@ -1,4 +1,29 @@
-    fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
+    /// `ret_type` is an AST.Type node. Two derived strings are computed once, at
+    /// the top, because the two questions the old String answered are different
+    /// and the old encoding could only answer them together:
+    ///
+    ///   ret_name — the type's *name*, for llvm_type and for the "void" test.
+    ///     Faithful (`type_to_string`), and "Unknown" when nothing was declared.
+    ///   implicit_return — whether the body's last ExprStmt becomes the result.
+    ///
+    /// The second is the one that needed care. It used to be spelled
+    /// `ret_type != "Nil" and ret_type != "void"`, which read the *parser's
+    /// sentinel* rather than any property of the type — and the two sentinels
+    /// disagreed. A FunDecl with no annotation carried "Nil" and so had implicit
+    /// return SUPPRESSED; a Lambda with no annotation carried "Int" and so had it
+    /// ENABLED. Both are now UnknownType, so the distinction has to be restored
+    /// from something real, and the real difference is the construct: a lambda
+    /// body is an expression form and `fun () { 42 }` must keep yielding 42,
+    /// while `fun f() { 42 }` has always discarded it. `emit_name` already
+    /// carries that fact — gen_lambda names every lambda `__lambda_N` — so the
+    /// construct is recoverable without threading a flag through six callers.
+    /// Measured on the pre-migration binary before it was written down; see the
+    /// table in docs/design/compiler-rewrite.md.
+    fun gen_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>) {
+        var ret_name: String = this.type_to_string(ret_type)
+        var is_lambda_body: Bool = name.contains("__lambda")
+        var implicit_return: Bool = ret_name != "Nil" and ret_name != "void"
+        if (this.is_unknown_type(ret_type)) { implicit_return = is_lambda_body }
         var emit_name: String = this.current_prefix + name
         // Only the ENTRY module's `main` becomes __saffron_main. An imported
         // module is free to define a function called `main` (turmeric/prelude.sf
@@ -13,9 +38,15 @@
             emit_name = name
         }
         this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+        // Same collapse as everywhere else, except that an unannotated *lambda*
+        // registered `Int` under the old encoding rather than `Nil`, and call-site
+        // typing reads this map. Preserving each construct's own former sentinel
+        // is what keeps the slice behaviour-neutral downstream.
+        var registered_ret: AST.Type = this.ret_type_for_registration(ret_type)
+        if (this.is_unknown_type(ret_type) and is_lambda_body) { registered_ret = AST.Type.IntType }
+        this.func_ret_types.set(emit_name, registered_ret)
         if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(name, this.str_to_type(ret_type))
+            this.func_ret_types.set(name, registered_ret)
             this.func_prefix_map.set(name, emit_name)
         }
         this.current_function_name = name
@@ -103,7 +134,7 @@
             this.string_vars = []
             this.gc_root_count = 0
             this.reset_locals()
-            var ret_llvm2: String = this.llvm_type(ret_type)
+            var ret_llvm2: String = this.llvm_type(ret_name)
             var all_params: List<String> = []
             if (full_params.length() > 0) {
                 all_params = this.split_respecting_generics(full_params, ",")
@@ -231,7 +262,7 @@
         this.reset_locals()
         this.string_vars = []
         this.typed_vars = {}
-        var ret_llvm: String = this.llvm_type(ret_type)
+        var ret_llvm: String = this.llvm_type(ret_name)
 
         // Parse params string "name:type,name:type"
         var param_list: List<String> = []
@@ -511,7 +542,7 @@
         this.gc_root_count = gc_root_count
 
         // Generate body statements, treating last ExprStmt as implicit return
-        if (body.length() > 0 and ret_type != "Nil" and ret_type != "void") {
+        if (body.length() > 0 and implicit_return) {
             var last_stmt: AST.Stmt = body[body.length() - 1]
             var last_kind: String = this.classify_stmt(last_stmt)
             if (last_kind == "expr") {
@@ -804,9 +835,13 @@
                         if (pr_doc.starts_with("@extern:")) {
                             this.extern_sigs.set(pr_emit, pr_doc.slice(8, pr_doc.length()))
                             this.extern_param_types.set(pr_emit, this.param_types_csv(pr_params))
-                            if (pr_ret.length() > 0) {
-                                this.func_ret_types.set(pr_emit, this.str_to_type(pr_ret))
-                            }
+                            // `pr_ret` is an AST.Type node now, so the old
+                            // `length() > 0` emptiness probe is gone: it was
+                            // asking whether a String had content, which was
+                            // always true here (this arm already matched a
+                            // FunDecl). An omitted annotation registers as Nil,
+                            // the same stand-in the old sentinel supplied.
+                            this.func_ret_types.set(pr_emit, this.ret_type_for_registration(pr_ret))
                         }
                     }
                 }

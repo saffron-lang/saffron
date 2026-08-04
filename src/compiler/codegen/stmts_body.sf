@@ -56,7 +56,7 @@
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+                    this.func_ret_types.set(emit_name, this.ret_type_for_registration(ret_type))
                     this.intrinsic_funcs.push(emit_name)
                 } else if (doc.starts_with("@inline")) {
                     // Mark function for alwaysinline attribute, then process normally
@@ -82,7 +82,7 @@
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+                    this.func_ret_types.set(emit_name, this.ret_type_for_registration(ret_type))
                     this.extern_sigs.set(emit_name, c_sig)
                     this.extern_param_types.set(emit_name, this.param_types_csv(params))
                 } else if (doc.starts_with("@extend:")) {
@@ -305,9 +305,18 @@
             while (ai < call_args.length()) {
                 var arg_kind: String = this.classify_expr(call_args[ai])
                 if (arg_kind == "lambda") {
-                    var lam_ret: String = match (call_args[ai]) { Lambda(p, r, b) => r   _ => "" }
-                    if (lam_ret.length() > 0 and lam_ret != "Int" and lam_ret != "Any") {
-                        return lam_ret
+                    // The two spellings excluded here were the *sentinels*: an
+                    // unannotated lambda carried "Int", and "Any" carries no
+                    // information a generic could be inferred from. With the node
+                    // encoding the first is UnknownType and states outright that
+                    // nothing was declared, so it is excluded by name rather than
+                    // by guessing from a type that happened to mean "absent".
+                    var lam_ret: AST.Type = match (call_args[ai]) { Lambda(p, r, b) => r   _ => AST.Type.UnknownType }
+                    if (!this.is_unknown_type(lam_ret)) {
+                        var lam_ret_str: String = this.type_to_string(lam_ret)
+                        if (lam_ret_str != "Int" and lam_ret_str != "Any") {
+                            return lam_ret_str
+                        }
                     }
                 }
                 if (arg_kind == "string") {
@@ -686,11 +695,12 @@
         i = 0
         while (i < methods.length()) {
             var mname: String = this.get_fun_name(methods[i])
-            var mret: String = this.get_fun_ret(methods[i])
+            var mret: AST.Type = this.get_fun_ret(methods[i])
             var full_name: String = name + "__" + mname
             var prefixed_full: String = this.current_prefix + full_name
-            this.func_ret_types.set(prefixed_full, this.str_to_type(mret))
-            this.func_ret_types.set(full_name, this.str_to_type(mret))
+            var mret_reg: AST.Type = this.ret_type_for_registration(mret)
+            this.func_ret_types.set(prefixed_full, mret_reg)
+            this.func_ret_types.set(full_name, mret_reg)
             this.known_functions.push(prefixed_full)
             this.known_functions.push(full_name)
             this.func_prefix_map.set(full_name, prefixed_full)
@@ -730,9 +740,16 @@
         }
     }
 
-    fun get_fun_ret(stmt: AST.Stmt): String {
+    /// The declared return type of a FunDecl, as a node.
+    ///
+    /// Every caller used to take the String this returned and immediately hand it
+    /// to `str_to_type`, so the migration to `AST.Type` deleted a round-trip
+    /// rather than adding one. The non-FunDecl fallback is UnknownType, which is
+    /// also what callers now test instead of the old `ret.length() > 0` — an
+    /// emptiness probe that could not tell "not a function" from "no annotation".
+    fun get_fun_ret(stmt: AST.Stmt): AST.Type {
         return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => r
-            _ => ""
+            _ => AST.Type.UnknownType
         }
     }
 
@@ -745,7 +762,7 @@
     fun gen_class_method(class_name: String, method: AST.Stmt) {
         var mname: String = this.get_fun_name(method)
         var mparams: List<AST.Param> = this.get_fun_params(method)
-        var mret: String = this.get_fun_ret(method)
+        var mret: AST.Type = this.get_fun_ret(method)
         var mbody: List<AST.Stmt> = this.get_fun_body(method)
         var mdoc: String = this.get_fun_doc(method)
         var full_name: String = class_name + "__" + mname

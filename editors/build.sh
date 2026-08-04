@@ -14,6 +14,7 @@
 #   editors/build.sh                 # build shared + vscode + intellij
 #   editors/build.sh --skip-intellij # skip the Gradle build (no JDK needed)
 #   editors/build.sh --regen-builtins# regenerate builtins.ts from the stdlib first
+#   editors/build.sh --test          # also run the shared server's unit tests
 #
 # The TypeScript builds use each package's LOCAL typescript devDependency, never
 # a global `tsc` (there isn't one on a stock machine) — so `npm install` runs
@@ -24,10 +25,12 @@ EDITORS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SKIP_INTELLIJ=0
 REGEN_BUILTINS=0
+RUN_TESTS=0
 for arg in "$@"; do
   case "$arg" in
     --skip-intellij) SKIP_INTELLIJ=1 ;;
     --regen-builtins) REGEN_BUILTINS=1 ;;
+    --test) RUN_TESTS=1 ;;
     -h|--help)
       sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -71,6 +74,16 @@ fi
 # 1. shared LSP server — the file both editors run.
 build_ts "$EDITORS_DIR/shared"
 
+# 1b. The shared server's tests: the lexical scanner that drives rename (whose
+# failures are silent edits rather than crashes) and the server itself, driven
+# over stdio against build/saffronc. Opt-in rather than always-on so a plain
+# build stays a build, and because the server suite shells out to the compiler
+# once per document. It skips itself, loudly, when there is no usable compiler.
+if [[ "$RUN_TESTS" == "1" ]]; then
+  log "node --test (shared)"
+  (cd "$EDITORS_DIR/shared" && node --test "test/*.test.mjs")
+fi
+
 # 2. VS Code extension.
 build_ts "$EDITORS_DIR/vscode"
 
@@ -82,6 +95,16 @@ elif ! command -v java >/dev/null && [[ -z "${JAVA_HOME:-}" ]]; then
 else
   log "gradle buildPlugin (intellij)"
   (cd "$EDITORS_DIR/intellij" && ./gradlew --console=plain buildPlugin)
+
+  # --test also runs the JetBrains Plugin Verifier, which is the only check that
+  # sees the failures compilation cannot: API that does not exist at the
+  # sinceBuild floor. It caught a PluginId.getId() call that compiled fine and
+  # would have thrown NoSuchFieldError on any IDE older than 2025.3. Off by
+  # default because it downloads a full IDE per verified version (GBs, slow).
+  if [[ "$RUN_TESTS" == "1" ]]; then
+    log "gradle verifyPlugin (intellij)"
+    (cd "$EDITORS_DIR/intellij" && ./gradlew --console=plain verifyPlugin)
+  fi
 fi
 
 log "done"

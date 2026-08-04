@@ -1062,7 +1062,7 @@ class Parser {
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
-                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                    return AST.Expr.Lambda(lparams, AST.Type.AnyType, lbody)
                 } else if (this.match_kind(",")) {
                     var lparams: List<AST.Param> = []
                     lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit, "public", AST.span_none()))
@@ -1093,7 +1093,7 @@ class Parser {
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
-                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                    return AST.Expr.Lambda(lparams, AST.Type.AnyType, lbody)
                 } else {
                     this.pos = kl_before
                 }
@@ -1643,9 +1643,14 @@ class Parser {
             }
         }
         this.consume(")")
-        var ret_type: String = "Int"
+        // An omitted return type is UnknownType, not the old in-band `"Int"`.
+        // `"Int"` was a real type name standing in for "nobody wrote one", so a
+        // lambda returning a String was indistinguishable from one declared
+        // `: Int` — mechanism M2, and the reason check_lambda_body has to blank
+        // current_func_ret rather than trust this field.
+        var ret_type: AST.Type = AST.Type.UnknownType
         if (this.match_kind(":")) {
-            ret_type = this.parse_type()
+            ret_type = this.parse_type_ast(this.parse_type())
         }
         if (this.match_kind("=>")) {
             // Short form: fun (x: Int) => expr
@@ -1929,9 +1934,11 @@ class Parser {
                 }
             }
             this.consume(")")
-            var ext_ret: String = "Nil"
+            // Same sentinel rule as the plain FunDecl site above: omitted is
+            // UnknownType, not "Nil".
+            var ext_ret: AST.Type = AST.Type.UnknownType
             if (this.match_kind(":")) {
-                ext_ret = this.parse_type()
+                ext_ret = this.parse_type_ast(this.parse_type())
             }
             var ext_body: List<AST.Stmt> = []
             if (this.match_kind_check("{")) {
@@ -2558,9 +2565,14 @@ class Parser {
             }
         }
         this.consume(")")
-        var ret_type: String = "Nil"
+        // An omitted return type is UnknownType. It used to be the string "Nil",
+        // which is a type a user can actually write — so `fun f(): Nil` and
+        // `fun f()` were the same node, and the Return check could not reject
+        // `fun f(): Nil { return 42 }` without also rejecting every unannotated
+        // function (BUGS #155).
+        var ret_type: AST.Type = AST.Type.UnknownType
         if (this.match_kind(":")) {
-            ret_type = this.parse_type()
+            ret_type = this.parse_type_ast(this.parse_type())
         }
         // Erase type params in parameter types and return type for codegen
         // (generics are erased at compile time — all values are i64 NaN-boxed)
@@ -2578,7 +2590,7 @@ class Parser {
                 epi = epi + 1
             }
             // Also erase type params in return type
-            if (type_param_names.contains(ret_type)) {
+            if (type_param_names.contains(this.type_ast_to_string(ret_type))) {
                 // Keep the type param name in ret_type for checker resolution
                 // but the codegen will treat it correctly since params are erased
             }
@@ -3000,7 +3012,7 @@ class Parser {
             if (mname == "init") {
                 var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => b    _ => [] }
                 var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => p    _ => [] }
-                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => r    _ => "" }
+                var mret: AST.Type = match (methods[i]) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => r    _ => AST.Type.UnknownType }
                 // Rebuilding an *existing* init: carry its own visibility across
                 // rather than resetting it to "public". Today the parser only ever
                 // produces "public", so this is behaviour-identical -- but once
@@ -3026,7 +3038,7 @@ class Parser {
             i = i + 1
         }
         // No init found — create one with just the defaults
-        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, "", "public", AST.span_none(), AST.span_none()))
+        methods.push(AST.Stmt.FunDecl("init", [], AST.Type.NilType, defaults, "", "public", AST.span_none(), AST.span_none()))
     }
 
     fun parse_import(): AST.Stmt {
@@ -3325,7 +3337,7 @@ class Parser {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) {
                 this.consume("}")
-                return AST.Expr.Lambda([], "Nil", body)
+                return AST.Expr.Lambda([], AST.Type.NilType, body)
             }
             // Bare string literals desugar to text(string)
             if (this.match_kind_check("string")) {
@@ -3336,7 +3348,7 @@ class Parser {
             }
         }
         this.consume("}")
-        return AST.Expr.Lambda([], "Nil", body)
+        return AST.Expr.Lambda([], AST.Type.NilType, body)
     }
 
     fun parse_trailing_closure_with_params(): AST.Expr {
@@ -3368,7 +3380,7 @@ class Parser {
             params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit, "public", AST.span_none()))
             i = i + 1
         }
-        return AST.Expr.Lambda(params, "Any", body)
+        return AST.Expr.Lambda(params, AST.Type.AnyType, body)
     }
 
     // =========================================================================
@@ -3471,7 +3483,7 @@ class Parser {
 
         // Emit: tag(attrs...) { children }
         // Add trailing closure (Lambda with children as body)
-        args.push(AST.Expr.Lambda([], "Nil", children))
+        args.push(AST.Expr.Lambda([], AST.Type.NilType, children))
         return AST.Expr.Call(AST.Expr.Variable(tag, tag_span), args, this.span_from(elem_start))
     }
 
@@ -3569,7 +3581,7 @@ class Parser {
                         }
                     }
                     this.html_depth = saved_depth
-                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                    return AST.Expr.Lambda(lparams, AST.Type.AnyType, lbody)
                 } else if (this.match_kind(",")) {
                     // Multi-param Kotlin lambda: {x, y => body}
                     var lparams: List<AST.Param> = []
@@ -3597,7 +3609,7 @@ class Parser {
                         }
                     }
                     this.html_depth = saved_depth
-                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                    return AST.Expr.Lambda(lparams, AST.Type.AnyType, lbody)
                 } else {
                     // Not a Kotlin lambda — restore position
                     this.pos = kl_before

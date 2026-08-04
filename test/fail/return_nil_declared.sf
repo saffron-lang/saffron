@@ -1,0 +1,34 @@
+// A function declared `: Nil` produces no value, so returning one is an error.
+//
+// This case was left open by the first half of BUGS #155 and could not be closed
+// without the FunDecl.ret_type migration to AST.Type. The reason is worth keeping:
+// the parser filled an OMITTED return annotation with the string "Nil", the same
+// spelling a real `: Nil` declaration produced. So a check keyed to "Nil" could
+// not fire on `fun f(): Nil { return 42 }` without also firing on every one of the
+// hundreds of unannotated functions in the compiler's own source — and the checker
+// type-checks that source, so a false positive there breaks the bootstrap outright.
+//
+// With `ret_type` a node, an omitted annotation is `UnknownType` and a declared
+// one is `NilType`. Two distinct facts, two distinct values, and the check becomes
+// expressible. Its companion `test/pass/return_type_valid.sf` pins the other side:
+// an unannotated function returning a value must still be accepted.
+//
+// Note this check is separate from `scalar_mismatch`, which allows Nil on either
+// side deliberately — for every OTHER position, Nil-vs-concrete is the nullable
+// check's business rather than a scalar comparison's.
+
+// A concrete scalar returned from a `: Nil` function.
+fun nil_returns_int(): Nil {
+    return 42
+}
+
+// Same, with a String — the check is on the declaration, not the value's type.
+fun nil_returns_string(): Nil {
+    return "value"
+}
+
+fun main() {
+    nil_returns_int()
+}
+
+main()
