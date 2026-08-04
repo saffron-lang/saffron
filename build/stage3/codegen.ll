@@ -106859,7 +106859,7 @@ match.end5576:
   %t197 = load i64, i64* %kind
   %t198 = getelementptr [3 x i8], [3 x i8]* @.str.3397, i64 0, i64 0
   %t199 = ptrtoint i8* %t198 to i64
-  %t200 = call i64 @__string_eq(i64 %t197, i64 %t199)
+  %t200 = call i64 @__any_eq(i64 %t197, i64 %t199)
   ret i64 %t200
 }
 
@@ -118779,7 +118779,7 @@ match.end6019:
   %t298 = load i64, i64* %kind
   %t299 = getelementptr [6 x i8], [6 x i8]* @.str.3937, i64 0, i64 0
   %t300 = ptrtoint i8* %t299 to i64
-  %t301 = call i64 @__string_eq(i64 %t298, i64 %t300)
+  %t301 = call i64 @__any_eq(i64 %t298, i64 %t300)
   ret i64 %t301
 }
 
