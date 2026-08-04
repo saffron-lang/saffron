@@ -2,7 +2,7 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+**9 open entries:** #2, #49, #65, #75, #107, #115, #131, #132,
 #147. Next free number is **#154**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
@@ -523,27 +523,6 @@ reference; broken paths only negatively.
 
 ---
 
-### 117. An unannotated list literal of class instances loses its element type
-
-```saffron
-var ann: List<Pt> = [Pt(1), Pt(2)]
-IO.println(ann[0].to_string())   // Pt(1)          — correct
-var un = [Pt(1), Pt(2)]
-IO.println(un[0].to_string())    // 5.21502e-310   — WRONG
-```
-
-Verified at HEAD: the same expression answers correctly with an annotation and
-returns the raw pointer without one. **Minor severity only because the annotation
-is a workaround** — the wrong answer is silent.
-
-Distinct from #115: this is the untyped-receiver dispatch hazard (a call on a
-value whose type inference failed is dropped or misdispatched rather than
-diagnosed), and it is *why* `test/oracle_println_class_not_bits.sf` annotates its
-lists. It also means #115's "only nested elements are wrong" framing holds for
-**annotated** collections only.
-
----
-
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
 **Severity: high**, and the remaining half of #125 — wasm64 output is no longer
@@ -645,6 +624,79 @@ one of the sites rewrite stage 3 has to touch.
 ---
 
 ## Resolved
+
+### 117. FIXED — an unannotated list literal of class instances lost its element type
+
+```saffron
+var ann: List<Pt> = [Pt(1), Pt(2)]
+IO.println(ann[0].to_string())   // Pt(1)          — correct
+var un = [Pt(1), Pt(2)]
+IO.println(un[0].to_string())    // 5.21502e-310   — WRONG
+```
+
+**Minor severity only because the annotation was a workaround** — the wrong
+answer was silent. The mechanism is the untyped-receiver dispatch hazard: a call
+on a value whose type inference failed is dropped or misdispatched rather than
+diagnosed. It is *why* `test/oracle_println_class_not_bits.sf` annotates its
+lists, and it means #115's "only nested elements are wrong" framing held for
+**annotated** collections only.
+
+**Four sites, not one.** The entry reads like a single missing inference rule.
+It was the same missing rule written out four times, in two passes that do not
+consult each other:
+
+1. `checker.sf`'s `ListLit` arm collapsed to `GenericType("List", [AnyType])`
+   unconditionally, without inferring its elements at all.
+2. `gen_list_lit` (`methods_body.sf`) typed the literal from a two-entry
+   whitelist — `String`, and `Int`-or-`Float`-folded-to-`Int`. Anything else,
+   including every class instance, fell through to `AnyType`.
+3. `get_expr_type`'s own `list_lit` arm carried a verbatim copy of that same
+   whitelist, so a *nested* literal disagreed with a flat one.
+4. `get_expr_type`'s `call` arm never recognised class construction. `Pt(1)` is
+   not in `func_ret_types` (that registry holds *function* return types), so the
+   arm returned `""` and every consumer asking "what does this constructor
+   evaluate to?" got "unknown". Fixing 1–3 without this one changes nothing,
+   because the element type they are trying to mirror is the constructor's.
+
+Fixing only the checker fixes nothing user-visible: **codegen does not consult
+the checker's inference.** That was measured, not assumed — the repro still
+printed `5.21502e-310` after a green bootstrap with the checker arm corrected.
+
+**The fix is gated on homogeneity, deliberately.** The element type is mirrored
+only when every element's type string agrees; a mixed literal stays `List<Any>`.
+A lying `List<T>` is strictly worse than `List<Any>`: `Any` routes to runtime tag
+dispatch and lands somewhere correct, while a wrong `T` dispatches *statically*
+into the wrong class. This is the same reasoning as #153 — `Any` is the compiler
+saying it does not know, which is exactly when a runtime check is required.
+
+The `Float`→`Int` fold in `gen_list_lit` was dropped as part of this. Post
+Int/Float split it is simply a lie about the representation; identity mode is
+unaffected because `get_expr_type` already answers `"Int"` there.
+
+**A second bug fell out of site 1.** A variable used only inside a list literal
+drew a false "unused variable" warning, because the checker's `ListLit` arm never
+walked its elements — the same un-walked-subtree defect as #126 and #121. The
+replacement arm infers every element even after a mismatch is already known,
+precisely so the walk's own bookkeeping (used-variable marking, nested visibility
+checks) still happens for the whole literal. It is asserted in the regression
+test.
+
+What #117 does **not** fix, and is not a regression: a class instance read back
+out of a genuinely `Any`-typed slot — `[Pt(1), 2]`, or an explicit
+`var l: List<Any> = [Pt(2)]` — still prints its raw bit pattern. That is #115.
+`__any_to_string`'s `do_ptr` arm returns the pointer as-is; it has no way to find
+a user class's `to_string`. Note the asymmetry: `var a: Any = Pt(1)` interpolates
+correctly, so the defect is in the collection-element path, not in `Any` itself.
+
+Verified: bootstrap green through stage 2 (the gen3→gen4 fixed point);
+`test/pass/list_lit_elem_type.sf` 12/12 covering the reported case, the annotated
+spelling, nested literals, all five scalar element types, list-of-lists, empty,
+the mixed fallback and the unused-variable assertion; full suite 286 passed / 8
+failed with the failure set identical to `test/FAILURE_BASELINE.txt` — nothing
+new, nothing incidentally fixed; `md5 build/saffronc` unchanged across the suite
+run.
+
+---
 
 ### 143. FIXED — a non-`Bool` condition was lowered as its low bit, so `if (42)` was false and `if ("x")` depended on the allocator
 
