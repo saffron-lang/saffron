@@ -130,6 +130,16 @@ class Codegen {
     // needs exactly that: to switch a call on the receiver's runtime tag it must
     // know which descendants change the method's behaviour.
     var class_own_methods: Map<String, List<String>>
+    // The methods a class DECLARES abstractly (bodyless). Deliberately disjoint
+    // from class_own_methods, which means "has a callable symbol of its own" —
+    // an abstract method has no body to dispatch to, so it must not be an
+    // answer to "who implements this". But gen_virtual_dispatch also used
+    // class_own_methods to decide "does the receiver's type know this method at
+    // all", and an interface answered no to that, so it bailed and left the
+    // static call to the interface's empty stub in place: every call through an
+    // interface-typed receiver was a silent no-op (BUGS #150). This table
+    // separates the two questions, keyed on the struct name like its sibling.
+    var class_own_abstract: Map<String, List<String>>
     var class_bare_of: Map<String, String>
     var llvm_module: LLVMMod.Module
     var llvm_func_builder: LLVMFunc.FunctionBuilder
@@ -206,6 +216,7 @@ class Codegen {
         this.class_parent_of = {}
         this.class_parents_of = {}
         this.class_own_methods = {}
+        this.class_own_abstract = {}
         this.class_bare_of = {}
         this.actor_classes = {}
         this.force_next_lambda_coro = false
@@ -2305,10 +2316,41 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
                         _ => []
                     }
+                    // The main program's classes get class_own_methods /
+                    // class_own_abstract / class_bare_of / a type tag in
+                    // generate()'s pre-pass (output_body.sf), but module classes
+                    // reach codegen only through THIS loop, which registered method
+                    // NAMES and nothing else — so no stdlib class was ever a BUGS
+                    // #50 dispatch candidate. A call through an interface- or
+                    // base-typed receiver whose type lives in an imported module
+                    // (e.g. @log's `List<Handler>`) found no owner and left the
+                    // static call to the abstract stub in place, silently
+                    // returning 0 (BUGS #150). Fill the same tables here, keyed on
+                    // the prefixed struct name — the same key class_struct_names
+                    // maps the bare name to further up in this function, which is
+                    // what gen_virtual_dispatch resolves the receiver through.
+                    // All writes are idempotent with the emit-time ones.
+                    var pr_own: List<String> = []
+                    var pr_abs: List<String> = []
+                    gen.class_bare_of.set(pr_type_name, pr_cname)
+                    // An interface is never instantiated, so gen_class_constructor
+                    // — the only other place a module class is tagged — is never
+                    // reached for it, and gen_virtual_dispatch bails when the
+                    // RECEIVER's type has no tag. Assign one here so the switch can
+                    // key on the interface.
+                    if (!gen.class_type_ids.has(pr_type_name)) {
+                        gen.class_type_ids.set(pr_type_name, gen.next_class_type_id)
+                        gen.next_class_type_id = gen.next_class_type_id + 1
+                    }
                     var pr_mj: Float = 0
                     while (pr_mj < pr_methods.length()) {
                         var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
                         if (pr_mname.length() > 0) {
+                            if (gen.get_fun_body(pr_methods[pr_mj]).length() > 0) {
+                                pr_own.push(pr_mname)
+                            } else {
+                                pr_abs.push(pr_mname)
+                            }
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = pr_prefix + pr_full
                             if (!gen.str_in_list(gen.known_functions,pr_full)) {
@@ -2320,6 +2362,8 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                         }
                         pr_mj = pr_mj + 1
                     }
+                    gen.class_own_methods.set(pr_type_name, pr_own)
+                    gen.class_own_abstract.set(pr_type_name, pr_abs)
                 }
             } else if (pr_kind2 == "enum") {
                 var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
