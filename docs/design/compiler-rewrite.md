@@ -466,6 +466,70 @@ One note correction worth recording, because it cuts the other way: a note claim
 grep for `FunDecl(`/`Lambda(` there returned one line, and it was a comment. The
 file needed no edit. Both directions of note-drift showed up in one slice.
 
+#### Landed 2026-08-04: the fourth slice, and a fix that reached one of two consumers
+
+Surveying `VarDecl.type_ann` for its own migration turned up two defects before a
+line of it was migrated, so they landed first. The survey is the point of the
+write-up: **measure what the sentinel currently controls before replacing it** was
+the third slice's rule, and applying it here found working code was scarcer than
+the plan assumed.
+
+**Assignment was checked for nullability and nothing else.** `check_assign` asked
+one question — is a nullable value escaping into a non-nullable binding — and never
+compared two concrete types. `var x: String = "abc"` followed by `x = 42` compiled
+clean and segfaulted at the first read: the store wrote a tagged pointer, the load
+untagged it as an `Int`. This is #155's defect one statement kind over, with the
+same fix (`scalar_mismatch`) and the same result — bootstrap green, zero firings
+across the suite. That two arms of `check_stmt` had independently grown the same
+hole is worth noting: neither was wrong about nullability, and neither had any
+reason to think comparing types was somebody's job.
+
+Two things the fix needed beyond the helper:
+
+- **A second scope accessor.** `get_var_type` consults `scope.narrowed` first,
+  which is right for *reading* a variable and wrong for checking a *store*:
+  narrowing says what the variable currently holds, not what it may hold. Asking
+  it would reject `if (x is String) { x = 42 }` on an `Any` binding. So
+  `get_declared_var_type` ignores narrowing, and the two questions have two
+  accessors. This is the third slice's lesson applied *before* it cost anything —
+  the first time in this stage that a one-spelling-two-facts conflation was
+  predicted rather than debugged.
+- **A lossy renderer, again.** The nullable check standing next to it asked
+  `env.get_var`, which renders through `AST.type_to_string` — deliberately lossy,
+  collapsing `UnionType` to the literal `"Union"`. `is_nullable` split that on
+  `"|"`, found no `Nil`, and rejected `var n: String|Nil = "s"; n = nil` with
+  *cannot assign nullable Nil to non-nullable Union*, naming a type nobody wrote.
+  The stored node was always correct; only the round-trip through a string lost the
+  members. The third slice added `type_to_source` for exactly this, but the real
+  lesson is narrower: **a nullability question wants the node, not a re-render, however
+  faithful.** Rendering is for diagnostics.
+
+**And #147 had been fixed in the checker only (now BUGS #160).** The parser's
+sentinel moved from `"Any"` to `""` so the checker could tell an explicit `: Any`
+from silence. It could — but codegen's global pre-scans still collapse the two,
+in **five pasted copies** of
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") { /* infer from a list/map/string initializer */ }
+```
+
+so an annotated-`Any` *global* is typed from its initializer and reassigning it
+across scalar kinds segfaults, while the identical *local* is correct. The
+allowlist is why it is jagged: `: Any = 1` and `: Any = nil` widen fine, because
+`Int` and `Nil` are not in it — partial correctness that reads as "works."
+
+This is the sharpest argument for I10 (one source of truth per fact) the stage has
+produced, and it is a measurement rather than a principle: a bug recorded as
+**resolved** had reached one of two consumers, the entry said nothing about it, and
+five copies of one inference is why. Each copy carries a comment citing the bug that
+motivated it (#36, #37, #80) — they were added independently and the logic was
+pasted. Deduplicating them is its own measured change, because the pre-scans differ
+in which corpus and prefix they walk.
+
+Operationally: **when closing an entry about a sentinel, grep the other side of the
+pipeline for the old spelling.** #147's fix was verified in the checker and by the
+suite, and both were right; nothing asked codegen the same question.
+
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
 A dedicated resolve pass sits between parse and check. It walks scopes and
@@ -853,7 +917,7 @@ resolve to exist first.
 | 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
 | 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
 | 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
-| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** Three slices landed 2026-08-04: BUGS #147 (`VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches); BUGS #155's scalar half (the `Return` arm compared no types at all; the class-typed segfault is deferred to I4); and `FunDecl.ret_type`/`Lambda.ret_type` → `AST.Type` with an explicit `UnknownType`, which closed #155's `: Nil` case and found two sentinels that meant opposite things. All three write-ups are under I3 above. Remaining: `VarDecl.type_ann` is *still* a `String` (`ast.sf:228`) — #147 moved its sentinel to `""` but not its type; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
+| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** Four slices landed 2026-08-04: BUGS #147 (`VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches); BUGS #155's scalar half (the `Return` arm compared no types at all; the class-typed segfault is deferred to I4); `FunDecl.ret_type`/`Lambda.ret_type` → `AST.Type` with an explicit `UnknownType`, which closed #155's `: Nil` case and found two sentinels that meant opposite things; and the `check_assign` slice, which found the same no-type-comparison hole in the assignment arm, a lossy-renderer false positive on unions, and that #147 had been fixed in the checker only (filed as BUGS #160). All four write-ups are under I3 above. Remaining: `VarDecl.type_ann` is *still* a `String` (`ast.sf:228`) — 55 sites across 12 files; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
 | 6 | LIR with `Val`/`Raw`/`Ptr` + rep-check; delete `--identity-mode` | M3 → #23/#24/#25/#28 + the GC-sweep hazard | Requires stage 5. Convert in the atomic groups #23 already identifies (enum construction with match field loads; closures with `gen_indirect_call`; instances with `gen_get_field`) — a partial conversion turns a printing bug into a segfault. |
@@ -872,7 +936,7 @@ reason stage 1 demonstrated: every piece of stage 1's residue — `T`/`E` in
 cannot answer. Stage 1 made those visible and countable; stage 3 is what makes them
 representable.
 
-Its first three slices landed 2026-08-04 and are worth reading before starting the
+Its first four slices landed 2026-08-04 and are worth reading before starting the
 next one. #147 (`VarDecl.type_ann`) showed that fixing one in-band sentinel exposes
 latent defects — three of them, one a lost GC root that surfaced as a runtime
 IndexError 40 lines from its cause. #155 (the `Return` arm) showed the other half
@@ -882,14 +946,26 @@ a returned value — is gated on I4's resolution rather than on stage 3 at all. 
 `ret_type` slice added the sharpest one: **two sentinels for the same absence meant
 opposite things** (`FunDecl`'s `"Nil"` suppressed implicit return, `Lambda`'s
 `"Int"` enabled it), so measure a sentinel's behaviour on the old binary, one probe
-per construct, before replacing it. All three write-ups under I3 above record the
-techniques that found each defect.
+per construct, before replacing it. And the `check_assign` slice showed that
+**surveying a node for migration is itself a bug-finding technique**: it produced two
+landed fixes and BUGS #160 before a line of `type_ann` was migrated, including the
+discovery that #147's fix had reached the checker and not codegen. All four write-ups
+under I3 above record the techniques that found each defect.
 
 Next slice: **`VarDecl.type_ann`** (`ast.sf:228`), which is still a `String`. #147
 moved its sentinel out of band but left the field's type alone, so it is now the
-last string type on a *declaration* node and the one with the most consumers. Then
-the 59 `: String`-returning functions in `checker.sf`, then interning behind a
-`TypeId`.
+last string type on a *declaration* node and the one with the most consumers — 55
+`VarDecl(` sites across 12 files, against the 11 files the `ret_type` slice touched.
+Surveying it already produced two landed fixes and one filed bug (the fourth-slice
+write-up above); the migration itself is still ahead. Then the 59 `: String`-returning
+functions in `checker.sf`, then interning behind a `TypeId`.
+
+Two things the survey says to expect. Codegen's five copied global pre-scans
+(BUGS #160) all read `type_ann` through `get_var_type`, so they are five sites that
+must change together or not at all — this is where the migration collides with I10.
+And the `""`-means-absent sentinel is now read in both `length() == 0` and
+`== "Any"` forms in the same disjunction, which is two questions again: one asks
+whether an annotation exists, the other what it says.
 
 Stage 9 (generated runtime) remains independent of everything and can be picked up
 in parallel at any time; stage 10 is still blocked on the single
