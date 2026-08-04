@@ -3,10 +3,12 @@
 ## Open
 
 **11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139, #143. Next free number is **#145**.
+#139, #143. Next free number is **#146**.
 
-#144 was filed and fixed in the same sitting (the unused-variable warning firing
-on compiler-mandated match-arm bindings) and is under `## Resolved`.
+#144 and #145 were each filed and fixed in the same sitting — the
+unused-variable warning firing on compiler-mandated match-arm bindings, and
+call-site argument types never being checked at all — and both are under
+`## Resolved`.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -677,6 +679,80 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 145. FIXED — the checker never compared a call's arguments to the callee's parameter types
+
+**Severity: high.** A statically typed language accepted `f(42)` for `fun f(x:
+String)`, compiled clean, exited 0, and segfaulted at runtime. Every call in
+every program was unchecked: free functions, methods, constructors, and
+`List<Int>.push("hello")` alike.
+
+What made it hard to notice is that the surrounding type system *did* work.
+`var s: String = 42` was rejected with `cannot assign Int to String`. Arity was
+enforced too — `'add' expects 3 arguments, got 2` is a real diagnostic. So a
+casual test of "does the checker catch type errors" passed, and the answer was
+yes, everywhere except the one boundary where a value crosses into a function.
+Arity is also not checked *here*: it lives in codegen (`expr_body.sf:2559`),
+which is why the two halves of "is this call well-formed" drifted apart.
+
+This surfaced from the other direction. An audit of excessive `Any` usage was
+asked to replace `Any` annotations with real types, and the finding that mattered
+was that doing so buys **zero** enforcement: retyping a parameter from `Any` to
+`String` changes no diagnostic if no one ever compares an argument against it. So
+the call-site gap had to close first, or the `Any` cleanup would have been
+cosmetic. (`Any` does cause real misdispatch, verified separately: with `class B
+extends A`, `via_any(B())` returns A's answer `10` while `via_b(B())` returns
+`20`.)
+
+The data needed for the fix was already stored. `func_params: Map<String,
+String>` (`checker.sf:48`) is populated by `define_func_params` for free
+functions *and* methods, encoded `"name:Type"` comma-separated by
+`params_list_to_string`, and four existing sites already parse it back with
+`split_type_args` to resolve generic return types. Nobody had compared it to the
+arguments.
+
+**Fix:** a `check_call_args` helper, wired at three sites — the free-function
+path in `infer_call`, `infer_method_call`, and the class-construction branch of
+`infer_call`. Three sites, not one, because the params are keyed differently per
+form: `name`, `Class__method`, `Class__init`. That was found by testing each call
+form separately rather than assuming one site covered calls in general — the
+first version wired only the free-function path and both the method and
+constructor negatives printed `NOT CAUGHT`.
+
+The check reuses `scalar_mismatch`, inheriting the same one-sided discipline
+#143 used: it fires only on a pair it can *prove* wrong (two different scalars,
+with `Int`->`Float` allowed as a widening) and lets `Any`, `Nil`, unions,
+generics, type params, class and enum types through. That is deliberately
+narrower than real subtyping. The asymmetry is not timidity about false
+negatives, it is about where a false *positive* lands: the checker type-checks
+the compiler's own source, so one bad error breaks the bootstrap. Widening the
+proof set is a separate, measured step.
+
+The diagnostic reports the name as written, not the `func_params` key: an error
+about `C__m` would leak an internal mangling into user-facing output, so
+`check_call_args` takes the lookup key and the display spelling separately and
+only the latter reaches the message.
+
+**Verified:** bootstrap green through Stage 2 (`gen3 compiles itself; gen4 links
+and compiles`) with **0** `argument N of ...` errors over the compiler's own
+source — the real test, since the compiler makes thousands of method calls on
+itself. Four negatives all rejected (free function, method, constructor, and a
+mismatch in the *second* argument, to confirm the index is right), and the
+positives still accepted: `Int`->`Float` widening, `Any`, and `String|Nil`
+taking `nil`.
+
+The suite went 269/11 to 266/14, and all three new failures were the check doing
+its job: `test/async_coop.sf`, `test/pass/gc_coro_root_order.sf` and
+`test/test_async.sf` each declared a sleep-delay parameter `Int` and then called
+it with `0.1`/`0.03`/`0.01`. `src/lib/async.sf:10` spells the same parameter
+`Float`, so the annotations were simply wrong and had been wrong invisibly. Fixed
+in the tests, not worked around in the checker — three real type errors found on
+the first run is the argument for the check, not against it.
+
+**Left open:** `Map<K,V>` value types are still entirely unenforced, and `is`
+folds to a literal `true` on an un-annotated `Map.get()` (`gen_is_check`,
+`expr_body.sf:511-596`). Both were found during the same audit and are not
+fixed here.
 
 ### 144. FIXED — the unused-variable warning was 98% noise, because it fired on match-arm bindings the language forces you to write
 
