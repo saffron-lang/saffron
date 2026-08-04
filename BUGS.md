@@ -536,15 +536,15 @@ a one-line edit.
 
 ---
 
-### 155. OPEN — no `return` is checked against its function's declared return type, so `fun make(): Box { return "s" }` compiles and segfaults
+### 155. OPEN (narrowed) — a `return` is checked against its declared return type only for scalar-vs-scalar; the class-typed segfault is still live
 
-**Severity: high.** Silent wrong type across a declared boundary, and the crash
-lands in the caller. Found while surveying `FunDecl.ret_type` for rewrite stage 3.
+**Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for
+rewrite stage 3.
 
-The `Return` arm of `check_stmt` (`checker.sf:2574`) infers the value's type and
-then asks exactly one question: is a *nullable* value being returned from a
-non-nullable slot. It never compares two concrete types. So every one of these
-compiles with zero diagnostics:
+The `Return` arm of `check_stmt` (`checker.sf:2574`) inferred the value's type and
+then asked exactly one question: is a *nullable* value being returned from a
+non-nullable slot. It never compared two concrete types, so every one of these
+compiled with zero diagnostics:
 
 ```saffron
 fun f(): String { return 42 }
@@ -553,7 +553,28 @@ fun f(): Bool   { return 42 }
 fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
 ```
 
-The class-typed case is the one that crashes:
+**Landed 2026-08-04: the scalar-vs-scalar half.** The `Return` arm now calls
+`scalar_mismatch` (`checker.sf:890`), inheriting the same one-sided discipline
+`check_call_args` uses — it fires only on two *different concrete scalars*, and
+lets `Any`, `Nil`, unions, generics, class and enum types through. The first three
+cases above are now errors; `test/fail/return_type_mismatch.sf` is the regression
+test and `test/pass/return_type_valid.sf` pins the legitimate patterns
+(same-type, `Int`→`Float` widening, nil-from-nullable, concrete-into-nullable,
+`Any` in either position, unannotated).
+
+Two exclusions are deliberate and both are documented at the site:
+
+- **`Int`→`String` is allowed.** In the NaN-boxed runtime an `Int` holding a heap
+  address *is* a String — a pointer to a NUL-terminated buffer.
+  `lexer.sf:byte_to_char` (line 431) returns a `__lex_malloc` result from a
+  `: String` function, and it is correct. This is the identity-mode analog of
+  `Int`→`Float` widening and disappears when I5 introduces `Ptr<T>`. The check
+  found this on its first bootstrap: `STAGE 1` rejected `lexer.sf` with
+  `cannot return Int from function expecting String`.
+- **The declared-`Nil` case is still unchecked**, because the sentinel problem
+  below is unsolved.
+
+**Still open: the class-typed case, which is the one that crashes.**
 
 ```saffron
 class Box { var n: Int
@@ -568,29 +589,42 @@ IO.println("n=${b.get()}")         // segfault
 The checker binds `b` to `Box` on the declaration's authority, codegen emits a
 direct `Box__get` call with a field load, and the receiver is a `String` pointer.
 
-**The material for the fix already exists.** `scalar_mismatch(annotated, actual)`
-(`checker.sf:890`) answers precisely this question for `VarDecl` — two distinct
-concrete scalars, with `Int`→`Float` widening and anything touching `Any`/`Nil`
-allowed — and `is_subtype_node` (`checker.sf:1005`) handles the class/interface
-case. Neither is called from the `Return` arm.
+A first attempt added the obvious two arms — declared-class/returned-scalar and
+declared-scalar/returned-class — and they were **reverted**: they are too eager,
+because "not a scalar name" is not the same as "a class." The suite named three
+distinct false-positive families in one run (5 tests):
 
-**Why it survived this long, and the trap in fixing it.** The parser defaults an
-omitted return type to a *real type name*: `"Nil"` for `FunDecl`
-(`parser.sf:2561`), `"Int"` for `Lambda` (`parser.sf:1646`). Both spellings are
-indistinguishable from an annotation the author wrote, so turning on a strict
-return check would immediately reject every unannotated `fun f() { return 42 }` —
-`"Nil"` vs `Int` — and every unannotated lambda returning anything but an integer.
-BUGS #147's write-up under `## Resolved` is the same defect one node over, and the
-`## Resolved` entry for the use-recording walk already notes it clears
-`current_func_ret` for exactly this reason: "a walk that exists to record uses must
-not start enforcing a return type nobody wrote."
+| Test | Spurious error | Why it is legal |
+|---|---|---|
+| `nullable_narrowing`, `pass/nullable_recv_dispatch` | `cannot return String from function expecting String\|Nil` | `String` **is** a subtype of `String\|Nil` |
+| `pass/nullable_shorthand` | `cannot return Int from function expecting Int\|Nil` | same |
+| `test_generics` | `cannot return Int from function expecting T` | `T` is a type *parameter*, resolved from the call site |
+| `pass/module_member_write_valid` | `cannot return e from function expecting Float` | `return Math.e` — the type came back as the raw member name `e`; an inference gap, not a type |
 
-So the honest ordering is the one stage 1 used: **make the sentinel
-distinguishable first, then turn on the check.** `ret_type` becomes an `AST.Type`
-with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work —
-and only then can the `Return` arm tell "the author declared `Nil`" from "nobody
-declared anything." Enforcing before that would be a large, noisy, and partly
-wrong diagnostic sweep.
+The last row is the useful one: an unresolved type currently *spells itself as a
+plausible type name*, which is mechanism M2 again — "I don't know" wearing the
+costume of an answer. A membership test against a real class/enum registry, or
+`is_subtype_node`, is what this needs, and both want the resolve pass (I4) to
+answer reliably for module-qualified names. `parse_type_node("AST.Type")` falls
+through to `ClassType("AST.Type")` while the value side infers `EnumType("Type")`
+— two spellings of one type, and `inherits_from` knows neither.
+
+**And the sentinel is still in-band.** The parser defaults an omitted return type
+to a *real type name*: `"Nil"` for `FunDecl` (`parser.sf:2561`), `"Int"` for
+`Lambda` (`parser.sf:1646`). Both are indistinguishable from an annotation the
+author wrote, so the declared-`Nil` case cannot be enforced without rejecting
+every unannotated `fun f() { return 42 }`. #147 under `## Resolved` is the same
+defect one AST node over, and `check_lambda_body` already sets
+`current_func_ret = AnyType` for exactly this reason — its comment says a walk
+that exists to record uses "must not start enforcing a return type nobody wrote."
+
+So the ordering stands, and the scalar half was landable ahead of it only because
+`scalar_mismatch` already excludes `Nil` on both sides: **make the sentinel
+distinguishable first, then turn on the rest.** `ret_type` becomes an `AST.Type`
+with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work,
+~18 construction sites and ~65 destructure arms across 14 files — and only then
+can the `Return` arm tell "the author declared `Nil`" from "nobody declared
+anything."
 
 ---
 

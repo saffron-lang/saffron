@@ -338,6 +338,61 @@ Two operational notes for the remaining slices:
   files, so a previous failed run's artifacts can make a fix look rejected — `git
   checkout -- build/stage3/` first.
 
+#### Landed 2026-08-04: the second slice, and how far a check gets without I4
+
+BUGS #155 was the next site: the `Return` arm inferred the value's type and then
+asked only whether a *nullable* value was escaping into a non-nullable slot. It
+never compared two concrete types, so `fun f(): Int { return "hi" }` compiled
+silently, and `fun make(): Box { return "not a box" }` compiled and then
+segfaulted in the caller — the checker binds the receiver to `Box` on the
+declaration's authority and codegen emits a field load against a `String` pointer.
+
+The scalar-vs-scalar half landed: the arm now calls `scalar_mismatch`, the same
+helper `VarDecl` uses, so it fires only on two *different concrete scalars*.
+`test/fail/return_type_mismatch.sf` pins the three errors and
+`test/pass/return_type_valid.sf` pins ten legitimate patterns. Two findings are
+worth carrying forward.
+
+**The sentinel did not block this slice, and the reason is instructive.** The
+prediction above was that `ret_type`'s in-band `"Nil"` (`parser.sf:2561`) would
+have to move before any return check could be turned on. It didn't, because
+`scalar_mismatch` already excludes `Nil` on either side (`checker.sf:893`) — so
+the sentinel is inert for exactly the comparisons that matter. What remains
+blocked is the case where the sentinel is the *subject*: `fun f(): Nil { return
+42 }` still compiles, and cannot be rejected until `"the author wrote Nil"` is
+distinguishable from `"nobody wrote anything"`. **A sentinel blocks the checks
+that inspect it, not every check in its neighbourhood** — worth testing before
+assuming a slice is gated.
+
+**The class half was written, measured, and reverted.** Two more arms — declared
+class/returned scalar and its inverse — looked like the obvious completion, and
+broke five tests in one run, in three distinct ways:
+
+| Spurious error | Why it is legal |
+|---|---|
+| `return String from function expecting String\|Nil` | `String` **is** a subtype of `String\|Nil` |
+| `return Int from function expecting T` | `T` is a type *parameter*, resolved at the call site |
+| `return e from function expecting Float` | `return Math.e` — the type came back as the raw member name `e` |
+
+The first two are the predictable cost of testing `!is_scalar_name(x)` and reading
+it as "x is a class": unions and type parameters are neither. The third is M2
+again in a new costume — an unresolved type **spelled itself as a plausible type
+name**, so the check compared `Float` against a type that does not exist and
+found them different. A real answer needs a class/enum registry query or
+`is_subtype_node`, and both need module-qualified names to resolve reliably:
+`parse_type_node("AST.Type")` yields `ClassType("AST.Type")` while the value side
+infers `EnumType("Type")`, two spellings of one type that `inherits_from` matches
+neither way. That is I4's job, so the segfault case is explicitly deferred to it
+rather than approximated.
+
+One concession is recorded at the site: **`Int`→`String` is allowed.** In identity
+mode an `Int` holding a heap address *is* a String, and
+`lexer.sf:byte_to_char` (line 431) legitimately returns a `__lex_malloc` result
+from a `: String` function. The check found it on its first bootstrap — `STAGE 1`
+rejected `lexer.sf` — and a scan confirmed it is the only such site in the
+compiler. It is the identity-mode analog of `Int`→`Float` widening and becomes an
+error when I5 introduces `Ptr<T>`.
+
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
 A dedicated resolve pass sits between parse and check. It walks scopes and
@@ -725,7 +780,7 @@ resolve to exist first.
 | 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
 | 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
 | 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
-| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** First slice landed 2026-08-04: BUGS #147, `VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches (see I3 above). Remaining: `FunDecl.ret_type` and `Lambda.ret_type` are still `String`; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
+| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** Two slices landed 2026-08-04: BUGS #147 (`VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches) and BUGS #155's scalar half (the `Return` arm compared no types at all; the class-typed segfault is deferred to I4). Both write-ups are under I3 above. Remaining: `FunDecl.ret_type` and `Lambda.ret_type` are still `String`; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
 | 6 | LIR with `Val`/`Raw`/`Ptr` + rep-check; delete `--identity-mode` | M3 → #23/#24/#25/#28 + the GC-sweep hazard | Requires stage 5. Convert in the atomic groups #23 already identifies (enum construction with match field loads; closures with `gen_indirect_call`; instances with `gen_get_field`) — a partial conversion turns a printing bug into a segfault. |
@@ -744,12 +799,16 @@ reason stage 1 demonstrated: every piece of stage 1's residue — `T`/`E` in
 cannot answer. Stage 1 made those visible and countable; stage 3 is what makes them
 representable.
 
-Its first slice (BUGS #147, `VarDecl.type_ann`) landed 2026-08-04 and is worth
-reading before starting the next one: fixing one in-band sentinel exposed three
-latent defects, one of them a lost GC root that surfaced as a runtime IndexError
-40 lines from its cause. The write-up under I3 above records both the pattern to
-expect and the two techniques that found them. Next slices: `FunDecl.ret_type`,
-`Lambda.ret_type`, then the 59 `: String`-returning functions in `checker.sf`.
+Its first two slices landed 2026-08-04 and are worth reading before starting the
+next one. #147 (`VarDecl.type_ann`) showed that fixing one in-band sentinel exposes
+latent defects — three of them, one a lost GC root that surfaced as a runtime
+IndexError 40 lines from its cause. #155 (the `Return` arm) showed the other half
+of the lesson: a check can often be turned on *before* its neighbouring sentinel
+moves, and the part that genuinely cannot wait — comparing a declared class against
+a returned value — is gated on I4's resolution rather than on stage 3 at all. Both
+write-ups under I3 above record the techniques that found each defect. Next slices:
+`FunDecl.ret_type`, `Lambda.ret_type` (which unblocks the `: Nil` case #155 left
+open), then the 59 `: String`-returning functions in `checker.sf`.
 
 Stage 9 (generated runtime) remains independent of everything and can be picked up
 in parallel at any time; stage 10 is still blocked on the single
