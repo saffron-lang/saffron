@@ -259,6 +259,11 @@ class NullChecker {
     //                 These get written into the lambda's own Param nodes.
     var fun_param_sigs: Map<String, String>
     var actor_classes: Map<String, Bool>
+    // Names declared with the `interface` soft keyword. `class`, `interface` and
+    // `actor` all parse to ClassDecl and register identically in class_fields, so
+    // without this the checker cannot tell an interface from a class. Populated in
+    // register_decl from ClassDecl's `introducer` field.
+    var interface_names: Map<String, Bool>
     // Bare enum names declared by two different modules with different variant
     // lists — see register_enum.
     var ambiguous_enums: List<String>
@@ -428,6 +433,7 @@ class NullChecker {
         this.receiver_params = {}
         this.fun_param_sigs = {}
         this.actor_classes = {}
+        this.interface_names = {}
         this.ambiguous_enums = []
         this.current_prefix = ""
         this.current_package = no_package_marker()
@@ -934,12 +940,47 @@ class NullChecker {
         var provably_not_bool: Bool = false
         if (this.is_scalar_name(t)) { provably_not_bool = true }
         if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") { provably_not_bool = true }
+        // A declared class or enum is provable too, and it belongs on this side of
+        // the line rather than in the let-through set above. #143 grouped
+        // class/enum with Any and unions, but they are not the same kind of
+        // unknown: `Any` might hold a Bool at runtime, so erroring on it would
+        // reject correct code, whereas a variable whose static type is a class or
+        // enum can never be one. The lowering makes it worse than merely
+        // undiagnosed — `trunc i64 %v to i1` on a class instance reads the low bit
+        // of an 8-byte-aligned pointer, so it is not "wrong sometimes", it is
+        // DETERMINISTICALLY false. `if (my_box)` never runs its then-branch and
+        // never says why.
+        //
+        // Guarded on the registries, not on spelling: only names actually declared
+        // in this compilation register in class_fields / enum_variants. An
+        // unresolved name is left alone, per #56.
+        //
+        // Interfaces are deliberately NOT included even though they also register
+        // in class_fields, because an interface-typed slot's runtime value is some
+        // implementor, and nothing here can prove none of them is Bool-like.
+        // interface_names is the discriminator, and it had to be added: `class`,
+        // `interface` and `actor` all parse to ClassDecl, so before this the
+        // checker had no way to tell them apart.
+        //
+        // Union types (`Box|Nil`) stay let through, and that is the residual worth
+        // naming: `if (maybe_box)` reads as a nil test and is also always false.
+        // Proving a union means proving EVERY member non-Bool, which is a bigger,
+        // separate change to the union parsing here — and unlike this case it risks
+        // reddening the bootstrap, which type-checks the compiler's own source.
+        if (this.env.class_fields.has(t) and !this.interface_names.has(t)) { provably_not_bool = true }
+        if (this.env.enum_variants.has(t)) { provably_not_bool = true }
         if (!provably_not_bool) return
         var hint: String = ""
         if (t == "Int" or t == "Float") { hint = "; compare it, e.g. `x != 0`" }
         else if (t == "String") { hint = "; compare it, e.g. `s != \"\"`" }
         else if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") {
             hint = "; test its size, e.g. `xs.length() > 0`"
+        }
+        else if (this.env.enum_variants.has(t)) {
+            hint = "; match on it, or compare a variant, e.g. `c == " + t + ".Variant`"
+        }
+        else if (this.env.class_fields.has(t)) {
+            hint = "; test a field, or compare it, e.g. `x != nil`"
         }
         // The condition expression itself, which is what the message is about --
         // and one span here locates all six callers (if, while, `!`, `and`,
@@ -1314,6 +1355,19 @@ class NullChecker {
             ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
+                }
+                // The keyword the author wrote. `interface` and `actor` are soft
+                // keywords, so all three shapes arrive as ClassDecl and register
+                // identically in class_fields — the checker previously could not
+                // tell them apart at all, and every arm here spelled the field
+                // `__intro` to say it was unused. check_condition needs the
+                // distinction: a class-typed condition is provably not Bool, while
+                // an interface-typed one holds some implementor and cannot be
+                // proven. Recording the parser's answer rather than re-deriving it
+                // from the "@actor" doc prefix is the point of #40's note where
+                // `introducer` was added.
+                if (__intro == "interface") {
+                    this.interface_names.set(name, true)
                 }
                 if (type_params.length() > 0) {
                     this.class_type_params.set(name, type_params.join(","))
