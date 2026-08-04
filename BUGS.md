@@ -2,8 +2,8 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155.
-Next free number is **#157**.
+**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157.
+Next free number is **#158**.
 
 #154 and #155 were filed on the same day on two lines of work that had not yet
 met — origin/main's "an enum inside a printed collection prints a bit pattern"
@@ -667,6 +667,48 @@ wrong.
 `test/oracle_enum_println.sf` records the current output and is the regression
 test; it has shown these subnormals unchanged across both the #105 and #115 fixes,
 which is how the residual stayed measured rather than assumed.
+
+---
+
+### 157. Punctuation after an import alias is swallowed into the alias
+
+```saffron
+import "@iter" as Iter;
+var xs = Iter.map([1, 2], fun (x: Int): Int => x * 2)
+// Error: undefined variable 'Iter'
+```
+
+**Severity: low, but the diagnostic actively misleads.** The alias registered is
+`Iter;`, semicolon included, so the module is present and reachable — just not
+under the name the author wrote. The error blames the *use* site for a name the
+*import* line mangled, and it names `Iter`, which looks correct in the source, so
+there is nothing in the message pointing at the real cause. A trailing comment
+(`as Iter // the iterator module`) fails identically.
+
+**Imports are not parsed as AST.** `main.sf` resolves them by scanning raw source
+lines, before the parser runs, because the import graph has to be walked to know
+what to parse at all. Two sites did the alias extraction, and both wrote the same
+expression inline:
+
+```saffron
+line.slice(as_idx + 4, line.length()).trim()
+```
+
+That is everything to end of line. `.trim()` strips whitespace and nothing else,
+which is correct for `as Iter` and wrong for every other line ending.
+
+**One expression written twice was two bugs.** The second site is
+`check_duplicate_aliases`, which hashes the extracted alias to detect a name
+imported twice in one file. There, `as X` and `as X;` produce different keys, so
+the check silently misses a real duplicate — it does not report a wrong alias, it
+reports nothing. That makes the shared-helper fix the systematic one rather than a
+tidiness preference: patching only the site that produced the visible error would
+have left the duplicate check broken with no symptom to lead anyone back to it.
+
+**Fix**: one `extract_alias_from_line(line, as_idx)` helper used by both, stopping
+at the first character that cannot appear in an identifier. That covers the whole
+class — semicolon, comment, trailing brace, stray punctuation — rather than the
+semicolon alone.
 
 ---
 

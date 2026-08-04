@@ -2509,7 +2509,7 @@ class NullChecker {
                     this.env.define_var(name, init_type_node)
                 } else {
                     // `init_type == "Nil"` joins the cannot-infer branch below
-                    // rather than being stored (BUGS #155). `var x = nil` used to
+                    // rather than being stored (BUGS #156). `var x = nil` used to
                     // type x as the singleton Nil *permanently*: the later `x = 5`
                     // was accepted silently, and then every use of x was a hard
                     // error, "cannot call .to_string() on nullable 'x' (type Nil)".
@@ -2530,7 +2530,9 @@ class NullChecker {
                     // for the one case that genuinely wants the singleton: an
                     // Any-typed nil satisfies `x is Nil` (verified, not assumed —
                     // test/pass/first_class_types.sf asserts it).
-                    // Cannot infer type — warning (not blocking).
+                    //
+                    // Either way this is a warning, not an error — both a bare nil
+                    // and a genuinely uninferrable initializer are legal.
                     //
                     // Except for the parser's own temporaries. `x++` desugars to
                     // a block holding `var __inc_N = <the place>`, and a field or
