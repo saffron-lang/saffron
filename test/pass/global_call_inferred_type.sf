@@ -1,0 +1,74 @@
+// BUGS #146 regression: a global `var` whose type comes from a CALL, read from
+// inside a function body, must keep that type.
+//
+// Codegen registers global variables (module_globals, the `@__g_*` emission)
+// before any IR generation, but a call's type comes from func_ret_types, which
+// prescan_decls fills — and that runs AFTER the global pass at all three entry
+// points. So the global pass saw an empty func_ret_types and could only resolve
+// literal shapes; its guard was literally
+// `if (vinit.starts_with("List") or vinit.starts_with("Map") or vinit == "String")`.
+//
+// A class instance matched nothing in that allowlist, so the global stayed out of
+// global_var_types, dispatch fell through to codegen's Int default, and every
+// method on it was rejected with "type 'Int' has no method 'bump'". The fix is a
+// second pass (prescan_global_call_types) that runs after prescan_decls.
+//
+// Only the global-plus-function-body combination reproduced it: at top level the
+// statement walk has already typed the variable through typed_vars, and a LOCAL
+// `var b = make()` is typed the same way. All four shapes are asserted here so a
+// future change cannot fix one and quietly break another.
+//
+// This file must COMPILE AND RUN. A `type 'Int' has no method` codegen error is
+// the bug returning.
+
+import "@test" as Test
+
+class Counter {
+    var n: Int
+    fun init(start: Int) { this.n = start }
+    fun bump() { this.n = this.n + 1 }
+    fun value(): Int { return this.n }
+}
+
+fun make_counter(start: Int): Counter {
+    return Counter(start)
+}
+
+// The bug's exact shape: global, type INFERRED from a call, no annotation.
+var g_inferred = make_counter(10)
+
+// The control: same global, annotated. This always worked, and it is the
+// documented workaround, so it must keep working.
+var g_annotated: Counter = make_counter(100)
+
+// Read from inside a function body — the half of the combination that failed.
+fun bump_inferred() {
+    g_inferred.bump()
+}
+
+fun bump_annotated() {
+    g_annotated.bump()
+}
+
+// A local with the same initializer shape, typed by the ordinary statement walk.
+fun local_roundtrip(): Int {
+    var local = make_counter(1000)
+    local.bump()
+    return local.value()
+}
+
+bump_inferred()
+bump_inferred()
+Test.assert_eq(g_inferred.value(), 12, "inferred global keeps its type when bumped from a function")
+
+bump_annotated()
+Test.assert_eq(g_annotated.value(), 101, "annotated global still works")
+
+Test.assert_eq(local_roundtrip(), 1001, "local inferred from a call still works")
+
+// Top-level read of the inferred global — the case that already passed, because
+// typed_vars has it by then. Asserted so the second pass cannot regress it.
+g_inferred.bump()
+Test.assert_eq(g_inferred.value(), 13, "inferred global still works at top level")
+
+Test.summary()

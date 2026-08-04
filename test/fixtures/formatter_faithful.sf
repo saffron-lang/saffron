@@ -1,0 +1,97 @@
+//! Fixture for test/formatter_test.sh — one instance of every construct the old
+//! AST-printing formatter destroyed, so a regression to AST reconstruction fails
+//! loudly instead of quietly.
+//!
+//! Deliberately written with RAGGED whitespace (bad indentation, double spaces,
+//! trailing blanks, three consecutive blank lines) so the test can prove the
+//! formatter actually normalized something. If this file were already tidy, a
+//! formatter that returned its input unchanged would pass every assertion.
+
+// A plain line comment at top level — never tokenized by lexer.sf, so an AST
+// formatter cannot see it at all.
+import "@iter" as Iter
+
+/* A block comment.
+   It spans lines, and /* it nests */ like lexer.sf says. */
+
+/// A doc comment (this one IS a token: TkDocComment).
+type Handler = Fun
+
+
+
+
+enum Shape {
+    Circle(r: Float),
+    Square(side: Float)
+}
+
+interface Drawable {
+    fun draw(): String
+}
+
+actor Counter {
+    var count: Int
+    fun init() { this.count = 0 }
+    fun bump() {   this.count = this.count + 1   }
+    fun get(): Int { return this.count }
+}
+
+class Point extends Drawable {
+    var x: Float
+    var y: Float
+
+    fun init(x: Float, y: Float) {
+            this.x = x
+            this.y = y
+    }
+
+    /// Interpolation inside a method — desugared in the LEXER, so the AST holds
+    /// only `"(" + x.to_string() + ", " + ...`, never the `${}` spelling.
+    fun draw(): String {
+        return "(${this.x}, ${this.y})"
+    }
+}
+
+fun classify(s: Shape): String {
+    return match (s) {
+        Circle(r) => "circle r=${r}"
+        Square(side) => "square s=${side}"
+    }
+}
+
+fun walk(items: List<Int>): Int {
+    var total: Int = 0   
+    // for-in is desugared by the PARSER into __for_src_N/__for_i_N plus a while,
+    // so an AST printer emits compiler-internal names here.
+    for (item in items) {
+        if (item < 0) { continue }
+        total += item
+    }
+    var i: Int = 0
+    while (i < items.length()) {
+        total = total - 1   // trailing comment after a statement
+        i++
+    }
+    return total
+}
+
+fun ambiguous(): Int {
+    // Angle brackets and pipes: `List<Int>` and `a < b` are the same tokens, as
+    // are `Int|Nil` and `a | b`. The formatter must not "fix" either spelling.
+    var xs: List<Int> = [3, 1, 2]
+    var m: Map<String, Int> = {"a": 1}
+    var maybe: Int|Nil = m.get("a")
+    var neg: Int = -5
+    var flag: Bool = !(1 > 2) and 3 <= 4
+    var bits: Int = (1 << 3) | (7 & 2) ^ 1
+    if (maybe != nil) { return xs[0] + neg }
+    if (flag) { return bits }
+    return (-1).abs()
+}
+
+fun escapes(): String {   
+    // Escapes and a literal dollar-brace-looking payload: all copied verbatim.
+    var quoted: String = "a \"b\" c\\d\te"
+    var nested: String = "outer ${classify(Shape.Circle(1.5))} done"
+    return quoted + nested
+}

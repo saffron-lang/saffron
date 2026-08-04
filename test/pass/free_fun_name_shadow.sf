@@ -1,0 +1,54 @@
+// BUGS #139 regression: a free function must not decide the type of a method
+// call on an unrelated receiver just because it shares the method's name.
+//
+// `infer_method_call`'s last-resort arm reads the method name out of the
+// FREE-function table. It exists for the alias-qualified call `Mod.helper()`,
+// whose receiver is a module alias the checker has no type for. Ungated, it also
+// answered for `value.get(k)` — an ordinary Map read on an Any-typed receiver —
+// from whatever `fun get` the program happened to declare. The parser defaults an
+// omitted return type to "Nil", so the Map read inferred `Nil` and the next
+// `.length()` failed the nullable-receiver check with a diagnostic naming a
+// variable that was never nil.
+//
+// This file must COMPILE AND RUN. A `cannot call .length() on nullable` error is
+// the bug returning.
+
+import "@test" as Test
+
+// The decoy: a free `get` with no return annotation, hence registered as Nil.
+// bazaar's basil/fetch.sf declares exactly this, three modules from the use site.
+fun get(url: String) {
+    IO.println("fetching " + url)
+}
+
+// Two more names Map/List/String methods also use, so one arm is not the whole
+// story. `has` and `length` are both in requires_non_nil or return-typed above
+// the fallback; `keys` is not, which is what makes it the interesting one.
+fun keys(prefix: String) {
+    IO.println("keys " + prefix)
+}
+
+// An Any-typed receiver, the shape that reaches the fallback at all. A directly
+// annotated `Map<String, String>` never gets there — the Map arms return first.
+fun opaque_map(): Any {
+    var m: Map<String, String> = {"a": "alpha", "bb": "beta"}
+    return m
+}
+
+var data = opaque_map()
+
+// The exact sequence from BUGS #139: a `get` whose type must stay unresolved
+// (Any), then a method on the result that requires non-nil.
+var pkgs = data.get("a")
+Test.assert_eq(pkgs.length(), 5, "get on an Any receiver is not typed Nil by a free fun get")
+
+var ks = data.keys()
+Test.assert_eq(ks.length(), 2, "keys on an Any receiver is not typed by a free fun keys")
+
+// The alias path the fallback exists for is exercised by test/imports.sf and the
+// module suites; here we only assert the free functions themselves still work,
+// so the gate did not make them unreachable.
+get("/x")
+keys("pre")
+
+Test.summary()

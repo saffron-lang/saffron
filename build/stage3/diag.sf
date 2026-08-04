@@ -1,0 +1,394 @@
+//! Compiler diagnostics — lightweight logging for saffronc.
+//! No external dependencies (no @time, no @os) so it links cleanly in bootstrap.
+//!
+//! Located diagnostics take an `AST.Span` (see ast.sf) plus the file name and the
+//! source text of the unit that span refers to. A span does not carry its own
+//! file, because a span is only meaningful against the text it was lexed from and
+//! that text is held once per parse unit — the caller supplies both.
+
+import "./ast.sf" as AST
+
+// --- Accumulating sink ---
+//
+// Every diagnostic the compiler raises is recorded here as well as printed, so a
+// caller that wants them as data (--json, an LSP) reads the list instead of
+// re-parsing stdout. Scraping stdout is exactly what made the editor integration
+// brittle: `server.ts` matched the *parser's* `[line N, col M]` format, which the
+// checker and codegen never emit, so type errors could not reach the editor at
+// all. One sink, read once, ends that.
+//
+// A Diagnostic deliberately does NOT carry its file. A span is meaningful only
+// against the source it was lexed from, and in a multi-module compile that source
+// is held per unit by the driver; main.sf attaches the file when it serializes.
+// Same reasoning as the note on `enum Span` in ast.sf.
+enum Severity {
+    SevError,
+    SevWarning,
+    // The I9 fall-through channel. Kept distinct from SevError so that "the
+    // compiler reported success right up to the assembler" (BUGS #37) cannot
+    // recur silently — an internal fault reads differently from a user's mistake.
+    SevInternal
+}
+
+enum Diagnostic {
+    // `phase` is one of "parser"/"checker"/"codegen"/"resolve" — the producer,
+    // for grouping in output. `span` is span_none() when the producer has no
+    // source region to offer (a great many checker errors are about expressions,
+    // whose spans do not exist until the expression nodes carry them).
+    Diag(severity: Severity, phase: String, span: AST.Span, message: String)
+}
+
+var _sink: List<Diagnostic> = []
+var _had_error: Bool = false
+
+/// Clear the sink. A process that checks or formats several files in one run must
+/// call this per file, or diagnostics from one leak into the next — the same
+/// sticky-global trap that `parser.sf::_had_error` and `codegen.sf::__codegen_errors`
+/// fall into. Reset is the caller's responsibility because only the caller knows
+/// where one unit of work ends and the next begins.
+fun reset_sink() {
+    _sink = []
+    _had_error = false
+}
+
+/// Every diagnostic recorded since the last `reset_sink`, in emission order.
+fun diagnostics(): List<Diagnostic> {
+    return _sink
+}
+
+/// True if any error (not warning) has been recorded since the last reset. This
+/// is the collected replacement for each phase's private `has_errors` flag.
+fun sink_had_error(): Bool {
+    return _had_error
+}
+
+// --- JSON serialization ---
+//
+// Hand-rolled, not `@json`: that module imports `@reflect`, which the compiler
+// cannot depend on without a cycle (diag.sf is imported by every phase and must
+// stay dependency-free — see the module docstring). The shapes here are fixed and
+// small, so manual assembly costs a page and buys the compiler no new imports.
+// This matches existing precedent in the tree for compiler-side serialization.
+
+/// A JSON string literal, quotes included, with the five escapes JSON requires
+/// for the characters that actually occur in diagnostics.
+///
+/// Compiler messages routinely carry `'`, `"` and `\` — quoted identifiers
+/// (`unused variable 'x'`), Windows-ish paths, and the escape sequences in a
+/// string-literal error all reach here — so an unescaped assembly would emit
+/// JSON that no parser accepts, on exactly the inputs an editor most needs.
+///
+/// Control characters below 0x20 other than \n, \t and \r are passed through
+/// rather than \u-escaped. Producing them would need char-to-int conversion,
+/// they cannot appear in a Saffron identifier or in any message the compiler
+/// composes, and the alternative — silently dropping them — is worse than
+/// emitting them, because a truncated message reads as a complete one.
+fun json_escape(s: String): String {
+    var out: String = "\""
+    var i: Float = 0
+    while (i < s.length()) {
+        var c: String = s.char_at(i)
+        if (c == "\"") { out = out + "\\\"" }
+        else if (c == "\\") { out = out + "\\\\" }
+        else if (c == "\n") { out = out + "\\n" }
+        else if (c == "\t") { out = out + "\\t" }
+        else if (c == "\r") { out = out + "\\r" }
+        else { out = out + c }
+        i = i + 1
+    }
+    return out + "\""
+}
+
+/// An integer for JSON, with no `.0` tail.
+///
+/// Every number in a span is a whole number — line, column, byte offset, length
+/// — but they are held as Float, and `to_string()` on a Float renders `4.0`.
+/// `4.0` is legal JSON, so this is not a correctness fix; it is that a consumer
+/// reading `line` expects an integer, and `JSON.parse` in TypeScript hands back
+/// `4` either way. `floor()` first so the intent is explicit rather than relying
+/// on the renderer.
+fun json_int(n: Float): String {
+    return n.floor().to_string()
+}
+
+/// One diagnostic as a JSON object.
+///
+/// `line`/`column`/`offset`/`length` are omitted entirely when the span is
+/// synthetic, rather than emitted as 0. A consumer must be able to tell "this
+/// diagnostic has no location" from "this diagnostic is at line 0", and 0 is a
+/// plausible-looking lie: an editor would place the squiggle at the top of the
+/// file, pointing at code that has nothing to do with the error. `located` says
+/// which case it is without the consumer having to infer it from sentinel values.
+///
+/// This matters more than it sounds: most checker errors are still unlocated,
+/// because they are about expressions and only declarations carried spans until
+/// recently. An editor that trusted a 0 would mislocate the majority of type
+/// errors.
+fun diagnostic_to_json(file: String, d: Diagnostic): String {
+    return match (d) {
+        Diag(sev, phase, span, msg) => {
+            var out: String = "{\"severity\":" + json_escape(severity_label(sev))
+            out = out + ",\"phase\":" + json_escape(phase)
+            out = out + ",\"file\":" + json_escape(file)
+            out = out + ",\"message\":" + json_escape(msg)
+            if (AST.span_is_real(span)) {
+                out = out + ",\"located\":true"
+                out = out + ",\"line\":" + json_int(AST.span_line(span))
+                out = out + ",\"column\":" + json_int(AST.span_col(span))
+                out = out + ",\"offset\":" + json_int(AST.span_offset(span))
+                out = out + ",\"length\":" + json_int(AST.span_len(span))
+            } else {
+                out = out + ",\"located\":false"
+            }
+            out + "}"
+        }
+    }
+}
+
+/// Every diagnostic in the sink as a JSON array, in emission order.
+///
+/// `file` is attached here because a Diagnostic deliberately does not carry one
+/// — a span is meaningful only against the text it was lexed from, and in a
+/// multi-module compile the driver holds that text per unit. See the note on the
+/// `Diagnostic` enum above.
+fun diagnostics_to_json(file: String): String {
+    var out: String = "["
+    var i: Float = 0
+    while (i < _sink.length()) {
+        if (i > 0) { out = out + "," }
+        out = out + diagnostic_to_json(file, _sink[i])
+        i = i + 1
+    }
+    return out + "]"
+}
+
+/// One document symbol as a JSON object, or "" when the declaration is
+/// synthetic and thus has no source region.
+///
+/// A synthetic symbol is dropped rather than emitted at 0:0, for the same reason
+/// `diagnostic_to_json` drops an unlocated span. A symbol the editor cannot jump
+/// to is worse than a symbol it never heard of — go-to-definition would land at
+/// the top of the file on a name the author never wrote. The caller filters ""
+/// out of the array, so a dropped symbol leaves no empty object behind.
+///
+/// The field set matches `SaffronSymbol` in the editor client (name, kind, line,
+/// column, length); `offset` is emitted too, unused by today's client but needed
+/// by a range-based editor operation, and a consumer ignores fields it does not
+/// read.
+fun symbol_json(name: String, kind: String, s: AST.Span): String {
+    if (!AST.span_is_real(s)) { return "" }
+    var out: String = "{\"name\":" + json_escape(name)
+    out = out + ",\"kind\":" + json_escape(kind)
+    out = out + ",\"line\":" + json_int(AST.span_line(s))
+    out = out + ",\"column\":" + json_int(AST.span_col(s))
+    out = out + ",\"offset\":" + json_int(AST.span_offset(s))
+    out = out + ",\"length\":" + json_int(AST.span_len(s))
+    return out + "}"
+}
+
+// --- Console suppression for --json ---
+//
+// There is no stderr channel in io.sf: every phase's diagnostics and the IR both
+// go to stdout. In --json mode the JSON object must be the ONLY thing on stdout,
+// or the client's JSON.parse chokes on a leading `[line N, col M] Error:` line.
+// The sink already holds every diagnostic as data, so the console form is pure
+// redundancy in that mode and is switched off wholesale.
+//
+// A global flag, not a parameter threaded through every printer, because the
+// printers are called from a dozen sites across three phases and the driver is
+// the single place that knows the mode. Same rationale as the sink itself being
+// a global. reset_sink() does NOT clear this — the mode is a property of the
+// invocation, set once before any file is processed, not per-file state.
+var _quiet: Bool = false
+
+fun set_quiet(q: Bool) {
+    _quiet = q
+}
+
+fun is_quiet(): Bool {
+    return _quiet
+}
+
+fun severity_label(s: Severity): String {
+    return match (s) {
+        SevError => "error"
+        SevWarning => "warning"
+        SevInternal => "internal compiler error"
+    }
+}
+
+// --- Record primitives (no printing) ---
+//
+// These only append to the sink. A phase that already owns its console output —
+// the checker prints its errors in a batch from error_report() — records through
+// these and keeps its printing exactly as it was, so console output does not
+// change while the data channel comes online. `span` is span_none() where the
+// producer has no region yet (most checker errors are about expressions, whose
+// spans arrive in a later stage).
+fun record_error(phase: String, s: AST.Span, msg: String) {
+    _sink.push(Diagnostic.Diag(Severity.SevError, phase, s, msg))
+    _had_error = true
+}
+
+fun record_warn(phase: String, s: AST.Span, msg: String) {
+    _sink.push(Diagnostic.Diag(Severity.SevWarning, phase, s, msg))
+}
+
+// --- Record + print helpers ---
+//
+// For a phase that prints at the call site (parser, codegen). Each records into
+// the sink AND renders the located form, so switching a call site over preserves
+// its console output while making the same diagnostic available as data.
+
+/// Record + print a located error.
+fun emit_error_at(file: String, source: String, s: AST.Span, phase: String, msg: String) {
+    record_error(phase, s, msg)
+    report(file, source, s, "error", msg)
+}
+
+/// Record + print a located warning, subject to the verbosity gate.
+fun emit_warn_at(file: String, source: String, s: AST.Span, phase: String, msg: String) {
+    record_warn(phase, s, msg)
+    if (_verbosity >= 1) {
+        report(file, source, s, "warning", msg)
+    }
+}
+
+var _verbosity: Float = 1
+var _internal_all: Bool = false
+var _internal_codegen: Bool = false
+var _internal_parser: Bool = false
+var _internal_checker: Bool = false
+var _internal_resolve: Bool = false
+var _internal_llvm: Bool = false
+
+fun set_verbosity(v: Float) {
+    _verbosity = v
+}
+
+fun enable_internal(category: String) {
+    if (category == "all") { _internal_all = true; _internal_codegen = true; _internal_parser = true; _internal_checker = true; _internal_resolve = true; _internal_llvm = true }
+    if (category == "codegen") { _internal_codegen = true }
+    if (category == "parser") { _internal_parser = true }
+    if (category == "checker") { _internal_checker = true }
+    if (category == "resolve") { _internal_resolve = true }
+    if (category == "llvm") { _internal_llvm = true }
+}
+
+fun error(phase: String, msg: String) {
+    IO.println("[error:" + phase + "] " + msg)
+}
+
+// --- Located diagnostics ---
+
+/// `file:line:col` for a real span, or just `file` when the span is synthetic.
+///
+/// This is the prefix that lets an editor or `make`-style tool jump to the
+/// offending source, which a bare `[error:codegen] ...` line cannot.
+fun format_span(file: String, s: AST.Span): String {
+    if (!AST.span_is_real(s)) { return file }
+    return file + ":" + AST.span_to_string(s)
+}
+
+/// One line of the source text, 1-based, or "" when `line` is out of range.
+fun source_line(source: String, line: Float): String {
+    if (source.length() == 0) { return "" }
+    if (line < 1) { return "" }
+    var lines: List<String> = source.split("\n")
+    if (line > lines.length()) { return "" }
+    return lines[line - 1]
+}
+
+/// A caret run under the span: `^` for a synthetic or single-character span,
+/// `^~~~` widening to the span's length otherwise.
+fun caret_for(s: AST.Span): String {
+    var caret: String = "^"
+    var width: Float = AST.span_len(s)
+    var i: Float = 1
+    while (i < width) {
+        caret = caret + "~"
+        i = i + 1
+    }
+    return caret
+}
+
+/// Print a located diagnostic: a `file:line:col: label: message` header, then the
+/// source line, then a caret under the span.
+///
+/// `source` may be "" — the header still carries the location, which is the part
+/// a tool consumes. Passing the text just adds the human-readable excerpt.
+fun report(file: String, source: String, s: AST.Span, label: String, msg: String) {
+    IO.println(format_span(file, s) + ": " + label + ": " + msg)
+    var line: Float = AST.span_line(s)
+    var text: String = source_line(source, line)
+    if (text.length() == 0) { return }
+    var prefix: String = "  " + line.floor().to_string() + " | "
+    IO.println(prefix + text)
+    var col: Float = AST.span_col(s)
+    var padding: String = ""
+    var pi: Float = 0
+    while (pi < prefix.length() + col - 1) {
+        padding = padding + " "
+        pi = pi + 1
+    }
+    IO.println(padding + caret_for(s))
+}
+
+/// A located error. Sets nothing — the caller owns its own `has_errors` flag —
+/// so this stays usable from the parser, checker and codegen alike.
+fun error_at(file: String, source: String, s: AST.Span, msg: String) {
+    report(file, source, s, "error", msg)
+}
+
+/// A located warning, subject to the same verbosity gate as `warn`.
+fun warn_at(file: String, source: String, s: AST.Span, msg: String) {
+    if (_verbosity >= 1) {
+        report(file, source, s, "warning", msg)
+    }
+}
+
+/// A located internal-compiler-error. The wording matters: this is the
+/// I9 fall-through channel, and it must be distinguishable from a user error so
+/// that "the compiler reported success right up to the assembler" (BUGS #37)
+/// cannot recur silently.
+fun internal_error_at(file: String, source: String, s: AST.Span, msg: String) {
+    report(file, source, s, "internal compiler error", msg)
+}
+
+fun warn(phase: String, msg: String) {
+    if (_verbosity >= 1) {
+        IO.println("[warn:" + phase + "] " + msg)
+    }
+}
+
+fun info(msg: String) {
+    if (_verbosity >= 2) {
+        IO.println("[info] " + msg)
+    }
+}
+
+fun detail(msg: String) {
+    if (_verbosity >= 3) {
+        IO.println("[debug] " + msg)
+    }
+}
+
+fun codegen(msg: String) {
+    if (_internal_codegen) { IO.println("[codegen] " + msg) }
+}
+
+fun parser(msg: String) {
+    if (_internal_parser) { IO.println("[parser] " + msg) }
+}
+
+fun checker(msg: String) {
+    if (_internal_checker) { IO.println("[checker] " + msg) }
+}
+
+fun resolve(msg: String) {
+    if (_internal_resolve) { IO.println("[resolve] " + msg) }
+}
+
+fun llvm(msg: String) {
+    if (_internal_llvm) { IO.println("[llvm] " + msg) }
+}

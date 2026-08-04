@@ -13,7 +13,7 @@ import "@os" as OS
 /// really `ls -1` — bare names, one level, no descent — so `entry[0]` indexed into
 /// a *filename string* and produced single characters. `files()` returned garbage
 /// and nothing was recursive despite the docs. See the same defect and the same fix
-/// in `@glob`'s `find_in`, and BUGS #152 for why it crashed instead of just
+/// in `@glob`'s `find_in`, and BUGS #153 for why it crashed instead of just
 /// returning nothing.
 class FileFinder {
     var file_paths: List<String>

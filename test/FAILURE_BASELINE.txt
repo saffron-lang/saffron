@@ -30,20 +30,26 @@
 #
 # Recorded 2026-08-03 at 4fb2690 (merge of phase5-internal): 262 passed, 16
 # failed, 14 skipped, 1 known-fail.
+#
+# Updated 2026-08-03 at the ide-stage0-spans merge: 275 passed, 11 failed, 14
+# skipped, 1 known-fail. That merge fixed five names, all removed below:
+# enum_cross_simple, imports, inheritance (module-system / @ast import fixes and
+# the alias/type-re-export fix now #149), pass/data_equality (structural ==
+# reaching more shapes), and test_lib_repro. No regressions: the 11 remaining
+# names are a strict subset of the previous 16.
+#
+# Updated 2026-08-03 at the origin/main merge (86ab8e6): 278 passed, 9 failed,
+# 14 skipped, 1 known-fail. origin/main's `\xNN` escape-decode fix (#152, was
+# origin's #146 before the collision renumber) fixed test_base64 and test_log,
+# both removed below. No regressions: the 9 remaining names are a strict subset
+# of the previous 11.
 
 async
 docstrings
-enum_cross_simple
-imports
-inheritance
 json
 oracle_enum_println
-pass/data_equality
 pass/deep_deserialize
 pass/expressions
 pass/overloading
 pass/varargs
-test_base64
 test_glob
-test_lib_repro
-test_log

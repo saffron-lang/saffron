@@ -16,13 +16,16 @@ class ExprBuilder {
     fun make_tuple(elems: List<AST.Expr>): AST.Expr {
         return AST.Expr.TupleLit(elems)
     }
-    // Multi-arg variant
+    // Multi-arg variant. The trailing span is part of the variant's declared
+    // arity, and an arm or construction short of it is a hard error — so this
+    // test would fail on shape rather than on what it exists to check
+    // (cross-module enum construction inside a class method) if it were omitted.
     fun make_call(callee: AST.Expr, args: List<AST.Expr>): AST.Expr {
-        return AST.Expr.Call(callee, args)
+        return AST.Expr.Call(callee, args, AST.span_none())
     }
-    // Three-arg variant
+    // Four-arg variant
     fun make_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): AST.Expr {
-        return AST.Expr.MethodCall(obj, method, args)
+        return AST.Expr.MethodCall(obj, method, args, AST.span_none())
     }
     // Cross-module enum from a different enum in the same module
     fun make_type(name: String): AST.Type {
@@ -37,9 +40,9 @@ fun test() {
     var elems: List<AST.Expr> = [AST.Expr.IntLit(1), AST.Expr.IntLit(2)]
     var t: AST.Expr = b.make_tuple(elems)
     IO.println("tuple ok")
-    var c: AST.Expr = b.make_call(AST.Expr.Variable("foo"), [AST.Expr.IntLit(3)])
+    var c: AST.Expr = b.make_call(AST.Expr.Variable("foo", AST.span_none()), [AST.Expr.IntLit(3)])
     IO.println("call ok")
-    var m: AST.Expr = b.make_method_call(AST.Expr.Variable("obj"), "method", [])
+    var m: AST.Expr = b.make_method_call(AST.Expr.Variable("obj", AST.span_none()), "method", [])
     IO.println("method_call ok")
     var ty: AST.Type = b.make_type("MyClass")
     IO.println("type ok")

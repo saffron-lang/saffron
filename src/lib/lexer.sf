@@ -6,20 +6,27 @@
 //! var tokens = Lexer.tokenize("var x = 42")
 //! ```
 
-import "../compiler/lexer.sf" as Internal
+import "../compiler/lexer.sf" as InternalLexer
 
 /// Re-export token types for pattern matching.
-var Token = Internal.Token
-var TokenKind = Internal.TokenKind
+///
+/// These are `type` aliases, not `var`. A `var X = Internal.X` looks like it
+/// re-exports a type and does not: the name binds in the *value* namespace, so
+/// codegen treats it as a function reference and emits a call to a symbol that
+/// was never defined. The IR then fails `opt` with "use of undefined value",
+/// which is a compiler bug, not a program error — and it fired for every
+/// program that merely imported this module.
+type Token = InternalLexer.Token
+type TokenKind = InternalLexer.TokenKind
 
 /// Tokenize a source string into a list of Tokens.
-fun tokenize(source: String): List<Internal.Token> {
-    var lexer = Internal.Lexer(source)
+fun tokenize(source: String): List<InternalLexer.Token> {
+    var lexer = InternalLexer.Lexer(source)
     return lexer.tokenize()
 }
 
 /// Tokenize a file by path.
-fun tokenize_file(path: String): List<Internal.Token> {
+fun tokenize_file(path: String): List<InternalLexer.Token> {
     var source = IO.read_file(path)
     return tokenize(source)
 }

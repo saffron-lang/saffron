@@ -4,7 +4,7 @@
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
             param_names.push(pname)
             pi = pi + 1
         }
@@ -444,7 +444,7 @@
 
     fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
         match (stmt) {
-            VarDecl(name, typ, init, doc, v_vis) => {
+            VarDecl(name, typ, init, doc, v_vis, __ns, __fs) => {
                 this.find_free_vars_expr(init, bound, free)
                 bound.push(name)
             }
@@ -460,9 +460,9 @@
                 this.find_free_vars_stmts(body, bound, free)
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
-            FunDecl(n, p, r, b, d, f_vis) => {}
-            EnumDecl(n, v, d, e_vis) => {}
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => {}
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -480,7 +480,7 @@
 
     fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
-            Variable(name) => {
+            Variable(name, __vs) => {
                 if (this.str_in_list(bound,name) or this.str_in_list(free,name)) {
                     // Already bound or already free — skip
                 } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
@@ -499,7 +499,7 @@
                     }
                 }
             }
-            Ref(rkind, rname, rslot) => {
+            Ref(rkind, rname, rslot, __rs) => {
                 // A capture is exactly a local/param that no enclosing binder
                 // provides. `rkind` says which it is, so none of the Variable
                 // arm's is_known guessing (uppercase-first-letter heuristics
@@ -515,7 +515,7 @@
                 this.find_free_vars_expr(r, bound, free)
             }
             Unary(o, r) => { this.find_free_vars_expr(r, bound, free) }
-            Call(c, args) => {
+            Call(c, args, __cs) => {
                 this.find_free_vars_expr(c, bound, free)
                 var i: Float = 0
                 while (i < args.length()) {
@@ -523,8 +523,8 @@
                     i = i + 1
                 }
                 // If calling a closure function, add its captures to our free vars
-                var call_name: String = match (c) { Variable(n) => n
-                    Ref(rk, rn, rs) => rn
+                var call_name: String = match (c) { Variable(n, __vs) => n
+                    Ref(rk, rn, rs, __rs) => rn
                     _ => ""
                 }
                 if (call_name.length() > 0) {
@@ -545,7 +545,7 @@
                     }
                 }
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 this.find_free_vars_expr(value, bound, free)
                 // A module global is NOT a capture. It is addressed as
                 // `@__g_<name>` from wherever it is mentioned, so there is
@@ -578,8 +578,8 @@
             BoolLit(v) => {}
             StringLit(s) => {}
             NilLit => {}
-            MemberAccess(o, f) => { this.find_free_vars_expr(o, bound, free) }
-            MethodCall(o, m, a) => {
+            MemberAccess(o, f, __ms) => { this.find_free_vars_expr(o, bound, free) }
+            MethodCall(o, m, a, __ks) => {
                 this.find_free_vars_expr(o, bound, free)
                 var mi: Float = 0
                 while (mi < a.length()) {
@@ -587,8 +587,8 @@
                     mi = mi + 1
                 }
             }
-            GetField(o, f) => { this.find_free_vars_expr(o, bound, free) }
-            SetField(o, f, v) => {
+            GetField(o, f, __gs) => { this.find_free_vars_expr(o, bound, free) }
+            SetField(o, f, v, __ss) => {
                 this.find_free_vars_expr(o, bound, free)
                 this.find_free_vars_expr(v, bound, free)
             }
@@ -647,7 +647,7 @@
                 var inner_bound: List<String> = []
                 var pi2: Float = 0
                 while (pi2 < p.length()) {
-                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis) => n }
+                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis, __ns) => n }
                     inner_bound.push(pn)
                     pi2 = pi2 + 1
                 }
@@ -737,7 +737,7 @@
     fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
         var sk: String = this.classify_stmt(stmt)
         if (sk == "var") {
-            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis) => init
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis, __ns, __fs) => init
                 _ => AST.Expr.NilLit
             }
             this.collect_lambda_assigned_expr(vi, out, in_lambda)
@@ -809,7 +809,7 @@
                 // Everything below this point is inside a closure boundary.
                 this.collect_lambda_assigned_stmts(b, out, true)
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 if (in_lambda and name.length() > 0 and !this.str_in_list(out, name)) {
                     out.push(name)
                 }
@@ -824,7 +824,7 @@
                 this.collect_lambda_assigned_expr(r, out, in_lambda)
             }
             Unary(o, r) => { this.collect_lambda_assigned_expr(r, out, in_lambda) }
-            Call(c, args) => {
+            Call(c, args, __cs) => {
                 this.collect_lambda_assigned_expr(c, out, in_lambda)
                 var i: Float = 0
                 while (i < args.length()) {
@@ -832,7 +832,7 @@
                     i = i + 1
                 }
             }
-            MethodCall(o, m, a) => {
+            MethodCall(o, m, a, __ks) => {
                 this.collect_lambda_assigned_expr(o, out, in_lambda)
                 var mi: Float = 0
                 while (mi < a.length()) {
@@ -840,9 +840,9 @@
                     mi = mi + 1
                 }
             }
-            MemberAccess(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
-            GetField(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
-            SetField(o, f, v) => {
+            MemberAccess(o, f, __ms) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            GetField(o, f, __gs) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            SetField(o, f, v, __ss) => {
                 this.collect_lambda_assigned_expr(o, out, in_lambda)
                 this.collect_lambda_assigned_expr(v, out, in_lambda)
             }
@@ -904,8 +904,8 @@
             }
             IsCheck(val, t) => { this.collect_lambda_assigned_expr(val, out, in_lambda) }
             Yield(v) => { this.collect_lambda_assigned_expr(v, out, in_lambda) }
-            Variable(name) => {}
-            Ref(rkind, rname, rslot) => {}
+            Variable(name, __vs) => {}
+            Ref(rkind, rname, rslot, __rs) => {}
             IntLit(v) => {}
             FloatLit(v) => {}
             BoolLit(v) => {}

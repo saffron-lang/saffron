@@ -2,21 +2,51 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#139, #143. Next free number is **#153**.
+**12 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#143, #147, #148. Next free number is **#154**.
 
-This worktree branched from an origin/main that predates local `main`'s #147
-(`: Any` ignored), #148 (nonexistent class-member read) and #149 (the ide alias
-fix), none of them pushed yet. Merge those in before trusting this list; #150
-and #151 below are numbered around them.
+#149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
+`## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
+five times at merge — #142 → #143 → #145 → #146 → #149 — each time origin/main
+turned out to already own the number it had reached. The lesson below about
+reading the next-free number from `main` is exactly why.
 
-#144, #145, #146, #150, #151 and #152 were each filed and fixed in the same sitting — the
-unused-variable warning firing on compiler-mandated match-arm bindings,
-call-site argument types never being checked at all, the lexer silently
-discarding `\xNN` escapes, interface-typed dispatch binding to the empty abstract
-stub, a cross-module subclass emitting an unprefixed forwarder, and an
-unresolved-type subscript falling through to the list path — and all six are under
-`## Resolved`.
+#144, #145, #146, #150, #151, #152 and #153 were each filed and fixed in the same
+sitting — the unused-variable warning firing on compiler-mandated match-arm
+bindings, call-site argument types never being checked at all, an inferred
+global read from inside a function being typed `Int`, interface-typed dispatch
+binding to the empty abstract stub, a cross-module subclass emitting an
+unprefixed inherited-method forwarder, the lexer silently discarding `\xNN`
+escapes, and an unresolved-type subscript falling through to the list path — and
+all seven are under `## Resolved`.
+
+**#152 collided the same way #146 did, and the subscript fix moved to #153.** ph5
+filed the unresolved-subscript crash as #152 while reading "next free is #153" from
+its own out-of-date header; origin/main had meanwhile given #152 to the lexer-escape
+entry above. The tie-break resolved it in seconds this time: the escape fix was
+already merged and cited by number in `lexer.sf` and `test/FAILURE_BASELINE.txt`,
+while the subscript entry existed only in one unpushed worktree, so the subscript
+entry moved. Its five in-source citations (`runtime.sf`, `glob.sf`, `find.sf`,
+`methods_body.sf`, `test/pass/unresolved_index.sf`) were rewritten in the merge.
+That is three collisions in this file's history now, all with the same cause:
+**re-read this header from `main` immediately before filing, not from the worktree
+you have been in all day.**
+
+**#146 collided across two unpushed lines of work, and the escape fix moved to
+#152.** Two different bugs were both filed as #146: locally "an inferred global
+read from inside a function was typed `Int`" (commit `f0d52ab` plus a
+rebootstrap, and three test/fixture files naming the number in their headers),
+and on origin/main "the lexer silently dropped the backslash of every escape it
+did not know" (commit `1800720`, one comment reference in `lexer.sf`; the test
+that shipped alongside it, `test/pass/iface_dispatch.sf`, belongs to #150). Per
+the tie-break below — the side with fewer commits, comments and test names
+carrying the number moves — the local entry keeps #146 and the lexer-escape
+entry is renumbered #152. Both were already FIXED and committed when they met,
+so neither could simply be renamed in place; the renumbering is recorded here
+because the escape bug is cited by number in prose (`lexer.sf`, updated to #152
+in this merge) rather than only in a heading. origin/main's own #151
+(cross-module subclass forwarder) did not collide — it landed after both #150
+and the escape fix, and keeps its number here.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -27,17 +57,29 @@ three separate worktrees each numbered a different bug #137, and two of them als
 claimed #138: the `as`-as-expression bug (this file's #137), ph5's List/Map `==`
 bug (re-filed as #142), and ide-stage0-spans' `var X = Module.Type` alias bug
 (still unmerged and still mis-numbered). ph5's had *already* been renumbered once,
-from an internal task ID that collided with the resolved #28. A worktree branched
+from an internal task ID that collided with the resolved #28. The alias bug has
+since merged and been renumbered to #143 to settle the collision. A worktree branched
 before a filing carries the pre-filing note forward and reads it as authoritative,
 so the collision is the default outcome rather than an accident, and it is only
 visible at merge time — by which point the number is in commit messages, code
 comments and test names. If you are filing from a worktree, `git show
 main:BUGS.md | head -10` first.
 
-The condition-lowering bug below is **#143**, filed from ph5 after reading
-`main`'s then-next-free number, so it is the one worktree filing in this round
-that did not collide. Its commit message and the `BUGS #143` comments in
-`src/compiler/checker.sf` cite it correctly.
+**The rule cuts both ways, and `main` is not automatically right.** Later the same
+day this file filed #143/#144 from `main` while three worktrees had *already*
+agreed on #143 (non-`Bool` condition lowering) and #144 (unused-variable noise),
+and one had taken #145 — none of them merged yet, so `main` was the stale copy.
+These two entries were renumbered to #146/#147 rather than making three worktrees
+renumber, which is the general tie-break: the side with fewer commits, comments and
+test names carrying the number moves. Before filing, check the worktrees too:
+`grep -h "Next free number" .claude/worktrees/*/BUGS.md BUGS.md`.
+
+The same tie-break settled the ide-stage0-spans alias fix when that worktree was
+finally merged: it had reached #146 through prior renumberings but had zero commits
+or test files citing any final number, while `main`'s #146 (inferred-global typed
+`Int`) had two commits and two test files carrying it, and `main` had since also
+filed #148 (nonexistent class-member read) from another session. Ide's entry moved
+to #149; the ambient rule did not change.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -603,90 +645,323 @@ a one-line edit.
 
 ---
 
-### 139. OPEN — REGRESSION: a value flowing through `Signal<T>.get()` re-infers as `Nil`, and no annotation clears it
+### 147. OPEN — an explicit `: Any` annotation is indistinguishable from no annotation, so the initializer's type wins
 
-**Severity: high.** This is the sole blocker for the `bazaar/frontend` build, and
-it is a **regression against the committed gen2** — see the gen2-vs-gen3 split
-below. Almost certainly fallout from the in-flight type-lattice rewrite
-(`UnknownType`/`NeverType`, uncommitted in `ast.sf`/`checker.sf`).
+**Severity: low.** Split out of #139, where it was point 1 ("it ignores explicit
+annotations"). It is real, and independent of that entry's actual cause.
 
-Repro (needs `basil` on the lib path):
+`parser.sf:2290` defaults an omitted annotation to the string `"Any"`:
 
 ```saffron
-import { Query, query } from "basil/query"
-var q: Query<Any> = query("http://x")
-var data = q.data.get()               // Signal<T>.get(): T, T bound to Any
-if (data != nil and data.has("k")) {
-    var pkgs = data.get("k")
-    if (pkgs != nil) {                 // guard is present and correct
-        IO.println(pkgs.length().to_string())   // ERROR: .length() on nullable 'pkgs' (type Nil)
-    }
+var type_ann: String = "Any"
+```
+
+and `checker.sf:2237` decides whether an annotation was written by comparing
+against that same default:
+
+```saffron
+if (type_ann_str != "Any") {
+    ... this.env.define_var(name, type_ann_node)
+} else if (init_type != "Any") {
+    this.env.define_var(name, init_type_node)     // <- an explicit `: Any` lands here
 }
 ```
 
-The gen split is the diagnosis:
+So `var x: Any = something_typed()` takes the inferred-from-initializer branch and
+binds the initializer's type, not `Any`. Writing `: Any` cannot widen a binding —
+the one thing an author writes it for. Under #139 that made the documented
+workaround (`var data: Any = ...`) fail to launder, which is how it was found.
 
-```
-build/stage2/saffronc  (committed gen2)  -> 0 errors
-build/saffronc         (current gen3)    -> 1 error   (.length() on nullable Nil)
-```
+The fix is to stop overloading a value as the "absent" marker: an empty string, or
+a separate `has_annotation` flag on the AST node, distinguishes the two. Note the
+`type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
+one of the sites rewrite stage 3 has to touch.
 
-Two properties make this nastier than an ordinary narrowing gap:
+### 148. OPEN — reading a nonexistent member of a CLASS instance compiles clean, then reads field 0 or emits invalid IR
 
-1. **It ignores explicit annotations.** `var data: Any = q.data.get()` still
-   errors, and so does `var pkgs: Any = data.get("k")`. The RHS type wins over
-   the declared type — the value is stamped `Nil` at the generic boundary and the
-   annotation does not launder it. That is the part that reads as a genuine bug
-   rather than a missing feature: a declared `Any` should never re-narrow to `Nil`.
-
-2. **The `!= nil` guard then narrows `Nil` to nothing.** Because `pkgs` is
-   *already* pure `Nil` (not `Any|Nil`), the guard is vacuous and the method call
-   is reported anyway.
-
-Isolation notes, to save the next person the bisect:
-- `Any.get("k")` on a plain `Any` narrows fine (0 errors). The poison is specific
-  to the value coming back from the generic `Signal<T>.get()`.
-- A hand-rolled `class Sig<T> { fun get(): T ... }` does **not** reproduce it, nor
-  does `Sig` initialized with `sig(nil)`. It only reproduces through basil's real
-  `Query`/`Signal` chain, so the trigger is some combination this minimal clone
-  doesn't capture (candidate: `this.data = Signal.signal(nil)` at `query.sf:27`
-  fixing the field's `T` to `Nil` at construction, independent of the class's `T`).
-
-**Only working workaround found:** launder through a function whose return type is
-declared `Any`, at *every* level the poisoned value is read:
+**Severity: high.** The class-side twin of #118/#122, which closed the same hole
+for *module* members only. A typo in a field or method name on a class receiver is
+not reported by the checker; codegen then does one of two wrong things depending on
+whether the class has any fields.
 
 ```saffron
-fun as_any(x: Any): Any { return x }
-var data = as_any(q.data.get())
-var pkgs = as_any(data.get("k"))      // both levels, or the inner one still errors
+class Box {
+    var first: Int
+    var second: Int
+    fun init(a: Int, b: Int) { this.first = a; this.second = b }
+}
+var b = Box(11, 22)
+IO.println(b.totally_absent)   // prints 11 — silently reads field 0
 ```
 
-A single `Query.snapshot(): Any` that returns `this.data.value` only launders the
-outer read — the inner `data.get("k")` still errors — so it is not enough on its
-own. Given that, and that the regression is in uncommitted rewrite work, the
-frontend was left un-worked-around pending the checker fix rather than sprayed
-with `as_any` calls.
+```saffron
+class Empty { fun init() {} }
+var e = Empty()
+IO.println(e.absent)           // opt: invalid getelementptr indices on %Empty = type {}
+```
 
-The reference build path, for whoever fixes this:
+The bare-method-reference spelling is the same defect wearing a different face:
+`a.finish` (no call) on a class that declares `finish` is a `MemberAccess`, not a
+`MethodCall`, so it too takes the field path and GEPs slot 0. That is why
+`test/inheritance.sf` (`IO.println(a.finish)`) and `test/imports.sf`
+(`IO.println(k.finish)`) both die with `invalid getelementptr indices` on a
+zero-field or method-only class — one defect, two red baseline entries.
+
+Mechanism, and it is the can't-express-unknown family yet again: the checker's
+`infer_member_access` (`checker.sf:2912`) resolves a class receiver via
+`get_class_field_type`, which returns `"Any"` for a field it cannot find rather
+than reporting absence — the honest widen for an *ambiguous* class (two modules
+declaring the same name), but indistinguishable here from a plain typo. Codegen's
+`MemberAccess` field path then emits a `getelementptr ..., i32 0, i32 0` with no
+check that the field exists, so a populated class reads slot 0 and a fieldless one
+produces a GEP that `opt` rejects.
+
+The predicate to gate on already exists: `dispatch_declaring_class(base, member)`
+(`checker.sf:2026`) does a DAG-wide, declaration-order walk of fields *and* methods
+across the whole `class_parents` hierarchy and returns `""` when nothing declares
+the member. The guard belongs in `infer_member_access`, on the resolved-class path
+(`class_fields.has(ma_base)`), and must fire only when the class is unambiguous
+(`!is_ambiguous_class`, matching `get_class_field_type`'s existing `"Any"` escape)
+so a genuinely ambiguous name still widens rather than false-erroring.
+
+**Two landmines for the fix, both capable of reddening the whole bootstrap:**
+
+1. `extend fun` methods may not appear in `class_method_names`, so a naive "member
+   absent → error" would falsely reject an extension-method reference. Verify
+   against the extend-fun tests before promoting.
+2. The guard must not fire on an `Any`-typed or unresolved receiver (the existing
+   `check_member_visibility` soft-fail posture, and the reason #56 warns against
+   erroring on that fallback — it "broke pass/math and test_reflect").
+
+Found while triaging the suite failure baseline: `inheritance` and `imports` were
+attributed to a codegen IR bug, but the root cause is a missing checker diagnostic,
+and the two other baseline entries `pass/data_equality`/`pass/deep_deserialize`
+(`data class`) and `pass/expressions`/`pass/varargs`/`pass/overloading` are
+separate stale-feature failures, not this.
+
+---
+
+## Resolved
+
+### 146. FIXED — an inferred global read from inside a function was typed `Int`, so every method on it was rejected
+
+**Severity: high.** The blocker for the `bazaar/frontend` build after #139, and
+hidden behind it: the checker aborted before codegen ran, so fixing #139 is what
+made it visible. It was not new — the same error reproduced on the pre-#139 gen3
+binary.
+
+Repro, no modules or generics needed:
+
+```saffron
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun bump() { this.n = this.n + 1 }
+}
+fun make(): Box { return Box(1) }
+var b = make()                  // global, type INFERRED (not annotated)
+fun go() { b.bump() }           // was: [codegen] Error: type 'Int' has no method 'bump'
+go()
+```
+
+Four variants isolated it exactly. All were measured, not reasoned:
+
+| variant | result |
+|---|---|
+| `b.bump()` at top level, not inside a function | OK |
+| `var b = make()` declared *local* to the function | OK |
+| `var b: Box = make()` — same global, annotated | OK |
+| `var b = make()` global, read inside a function | **`type 'Int' has no method 'bump'`** |
+
+So it was the combination "inferred global" + "read from a function body", with the
+annotation a complete workaround. `Int` was the tell: codegen's fallback for a type
+it could not determine (`types_body.sf` `str_to_type` has no Unknown arm, and
+`IntType` is the first arm) — the same silent-wrong-answer class rewrite stage 1
+exists to convert into a diagnostic.
+
+**Two independent defects had to be fixed, which is why the repro needed both a
+plain and an alias-qualified form.**
+
+*Defect 1 — the global pre-registration pass could not type a call.* Codegen
+registers global `var`s (the `@__g_*` emission) before any IR generation, but a
+call's return type comes from `func_ret_types`, which `prescan_decls` fills — and
+that runs *after* the global pass at all three entry points. So the global pass saw
+an empty `func_ret_types` and could only resolve literal shapes; its guard was
+literally `if (vinit.starts_with("List") or vinit.starts_with("Map") or vinit ==
+"String")`. A class instance matched nothing, stayed out of `global_var_types`, and
+dispatch fell through to the `Int` default. Fixed by a second pass,
+`prescan_global_call_types` (`codegen/utils_body.sf`), that runs *after*
+`prescan_decls` and only adds a type for a still-untyped global whose initializer is
+a `call`/`method_call` with a known non-`Any` return — it never overrides an
+annotated or literal-initialized global. Wired into all three entry points in
+`codegen.sf`, always after `prescan_decls`, and per module prefix so a
+module-qualified global registers under both its bare and prefixed name.
+
+*Defect 2 — `get_expr_type` had no alias arm for `method_call`.* `Lib.make()` is a
+`method_call` to the parser: the receiver is a module alias, not a value, so none
+of the class lookups in `get_expr_type`'s `method_call` arm could resolve it — the
+alias has no type for them to key on — and it answered `Any`. The `call` arm had
+carried such a branch all along; the `method_call` arm just never grew one, so even
+with the second pass in place an alias-qualified inferred global still typed `Any`.
+Fixed by adding the branch (`methods_body.sf`, keyed on `has_module_alias(receiver)`
+and placed above the class lookups, since a module alias is never a class
+instance).
+
+Regression coverage: `test/pass/global_call_inferred_type.sf` (the plain form, all
+four variants asserted so a future change cannot fix one and break another) and
+`test/pass/global_call_alias_inferred.sf` + `test/fixtures/global_call_alias_lib.sf`
+(the module-alias form, which exercises defect 2). Suite after the fix: 265 passed /
+16 failed, failure set identical to the baseline in both `comm` directions.
+
+The reference build this unblocks:
 
 ```
 cd bazaar/frontend
 ../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
 ```
 
-Gen2 fails it too, but for an unrelated and already-fixed reason — the
-`{ stmt; stmt() }` arrow-body form at `main.sf:151,306` is BUGS #136, which gen3
-handles. So the frontend genuinely needs *both* the #136 fix (gen3-only) and the
-absence of this regression (gen2-only); no single existing binary compiles it.
+### 139. FIXED — a free function decided the type of any same-named method call on an unresolved receiver
 
----
+**Severity: high.** Sole blocker for the `bazaar/frontend` build: 14 errors, no
+artifact. Reported as a `Signal<T>.get()` regression, which it was not — the title
+of this entry used to read "a value flowing through `Signal<T>.get()` re-infers as
+`Nil`", and the entry blamed the in-flight `UnknownType`/`NeverType` lattice work.
+Both were wrong, and the second was checkable: those two variants have match arms
+and **zero construction sites** anywhere in `src/`, so nothing could have produced
+one. Worth remembering as a diagnosis failure and not just a bug: the entry's
+"isolation notes" section confidently ruled the cause into the generic machinery
+because that is where the symptom appeared.
 
-## Resolved
+The cause was `infer_method_call`'s last-resort arm (`checker.sf:3610` before the
+fix):
+
+```saffron
+var ret: String = this.env.get_func_ret(method)
+if (ret != "Any") return ret
+```
+
+That reads the method name out of the table of **free functions**. It exists for
+the alias-qualified call `Mod.helper()`: the parser builds that as a MethodCall
+whose receiver is a module alias — a name the checker has no type for — so the
+callee's declared return type is only reachable under its bare name.
+
+Ungated, it also answered for every unresolved `value.foo()`, from whatever free
+`fun foo` the program happened to declare. The chain in bazaar:
+
+1. `basil/fetch.sf:16` declares `fun get(url, callback)` with no return annotation.
+2. `parser.sf:2438` defaults an omitted return type to `"Nil"`.
+3. `data.get("k")` on an `Any`-typed receiver — an ordinary Map read — infers `Nil`.
+4. The next line's `.length()` trips the nullable-receiver check:
+   `cannot call .length() on nullable 'pkgs' (type Nil); add a nil check first`.
+
+Nothing in the user's file was wrong. A function three modules away, whose only
+sin was sharing a name with a Map method, decided the type — and the diagnostic
+named a variable that was never nil, which is why the reported repro looked like a
+narrowing bug.
+
+The fix gates the arm on the receiver being a bare name that is **not** a bound
+variable, the only shape a module alias can take, and adds `TypeEnv.has_var()` to
+ask that. `get_var_type(name) == AnyType` cannot answer it: an unbound name and a
+name declared `Any` both return `AnyType`. An empty `obj_name` (the receiver is an
+expression, e.g. `q.data.get(k)`) is excluded by the same length check.
+
+Measured: the bazaar repro goes 14 errors → 0 with an artifact; the alias path
+stays typed (`Mod.make_label(3)` still infers `String`, not `Any`); suite
+262 passed / 16 failed with a failure set identical to `test/FAILURE_BASELINE.txt`
+— no regressions, no incidental fixes.
+
+`test/pass/free_fun_name_shadow.sf` is the regression test. It was verified to
+FAIL on the pre-fix binary with the exact #139 error and pass after, so it guards
+something rather than merely passing.
+
+Two things this entry used to contain are separate bugs, now filed as such:
+**#147** (an explicit `: Any` annotation is ignored — this entry's point 1, and why
+the documented `var data: Any = ...` workaround did not work) and **#146** (the
+codegen errors this fix uncovered in the frontend, which the checker's early abort
+had been hiding).
 
 Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 149. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
+
+**Severity: high.** Broke `@ast`, `@lexer` and `@lang` completely — any program
+that so much as imported one died — and the workaround it forced switched off
+exhaustive match checking for their callers.
+
+**Reproduction** — two lines:
+
+```saffron
+import "@ast" as AST
+fun main() { IO.println("never gets here") }
+```
+
+fails with:
+
+```
+saffron: the compiler emitted invalid LLVM IR
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:472:17: error: use of undefined value '@compiler_ast_Expr'
+    %r = call i64 @compiler_ast_Expr()
+```
+
+Note the program never mentions `Expr`. The bad IR comes from `src/lib/ast.sf`
+itself, which is why the failure looked like a compiler bug rather than a
+library one.
+
+**Cause.** `src/lib/ast.sf` re-exported the compiler's AST types with
+`var Expr = Internal.Expr`. `var` binds a name in the **value** namespace, so
+codegen resolved it as a function reference, wrapped it in a closure
+(`@__wrap_201_compiler_ast_Expr`) and emitted a call to `@compiler_ast_Expr` — a
+symbol nothing defines, because `Expr` is a type. `type X = Y` is the real alias
+form; the parser has supported it all along (`parse_stmt`, desugared to a
+`VarDecl` carrying the docstring `@type_alias`).
+
+**The second-order cost was larger than the crash.** Because no annotation could
+name a `var`-bound type, every signature in `src/lib/ast.sf` fell back to `Any`
+— 29 occurrences. `Any` disables exhaustive match checking for callers, and that
+is precisely how five non-exhaustive matches sat unnoticed in
+`tools/gen_docs.sf`, one of which had a stale arity that survived the WS1a span
+sweep. Switching to `type` and restoring real annotations made the checker report
+all five immediately.
+
+**Fix.** `type` instead of `var` in `src/lib/{ast,lexer,lang}.sf`, real
+`Stmt`/`Span`/`Expr`/`Param` annotations throughout `src/lib/ast.sf` (only the
+two `visitor` callbacks remain `Any`, correctly — they are function values), and
+explicit `_ => {}` arms in `tools/gen_docs.sf` for the matches that intentionally
+handle one variant. Regression test: `test/pass/module_type_reexport.sf`, which
+asserts the aliases work as annotations at both hops — `@ast` aliases the
+compiler's definitions and `@lang` aliases `@ast`'s aliases.
+
+**A second, distinct bug sat underneath this one.** With the aliases fixed, the
+link then failed with `Undefined symbols: _compiler_ast_Parser` —
+`src/lib/{ast,lexer,parser}.sf` each bind `Internal` to a different compiler
+file, and aliases were resolved through one whole-program map with
+first-writer-wins, so the three collapsed onto one. That is **#123**, fixed
+independently and concurrently by making an alias file-local, which is what the
+syntax already reads as. The three `Internal` bindings were renamed here
+(`InternalAst`, `InternalLexer`, `InternalParser`, plus `PubAst` in `@lang` and
+`gen_docs.sf`) before #123 landed; the renames are no longer load-bearing but are
+kept, since a reader of `src/lib/lexer.sf` should not have to know which
+`Internal` is meant.
+
+**The lesson worth keeping:** the failure announced itself as "this is a compiler
+bug, not an error in your program", and it was a two-word error in a library.
+A diagnostic that confidently assigns blame can still be pointing the wrong way.
+
+**Renumbered #142 → #143 → #145 → #146 → #149 across four merges.** This entry was
+written on the ide-stage0-spans worktree as #142; ph5's List/Map `==` fix owned
+#142, so it moved to #143 at the first merge. Then origin/main's own #143
+(non-`Bool` condition lowering) landed, colliding again, so it took #145. Then
+origin/main's #145 (call-site argument checking) landed, so it took #146. At the
+final merge origin/main's own #146 (inferred-global typed `Int`) owned that number
+with two commits and two test files citing it, and origin/main had since also filed
+#148 (nonexistent class-member read), so this entry took #149 — the next free number
+on `main` after those. Four times bitten by the same per-worktree collision the note
+at the top of `## Open` warns about: read the next-free number from `main`, never
+from a worktree.
 
 ### 151. FIXED — a module class extending another module class emits an unprefixed inherited-method forwarder, so the IR references an undefined `@Base__init`
 
@@ -739,7 +1014,7 @@ deliberately global, and the module-init functions build their own name from the
 prefix (`"__mod_init_" + prefix`), so they are unique by construction. The
 forwarder was the only class symbol not named by `gen_function`.
 
-### 152. FIXED — indexing a receiver whose static type is unresolved fell through to the list path, so `s[i]` on a NaN-tagged String segfaulted
+### 153. FIXED — indexing a receiver whose static type is unresolved fell through to the list path, so `s[i]` on a NaN-tagged String segfaulted
 
 **Severity: high** — a silent SIGSEGV with no diagnostic, and the *fifth* symptom of
 one root cause.
@@ -891,7 +1166,7 @@ cross-module **subclassing** (a module class extending another module class)
 emits an undefined `@Base__init`. `test_log` does not subclass across the
 boundary, so it is unaffected, and the two fixes are independent.
 
-### 146. FIXED — the lexer silently dropped the backslash of every escape it did not know, so `"\x41"` was the three characters `x41`
+### 152. FIXED — the lexer silently dropped the backslash of every escape it did not know, so `"\x41"` was the three characters `x41`
 
 **Severity: high, and silent.** `read_string` (`src/compiler/lexer.sf`) handled
 `\n`, `\r`, `\t`, `\\` and `\"`, and ended with `else { result.append(esc) }` —
@@ -1853,8 +2128,6 @@ standalone path (`strip_nil_from_node`'s if-expression branches typing as
 `AST.Type vs NilType`); verified pre-existing by applying the hoist alone to main's
 `checker.sf`, which produces them with no #126 walk present. Not fixed — that is
 **#130**.
-
----
 
 ### 66. FIXED — binary files could not be read or served: `IO.read_file` truncated at the first NUL, so `static_files` served any wasm module as 0 bytes
 
