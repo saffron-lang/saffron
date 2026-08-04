@@ -106,6 +106,32 @@ class TypeEnv {
         return AST.Type.AnyType
     }
 
+    // The type `name` was DECLARED with, ignoring any narrowing in effect.
+    //
+    // `get_var_type` above consults `scope.narrowed` first, which is right for
+    // *reading* a variable — inside `if (x is String)`, `x` really is a String.
+    // It is wrong for checking an *assignment*, because narrowing describes what
+    // the variable currently holds, not what it is allowed to hold. Asking the
+    // narrowed type whether a store is legal rejects this:
+    //
+    //     var x: Any = f()
+    //     if (x is String) { x = 42 }      // legal: the binding is Any
+    //
+    // Narrowing is scoped to the `is` guard; the declaration is what constrains
+    // the store. Two questions, so two accessors — the same lesson the ret_type
+    // slice paid for, where one spelling carried two facts.
+    fun get_declared_var_type(name: String): AST.Type {
+        var i: Float = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: Scope = this.scopes[i]
+            if (scope.vars.has(name)) {
+                return scope.vars.get(name)
+            }
+            i = i - 1
+        }
+        return AST.Type.AnyType
+    }
+
     // True when `name` is bound as a variable in some enclosing scope. Distinct
     // from `get_var_type(name) == AnyType`, which cannot tell an unbound name
     // apart from one declared `Any` — both answer AnyType. A module alias is
@@ -3824,11 +3850,41 @@ class NullChecker {
         return "Any"
     }
 
+    // An assignment used to ask exactly one question — is a nullable value
+    // escaping into a non-nullable binding — and never compared two concrete
+    // types. So `var x: String = "abc"` followed by `x = 42` compiled clean, and
+    // then `"${x}"` read the string pointer with `__val_untag_int` and segfaulted.
+    // This is the same defect BUGS #155 found in the `Return` arm, one statement
+    // kind over, and it takes the same fix: `scalar_mismatch`, whose one-sided
+    // discipline (fire only on two DIFFERENT concrete scalars; let Any, Nil,
+    // unions, generics, classes and enums through) is what makes it safe to turn
+    // on against the compiler's own source.
+    //
+    // The declared type is the one that constrains the store, so this asks
+    // `get_declared_var_type` rather than `get_var`; see the note there for the
+    // narrowing case it would otherwise reject.
     fun check_assign(name: String, value: AST.Expr, name_span: AST.Span): String {
         var val_type: String = this.infer_expr(value)
+        var decl_node: AST.Type = this.env.get_declared_var_type(name)
         var var_type: String = this.env.get_var(name)
-        if (var_type != "Any" and !this.is_nullable(var_type) and this.is_nullable(val_type)) {
-            this.error_at(name_span, name + ": cannot assign nullable " + val_type + " to non-nullable " + var_type)
+        // Ask the NODE whether the binding is nullable, not the rendered string.
+        //
+        // `env.get_var` renders through `AST.type_to_string`, which is deliberately
+        // lossy for diagnostics: it collapses `UnionType` to the literal "Union".
+        // `is_nullable` then split that on "|", found no "Nil" component, and
+        // reported a nullable binding as non-nullable — so `var n: String|Nil = "s"`
+        // followed by `n = nil` was rejected with "cannot assign nullable Nil to
+        // non-nullable Union", naming a type nobody wrote. The stored node was
+        // always correct; only the round-trip through a string lost the members.
+        // This is the same lossy-renderer defect the ret_type slice hit, which is
+        // why `type_to_source` exists — but a nullability question wants the node,
+        // not a faithful re-render.
+        if (var_type != "Any" and !this.is_nullable_type(decl_node) and this.is_nullable(val_type)) {
+            this.error_at(name_span, name + ": cannot assign nullable " + val_type + " to non-nullable " + AST.type_to_source(decl_node))
+        }
+        var decl_type: String = AST.type_to_string(decl_node)
+        if (this.scalar_mismatch(decl_type, val_type)) {
+            this.error_at(name_span, name + ": cannot assign " + val_type + " to " + decl_type + " variable")
         }
         return val_type
     }
