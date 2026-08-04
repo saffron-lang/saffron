@@ -60,6 +60,12 @@
 # removed, test_glob — the subscript fix plus real recursive descent in `@glob`'s
 # find_in and a trailing-slash fix in _ignore_matches. No regressions: the 8
 # remaining names are a strict subset of the previous 9.
+#
+# Confirmed 2026-08-03 after merging the #148 fix with ph5 #153 and compiler-
+# rewrite stage 1: 285 passed, 8 failed, 14 skipped, 1 known-fail. The SET is
+# unchanged from the 8 above — the three merged changes compose, with bootstrap
+# green including the STAGE 2 gen4 fixed point. The +4 in `passed` is #148's three
+# new tests plus one that arrived upstream; no name entered or left this list.
 
 async
 docstrings
