@@ -137,7 +137,7 @@ fun want(d: Int): String {
 // But the RESULT goes into a local before the assertion, and that is not a
 // convenience: writing `assert_eq(grow(d).to_string(), want(d), "...${d}")` leaves
 // argument 0 in an LLVM register while argument 1 and the message interpolation
-// allocate thousands of strings, so a collection there frees it. That is BUGS #156,
+// allocate thousands of strings, so a collection there frees it. That is BUGS #162,
 // it is not specific to enums, and the identical shape built out of CLASSES —
 // GC-headered since long before #154 — corrupts the same way. Storing both operands
 // first tests what this file is about instead of re-failing a separate open bug.
