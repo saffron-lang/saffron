@@ -1,0 +1,112 @@
+// BUGS #147: an explicit `: Any` annotation was indistinguishable from no
+// annotation, so the initializer's type won and `: Any` could not widen a
+// binding — the one thing an author writes it for.
+//
+// The cause was a sentinel collision, not a typing rule: parser.sf defaulted an
+// omitted annotation to the string "Any", and the checker decided whether an
+// annotation had been written by comparing against that same default. Two
+// different facts, one spelling. The sentinel is now "".
+//
+// What a widened binding has to buy you is DISPATCH on what the variable
+// actually holds. That is the observable consequence, and the one that failed:
+// before the fix, `var laundered: Any = make_box()` bound the variable as `Box`,
+// so a later `laundered = "text"` followed by `laundered.length()` was rejected
+// outright with `type 'Box' has no method 'length'` — a compile error naming a
+// type the author explicitly annotated away. That is how #139's documented
+// `var data: Any = ...` workaround silently failed to launder.
+//
+// Reassignment alone does NOT reproduce it: assignment is not checked strictly
+// enough to notice the narrower binding, so a version of this test that only
+// reassigned passed against the broken compiler. The method call is the assertion
+// that bites.
+
+import "@test" as T
+
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun get(): Int { return this.n }
+}
+
+fun make_box(): Box { return Box(7) }
+fun make_string(): String { return "hello" }
+
+// The value is Any-typed and the declared return type is concrete. This is the
+// shape lexer.sf uses throughout, and it must stay legal.
+fun via_any(n: Float): Float {
+    var doubled: Any = n * 2
+    return doubled
+}
+
+fun main() {
+    // The core case. The initializer is a String, so an inferred binding would
+    // be String — and assigning an Int to it afterwards would be a scalar
+    // mismatch the checker rejects. Compiling at all is half the assertion.
+    var widened: Any = make_string()
+    T.assert_eq(widened, "hello", "an Any-annotated binding holds its initializer")
+    widened = 42
+    T.assert_eq(widened, 42, "an Any-annotated binding accepts a different type")
+    widened = true
+    T.assert_eq(widened, true, "and a third type")
+
+    // The regression that bites. A class initializer, then a String, then a
+    // String method: this is the exact shape that failed to COMPILE before the
+    // fix, with "type 'Box' has no method 'length'".
+    var laundered: Any = make_box()
+    laundered = "no longer a Box"
+    T.assert_eq(laundered, "no longer a Box", "Any launders a class-typed initializer")
+    T.assert_eq(laundered.length(), 15, "and dispatches on what it now holds, not on Box")
+
+    // Same in the other direction: annotate Any over a String initializer and
+    // call a String method on it. Dispatch has to reach the runtime helper
+    // rather than being resolved statically against the initializer's type.
+    var text: Any = make_string()
+    T.assert_eq(text.to_upper(), "HELLO", "a String method through an Any binding")
+
+    // `Any` is the top type, so nil inhabits it. This is the shape the compiler's
+    // own source uses eight times (`var llvm_end_bb: Any = nil` in
+    // codegen/stmts_body.sf), and it was REJECTED the moment the sentinel moved:
+    // is_nullable_type answered false for AnyType, on a branch no test could reach
+    // while every explicit `: Any` was being read as "no annotation".
+    var empty: Any = nil
+    T.assert(empty == nil, "an Any-annotated binding may start nil")
+    empty = "filled"
+    T.assert_eq(empty, "filled", "and be filled in later")
+
+    // Returning an Any-typed value from a function with a CONCRETE return type.
+    // `Any` is the top type and is_subtype_node admits it in either position, but
+    // the Return site approximated that rule with a nullability test — so once
+    // AnyType became nullable, every such return turned into "cannot return
+    // nullable Any from function expecting Float" and lexer.sf stopped compiling.
+    T.assert_eq(via_any(4), 8, "an Any value returned from a Float-typed function")
+
+    // The other half of the fix: an OMITTED annotation must still infer. Moving
+    // the sentinel would be a regression if it broke this, and nothing else in
+    // the suite distinguishes "infers correctly" from "was annotated Any".
+    var inferred = make_box()
+    T.assert_eq(inferred.get(), 7, "an omitted annotation still infers from the initializer")
+
+    var inferred_str = make_string()
+    T.assert_eq(inferred_str.length(), 5, "inferred String keeps its methods")
+
+    // A real annotation that is NOT Any must still be respected, and must still
+    // beat the initializer's type for dispatch.
+    var annotated: Box = make_box()
+    T.assert_eq(annotated.get(), 7, "a concrete annotation still binds as declared")
+
+    // `x++` desugars to synthetic VarDecls that carried the same "Any" sentinel;
+    // they were switched to "" with it. If they had been left behind they would
+    // now carry a genuine widening annotation, so exercise the shape.
+    var counter: Int = 0
+    counter++
+    counter++
+    T.assert_eq(counter, 2, "the ++ desugar's temporaries survived the sentinel move")
+
+    var b: Box = Box(1)
+    b.n++
+    T.assert_eq(b.n, 2, "++ through a field place still works")
+
+    T.summary()
+}
+
+main()
