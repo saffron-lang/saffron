@@ -22,12 +22,42 @@ import {
   DocumentFormattingParams,
   TextEdit,
   Range,
+  ReferenceParams,
+  RenameParams,
+  PrepareRenameParams,
+  WorkspaceEdit,
+  DocumentHighlight,
+  DocumentHighlightKind,
+  DocumentHighlightParams,
+  FoldingRange,
+  FoldingRangeKind,
+  FoldingRangeParams,
+  SignatureHelp,
+  SignatureHelpParams,
+  SignatureInformation,
+  ParameterInformation,
+  SemanticTokensParams,
+  SemanticTokens,
+  SemanticTokensLegend,
+  WorkspaceSymbolParams,
+  WorkspaceSymbol,
+  ResponseError,
+  ErrorCodes,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
+import {
+  scanIdentifiers,
+  occurrencesOf,
+  splitParams,
+  callContextAt,
+  IDENT_START,
+  IDENT_PART,
+  Occurrence,
+} from "./scan";
 import {
   getBuiltinStub,
   getBuiltinFunctionLine,
@@ -54,6 +84,42 @@ const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
 let compilerPath = findCompiler();
+
+// The semantic-token types this server can produce, and nothing more. A client
+// indexes tokens by their position in this legend, so the order is part of the
+// wire format: appending is safe, reordering silently recolours everything.
+//
+// Only types the compiler can actually justify are listed. A legend advertising
+// `keyword` or `operator` would be a promise to classify them, and those come
+// from the TextMate grammar, which already does it without a round-trip to the
+// compiler. Semantic tokens here exist to say what the grammar *cannot* know:
+// whether `Foo` is a class, an enum or a variable.
+const semanticTokenTypes = [
+  "class",
+  "interface",
+  "enum",
+  "enumMember",
+  "function",
+  "method",
+  "property",
+  "variable",
+  "parameter",
+] as const;
+
+// Modifiers are a bitset, so their order is wire format too. `declaration`
+// marks the defining occurrence; the three visibility modifiers let a theme
+// distinguish a private member without the client parsing anything.
+const semanticTokenModifiers = [
+  "declaration",
+  "private",
+  "protected",
+  "internal",
+] as const;
+
+const semanticTokensLegend: SemanticTokensLegend = {
+  tokenTypes: semanticTokenTypes as unknown as string[],
+  tokenModifiers: semanticTokenModifiers as unknown as string[],
+};
 
 connection.onInitialize((params: InitializeParams): InitializeResult => {
   const settings = params.initializationOptions;
@@ -84,6 +150,26 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
         triggerCharacters: ["."],
       },
       documentFormattingProvider: true,
+      referencesProvider: true,
+      documentHighlightProvider: true,
+      foldingRangeProvider: true,
+      workspaceSymbolProvider: true,
+      // prepareProvider makes the client ask whether a rename is legal at the
+      // cursor *before* prompting for the new name. Without it the user types a
+      // replacement and only then learns the position was not renameable.
+      renameProvider: { prepareProvider: true },
+      signatureHelpProvider: {
+        triggerCharacters: ["("],
+        retriggerCharacters: [","],
+      },
+      semanticTokensProvider: {
+        legend: semanticTokensLegend,
+        full: true,
+        // No `range` and no delta support: this server recomputes tokens from a
+        // whole-file compile anyway, so a range request would do identical work
+        // and return a subset. Advertising only what is actually incremental
+        // keeps the client from expecting cheap partial updates that aren't.
+      },
     },
   };
 });
@@ -107,14 +193,43 @@ interface SaffronDiagnostic {
 
 // The --json symbol shape (see src/compiler/diag.sf symbol_json). Only located
 // symbols are emitted, so line/column/offset/length are always present here.
+//
+// `line`/`column`/`length` describe the NAME only — the rename and highlight
+// target. `start_offset`/`end_offset` describe the declaration's full extent and
+// are what folding uses; they are absent when the node had no real extent span, so
+// a folding range must be skipped rather than invented for those.
 interface SaffronSymbol {
   name: string;
-  kind: "variable" | "function" | "class" | "parameter" | "module" | "enum" | "variant" | "interface" | "method";
+  kind: SaffronSymbolKind;
   line: number;
   column: number;
   offset: number;
   length: number;
+  /** Declared access modifier. Always present; the parser defaults it to "public". */
+  visibility: "public" | "private" | "internal" | "protected";
+  /** Owning declaration's name for a member (method/field/variant); "" at top level. */
+  container: string;
+  /** Rendered signature or type for display. "" when there is nothing to show. */
+  detail: string;
+  /** Doc comment with parser markers stripped; "" when undocumented. */
+  doc: string;
+  /** Full-extent byte offsets. Absent when the declaration has no real extent. */
+  start_offset?: number;
+  end_offset?: number;
 }
+
+type SaffronSymbolKind =
+  | "variable"
+  | "function"
+  | "class"
+  | "parameter"
+  | "module"
+  | "enum"
+  | "variant"
+  | "interface"
+  | "method"
+  | "field"
+  | "actor";
 
 interface CheckOutput {
   file: string;
@@ -331,7 +446,20 @@ function parseCheckOutput(filePath: string, output: string): CheckOutput | null 
   const diagnostics: SaffronDiagnostic[] = Array.isArray(data.diagnostics)
     ? data.diagnostics
     : [];
-  const symbols: SaffronSymbol[] = Array.isArray(data.symbols) ? data.symbols : [];
+  // Normalize the symbol list rather than trusting it wholesale. A compiler older
+  // than the payload extension omits visibility/container/detail/doc, and every
+  // consumer below would otherwise have to guard each field independently — the
+  // kind of scattered `?? ""` that makes a missing field indistinguishable from an
+  // empty one at the point it matters. Defaulting once here keeps the rest honest.
+  const symbols: SaffronSymbol[] = (Array.isArray(data.symbols) ? data.symbols : []).map(
+    (s: any): SaffronSymbol => ({
+      ...s,
+      visibility: s.visibility ?? "public",
+      container: s.container ?? "",
+      detail: s.detail ?? "",
+      doc: s.doc ?? "",
+    }),
+  );
   return { file: filePath, diagnostics, symbols };
 }
 
@@ -444,7 +572,29 @@ const kindLabels: Record<string, string> = {
   variant: "variant",
   interface: "interface",
   method: "fun",
+  field: "var",
+  actor: "actor",
 };
+
+/**
+ * A declaration rendered as the source line it came from, near enough to read.
+ *
+ * The visibility modifier is shown only when it is not the default. Printing
+ * `public` on every symbol would put a modifier on hover text that the author
+ * never wrote, and the interesting case — that a member is `private` — would
+ * stop standing out.
+ */
+function renderDeclaration(sym: SaffronSymbol): string {
+  const label = kindLabels[sym.kind] ?? sym.kind;
+  const vis = sym.visibility === "public" ? "" : `${sym.visibility} `;
+  const qualified = sym.container.length > 0 ? `${sym.container}.${sym.name}` : sym.name;
+
+  // detail is either a rendered signature — starting with `(` — or a bare type.
+  // A signature juxtaposes; a type needs its `:`.
+  if (sym.detail.startsWith("(")) return `${vis}${label} ${qualified}${sym.detail}`;
+  if (sym.detail.length > 0) return `${vis}${label} ${qualified}: ${sym.detail}`;
+  return `${vis}${label} ${qualified}`;
+}
 
 connection.onHover(async (params: HoverParams): Promise<Hover | null> => {
   const doc = documents.get(params.textDocument.uri);
@@ -460,14 +610,11 @@ connection.onHover(async (params: HoverParams): Promise<Hover | null> => {
   const sym = findSymbol(cached.symbols, ctx.word, ctx.qualifier);
   if (!sym) return null;
 
-  const label = kindLabels[sym.kind] || sym.kind;
-  const prefix = ctx.qualifier ? `${ctx.qualifier}.` : "";
-  return {
-    contents: {
-      kind: MarkupKind.Markdown,
-      value: `\`\`\`saffron\n(${label}) ${prefix}${sym.name}\n\`\`\``,
-    },
-  };
+  // The declaration first, in a code fence, then the doc comment as prose below
+  // it — the conventional shape, and the reason `doc` is in the payload.
+  let value = `\`\`\`saffron\n${renderDeclaration(sym)}\n\`\`\``;
+  if (sym.doc.length > 0) value += `\n\n${sym.doc}`;
+  return { contents: { kind: MarkupKind.Markdown, value } };
 });
 
 connection.onDefinition(async (params: DefinitionParams): Promise<Location | null> => {
@@ -669,6 +816,10 @@ const symbolKinds: Record<string, SymbolKind> = {
   variant: SymbolKind.EnumMember,
   interface: SymbolKind.Interface,
   method: SymbolKind.Method,
+  field: SymbolKind.Field,
+  // No SymbolKind.Actor exists. Class is the closest true statement — an actor
+  // is a class with serialized methods — and `detail` says "actor" in the text.
+  actor: SymbolKind.Class,
 };
 
 function symbolRange(sym: SaffronSymbol) {
@@ -689,19 +840,55 @@ connection.onDocumentSymbol(
     if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
     if (!cached) return [];
 
-    // The compiler emits a flat symbol list (declarations plus enum variants and
-    // class methods). Present it flat; a nesting pass would need container info
-    // the payload does not yet carry. Each symbol's range and selectionRange are
-    // the same name-span — precise enough for outline navigation and highlight.
-    return cached.symbols.map((sym) => {
-      const range = symbolRange(sym);
-      return {
+    // Nested from the payload's `container`: a method or field hangs under its
+    // class, a variant under its enum. `container` is a *name*, so two classes
+    // in one file each declaring `init` both nest correctly, which a flat list
+    // could not express and a line-range heuristic would get wrong for a nested
+    // declaration.
+    const toSymbol = (sym: SaffronSymbol): DocumentSymbol => {
+      const selectionRange = symbolRange(sym);
+      // range must CONTAIN selectionRange or clients drop the entry. The full
+      // extent satisfies that when present; the name span trivially does when not.
+      const range =
+        sym.start_offset !== undefined && sym.end_offset !== undefined && doc
+          ? { start: doc.positionAt(sym.start_offset), end: doc.positionAt(sym.end_offset) }
+          : selectionRange;
+      const out: DocumentSymbol = {
         name: sym.name,
         kind: symbolKinds[sym.kind] ?? SymbolKind.Variable,
         range,
-        selectionRange: range,
+        selectionRange,
       };
-    });
+      if (sym.detail.length > 0) out.detail = sym.detail;
+      return out;
+    };
+
+    const byContainer = new Map<string, SaffronSymbol[]>();
+    for (const sym of cached.symbols) {
+      if (sym.container.length === 0) continue;
+      const bucket = byContainer.get(sym.container);
+      if (bucket) bucket.push(sym);
+      else byContainer.set(sym.container, [sym]);
+    }
+
+    const roots: DocumentSymbol[] = [];
+    for (const sym of cached.symbols) {
+      if (sym.container.length > 0) continue;
+      const node = toSymbol(sym);
+      const children = byContainer.get(sym.name);
+      if (children) node.children = children.map(toSymbol);
+      roots.push(node);
+    }
+
+    // A member whose container is not itself a top-level symbol would otherwise
+    // vanish from the outline entirely. Surfacing it at the root is wrong-looking
+    // but visible; dropping it makes the outline quietly incomplete.
+    const rootNames = new Set(cached.symbols.filter((s) => s.container.length === 0).map((s) => s.name));
+    for (const sym of cached.symbols) {
+      if (sym.container.length > 0 && !rootNames.has(sym.container)) roots.push(toSymbol(sym));
+    }
+
+    return roots;
   },
 );
 
@@ -717,7 +904,70 @@ const completionKinds: Record<string, CompletionItemKind> = {
   variant: CompletionItemKind.EnumMember,
   interface: CompletionItemKind.Interface,
   method: CompletionItemKind.Method,
+  field: CompletionItemKind.Field,
+  actor: CompletionItemKind.Class,
 };
+
+/** A completion item carrying the payload's signature and doc comment. */
+function toCompletionItem(sym: SaffronSymbol): CompletionItem {
+  const item: CompletionItem = {
+    label: sym.name,
+    kind: completionKinds[sym.kind] ?? CompletionItemKind.Variable,
+  };
+  if (sym.detail.length > 0) item.detail = sym.detail;
+  if (sym.doc.length > 0) item.documentation = { kind: MarkupKind.Markdown, value: sym.doc };
+  return item;
+}
+
+/**
+ * The directory of the nearest `pantry.toml` at or above `file`, or null.
+ *
+ * This is the package boundary `internal` is scoped to. Per
+ * docs/design/access-modifiers.md: Saffron already calls a *file* a module, so
+ * `internal` is deliberately **package**-scoped — the pantry.toml that owns the
+ * file — and not directory-scoped. Using the directory would be a different rule
+ * that happens to agree in flat layouts and disagree in nested ones.
+ */
+function packageRootOf(file: string): string | null {
+  let dir = path.dirname(path.resolve(file));
+  for (;;) {
+    if (fs.existsSync(path.join(dir, "pantry.toml"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * Whether a symbol declared in `declFile` may be named from `fromFile`.
+ *
+ * Only the file-crossing half of the rule is enforced, and deliberately so:
+ * this filters *module-member* completion, which is cross-file by construction.
+ *
+ * - `private` at top level means file-scoped, so a name from another file is out.
+ *   (For a class *member* `private` is narrower still — the class body — but a
+ *   member is never offered through a module alias, so that case does not arise
+ *   here.)
+ * - `internal` means package-scoped; see packageRootOf. A file with no
+ *   pantry.toml above it has no package, and rather than spell that unknown as a
+ *   concrete answer the symbol is treated as accessible — the design leaves this
+ *   case open, and over-offering in a completion list is recoverable where
+ *   hiding a name the user is entitled to reads as the symbol not existing.
+ * - `protected` — visible in the class and its subclasses — needs the
+ *   inheritance graph, which the payload does not carry. Treated as accessible
+ *   for the same reason: the checker still rejects a real violation.
+ */
+function isAccessibleFrom(sym: SaffronSymbol, declFile: string, fromFile: string): boolean {
+  if (sym.visibility === "public" || sym.visibility === "protected") return true;
+  if (path.resolve(declFile) === path.resolve(fromFile)) return true;
+  if (sym.visibility === "internal") {
+    const declPkg = packageRootOf(declFile);
+    const fromPkg = packageRootOf(fromFile);
+    if (declPkg === null || fromPkg === null) return true;
+    return declPkg === fromPkg;
+  }
+  return false; // private, in another file
+}
 
 connection.onCompletion(
   async (params: CompletionParams): Promise<CompletionItem[]> => {
@@ -744,13 +994,23 @@ connection.onCompletion(
         let targetCheck = fileCache.get(targetUri);
         if (!targetCheck) targetCheck = (await runCheck(targetUri)) ?? undefined;
         if (targetCheck) {
-          // Only top-level, public-facing kinds are meaningful as module members.
+          const fromFile = decodeURIComponent(params.textDocument.uri.replace("file://", ""));
+          // Top-level declarations only — a class's own methods are reached
+          // through an instance, not through the module alias — and only those
+          // this file is allowed to name.
           return targetCheck.symbols
-            .filter((s) => s.kind === "function" || s.kind === "class" || s.kind === "enum" || s.kind === "interface" || s.kind === "variable")
-            .map((s) => ({
-              label: s.name,
-              kind: completionKinds[s.kind] ?? CompletionItemKind.Field,
-            }));
+            .filter((s) => s.container.length === 0)
+            .filter(
+              (s) =>
+                s.kind === "function" ||
+                s.kind === "class" ||
+                s.kind === "actor" ||
+                s.kind === "enum" ||
+                s.kind === "interface" ||
+                s.kind === "variable",
+            )
+            .filter((s) => isAccessibleFrom(s, targetFile, fromFile))
+            .map(toCompletionItem);
         }
       }
       return [];
@@ -765,9 +1025,13 @@ connection.onCompletion(
     if (cached) {
       const seen = new Set<string>();
       for (const s of cached.symbols) {
+        // Members are not in scope as bare names — `radius` alone does not
+        // resolve, `this.radius` does — so offering them here suggests code that
+        // will not compile. Member completion after `.` is the branch above.
+        if (s.container.length > 0) continue;
         if (seen.has(s.name)) continue;
         seen.add(s.name);
-        items.push({ label: s.name, kind: completionKinds[s.kind] ?? CompletionItemKind.Variable });
+        items.push(toCompletionItem(s));
       }
     }
     for (const name of builtinModuleNames) {
@@ -857,6 +1121,408 @@ connection.onDocumentFormatting(
       end: doc.positionAt(original.length),
     };
     return [TextEdit.replace(fullRange, formatted)];
+  },
+);
+
+// --- References & highlight --------------------------------------------------
+//
+// Both are name-based, and that is a real limitation rather than a shortcut.
+// The compiler resolves *variable* references (resolve.sf produces
+// Ref(kind, name, slot)) but leaves member and method accesses unresolved, and
+// the --json payload carries declarations only — no reference list. So two
+// distinct `count`s, a field on one class and a local in another function, are
+// indistinguishable here.
+//
+// Reporting them together is the honest failure: a superset the user can see
+// and dismiss. The alternative — guessing which occurrences belong to the
+// binding under the cursor — would silently *omit* real references, and a
+// find-references that quietly misses call sites is worse than one that shows
+// a few extra. Rename inherits the same caveat and handles it differently, in
+// prepareRename below.
+
+/** The occurrence under a cursor position, or null when the cursor is not on code. */
+function occurrenceAt(doc: TextDocument, line: number, character: number): Occurrence | null {
+  const text = doc.getText();
+  const offset = doc.offsetAt({ line, character });
+  for (const occ of scanIdentifiers(text)) {
+    // Inclusive of the end so a cursor just past the last character — where it
+    // sits after typing the name — still counts as being on it.
+    if (offset >= occ.offset && offset <= occ.offset + occ.length) return occ;
+  }
+  return null;
+}
+
+connection.onReferences(async (params: ReferenceParams): Promise<Location[]> => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return [];
+
+  const occ = occurrenceAt(doc, params.position.line, params.position.character);
+  if (!occ) return [];
+
+  const text = doc.getText();
+  const includeDecl = params.context?.includeDeclaration ?? true;
+
+  let cached = fileCache.get(params.textDocument.uri);
+  if (!cached) cached = (await runCheck(params.textDocument.uri, text)) ?? undefined;
+  const declOffsets = new Set(
+    (cached?.symbols ?? []).filter((s) => s.name === occ.name).map((s) => s.offset),
+  );
+
+  return occurrencesOf(text, occ.name)
+    .filter((o) => includeDecl || !declOffsets.has(o.offset))
+    .map((o) => ({
+      uri: params.textDocument.uri,
+      range: { start: doc.positionAt(o.offset), end: doc.positionAt(o.offset + o.length) },
+    }));
+});
+
+connection.onDocumentHighlight(
+  async (params: DocumentHighlightParams): Promise<DocumentHighlight[]> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const occ = occurrenceAt(doc, params.position.line, params.position.character);
+    if (!occ) return [];
+
+    const text = doc.getText();
+    let cached = fileCache.get(params.textDocument.uri);
+    if (!cached) cached = (await runCheck(params.textDocument.uri, text)) ?? undefined;
+    const declOffsets = new Set(
+      (cached?.symbols ?? []).filter((s) => s.name === occ.name).map((s) => s.offset),
+    );
+
+    return occurrencesOf(text, occ.name).map((o) => ({
+      range: { start: doc.positionAt(o.offset), end: doc.positionAt(o.offset + o.length) },
+      // Write vs Text, not Read: the declaration is the only occurrence we can
+      // identify with certainty, because the compiler gave us its offset. Marking
+      // an assignment as a write would mean parsing `=` out of the buffer, and a
+      // wrong guess miscolours the very thing highlight exists to clarify.
+      kind: declOffsets.has(o.offset) ? DocumentHighlightKind.Write : DocumentHighlightKind.Text,
+    }));
+  },
+);
+
+// --- Rename ------------------------------------------------------------------
+//
+// Rename is name-based like references, but the consequence differs in kind: a
+// wrong reference listing is a UI annoyance, a wrong rename is a silent code
+// edit. So rename is restricted to names the compiler actually declared in this
+// file — prepareRename rejects anything else — and it is single-file.
+//
+// A name declared in this file may still be *exported* and referenced from
+// another, and this rename will not follow it there. Making it cross-file would
+// mean compiling every dependent file to find the references, and doing that
+// against a name-based matcher would spray edits across the workspace on a name
+// collision. The narrow version is the one that cannot corrupt a file the user
+// is not looking at.
+
+connection.onPrepareRename(async (params: PrepareRenameParams) => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return null;
+
+  const occ = occurrenceAt(doc, params.position.line, params.position.character);
+  if (!occ) return null;
+
+  let cached = fileCache.get(params.textDocument.uri);
+  if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+  if (!cached) {
+    // No payload means the file does not currently compile. Refusing is right:
+    // the declaration set is unknown, so there is no way to tell a local
+    // declaration from an imported name, and renaming the latter edits this file
+    // while leaving its definition alone.
+    return new ResponseError(
+      ErrorCodes.InvalidRequest,
+      "Cannot rename: the file does not compile, so its declarations are unknown.",
+    );
+  }
+
+  const declared = cached.symbols.some((s) => s.name === occ.name);
+  if (!declared) {
+    return new ResponseError(
+      ErrorCodes.InvalidRequest,
+      `Cannot rename '${occ.name}': it is not declared in this file.`,
+    );
+  }
+
+  return {
+    range: { start: doc.positionAt(occ.offset), end: doc.positionAt(occ.offset + occ.length) },
+    placeholder: occ.name,
+  };
+});
+
+connection.onRenameRequest(async (params: RenameParams): Promise<WorkspaceEdit | null> => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return null;
+
+  const occ = occurrenceAt(doc, params.position.line, params.position.character);
+  if (!occ) return null;
+
+  // The new name must be a legal identifier. Without this check a stray
+  // paste — a space, a dotted path — is applied verbatim and produces a file
+  // that no longer parses, with the original name gone from every site.
+  if (!IDENT_START.test(params.newName[0] ?? "") || ![...params.newName].every((ch) => IDENT_PART.test(ch))) {
+    return new ResponseError(
+      ErrorCodes.InvalidRequest,
+      `'${params.newName}' is not a valid Saffron identifier.`,
+    ) as unknown as null;
+  }
+
+  // Re-check the declaration guard. prepareRename is advisory — a client may
+  // skip it entirely — so the destructive half enforces its own precondition
+  // rather than trusting that the advisory half ran.
+  let cached = fileCache.get(params.textDocument.uri);
+  if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+  if (!cached || !cached.symbols.some((s) => s.name === occ.name)) return null;
+
+  const text = doc.getText();
+  const edits = occurrencesOf(text, occ.name).map((o) =>
+    TextEdit.replace(
+      { start: doc.positionAt(o.offset), end: doc.positionAt(o.offset + o.length) },
+      params.newName,
+    ),
+  );
+  if (edits.length === 0) return null;
+
+  return { changes: { [params.textDocument.uri]: edits } };
+});
+
+// --- Folding -----------------------------------------------------------------
+
+connection.onFoldingRanges(async (params: FoldingRangeParams): Promise<FoldingRange[]> => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return [];
+
+  let cached = fileCache.get(params.textDocument.uri);
+  if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+
+  const ranges: FoldingRange[] = [];
+
+  // Declaration bodies, from the payload's full extent. Only symbols that
+  // actually carry one: a folding range invented from a name span folds a
+  // single line and reads as a broken control.
+  for (const sym of cached?.symbols ?? []) {
+    if (sym.start_offset === undefined || sym.end_offset === undefined) continue;
+    const start = doc.positionAt(sym.start_offset);
+    const end = doc.positionAt(sym.end_offset);
+    // endLine is inclusive in LSP and the extent's last line holds the closing
+    // brace, which should stay visible when folded — so fold to the line above
+    // it. A one-line declaration then has start === end and is dropped.
+    const endLine = end.line - 1;
+    if (endLine <= start.line) continue;
+    ranges.push({ startLine: start.line, endLine, kind: FoldingRangeKind.Region });
+  }
+
+  // Consecutive `///`/`//!` doc-comment runs, which the payload cannot describe:
+  // a docstring reaches us as text with its markers stripped, not as a source
+  // region. Folding a long doc block is worth the separate scan.
+  const lines = doc.getText().split("\n");
+  let runStart = -1;
+  for (let i = 0; i <= lines.length; i++) {
+    const isDoc = i < lines.length && /^\s*\/\/[/!]/.test(lines[i]);
+    if (isDoc && runStart === -1) runStart = i;
+    else if (!isDoc && runStart !== -1) {
+      if (i - 1 > runStart) {
+        ranges.push({ startLine: runStart, endLine: i - 1, kind: FoldingRangeKind.Comment });
+      }
+      runStart = -1;
+    }
+  }
+
+  return ranges;
+});
+
+// --- Signature help ----------------------------------------------------------
+//
+// The payload's `detail` is a rendered signature — `(a: Int, b: Int): Int` —
+// deliberately a display string and not a parseable encoding (see
+// diag.sf::symbol_json). Splitting it here to place parameter *ranges* would be
+// exactly the reuse that comment warns against: a comma split corrupts on
+// `Map<String,Int>`, so `f(m: Map<String,Int>, n: Int)` would report three
+// parameters and highlight the wrong one.
+//
+// So the signature label is shown whole, and active-parameter tracking is done
+// by finding the parameter boundaries in the label with a depth-aware scan that
+// ignores commas nested inside `<>`, `()` or `[]`.
+
+
+connection.onSignatureHelp(async (params: SignatureHelpParams): Promise<SignatureHelp | null> => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return null;
+
+  const text = doc.getText();
+  const offset = doc.offsetAt(params.position);
+  const call = callContextAt(text, offset);
+  if (!call) return null;
+
+  let cached = fileCache.get(params.textDocument.uri);
+  if (!cached) cached = (await runCheck(params.textDocument.uri, text)) ?? undefined;
+
+  // A callable with a rendered signature. Constructors reach here too: `Circle(1)`
+  // finds the class, whose own detail is empty, so prefer its `init`.
+  const candidates = (cached?.symbols ?? []).filter(
+    (s) => s.name === call.name && s.detail.startsWith("("),
+  );
+  let sym = candidates[0];
+  if (!sym) {
+    const cls = (cached?.symbols ?? []).find(
+      (s) => s.name === call.name && (s.kind === "class" || s.kind === "actor"),
+    );
+    if (cls) {
+      sym = (cached?.symbols ?? []).find(
+        (s) => s.kind === "method" && s.name === "init" && s.container === cls.name,
+      )!;
+    }
+  }
+  if (!sym) return null;
+
+  const label = `${sym.name}${sym.detail}`;
+  const offsetInLabel = sym.name.length;
+  const parameters: ParameterInformation[] = splitParams(sym.detail).map((p) => ({
+    // Offset pairs rather than a substring label: a string label is matched by
+    // the client against the signature text, and two parameters of the same type
+    // would highlight the first one twice.
+    label: [offsetInLabel + p.start, offsetInLabel + p.end] as [number, number],
+  }));
+
+  const signature: SignatureInformation = { label, parameters };
+  if (sym.doc.length > 0) {
+    signature.documentation = { kind: MarkupKind.Markdown, value: sym.doc };
+  }
+
+  return {
+    signatures: [signature],
+    activeSignature: 0,
+    // Clamped: a call with more arguments than parameters is a real thing to be
+    // typing (it is about to be an arity error), and an out-of-range index makes
+    // some clients drop the whole response, hiding the signature exactly when it
+    // would show the mistake. `undefined` for a no-parameter signature — there is
+    // no active parameter to point at, and 0 would highlight a range that is not
+    // there.
+    activeParameter:
+      parameters.length === 0 ? undefined : Math.min(call.argIndex, parameters.length - 1),
+  };
+});
+
+// --- Semantic tokens ---------------------------------------------------------
+//
+// What this adds over the TextMate grammar is the distinction the grammar
+// cannot make: whether a bare `Foo` is a class, an enum, a variable or a
+// parameter. It is driven by the declaration payload, so it classifies
+// occurrences of *declared* names and leaves everything else to the grammar.
+//
+// Same name-based caveat as references, with a smaller blast radius: a
+// misclassified token is a wrong colour, not a wrong edit.
+
+const tokenTypeIndex = new Map<string, number>(semanticTokenTypes.map((t, i) => [t, i]));
+
+const symbolKindToTokenType: Record<string, (typeof semanticTokenTypes)[number]> = {
+  class: "class",
+  // An actor is a class the compiler serializes; there is no `actor` token type
+  // in the LSP standard set, and inventing one means themes ignore it.
+  actor: "class",
+  interface: "interface",
+  enum: "enum",
+  variant: "enumMember",
+  function: "function",
+  method: "method",
+  field: "property",
+  variable: "variable",
+  parameter: "parameter",
+  module: "class",
+};
+
+const visibilityModifierBit: Record<string, number> = {
+  private: 1 << semanticTokenModifiers.indexOf("private"),
+  protected: 1 << semanticTokenModifiers.indexOf("protected"),
+  internal: 1 << semanticTokenModifiers.indexOf("internal"),
+};
+const declarationBit = 1 << semanticTokenModifiers.indexOf("declaration");
+
+connection.languages.semanticTokens.on(
+  async (params: SemanticTokensParams): Promise<SemanticTokens> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return { data: [] };
+
+    let cached = fileCache.get(params.textDocument.uri);
+    if (!cached) cached = (await runCheck(params.textDocument.uri, doc.getText())) ?? undefined;
+    if (!cached) return { data: [] };
+
+    // Last declaration of a name wins, matching findSymbol's reverse scan, so a
+    // shadowed name colours as its most recent meaning rather than its first.
+    const byName = new Map<string, SaffronSymbol>();
+    for (const s of cached.symbols) byName.set(s.name, s);
+    const declOffsets = new Set(cached.symbols.map((s) => s.offset));
+
+    const tokens: { line: number; char: number; length: number; type: number; mods: number }[] = [];
+    for (const occ of scanIdentifiers(doc.getText())) {
+      const sym = byName.get(occ.name);
+      if (!sym) continue;
+      const typeName = symbolKindToTokenType[sym.kind];
+      if (typeName === undefined) continue;
+      const type = tokenTypeIndex.get(typeName);
+      if (type === undefined) continue;
+
+      let mods = visibilityModifierBit[sym.visibility] ?? 0;
+      if (declOffsets.has(occ.offset)) mods |= declarationBit;
+
+      const pos = doc.positionAt(occ.offset);
+      tokens.push({ line: pos.line, char: pos.character, length: occ.length, type, mods });
+    }
+
+    // The wire format is delta-encoded: line relative to the previous token,
+    // character relative to the previous token *on the same line*. Sorting first
+    // is not optional — a single out-of-order token makes every delta after it
+    // wrong, which shows up as colours drifting down the file rather than as an
+    // error.
+    tokens.sort((a, b) => (a.line - b.line) || (a.char - b.char));
+
+    const data: number[] = [];
+    let prevLine = 0;
+    let prevChar = 0;
+    for (const t of tokens) {
+      const deltaLine = t.line - prevLine;
+      const deltaChar = deltaLine === 0 ? t.char - prevChar : t.char;
+      data.push(deltaLine, deltaChar, t.length, t.type, t.mods);
+      prevLine = t.line;
+      prevChar = t.char;
+    }
+    return { data };
+  },
+);
+
+// --- Workspace symbols -------------------------------------------------------
+
+connection.onWorkspaceSymbol(
+  async (params: WorkspaceSymbolParams): Promise<WorkspaceSymbol[]> => {
+    const query = params.query.toLowerCase();
+    const results: WorkspaceSymbol[] = [];
+
+    // Open documents only, not a workspace crawl. Answering across the whole
+    // tree would mean compiling every .sf file in it on the first keystroke of
+    // the query — for this repo, the compiler's own sources included. The
+    // already-compiled files are free, and an empty result for an unopened file
+    // is a smaller surprise than a multi-second freeze.
+    for (const [uri, check] of fileCache) {
+      for (const sym of check.symbols) {
+        // An empty query means "everything", which is what a client sends to
+        // populate the picker before the user types.
+        if (query.length > 0 && !sym.name.toLowerCase().includes(query)) continue;
+        const symbol: WorkspaceSymbol = {
+          name: sym.name,
+          kind: symbolKinds[sym.kind] ?? SymbolKind.Variable,
+          location: {
+            uri,
+            range: {
+              start: { line: sym.line - 1, character: sym.column - 1 },
+              end: { line: sym.line - 1, character: sym.column - 1 + sym.length },
+            },
+          },
+        };
+        if (sym.container.length > 0) symbol.containerName = sym.container;
+        results.push(symbol);
+      }
+    }
+    return results;
   },
 );
 
