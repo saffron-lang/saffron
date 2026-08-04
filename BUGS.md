@@ -2,8 +2,8 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147. Next free number is **#148**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147, #148. Next free number is **#149**.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -576,6 +576,68 @@ The fix is to stop overloading a value as the "absent" marker: an empty string, 
 a separate `has_annotation` flag on the AST node, distinguishes the two. Note the
 `type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
 one of the sites rewrite stage 3 has to touch.
+
+### 148. OPEN — reading a nonexistent member of a CLASS instance compiles clean, then reads field 0 or emits invalid IR
+
+**Severity: high.** The class-side twin of #118/#122, which closed the same hole
+for *module* members only. A typo in a field or method name on a class receiver is
+not reported by the checker; codegen then does one of two wrong things depending on
+whether the class has any fields.
+
+```saffron
+class Box {
+    var first: Int
+    var second: Int
+    fun init(a: Int, b: Int) { this.first = a; this.second = b }
+}
+var b = Box(11, 22)
+IO.println(b.totally_absent)   // prints 11 — silently reads field 0
+```
+
+```saffron
+class Empty { fun init() {} }
+var e = Empty()
+IO.println(e.absent)           // opt: invalid getelementptr indices on %Empty = type {}
+```
+
+The bare-method-reference spelling is the same defect wearing a different face:
+`a.finish` (no call) on a class that declares `finish` is a `MemberAccess`, not a
+`MethodCall`, so it too takes the field path and GEPs slot 0. That is why
+`test/inheritance.sf` (`IO.println(a.finish)`) and `test/imports.sf`
+(`IO.println(k.finish)`) both die with `invalid getelementptr indices` on a
+zero-field or method-only class — one defect, two red baseline entries.
+
+Mechanism, and it is the can't-express-unknown family yet again: the checker's
+`infer_member_access` (`checker.sf:2912`) resolves a class receiver via
+`get_class_field_type`, which returns `"Any"` for a field it cannot find rather
+than reporting absence — the honest widen for an *ambiguous* class (two modules
+declaring the same name), but indistinguishable here from a plain typo. Codegen's
+`MemberAccess` field path then emits a `getelementptr ..., i32 0, i32 0` with no
+check that the field exists, so a populated class reads slot 0 and a fieldless one
+produces a GEP that `opt` rejects.
+
+The predicate to gate on already exists: `dispatch_declaring_class(base, member)`
+(`checker.sf:2026`) does a DAG-wide, declaration-order walk of fields *and* methods
+across the whole `class_parents` hierarchy and returns `""` when nothing declares
+the member. The guard belongs in `infer_member_access`, on the resolved-class path
+(`class_fields.has(ma_base)`), and must fire only when the class is unambiguous
+(`!is_ambiguous_class`, matching `get_class_field_type`'s existing `"Any"` escape)
+so a genuinely ambiguous name still widens rather than false-erroring.
+
+**Two landmines for the fix, both capable of reddening the whole bootstrap:**
+
+1. `extend fun` methods may not appear in `class_method_names`, so a naive "member
+   absent → error" would falsely reject an extension-method reference. Verify
+   against the extend-fun tests before promoting.
+2. The guard must not fire on an `Any`-typed or unresolved receiver (the existing
+   `check_member_visibility` soft-fail posture, and the reason #56 warns against
+   erroring on that fallback — it "broke pass/math and test_reflect").
+
+Found while triaging the suite failure baseline: `inheritance` and `imports` were
+attributed to a codegen IR bug, but the root cause is a missing checker diagnostic,
+and the two other baseline entries `pass/data_equality`/`pass/deep_deserialize`
+(`data class`) and `pass/expressions`/`pass/varargs`/`pass/overloading` are
+separate stale-feature failures, not this.
 
 ---
 
