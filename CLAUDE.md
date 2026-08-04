@@ -451,6 +451,14 @@ Promotion copies a working gen3 into `build/stage2/saffronc`, enabling new synta
   1m52 → 3m42); don't skip it when deciding on a promotion.
 - Gen3 compiles test programs correctly: `tools/saffron run test/hello_bootstrap.sf`
 
+Stage 2 also **asserts that codegen's `Int` inference fallback count is 0** on the
+compiler's own source, so `codegen fell back to `Int` N time(s)` is a bootstrap
+failure with no compile error attached — the source is fine, inference gave up
+somewhere it used to answer. The failure prints each site; the full log is
+`build/stage4/unresolved.log`. Measure any file the same way with
+`saffronc --report-unresolved`, or `SAFFRONC_FLAGS=--report-unresolved` through
+`tools/saffron`. See stage 1 in `docs/design/compiler-rewrite.md`.
+
 Stage 2 was added on 2026-07-31. Before that this section claimed the test stage
 verified gen3 could compile itself, and it did not — it compiled
 `test/hello_bootstrap.sf`, five lines of `IO.println`. A gen3 that rejected the
