@@ -47,6 +47,14 @@ private class SaffronLspServerDescriptor(project: Project) :
      * bookkeeping, never in a request. The server implements it for VS Code; in
      * IntelliJ, Refactor > Rename falls back to the TextMate word-occurrence
      * rename, which is not scope-aware. Nothing here can change that.
+     *
+     * Overriding `lspFormattingSupport` is deprecated in 2025.3 in favour of
+     * `lspCustomization.formattingCustomizer`, and it is deliberately still used
+     * here: `LspFormattingCustomizer` does not exist in 2024.2, so switching
+     * would raise the sinceBuild floor from 242 to 253. The deprecated form
+     * verifies Compatible on both. When the floor moves to 2025.3 for another
+     * reason, switch then -- and expect this to be the thing that breaks if the
+     * deprecated method is eventually removed.
      */
     override val lspFormattingSupport = object : LspFormattingSupport() {
         override fun shouldFormatThisFileExclusivelyByServer(

@@ -1,5 +1,12 @@
 <idea-plugin>
-    <id>dev.saffron.intellij</id>
+    <!-- Not dev.saffron.intellij: the Plugin Verifier rejects any plugin ID
+         containing "intellij" as a leftover from the project template
+         (TemplateWordInPluginId), which made `verifyPlugin` unable to check
+         anything else. Renamed rather than muted because at 0.1.0 nothing is
+         published and no installed plugin has this ID to break (an ID change
+         makes an already-installed plugin a different plugin). The Kotlin
+         package stays dev.saffron.intellij; only the ID is checked. -->
+    <id>dev.saffron.lang</id>
     <name>Saffron</name>
     <version>0.1.0</version>
     <vendor>saffron-lang</vendor>
