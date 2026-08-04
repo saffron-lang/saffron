@@ -1088,9 +1088,16 @@ source annotates its subscript receivers and never exercises the unresolved path
 original `walk_dir` chain, every position of an unresolved String, negative indices
 through both `__str_get` and `__list_get`, and an unresolved Map subscript asserting a
 *key* lookup rather than an ordinal read. `test/test_glob.sf` went from `segfault` to
-23/23. Suite 275 passed / 8 failed, with a failure name set identical to post-#151
-minus `segfault test_glob` — nothing added; `build/saffronc`'s md5 was unchanged
-across the run with no concurrent bootstrap.
+23/23. Suite 281 passed / 8 failed after the origin/main merge, one name removed
+(`test_glob`) and nothing added against `test/FAILURE_BASELINE.txt`;
+`build/saffronc`'s md5 was unchanged across the run.
+
+`test_glob` had been recorded in the baseline as *nondeterministic — treat its
+presence or absence as noise*, and that note is now removed: it passes 5/5 at a
+fixed HEAD. The flakiness was the bug. A segfault from indexing a NaN-tagged String
+depends on what the allocator happened to put where, so the same test at the same
+commit could pass or fault — which is exactly how a hard crash got filed as flake
+and then read as background noise for weeks.
 
 ### 150. FIXED — a call through an interface-typed receiver bound to the interface's empty abstract stub, so it silently did nothing and returned 0
 

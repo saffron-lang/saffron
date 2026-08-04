@@ -12818,7 +12818,7 @@ class Codegen {
     // SIGSEGV. That default is the shared root of BUGS #29, #93, #94 and #95, each
     // fixed by adding one more static type above it; this routes the leftover case
     // to __any_index_get, which discriminates on the GC type tag at runtime the way
-    // __any_length already does for `.length()` (BUGS #152).
+    // __any_length already does for `.length()` (BUGS #153).
     //
     // `Any` is INCLUDED. It is tempting to exclude it on the theory that an
     // untyped receiver reaching a subscript is usually a List, and keeping it on
