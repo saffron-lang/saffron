@@ -1,6 +1,7 @@
 // LLVM IR code generator for Saffron-mini
 
 import "./ast.sf" as AST
+import "./diag.sf" as Diag
 import "llvm/types" as LLVMTypes
 import "llvm/instructions" as LLVMInst
 import "llvm/module" as LLVMMod
@@ -404,6 +405,24 @@ class Codegen {
         this.sb.append("\n")
     }
 
+    /// Report a codegen error: print the `[codegen] Error: ...` line exactly as
+    /// before, set the has_errors flag, and record it into the shared Diag sink so
+    /// --json and the LSP can read it as data. `msg` is the full message minus the
+    /// `[codegen] Error: ` prefix, which this adds — so the console output is
+    /// byte-for-byte what it was, and the sink stores the clean message.
+    ///
+    /// The span is span_none(): codegen errors are about expressions, and
+    /// expression nodes do not carry spans yet (that is the next stage). When they
+    /// do, this gains a located sibling and these calls pass the offending node's
+    /// span.
+    fun codegen_error(msg: String) {
+        // The sink record is unconditional; the console line is suppressed in
+        // --json mode so stdout stays parseable JSON. See Diag.set_quiet.
+        if (!Diag.is_quiet()) { IO.println("[codegen] Error: " + msg) }
+        this.has_errors = true
+        Diag.record_error("codegen", AST.span_none(), msg)
+    }
+
     fun emit_indent(line: String) {
         if (this.block_terminated) return nil
         this.sb.append("  ")
@@ -597,8 +616,8 @@ class Codegen {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var ptype: String = this.type_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -620,7 +639,7 @@ class Codegen {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             sb.append(this.type_to_string(pt))
             i = i + 1
         }
@@ -1558,7 +1577,7 @@ class Codegen {
                     local
                 }
             }
-            Variable(name) => {
+            Variable(name, __vs) => {
                 if (this.typed_vars.has(name)) {
                     this.last_type = this.typed_vars.get(name)
                 } else {
@@ -1589,8 +1608,7 @@ class Codegen {
                     // fails regardless — just with "use of undefined value
                     // '%data'" from llc instead of a source-level diagnostic.
                     // Failing here names the variable and stops before codegen.
-                    IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
+                    this.codegen_error("undefined variable '" + name + "'")
                 }
                 // A nested `fun` declared in THIS body shadows a like-named module
                 // global, so it must be answered as a function reference even though
@@ -1651,7 +1669,7 @@ class Codegen {
                 }
                 local
             }
-            Ref(rkind, rname, rslot) => {
+            Ref(rkind, rname, rslot, __rs) => {
                 // Resolved by resolve.sf with a scope chain in hand, so the
                 // local-vs-global question is already answered. The Variable arm
                 // above has to re-derive it from module_globals, and gets it
@@ -1670,8 +1688,7 @@ class Codegen {
                     }
                 }
                 if (rkind == "unknown") {
-                    IO.println("[codegen] Error: undefined variable '" + rname + "'")
-                    this.has_errors = true
+                    this.codegen_error("undefined variable '" + rname + "'")
                 }
                 if (rkind == "func") {
                     if (!this.named_imports.has(rname)) {
@@ -1700,10 +1717,10 @@ class Codegen {
             Unary(op, right) => {
                 this.gen_unary(op, right)
             }
-            Call(callee, args) => {
+            Call(callee, args, __cs) => {
                 this.gen_call(callee, args)
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 var val: String = this.gen_arg_value(value)
                 // Prefixed key only — see the note in stmts_body.sf's
                 // gen_var_decl_with_name. The bare-name fallback could only
@@ -1737,7 +1754,7 @@ class Codegen {
             Logical(left, op, right) => {
                 this.gen_logical(left, op, right)
             }
-            MemberAccess(object, field) => {
+            MemberAccess(object, field, __ms) => {
                 // Check if object is This -> field access
                 if (this.is_this_expr(object)) {
                     return this.gen_get_field(object, field)
@@ -1838,8 +1855,7 @@ class Codegen {
                         // parallel copy of this block wins for every spelling
                         // measured (336 files) — but it is kept correct so it
                         // reports rather than guesses if it ever goes live.
-                        IO.println("[codegen] Error: no member '" + field + "' in module '" + obj_name + "'")
-                        this.has_errors = true
+                        this.codegen_error("no member '" + field + "' in module '" + obj_name + "'")
                         return "0"
                     }
                 }
@@ -1888,10 +1904,10 @@ class Codegen {
                 }
                 local
             }
-            GetField(object, field) => {
+            GetField(object, field, __gs) => {
                 this.gen_get_field(object, field)
             }
-            SetField(object, field, value) => {
+            SetField(object, field, value, __ss) => {
                 // This arm is currently UNREACHABLE, and measured so rather than
                 // argued: with a distinct marker string on each of the two write
                 // sites, 18 syntactic positions were swept (top level, function
@@ -1918,7 +1934,7 @@ class Codegen {
             IndexSet(object, index, value) => {
                 this.gen_index_set(object, index, value)
             }
-            MethodCall(object, method, args) => {
+            MethodCall(object, method, args, __ks) => {
                 this.gen_method_call(object, method, args)
             }
             MapLit => {
@@ -1962,8 +1978,8 @@ class Codegen {
 
     fun gen_yield(value: AST.Expr): String {
         // Detect yield [reason, arg] pattern for sleep/IO
-        var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
-        if (is_list == "yes") {
+        var is_list: Bool = match (value) { ListLit(elems) => true _ => false }
+        if (is_list) {
             var elems: List<AST.Expr> = match (value) { ListLit(e) => e    _ => [] }
             if (elems.length() >= 1) {
                 var reason: String = this.gen_arg_value(elems[0])
@@ -3147,8 +3163,8 @@ class Codegen {
         // Handle function references as values (e.g. passing HomePage to Router.Route)
         var expr_kind: String = this.classify_expr(expr)
         if (expr_kind == "variable") {
-            var __vn: String = match (expr) { Variable(n) => n
-                Ref(rk, rn, rs) => rn
+            var __vn: String = match (expr) { Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             // Nested-`fun` binding in this body wins over a like-named module
@@ -3183,13 +3199,13 @@ class Codegen {
             }
         }
         if (expr_kind == "method_call") {
-            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o
+            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a, __ks) => o
                 _ => AST.Expr.NilLit
             }
-            var mc_method: String = match (expr) { MethodCall(o, m, a) => m
+            var mc_method: String = match (expr) { MethodCall(o, m, a, __ks) => m
                 _ => ""
             }
-            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a
+            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a, __ks) => a
                 _ => []
             }
             return this.gen_method_call(mc_obj, mc_method, mc_args)
@@ -3253,10 +3269,10 @@ class Codegen {
             return this.gen_arg_value(be_value)
         }
         if (expr_kind == "get_field") {
-            var gf_obj: AST.Expr = match (expr) { GetField(o, f) => o
+            var gf_obj: AST.Expr = match (expr) { GetField(o, f, __gs) => o
                 _ => AST.Expr.NilLit
             }
-            var gf_field: String = match (expr) { GetField(o, f) => f
+            var gf_field: String = match (expr) { GetField(o, f, __gs) => f
                 _ => ""
             }
             return this.gen_get_field(gf_obj, gf_field)
@@ -3272,13 +3288,13 @@ class Codegen {
             return local
         }
         if (expr_kind == "set_field") {
-            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v) => o
+            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v, __ss) => o
                 _ => AST.Expr.NilLit
             }
-            var sf_field: String = match (expr) { SetField(o, f, v) => f
+            var sf_field: String = match (expr) { SetField(o, f, v, __ss) => f
                 _ => ""
             }
-            var sf_val: AST.Expr = match (expr) { SetField(o, f, v) => v
+            var sf_val: AST.Expr = match (expr) { SetField(o, f, v, __ss) => v
                 _ => AST.Expr.NilLit
             }
             // The LIVE write site — this is the copy every spelling of
@@ -3308,11 +3324,11 @@ class Codegen {
             // beat a like-named parameter and the parameter became unreachable
             // — BUGS #40, whose repro is `var x` in the main program silently
             // capturing math.sf's `sqrt(x)` parameter.
-            var ref_kind: String = match (expr) { Ref(rk, rn, rs) => rk
+            var ref_kind: String = match (expr) { Ref(rk, rn, rs, __rs) => rk
                 _ => ""
             }
             if (ref_kind == "local" or ref_kind == "param") {
-                var pname: String = match (expr) { Ref(rk, rn, rs) => rn
+                var pname: String = match (expr) { Ref(rk, rn, rs, __rs) => rn
                     _ => ""
                 }
                 if (this.typed_vars.has(pname)) {
@@ -3333,8 +3349,8 @@ class Codegen {
                 }
                 return plocal
             }
-            var vname: String = match (expr) { Variable(n) => n
-                Ref(rk, rn, rs) => rn
+            var vname: String = match (expr) { Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             if (this.typed_vars.has(vname)) {
@@ -3350,8 +3366,7 @@ class Codegen {
             // emitted below references %name, which llc rejects anyway, so a
             // warning only delays the same failure into an opaque IR error.
             if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
+                this.codegen_error("undefined variable '" + vname + "'")
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -3380,10 +3395,10 @@ class Codegen {
             return local
         }
         if (expr_kind == "member") {
-            var m_obj: Any = match (expr) { MemberAccess(o, f) => o
+            var m_obj: Any = match (expr) { MemberAccess(o, f, __ms) => o
                 _ => ""
             }
-            var m_field: String = match (expr) { MemberAccess(o, f) => f
+            var m_field: String = match (expr) { MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             // Check if object is This → field access
@@ -3492,15 +3507,14 @@ class Codegen {
                 // constructors, @inline functions, named imports, forward
                 // references and locals shadowing an alias all resolve before
                 // reaching here and were each confirmed unaffected.
-                IO.println("[codegen] Error: no member '" + m_field + "' in module '" + mn + "'")
-                this.has_errors = true
+                this.codegen_error("no member '" + m_field + "' in module '" + mn + "'")
                 return "0"
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
                 var obj_kind2: String = this.classify_expr(m_obj)
                 if (obj_kind2 == "member") {
-                    var inner_field: String = match (m_obj) { MemberAccess(o, f) => f
+                    var inner_field: String = match (m_obj) { MemberAccess(o, f, __ms) => f
                         _ => ""
                     }
                     var key: String = inner_field + "." + m_field
@@ -3509,7 +3523,7 @@ class Codegen {
                     }
                     // Fallback: maybe the inner MemberAccess root is a module alias
                     // e.g. AST.Type.IntType where AST is module, Type is enum, IntType is variant
-                    var inner_obj: AST.Expr = match (m_obj) { MemberAccess(o, f) => o
+                    var inner_obj: AST.Expr = match (m_obj) { MemberAccess(o, f, __ms) => o
                         _ => AST.Expr.NilLit
                     }
                     var root_name: String = this.get_variable_name(inner_obj)
@@ -3585,8 +3599,7 @@ class Codegen {
             // of guessing an offset.
             var fb_obj_kind: String = this.classify_expr(m_obj)
             if (fb_obj_kind == "call") {
-                IO.println("[codegen] Error: cannot determine the type of the receiver of '." + m_field + "': an indirect call through 'Fun' has no known return type, so the field's offset is unknown. Annotate the result first, e.g. 'var x: T = f(...)' then use 'x." + m_field + "'.")
-                this.has_errors = true
+                this.codegen_error("cannot determine the type of the receiver of '." + m_field + "': an indirect call through 'Fun' has no known return type, so the field's offset is unknown. Annotate the result first, e.g. 'var x: T = f(...)' then use 'x." + m_field + "'.")
             }
             this.last_type = AST.Type.AnyType
             return "0"
@@ -4051,14 +4064,12 @@ class Codegen {
                 if (this.func_param_count.has(resolved_callee)) {
                     var expected: Float = this.func_param_count.get(resolved_callee)
                     if (args.length() != expected and !has_real_defs) {
-                        IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-                        this.has_errors = true
+                        this.codegen_error("'" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                     }
                 } else if (this.called_function_arity.has(resolved_callee)) {
                     var expected: Float = this.called_function_arity.get(resolved_callee)
                     if (args.length() != expected and expected > 0 and !has_real_defs) {
-                        IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-                        this.has_errors = true
+                        this.codegen_error("'" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                     }
                 }
             }
@@ -4185,11 +4196,11 @@ class Codegen {
                             var si: Float = 0
                             while (si < tc_args.length()) {
                                 if (this.classify_expr(tc_args[si]) == "assign") {
-                                    var arg_name: String = match (tc_args[si]) { Assign(n, v) => n
+                                    var arg_name: String = match (tc_args[si]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (arg_name == pname) {
-                                        var arg_value: AST.Expr = match (tc_args[si]) { Assign(n, v) => v
+                                        var arg_value: AST.Expr = match (tc_args[si]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         tc_new.push(arg_value)
@@ -4252,11 +4263,11 @@ class Codegen {
                     var si: Float = 0
                     while (si < args.length()) {
                         if (this.classify_expr(args[si]) == "assign") {
-                            var arg_name: String = match (args[si]) { Assign(n, v) => n
+                            var arg_name: String = match (args[si]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (arg_name == pname) {
-                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v) => v
+                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 new_args.push(arg_value)
@@ -4427,11 +4438,11 @@ class Codegen {
                             var si2: Float = 0
                             while (si2 < tc_args2.length()) {
                                 if (this.classify_expr(tc_args2[si2]) == "assign") {
-                                    var arg_name2: String = match (tc_args2[si2]) { Assign(n, v) => n
+                                    var arg_name2: String = match (tc_args2[si2]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (arg_name2 == pname2) {
-                                        var arg_value2: AST.Expr = match (tc_args2[si2]) { Assign(n, v) => v
+                                        var arg_value2: AST.Expr = match (tc_args2[si2]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         tc_new2.push(arg_value2)
@@ -4491,11 +4502,11 @@ class Codegen {
                     var si2: Float = 0
                     while (si2 < args.length()) {
                         if (this.classify_expr(args[si2]) == "assign") {
-                            var arg_name2: String = match (args[si2]) { Assign(n, v) => n
+                            var arg_name2: String = match (args[si2]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (arg_name2 == pname2) {
-                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v) => v
+                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 new_args2.push(arg_value2)
@@ -4748,9 +4759,9 @@ class Codegen {
         // looked up in string_vars, and the 24 hand-written `=> ""` arms had
         // likewise gone stale (MapLit, IndexGet, IndexSet, MethodCall missing).
         var name: String = match (expr) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
-            GetField(o, f) => f
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
+            GetField(o, f, __gs) => f
             _ => ""
         }
         if (name.length() > 0) {
@@ -5205,12 +5216,10 @@ class Codegen {
         if (this.class_struct_names.has(resolved)) { not_assignable = true }
         if (this.enum_defs.has(resolved)) { not_assignable = true }
         if (not_assignable) {
-            IO.println("[codegen] Error: cannot assign to '" + field + "' in module '" + obj_name + "' — it is not a variable")
-            this.has_errors = true
+            this.codegen_error("cannot assign to '" + field + "' in module '" + obj_name + "' — it is not a variable")
             return true
         }
-        IO.println("[codegen] Error: no member '" + field + "' in module '" + obj_name + "'")
-        this.has_errors = true
+        this.codegen_error("no member '" + field + "' in module '" + obj_name + "'")
         return true
     }
 
@@ -5868,7 +5877,7 @@ class Codegen {
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
             param_names.push(pname)
             pi = pi + 1
         }
@@ -6308,7 +6317,7 @@ class Codegen {
 
     fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
         match (stmt) {
-            VarDecl(name, typ, init, doc, v_vis) => {
+            VarDecl(name, typ, init, doc, v_vis, __ns, __fs) => {
                 this.find_free_vars_expr(init, bound, free)
                 bound.push(name)
             }
@@ -6324,9 +6333,9 @@ class Codegen {
                 this.find_free_vars_stmts(body, bound, free)
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
-            FunDecl(n, p, r, b, d, f_vis) => {}
-            EnumDecl(n, v, d, e_vis) => {}
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => {}
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -6344,7 +6353,7 @@ class Codegen {
 
     fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
-            Variable(name) => {
+            Variable(name, __vs) => {
                 if (this.str_in_list(bound,name) or this.str_in_list(free,name)) {
                     // Already bound or already free — skip
                 } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
@@ -6363,7 +6372,7 @@ class Codegen {
                     }
                 }
             }
-            Ref(rkind, rname, rslot) => {
+            Ref(rkind, rname, rslot, __rs) => {
                 // A capture is exactly a local/param that no enclosing binder
                 // provides. `rkind` says which it is, so none of the Variable
                 // arm's is_known guessing (uppercase-first-letter heuristics
@@ -6379,7 +6388,7 @@ class Codegen {
                 this.find_free_vars_expr(r, bound, free)
             }
             Unary(o, r) => { this.find_free_vars_expr(r, bound, free) }
-            Call(c, args) => {
+            Call(c, args, __cs) => {
                 this.find_free_vars_expr(c, bound, free)
                 var i: Float = 0
                 while (i < args.length()) {
@@ -6387,8 +6396,8 @@ class Codegen {
                     i = i + 1
                 }
                 // If calling a closure function, add its captures to our free vars
-                var call_name: String = match (c) { Variable(n) => n
-                    Ref(rk, rn, rs) => rn
+                var call_name: String = match (c) { Variable(n, __vs) => n
+                    Ref(rk, rn, rs, __rs) => rn
                     _ => ""
                 }
                 if (call_name.length() > 0) {
@@ -6409,7 +6418,7 @@ class Codegen {
                     }
                 }
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 this.find_free_vars_expr(value, bound, free)
                 // A module global is NOT a capture. It is addressed as
                 // `@__g_<name>` from wherever it is mentioned, so there is
@@ -6442,8 +6451,8 @@ class Codegen {
             BoolLit(v) => {}
             StringLit(s) => {}
             NilLit => {}
-            MemberAccess(o, f) => { this.find_free_vars_expr(o, bound, free) }
-            MethodCall(o, m, a) => {
+            MemberAccess(o, f, __ms) => { this.find_free_vars_expr(o, bound, free) }
+            MethodCall(o, m, a, __ks) => {
                 this.find_free_vars_expr(o, bound, free)
                 var mi: Float = 0
                 while (mi < a.length()) {
@@ -6451,8 +6460,8 @@ class Codegen {
                     mi = mi + 1
                 }
             }
-            GetField(o, f) => { this.find_free_vars_expr(o, bound, free) }
-            SetField(o, f, v) => {
+            GetField(o, f, __gs) => { this.find_free_vars_expr(o, bound, free) }
+            SetField(o, f, v, __ss) => {
                 this.find_free_vars_expr(o, bound, free)
                 this.find_free_vars_expr(v, bound, free)
             }
@@ -6511,7 +6520,7 @@ class Codegen {
                 var inner_bound: List<String> = []
                 var pi2: Float = 0
                 while (pi2 < p.length()) {
-                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis) => n }
+                    var pn: String = match (p[pi2]) { Param(n, t, d, p_vis, __ns) => n }
                     inner_bound.push(pn)
                     pi2 = pi2 + 1
                 }
@@ -6601,7 +6610,7 @@ class Codegen {
     fun collect_lambda_assigned_stmt(stmt: AST.Stmt, out: List<String>, in_lambda: Bool) {
         var sk: String = this.classify_stmt(stmt)
         if (sk == "var") {
-            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis) => init
+            var vi: AST.Expr = match (stmt) { VarDecl(n, t, init, d, v_vis, __ns, __fs) => init
                 _ => AST.Expr.NilLit
             }
             this.collect_lambda_assigned_expr(vi, out, in_lambda)
@@ -6673,7 +6682,7 @@ class Codegen {
                 // Everything below this point is inside a closure boundary.
                 this.collect_lambda_assigned_stmts(b, out, true)
             }
-            Assign(name, value) => {
+            Assign(name, value, __as) => {
                 if (in_lambda and name.length() > 0 and !this.str_in_list(out, name)) {
                     out.push(name)
                 }
@@ -6688,7 +6697,7 @@ class Codegen {
                 this.collect_lambda_assigned_expr(r, out, in_lambda)
             }
             Unary(o, r) => { this.collect_lambda_assigned_expr(r, out, in_lambda) }
-            Call(c, args) => {
+            Call(c, args, __cs) => {
                 this.collect_lambda_assigned_expr(c, out, in_lambda)
                 var i: Float = 0
                 while (i < args.length()) {
@@ -6696,7 +6705,7 @@ class Codegen {
                     i = i + 1
                 }
             }
-            MethodCall(o, m, a) => {
+            MethodCall(o, m, a, __ks) => {
                 this.collect_lambda_assigned_expr(o, out, in_lambda)
                 var mi: Float = 0
                 while (mi < a.length()) {
@@ -6704,9 +6713,9 @@ class Codegen {
                     mi = mi + 1
                 }
             }
-            MemberAccess(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
-            GetField(o, f) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
-            SetField(o, f, v) => {
+            MemberAccess(o, f, __ms) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            GetField(o, f, __gs) => { this.collect_lambda_assigned_expr(o, out, in_lambda) }
+            SetField(o, f, v, __ss) => {
                 this.collect_lambda_assigned_expr(o, out, in_lambda)
                 this.collect_lambda_assigned_expr(v, out, in_lambda)
             }
@@ -6768,8 +6777,8 @@ class Codegen {
             }
             IsCheck(val, t) => { this.collect_lambda_assigned_expr(val, out, in_lambda) }
             Yield(v) => { this.collect_lambda_assigned_expr(v, out, in_lambda) }
-            Variable(name) => {}
-            Ref(rkind, rname, rslot) => {}
+            Variable(name, __vs) => {}
+            Ref(rkind, rname, rslot, __rs) => {}
             IntLit(v) => {}
             FloatLit(v) => {}
             BoolLit(v) => {}
@@ -7008,8 +7017,7 @@ class Codegen {
             // Reject an unconvertible declared C type here, at the signature,
             // rather than letting the `else` below claim it is an i64 (BUGS #24).
             if (!this.extern_param_type_supported(norm)) {
-                IO.println("[codegen] Error: @extern \"" + sig + "\": parameter " + (i + 1).floor().to_string() + " has C type '" + ptype + "', which the FFI boundary cannot convert. Supported: i64, i32, double, void*/i8*, void**/i8**.")
-                this.has_errors = true
+                this.codegen_error("@extern \"" + sig + "\": parameter " + (i + 1).floor().to_string() + " has C type '" + ptype + "', which the FFI boundary cannot convert. Supported: i64, i32, double, void*/i8*, void**/i8**.")
             }
             // An `Any` i64 param is an opaque box in transit: the C side only
             // stores and returns it, so the value must arrive with its tag
@@ -7059,8 +7067,7 @@ class Codegen {
         // return LLVM does not already hold in an i64. `void**` and `i1` both
         // reach it today and both produce IR that fails to assemble.
         if (!this.extern_ret_type_supported(llvm_ret)) {
-            IO.println("[codegen] Error: @extern \"" + sig + "\": return C type '" + ret_c + "' cannot be boxed at the FFI boundary. Supported: void, i64, i32, double, void*/i8*.")
-            this.has_errors = true
+            this.codegen_error("@extern \"" + sig + "\": return C type '" + ret_c + "' cannot be boxed at the FFI boundary. Supported: void, i64, i32, double, void*/i8*.")
         }
         if (llvm_ret == "void") {
             this.emit_indent("call void @" + c_name + "(" + call_args.join(", ") + ")")
@@ -7152,7 +7159,7 @@ class Codegen {
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 if (!doc.starts_with("@import:")) {
                     this.gen_var_decl(stmt)
                 }
@@ -7182,7 +7189,7 @@ class Codegen {
             LetPattern(pattern, value) => {
                 this.gen_let_pattern(pattern, value)
             }
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // Capture and clear pending_extend_class to prevent stale state
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
@@ -7219,8 +7226,8 @@ class Codegen {
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
-                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis, __ns) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -7252,8 +7259,8 @@ class Codegen {
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
-                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis) => d }
-                        var pname: String = match (p) { Param(n, t, d, p_vis) => n }
+                        var dval: AST.Expr = match (p) { Param(n, t, d, p_vis, __ns) => d }
+                        var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
                         defaults.push(dval)
                         param_names.push(pname)
                         pi = pi + 1
@@ -7264,10 +7271,10 @@ class Codegen {
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // Registered before the body is generated: a method returning a
                 // class type parameter is typed by substituting the receiver's
                 // own type arguments, and that has to be known by the time any
@@ -7285,19 +7292,19 @@ class Codegen {
     }
 
     fun get_var_name(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d, v_vis) => n
+        return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => n
             _ => ""
         }
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d, v_vis) => t
+        return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => t
             _ => ""
         }
     }
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { VarDecl(n, t, i, d, v_vis) => i
+        return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => i
             // Was `_ => ""`: a String default on a function declared to return
             // AST.Expr. Nothing rejected it because the checker never walked
             // method bodies (BUGS #76), and every caller pre-checks for a
@@ -7308,13 +7315,13 @@ class Codegen {
     }
 
     fun get_var_doc(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d, v_vis) => d
+        return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => d
             _ => ""
         }
     }
 
     fun get_fun_doc(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => d
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => d
             _ => ""
         }
     }
@@ -7440,14 +7447,14 @@ class Codegen {
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
-        // If init is a Call(callee, args), try to infer generic type from args:
+        // If init is a Call(callee, args, ...), try to infer generic type from args:
         // 1. Lambda args with explicit return type
         // 2. String literal args → String
         // 3. Number literal args → Float
         // 4. Typed variable args → that variable's type
         var ek: String = this.classify_expr(init)
         if (ek == "call") {
-            var call_args: List<AST.Expr> = match (init) { Call(c, a) => a   _ => [] }
+            var call_args: List<AST.Expr> = match (init) { Call(c, a, __cs) => a   _ => [] }
             var ai: Float = 0
             while (ai < call_args.length()) {
                 var arg_kind: String = this.classify_expr(call_args[ai])
@@ -7839,25 +7846,25 @@ class Codegen {
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => n
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => n
             _ => ""
         }
     }
 
     fun get_fun_params(stmt: AST.Stmt): List<AST.Param> {
-        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => p
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => p
             _ => []
         }
     }
 
     fun get_fun_ret(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => r
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => r
             _ => ""
         }
     }
 
     fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { FunDecl(n, p, r, b, d, f_vis) => b
+        return match (stmt) { FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => b
             _ => ""
         }
     }
@@ -7894,7 +7901,7 @@ class Codegen {
         var mpi: Float = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mpn: String = match (mp) { Param(n, t, d, p_vis) => n }
+            var mpn: String = match (mp) { Param(n, t, d, p_vis, __ns) => n }
             method_param_names.push(mpn)
             mpi = mpi + 1
         }
@@ -7908,7 +7915,7 @@ class Codegen {
         mpi = 0
         while (mpi < mparams.length()) {
             var mp: AST.Param = mparams[mpi]
-            var mdval: AST.Expr = match (mp) { Param(n, t, d, p_vis) => d }
+            var mdval: AST.Expr = match (mp) { Param(n, t, d, p_vis, __ns) => d }
             method_defaults.push(mdval)
             mpi = mpi + 1
         }
@@ -7976,13 +7983,13 @@ class Codegen {
     }
 
     fun get_variant_name(v: AST.Variant): String {
-        return match (v) { Variant(n, f) => n
+        return match (v) { Variant(n, f, __ns) => n
             _ => ""
         }
     }
 
     fun get_variant_fields(v: AST.Variant): String {
-        return match (v) { Variant(n, f) => f
+        return match (v) { Variant(n, f, __ns) => f
             _ => ""
         }
     }
@@ -8013,10 +8020,10 @@ class Codegen {
         i = 0
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
-            var vname: String = match (v) { Variant(n, f) => n
+            var vname: String = match (v) { Variant(n, f, __ns) => n
                 _ => ""
             }
-            var vfields: String = match (v) { Variant(n, f) => f
+            var vfields: String = match (v) { Variant(n, f, __ns) => f
                 _ => ""
             }
             if (vfields.length() > 0) {
@@ -8352,13 +8359,13 @@ class Codegen {
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
-        return match (stmt) { EnumDecl(n, v, d, e_vis) => n
+        return match (stmt) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
             _ => ""
         }
     }
 
     fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
-        return match (stmt) { EnumDecl(n, v, d, e_vis) => v
+        return match (stmt) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
             _ => ""
         }
     }
@@ -8373,12 +8380,12 @@ class Codegen {
 
     fun try_register_enum(decl: AST.Stmt) {
         match (decl) {
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.register_enum_variants(name, variants)
             }
-            VarDecl(n, t, i, d, v_vis) => {}
-            FunDecl(n, p, r, b, d, f_vis) => {}
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {}
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -8404,10 +8411,10 @@ class Codegen {
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
-        var vname: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => n
+        var vname: String = match (stmt) { VarDecl(n, t, init, d, v_vis, __ns, __fs) => n
             _ => ""
         }
-        var vdoc: String = match (stmt) { VarDecl(n, t, init, d, v_vis) => d
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d, v_vis, __ns, __fs) => d
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
@@ -8545,10 +8552,10 @@ class Codegen {
         return match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "expr"
-            VarDecl(n, t, i, d, v_vis) => "var"
-            FunDecl(n, p, r, b, d, f_vis) => "fun"
-            EnumDecl(n, v, d, e_vis) => "enum"
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "class"
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => "var"
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => "fun"
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => "enum"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -8570,10 +8577,10 @@ class Codegen {
         var kind: Any = match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
-            VarDecl(n, t, i, d, v_vis) => "other"
-            FunDecl(n, p, r, b, d, f_vis) => "other"
-            EnumDecl(n, v, d, e_vis) => "other"
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => "other"
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => "other"
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => "other"
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => "other"
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
@@ -9360,9 +9367,9 @@ class Codegen {
 
     fun resolve_callee(expr: AST.Expr): String {
         return match (expr) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
-            MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
+            MemberAccess(obj, field, __ms) => this.resolve_callee(obj) + "." + field
             x => ""
         }
     }
@@ -9465,7 +9472,7 @@ class Codegen {
             return
         }
         match (stmt) {
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
@@ -9495,9 +9502,9 @@ class Codegen {
             Return(value) => {
                 this.collect_vars_expr(value, names, types)
             }
-            FunDecl(n, p, r, b, d, f_vis) => {}
-            EnumDecl(n, v, d, e_vis) => {}
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => {}
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => {}
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => {}
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -9560,8 +9567,8 @@ class Codegen {
                 this.collect_vars_expr(right, names, types)
             }
             Unary(op, right) => { this.collect_vars_expr(right, names, types) }
-            Assign(name, value) => { this.collect_vars_expr(value, names, types) }
-            Call(callee, args) => {
+            Assign(name, value, __as) => { this.collect_vars_expr(value, names, types) }
+            Call(callee, args, __cs) => {
                 this.collect_vars_expr(callee, names, types)
                 var ci: Float = 0
                 while (ci < args.length()) {
@@ -9569,7 +9576,7 @@ class Codegen {
                     ci = ci + 1
                 }
             }
-            MethodCall(obj, method, args) => {
+            MethodCall(obj, method, args, __ks) => {
                 this.collect_vars_expr(obj, names, types)
                 var mi: Float = 0
                 while (mi < args.length()) {
@@ -9577,11 +9584,11 @@ class Codegen {
                     mi = mi + 1
                 }
             }
-            SetField(obj, field, value) => {
+            SetField(obj, field, value, __ss) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(value, names, types)
             }
-            GetField(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            GetField(obj, field, __gs) => { this.collect_vars_expr(obj, names, types) }
             IndexGet(obj, idx) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(idx, names, types)
@@ -9591,14 +9598,14 @@ class Codegen {
                 this.collect_vars_expr(idx, names, types)
                 this.collect_vars_expr(value, names, types)
             }
-            MemberAccess(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            MemberAccess(obj, field, __ms) => { this.collect_vars_expr(obj, names, types) }
             IntLit(v) => {}
             FloatLit(v) => {}
             BoolLit(v) => {}
             StringLit(s) => {}
             NilLit => {}
-            Variable(n) => {}
-            Ref(rk, rn, rs) => {}
+            Variable(n, __vs) => {}
+            Ref(rk, rn, rs, __rs) => {}
             This => {}
             MapLit => {}
             // A container literal's ELEMENTS can declare variables, because the
@@ -9701,23 +9708,23 @@ class Codegen {
             BoolLit(v) => "other"
             StringLit(s) => "other"
             NilLit => "other"
-            Variable(n) => "other"
-            Ref(rk, rn, rs) => "other"
+            Variable(n, __vs) => "other"
+            Ref(rk, rn, rs, __rs) => "other"
             Binary(l, o, r) => "other"
             Unary(o, r) => "other"
-            Call(c, a) => "other"
-            Assign(n, v) => "other"
+            Call(c, a, __cs) => "other"
+            Assign(n, v, __as) => "other"
             Logical(l, o, r) => "other"
-            MemberAccess(o, f) => "other"
+            MemberAccess(o, f, __ms) => "other"
             EnumConstruct(e, v, a) => "other"
             Lambda(p, r, b) => "other"
-            GetField(o, f) => "other"
-            SetField(o, f, v) => "other"
+            GetField(o, f, __gs) => "other"
+            SetField(o, f, v, __ss) => "other"
             This => "other"
             ListLit(e) => "other"
             IndexGet(o, i) => "other"
             IndexSet(o, i, v) => "other"
-            MethodCall(o, m, a) => "other"
+            MethodCall(o, m, a, __ks) => "other"
             MapLit => "other"
             BlockExpr(s, v) => "other"
             IsCheck(val, t) => "other"
@@ -9748,16 +9755,16 @@ class Codegen {
             Yield(v) => true
             Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             Unary(o, r) => this.expr_has_yield(r)
-            Call(c, a) => this.call_is_suspend(c) or this.exprs_have_yield(a)
-            Assign(n, v) => this.expr_has_yield(v)
+            Call(c, a, __cs) => this.call_is_suspend(c) or this.exprs_have_yield(a)
+            Assign(n, v, __as) => this.expr_has_yield(v)
             Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
-            MethodCall(o, m, a) => m == "await" or this.expr_has_yield(o) or this.exprs_have_yield(a)
+            MethodCall(o, m, a, __ks) => m == "await" or this.expr_has_yield(o) or this.exprs_have_yield(a)
             ListLit(e) => this.exprs_have_yield(e)
             IndexGet(o, i) => this.expr_has_yield(o) or this.expr_has_yield(i)
             IndexSet(o, i, v) => this.expr_has_yield(o) or this.expr_has_yield(i) or this.expr_has_yield(v)
-            SetField(o, f, v) => this.expr_has_yield(o) or this.expr_has_yield(v)
-            GetField(o, f) => this.expr_has_yield(o)
-            MemberAccess(o, f) => this.expr_has_yield(o)
+            SetField(o, f, v, __ss) => this.expr_has_yield(o) or this.expr_has_yield(v)
+            GetField(o, f, __gs) => this.expr_has_yield(o)
+            MemberAccess(o, f, __ms) => this.expr_has_yield(o)
             EnumConstruct(e, v, a) => this.exprs_have_yield(a)
             Match(s, a) => this.expr_has_yield(s)
             BlockExpr(s, v) => this.stmts_have_yield(s) or this.expr_has_yield(v)
@@ -9795,26 +9802,26 @@ class Codegen {
     fun stmt_has_yield(stmt: AST.Stmt): Bool {
         return match (stmt) {
             ExprStmt(e) => this.expr_has_yield(e)
-            VarDecl(n, t, init, d, v_vis) => this.expr_has_yield(init)
+            VarDecl(n, t, init, d, v_vis, __ns, __fs) => this.expr_has_yield(init)
             Return(v) => this.expr_has_yield(v)
             If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
             While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
             Block(s) => this.stmts_have_yield(s)
             TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
             Throw(v) => this.expr_has_yield(v)
-            FunDecl(n, p, r, b, d, f_vis) => false
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => false
             _ => false
         }
     }
 
     fun collect_calls_from_expr(expr: AST.Expr, calls: List<String>) {
         match (expr) {
-            Call(callee, args) => {
+            Call(callee, args, __cs) => {
                 var name: String = this.get_variable_name(callee)
                 if (name.length() > 0) { calls.push(name) }
                 this.collect_calls_from_exprs(args, calls)
             }
-            MethodCall(o, m, a) => {
+            MethodCall(o, m, a, __ks) => {
                 // Extract module-qualified call: Async.sleep → stdlib_async_sleep
                 var obj_name: String = this.get_variable_name(o)
                 if (obj_name.length() > 0 and this.has_module_alias(obj_name)) {
@@ -9829,7 +9836,7 @@ class Codegen {
                 this.collect_calls_from_expr(l, calls)
                 this.collect_calls_from_expr(r, calls)
             }
-            Assign(n, v) => { this.collect_calls_from_expr(v, calls) }
+            Assign(n, v, __as) => { this.collect_calls_from_expr(v, calls) }
             Logical(l, o, r) => {
                 this.collect_calls_from_expr(l, calls)
                 this.collect_calls_from_expr(r, calls)
@@ -9845,12 +9852,12 @@ class Codegen {
                 this.collect_calls_from_expr(i, calls)
                 this.collect_calls_from_expr(v, calls)
             }
-            SetField(o, f, v) => {
+            SetField(o, f, v, __ss) => {
                 this.collect_calls_from_expr(o, calls)
                 this.collect_calls_from_expr(v, calls)
             }
-            GetField(o, f) => { this.collect_calls_from_expr(o, calls) }
-            MemberAccess(o, f) => { this.collect_calls_from_expr(o, calls) }
+            GetField(o, f, __gs) => { this.collect_calls_from_expr(o, calls) }
+            MemberAccess(o, f, __ms) => { this.collect_calls_from_expr(o, calls) }
             BlockExpr(s, v) => {
                 this.collect_calls_from_stmts(s, calls)
                 this.collect_calls_from_expr(v, calls)
@@ -9912,7 +9919,7 @@ class Codegen {
     fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
         match (stmt) {
             ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
-            VarDecl(n, t, init, d, v_vis) => { this.collect_calls_from_expr(init, calls) }
+            VarDecl(n, t, init, d, v_vis, __ns, __fs) => { this.collect_calls_from_expr(init, calls) }
             Return(v) => { this.collect_calls_from_expr(v, calls) }
             If(c, tb, eb) => {
                 this.collect_calls_from_expr(c, calls)
@@ -9976,7 +9983,7 @@ class Codegen {
                 var cls_name: String = ""
                 var cls_methods: List<AST.Stmt> = []
                 match (program[i]) {
-                    ClassDecl(cn, __tps, cps, cf, cm, cd, c_vis) => {
+                    ClassDecl(cn, __tps, cps, cf, cm, cd, c_vis, __ns, __fs, __intro) => {
                         cls_name = cn
                         cls_methods = cm
                     }
@@ -10601,8 +10608,8 @@ class Codegen {
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            defaults.push(match (p) { Param(n, t, d, p_vis) => d })
-            pnames.push(match (p) { Param(n, t, d, p_vis) => n })
+            defaults.push(match (p) { Param(n, t, d, p_vis, __ns) => d })
+            pnames.push(match (p) { Param(n, t, d, p_vis, __ns) => n })
             pi = pi + 1
         }
         this.func_defaults.set(emit_name, defaults)
@@ -10626,10 +10633,10 @@ class Codegen {
     /// leading `self`, registered under both the bare `Class__method` name and
     /// the prefixed one.
     fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
-        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+        var cname: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
             _ => ""
         }
-        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
             _ => []
         }
         var mi: Float = 0
@@ -10644,8 +10651,8 @@ class Codegen {
                 var mpi: Float = 0
                 while (mpi < mparams.length()) {
                     var mp: AST.Param = mparams[mpi]
-                    mdefs.push(match (mp) { Param(n, t, d, p_vis) => d })
-                    mpnames.push(match (mp) { Param(n, t, d, p_vis) => n })
+                    mdefs.push(match (mp) { Param(n, t, d, p_vis, __ns) => d })
+                    mpnames.push(match (mp) { Param(n, t, d, p_vis, __ns) => n })
                     mpi = mpi + 1
                 }
                 var full: String = cname + "__" + mname
@@ -11374,11 +11381,11 @@ class Codegen {
 
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
-            FunDecl(n, p, r, b, d, f_vis) => true
-            EnumDecl(n, v, d, e_vis) => true
-            ClassDecl(n, __tps, ps, f, m, d, c_vis) => true
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => true
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => true
+            ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => true
             ExprStmt(e) => this.is_nil_expr(e)
-            VarDecl(n, t, i, d, v_vis) => d.starts_with("@import:")
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => d.starts_with("@import:")
             Return(v) => false
             If(c, t, e) => false
             While(c, b) => false
@@ -11522,7 +11529,7 @@ class Codegen {
         while (pri < program.length()) {
             var pr_stmt: AST.Stmt = program[pri]
             match (pr_stmt) {
-                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis) => {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc, f_vis, __ns, __fs) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
                         if (!this.str_in_list(this.known_functions,pr_emit)) {
@@ -11548,7 +11555,7 @@ class Codegen {
                         }
                     }
                 }
-                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc, c_vis) => {
+                ClassDecl(pr_cname, __tps, pr_parents, pr_fields, pr_methods, pr_doc, c_vis, __ns, __fs, __intro) => {
                     // Register the class constructor name
                     var pr_type_name: String = pr_cname
                     if (this.current_prefix.length() > 0) {
@@ -11622,7 +11629,7 @@ class Codegen {
                     }
                     this.class_own_methods.set(pr_type_name, pr_own)
                 }
-                EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis) => {
+                EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis, __ns, __fs) => {
                     // Register enum variant constructor names AND variant tags
                     // so that match expressions work regardless of declaration order
                     var pr_vnames: List<String> = []
@@ -11642,7 +11649,7 @@ class Codegen {
                     }
                     this.enum_defs.set(pr_ename, pr_vnames)
                 }
-                VarDecl(n, t, init, d, v_vis) => {}
+                VarDecl(n, t, init, d, v_vis, __ns, __fs) => {}
                 ExprStmt(e) => {}
                 Return(v) => {}
                 If(c, t, e) => {}
@@ -12259,7 +12266,7 @@ class Codegen {
 
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
-        MethodCall(o, m, a) => "method_call"
+        MethodCall(o, m, a, __ks) => "method_call"
         ListLit(e) => "list_lit"
         IndexGet(o, i) => "index_get"
         IndexSet(o, i, v) => "index_set"
@@ -12268,20 +12275,20 @@ class Codegen {
         IntLit(v) => "int"
         FloatLit(v) => "float"
         BoolLit(v) => "bool"
-        Variable(n) => "variable"
-        Ref(rk, rn, rs) => "variable"
+        Variable(n, __vs) => "variable"
+        Ref(rk, rn, rs, __rs) => "variable"
         Binary(l, o, r) => "binary"
         Unary(o, r) => "unary"
-        Call(c, a) => "call"
-        Assign(n, v) => "assign"
+        Call(c, a, __cs) => "call"
+        Assign(n, v, __as) => "assign"
         Logical(l, o, r) => "logical"
-        MemberAccess(o, f) => "member"
+        MemberAccess(o, f, __ms) => "member"
         NilLit => "nil"
         Match(s, a) => "match_expr"
         EnumConstruct(e, v, a) => "enum"
         Lambda(p, r, b) => "lambda"
-        GetField(o, f) => "get_field"
-        SetField(o, f, v) => "set_field"
+        GetField(o, f, __gs) => "get_field"
+        SetField(o, f, v, __ss) => "set_field"
         This => "this"
         BlockExpr(s, v) => "block_expr"
         IsCheck(val, t) => "is_check"
@@ -12299,8 +12306,8 @@ class Codegen {
     // result was bound as `Any`, so the declared String return type was never
     // actually checked (BUGS #76).
     return match (expr) {
-        Variable(n) => n
-        Ref(rk, rn, rs) => rn
+        Variable(n, __vs) => n
+        Ref(rk, rn, rs, __rs) => rn
         _ => ""
     }
     }
@@ -12357,13 +12364,13 @@ class Codegen {
     if (ek == "this") return this.current_class
     if (ek == "get_field" or ek == "member") {
         var gf_inner_obj: AST.Expr = match (expr) {
-            GetField(o, f) => o
-            MemberAccess(o, f) => o
+            GetField(o, f, __gs) => o
+            MemberAccess(o, f, __ms) => o
             _ => AST.Expr.NilLit
         }
         var gf_field: String = match (expr) {
-            GetField(o, f) => f
-            MemberAccess(o, f) => f
+            GetField(o, f, __gs) => f
+            MemberAccess(o, f, __ms) => f
             _ => ""
         }
         var gf_obj_name: String = this.get_variable_name(gf_inner_obj)
@@ -12384,11 +12391,11 @@ class Codegen {
     }
     if (ek == "method_call") {
         var mc_method: String = match (expr) {
-            MethodCall(o, m, a) => m
+            MethodCall(o, m, a, __ks) => m
             _ => ""
         }
         var mc_obj: AST.Expr = match (expr) {
-            MethodCall(o, m, a) => o
+            MethodCall(o, m, a, __ks) => o
             _ => AST.Expr.NilLit
         }
         // Check if method call is on a user class (resolve obj type)
@@ -12410,13 +12417,13 @@ class Codegen {
         } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
             // Handle chained field access: this.field.method()
             var inner_obj: AST.Expr = match (mc_obj) {
-                GetField(o, f) => o
-                MemberAccess(o, f) => o
+                GetField(o, f, __gs) => o
+                MemberAccess(o, f, __ms) => o
                 _ => AST.Expr.NilLit
             }
             var inner_field: String = match (mc_obj) {
-                GetField(o, f) => f
-                MemberAccess(o, f) => f
+                GetField(o, f, __gs) => f
+                MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             var inner_class: String = ""
@@ -12518,7 +12525,7 @@ class Codegen {
     }
     if (ek == "call") {
         var call_callee: AST.Expr = match (expr) {
-            Call(c, a) => c
+            Call(c, a, __cs) => c
             x => AST.Expr.NilLit
         }
         var callee_name: String = this.resolve_callee(call_callee)
@@ -12628,7 +12635,14 @@ class Codegen {
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_ttype.starts_with("Tuple<")) {
+            // Recorded into the sink for --json, but deliberately NOT routed through
+            // codegen_error: unlike every other site here, this one prints an error
+            // and never sets has_errors, so the compile currently exits 0. That is
+            // a latent BUGS #37 shape, but flipping it to fatal is a behavior change
+            // that belongs in its own commit, not smuggled in under a diagnostics
+            // refactor. Preserve the current fatality; surface the message as data.
             IO.println("[codegen] Error: use ._0, ._1 etc. to access tuple fields (not indexing)")
+            Diag.record_error("codegen", AST.span_none(), "use ._0, ._1 etc. to access tuple fields (not indexing)")
         }
     }
     // Map indexing: map["key"] → __map_get(map, key)
@@ -13097,8 +13111,7 @@ class Codegen {
         // func_prefix_map or known_functions before any body is lowered, so reaching
         // here means the method genuinely does not exist. Report it instead of
         // emitting a call to a name that was never defined.
-        IO.println("[codegen] Error: no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
-        this.has_errors = true
+        this.codegen_error("no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
         return full
     }
 
@@ -13850,11 +13863,11 @@ class Codegen {
                             var __mp_si: Float = 0
                             while (__mp_si < __mp_tc_args.length()) {
                                 if (this.classify_expr(__mp_tc_args[__mp_si]) == "assign") {
-                                    var __mp_an: String = match (__mp_tc_args[__mp_si]) { Assign(n, v) => n
+                                    var __mp_an: String = match (__mp_tc_args[__mp_si]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (__mp_an == __mp_pn) {
-                                        var __mp_av: AST.Expr = match (__mp_tc_args[__mp_si]) { Assign(n, v) => v
+                                        var __mp_av: AST.Expr = match (__mp_tc_args[__mp_si]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         __mp_tc_new.push(__mp_av)
@@ -13915,11 +13928,11 @@ class Codegen {
                     var __mp_si2: Float = 0
                     while (__mp_si2 < args.length()) {
                         if (this.classify_expr(args[__mp_si2]) == "assign") {
-                            var __mp_an2: String = match (args[__mp_si2]) { Assign(n, v) => n
+                            var __mp_an2: String = match (args[__mp_si2]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (__mp_an2 == __mp_pn2) {
-                                var __mp_av2: AST.Expr = match (args[__mp_si2]) { Assign(n, v) => v
+                                var __mp_av2: AST.Expr = match (args[__mp_si2]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 __mp_new_args.push(__mp_av2)
@@ -14247,7 +14260,7 @@ class Codegen {
     if (obj_name.length() == 0) {
         var obj_kind: String = this.classify_expr(object)
         if (obj_kind == "member") {
-            var inner_field: String = match (object) { MemberAccess(o, f) => f
+            var inner_field: String = match (object) { MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             var enum_key2: String = inner_field + "." + method
@@ -14275,7 +14288,7 @@ class Codegen {
                         var ret_expr: AST.Expr = match (lambda_body[0]) { Return(v) => v   _ => AST.Expr.NilLit }
                         var ret_ek: String = this.classify_expr(ret_expr)
                         if (ret_ek == "call") {
-                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a) => c   _ => AST.Expr.NilLit }
+                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a, __cs) => c   _ => AST.Expr.NilLit }
                             var ret_callee_name: String = this.get_variable_name(ret_callee)
                             if (ret_callee_name.length() > 0) {
                                 var prefixed_callee: String = this.current_prefix + ret_callee_name
@@ -14286,8 +14299,8 @@ class Codegen {
                                 }
                             }
                         } else if (ret_ek == "method_call") {
-                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
-                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
+                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a, __ks) => m   _ => "" }
+                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a, __ks) => o   _ => AST.Expr.NilLit }
                             var mc_ns: String = this.get_variable_name(mc_obj_expr)
                             if (mc_ns.length() > 0 and this.has_module_alias(mc_ns)) {
                                 var mc_full: String = this.module_alias_prefix(mc_ns) + mc_method_name
@@ -15597,8 +15610,7 @@ class Codegen {
             if (__fields_str.contains(method + ":")) { __method_exists = true }
         }
         if (!__method_exists) {
-            IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + class_name + "' has no method '" + method + "'")
             this.last_type = AST.Type.IntType
             return "0"
         }
@@ -15735,25 +15747,22 @@ class Codegen {
             }
         }
         if (!__ft_exists) {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
     } else if (is_builtin_type) {
         // A builtin or `Any` receiver with no matching arm above. `Any` is the
         // common shape and deserves the annotation hint; a concrete builtin
         // means the method genuinely does not exist on that type.
         if (obj_type == "Any") {
-            IO.println("[codegen] Error: cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
+            this.codegen_error("cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
         } else {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
-        this.has_errors = true
     } else {
         // Receiver type unknown to codegen entirely: an empty type string, or a
         // named type with no registered fields. Either way there is nothing to
         // dispatch to, and silently returning 0 is what BUGS #37 is.
-        IO.println("[codegen] Error: cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
-        this.has_errors = true
+        this.codegen_error("cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
     }
     this.last_type = AST.Type.IntType
     return "0"
@@ -16206,23 +16215,23 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         while (si3 < stmts3.length()) {
             var sk3: String = gen.classify_stmt(stmts3[si3])
             if (sk3 == "class") {
-                var cn3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var cn3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 // Only the primary base contributes fields — see the layout rule in
                 // gen_class_decl_with_parents. parents[0] is that base.
-                var cp3_all: List<String> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => ps
+                var cp3_all: List<String> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => ps
                     _ => []
                 }
                 var cp3: String = ""
                 if (cp3_all.length() > 0) { cp3 = cp3_all[0] }
-                var cf3: List<AST.Param> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => f
+                var cf3: List<AST.Param> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => f
                     _ => []
                 }
-                var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                     _ => []
                 }
-                var cd3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => d
+                var cd3: String = match (stmts3[si3]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
                     _ => ""
                 }
                 if (cd3.starts_with("@actor")) {
@@ -16269,7 +16278,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tp3_names: List<String> = match (stmts3[si3]) { ClassDecl(n, tps, ps, f, m, d, c_vis) => tps
+                    var tp3_names: List<String> = match (stmts3[si3]) { ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => tps
                         _ => []
                     }
                     if (tp3_names.length() > 0) {
@@ -16316,7 +16325,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     }
                 }
             } else if (pr_kind == "class") {
-                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -16330,7 +16339,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
-                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -16350,10 +16359,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     }
                 }
             } else if (pr_kind == "enum") {
-                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
+                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
+                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -16387,10 +16396,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -16399,7 +16408,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                 _ => []
             }
             var pr_mj2: Float = 0
@@ -16414,10 +16423,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
@@ -16714,7 +16723,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -16775,20 +16784,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         while (si < end) {
             var mod_kind: String = gen.classify_stmt(all_stmts[si])
             if (mod_kind == "class") {
-                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 // Only the primary base contributes fields — see the layout rule in
                 // gen_class_decl_with_parents. parents[0] is that base.
-                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => ps
+                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => ps
                     _ => []
                 }
                 var mod_parent: String = ""
                 if (mod_parent_all.length() > 0) { mod_parent = mod_parent_all[0] }
-                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => f
+                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => f
                     _ => []
                 }
-                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                     _ => []
                 }
                 if (mod_name.length() > 0) {
@@ -16828,7 +16837,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d, c_vis) => tps
+                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => tps
                         _ => []
                     }
                     if (tpm_names.length() > 0) {
@@ -16846,7 +16855,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis, __ns, __fs) => n
                 _ => ""
             }
             if (gvname.length() > 0) {
@@ -16885,23 +16894,23 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     while (pri < program.length()) {
         var pr_kind: String = gen.classify_stmt(program[pri])
         if (pr_kind == "class") {
-            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                 _ => ""
             }
             // Only the primary base contributes fields — see the layout rule in
             // gen_class_decl_with_parents. parents[0] is that base.
-            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => ps
+            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => ps
                 _ => []
             }
             var pr_parent: String = ""
             if (pr_parent_all.length() > 0) { pr_parent = pr_parent_all[0] }
-            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => f
+            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => f
                 _ => []
             }
-            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                 _ => []
             }
-            var pr_doc: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => d
+            var pr_doc: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
                 _ => ""
             }
             if (pr_doc.starts_with("@actor")) {
@@ -16943,7 +16952,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 // Declared generic parameter names, kept alongside the method list
                 // so a method returning a class type parameter can be typed at a
                 // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d, c_vis) => tps
+                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => tps
                     _ => []
                 }
                 if (tpp_names.length() > 0) {
@@ -16994,7 +17003,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     }
                 }
             } else if (pr_kind == "class") {
-                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -17009,7 +17018,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         gen.known_functions.push(pr_cname)
                     }
                     // Register all method names as ClassName__method
-                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -17029,10 +17038,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     }
                 }
             } else if (pr_kind == "enum") {
-                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -17074,10 +17083,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -17086,7 +17095,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                 _ => []
             }
             var pr_mj2: Float = 0
@@ -17101,10 +17110,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
@@ -17430,7 +17439,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
             if (!gen.is_decl(all_stmts[si])) {
                 var stmt_kind: String = gen.classify_stmt(all_stmts[si])
                 if (stmt_kind == "var") {
-                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis) => n
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => n
                         _ => ""
                     }
                     var vdoc3: String = gen.get_var_doc(all_stmts[si])
@@ -17489,20 +17498,20 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
         while (si < end) {
             var mod_kind: String = gen.classify_stmt(all_stmts[si])
             if (mod_kind == "class") {
-                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 // Only the primary base contributes fields — see the layout rule in
                 // gen_class_decl_with_parents. parents[0] is that base.
-                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => ps
+                var mod_parent_all: List<String> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => ps
                     _ => []
                 }
                 var mod_parent: String = ""
                 if (mod_parent_all.length() > 0) { mod_parent = mod_parent_all[0] }
-                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => f
+                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => f
                     _ => []
                 }
-                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                     _ => []
                 }
                 if (mod_name.length() > 0) {
@@ -17539,7 +17548,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     // Declared generic parameter names, kept alongside the method list
                     // so a method returning a class type parameter can be typed at a
                     // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d, c_vis) => tps
+                    var tpm_names: List<String> = match (all_stmts[si]) { ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => tps
                         _ => []
                     }
                     if (tpm_names.length() > 0) {
@@ -17572,7 +17581,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
     while (gvi < program.length()) {
         var gvk: String = gen.classify_stmt(program[gvi])
         if (gvk == "var") {
-            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis) => n
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d, v_vis, __ns, __fs) => n
                 _ => ""
             }
             if (gvname.length() > 0) {
@@ -17610,20 +17619,20 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
     while (pri < program.length()) {
         var pr_kind: String = gen.classify_stmt(program[pri])
         if (pr_kind == "class") {
-            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+            var pr_name: String = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                 _ => ""
             }
             // Only the primary base contributes fields — see the layout rule in
             // gen_class_decl_with_parents. parents[0] is that base.
-            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => ps
+            var pr_parent_all: List<String> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => ps
                 _ => []
             }
             var pr_parent: String = ""
             if (pr_parent_all.length() > 0) { pr_parent = pr_parent_all[0] }
-            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => f
+            var pr_fields: List<AST.Param> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => f
                 _ => []
             }
-            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+            var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                 _ => []
             }
             if (pr_name.length() > 0) {
@@ -17654,7 +17663,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 // Declared generic parameter names, kept alongside the method list
                 // so a method returning a class type parameter can be typed at a
                 // call site: `Box<String>` states that `T` is `String` (BUGS #95).
-                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d, c_vis) => tps
+                var tpp_names: List<String> = match (program[pri]) { ClassDecl(n, tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => tps
                     _ => []
                 }
                 if (tpp_names.length() > 0) {
@@ -17713,7 +17722,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     }
                 }
             } else if (pr_kind2 == "class") {
-                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                     _ => ""
                 }
                 if (pr_cname.length() > 0) {
@@ -17727,7 +17736,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
-                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                         _ => []
                     }
                     var pr_mj: Float = 0
@@ -17747,10 +17756,10 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                     }
                 }
             } else if (pr_kind2 == "enum") {
-                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => n
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                     _ => ""
                 }
-                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis) => v
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
@@ -17784,10 +17793,10 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
-            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => n
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => n
                 _ => ""
             }
-            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => d
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
                 _ => ""
             }
             if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
@@ -17796,7 +17805,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
-            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis) => m
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
                 _ => []
             }
             var pr_mj2: Float = 0
@@ -17811,10 +17820,10 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 pr_mj2 = pr_mj2 + 1
             }
         } else if (pr_pk == "enum") {
-            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => n
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => n
                 _ => ""
             }
-            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis) => v
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d, e_vis, __ns, __fs) => v
                 _ => []
             }
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {

@@ -3,6 +3,7 @@
 // Blocks compilation on errors by default (use --no-check to bypass).
 
 import "./ast.sf" as AST
+import "./diag.sf" as Diag
 
 // The one spelling of "this file provably belongs to no package", shared by both
 // sides of the package seam: main.sf produces it when a file sits under no
@@ -23,11 +24,22 @@ class Scope {
     var vars: Map<String, AST.Type>
     var narrowed: Map<String, AST.Type>
     var used: Map<String, Bool>
+    // Names bound by a match-arm payload pattern, which check_unused_in_scope
+    // exempts. They live in `vars` like any other binding — they must, so uses
+    // resolve and types are known — but they are not *declarations the author
+    // chose to make*: check_pattern_arity requires every payload field to be
+    // named, so `match (s) { Span(line, col, offset, len) => line }` has to
+    // spell all four and an unread one is compiler-mandated, not a defect.
+    // Tracking them as a separate set rather than skipping the arm scope
+    // wholesale keeps a `var` declared inside an arm body checked: BlockExpr
+    // pushes no scope of its own, so such a var lands in this same scope.
+    var pattern_bound: Map<String, Bool>
 
     fun init() {
         this.vars = {}
         this.narrowed = {}
         this.used = {}
+        this.pattern_bound = {}
     }
 }
 
@@ -68,6 +80,14 @@ class TypeEnv {
     fun define_var(name: String, typ: AST.Type) {
         var scope: Scope = this.current_scope()
         scope.vars.set(name, typ)
+    }
+
+    // Same as define_var, but marks the name as bound by a match-arm pattern so
+    // check_unused_in_scope skips it. See the comment on Scope.pattern_bound.
+    fun define_pattern_var(name: String, typ: AST.Type) {
+        var scope: Scope = this.current_scope()
+        scope.vars.set(name, typ)
+        scope.pattern_bound.set(name, true)
     }
 
     fun get_var_type(name: String): AST.Type {
@@ -408,21 +428,60 @@ class NullChecker {
         this.entry_aliases = {}
     }
 
+    // The checker prints its diagnostics in a batch from error_report() at the
+    // end of the walk, not at the call site, so these only accumulate. Each also
+    // records into the shared Diag sink so --json and the LSP can read checker
+    // errors as data — which they never could before, since the client scraped
+    // stdout for the *parser's* line/col format that the checker does not emit.
+    //
+    // `error(msg)` records with no span: most checker errors are about
+    // expressions, and expression spans do not exist yet. `error_at(span, msg)`
+    // is the located sibling — call it wherever a declaration span is in hand
+    // (WS1a put spans on every declaration node), and the diagnostic reaches the
+    // editor with a jump target.
     fun error(msg: String) {
         this.errors.push(msg)
+        Diag.record_error("checker", AST.span_none(), msg)
+    }
+
+    fun error_at(s: AST.Span, msg: String) {
+        this.errors.push(msg)
+        Diag.record_error("checker", s, msg)
     }
 
     fun warn(msg: String) {
         this.warnings.push(msg)
+        Diag.record_warn("checker", AST.span_none(), msg)
     }
 
+    fun warn_at(s: AST.Span, msg: String) {
+        this.warnings.push(msg)
+        Diag.record_warn("checker", s, msg)
+    }
+
+    // Warn about declarations in the innermost scope that nothing ever read.
+    //
+    // Match-arm payload bindings are exempt, and that exemption is 97.8% of this
+    // warning's former output — 1725 of 1763 lines emitted while checking the
+    // compiler's own source. check_pattern_arity REQUIRES every payload field to
+    // be named, so `match (s) { Span(line, col, offset, len) => line }` cannot be
+    // written any shorter and the three unread bindings are the language's doing,
+    // not the author's. `src/compiler/ast.sf` is built out of that idiom, and
+    // this file's own `TypeAlias(ta_n, ta_t, ta_vis) => {}` was three warnings
+    // from an empty arm. Same rationale already written down for lambda params in
+    // check_lambda_body: a compiler-mandated binding must not draw a warning.
+    //
+    // The exemption is by binding kind, not by skipping the arm scope, because
+    // BlockExpr pushes no scope — a `var` declared inside a match-arm body lands
+    // in the arm's scope, and dropping the whole scope's check would stop
+    // reporting those. `_` and a `_`-prefix still silence any binding.
     fun check_unused_in_scope() {
         var scope: Scope = this.env.scopes[this.env.scopes.length() - 1]
         var declared: List<String> = scope.vars.keys()
         var i: Float = 0
         while (i < declared.length()) {
             var name: String = declared[i]
-            if (!name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
+            if (!scope.pattern_bound.has(name) and !name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
                 this.warn("unused variable '" + name + "'")
             }
             i = i + 1
@@ -435,8 +494,8 @@ class NullChecker {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var ptype: String = this.type_node_to_string(pt)
             sb.append(pname)
             sb.append(":")
@@ -813,6 +872,95 @@ class NullChecker {
         return false
     }
 
+    // Infer a condition and require it to be Bool (BUGS #143).
+    //
+    // Codegen lowers every condition through `to_i1`, which is
+    // `trunc i64 %v to i1` — the LOW BIT of the NaN-boxed value. That is right
+    // for a real Bool only because __val_tag_bool happens to put the truth
+    // value in bit 0. For anything else it is nonsense: `if (42)` was false
+    // because 42 is even, `if (43)` true because 43 is odd, and `if (some_str)`
+    // answered on the low bit of a heap address, so it could flip between runs.
+    // Nothing diagnosed it, because the If/While arms called infer_expr and
+    // threw the type away.
+    //
+    // The check is deliberately one-sided: it fires only on a type we can PROVE
+    // is not Bool, exactly like scalar_mismatch. Any, Nil, unions, generics,
+    // class and enum types are all let through. A too-eager version here does
+    // not merely annoy — the checker type-checks the compiler's own source, so a
+    // false error is a broken bootstrap. Tightening the let-through set is a
+    // separate, measured step.
+    //
+    // `ctx` names the construct ("if", "while", "ternary", "and"/"or") so the
+    // message says where. Codegen is unchanged: once the condition is provably
+    // Bool, trunc is the correct lowering.
+    fun check_condition(cond: AST.Expr, ctx: String) {
+        var t: String = this.infer_expr(cond)
+        if (t == "Bool") return
+        var provably_not_bool: Bool = false
+        if (this.is_scalar_name(t)) { provably_not_bool = true }
+        if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") { provably_not_bool = true }
+        if (!provably_not_bool) return
+        var hint: String = ""
+        if (t == "Int" or t == "Float") { hint = "; compare it, e.g. `x != 0`" }
+        else if (t == "String") { hint = "; compare it, e.g. `s != \"\"`" }
+        else if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") {
+            hint = "; test its size, e.g. `xs.length() > 0`"
+        }
+        this.error(ctx + " condition must be Bool, got " + t + hint)
+    }
+
+    // Check a call's argument types against the callee's declared parameter
+    // types (BUGS #145).
+    //
+    // Nothing did this before. `fun f(x: String)` called as `f(42)` compiled
+    // clean and segfaulted at runtime, because the checker never compared an
+    // argument to a parameter — for functions, methods, constructors or
+    // `List<Int>.push`. Only *arity* was checked, and even that lives in codegen
+    // (`expr_body.sf:2559`), not here. Meanwhile `var s: String = 42` WAS
+    // rejected, so the type system looked like it worked; the hole was exactly at
+    // the call boundary.
+    //
+    // `func_params` already held what this needs — `params_list_to_string`
+    // encodes "name:Type" pairs and three call sites already parse them back for
+    // generic return-type resolution. The data was there; nobody compared it.
+    //
+    // Reuses `scalar_mismatch`, so this inherits its one-sided discipline: it
+    // fires only on a pair we can PROVE wrong (two different scalars, with
+    // Int->Float allowed as a widening), and lets Any, Nil, unions, generics,
+    // class and enum types through. That is deliberately narrower than a real
+    // subtyping check. A broader version would need `is_subtype` on every
+    // annotation spelling the codebase uses, and a false error here does not
+    // merely annoy — the checker type-checks the compiler's own source, so it
+    // breaks the bootstrap. Widening the proof set is a separate, measured step.
+    //
+    // Type parameters are skipped: a param typed `T` is resolved from the
+    // argument, not checked against it, which is what resolve_type_params does
+    // just below.
+    //
+    // `key` is the func_params key (mangled: `Class__method`, `Class__init`);
+    // `disp` is what the user wrote and is the only one that reaches the message.
+    fun check_call_args(key: String, disp: String, args: List<AST.Expr>) {
+        var params_str: String = this.env.get_func_params(key)
+        if (params_str.length() == 0) return
+        var entries: List<String> = this.split_type_args(params_str)
+        var i: Float = 0
+        while (i < entries.length() and i < args.length()) {
+            var entry: String = entries[i]
+            var colon_pos: Float = entry.index_of(":")
+            if (colon_pos >= 0) {
+                var pname: String = entry.slice(0, colon_pos)
+                var ptype: String = entry.slice(colon_pos + 1, entry.length())
+                if (!this.is_type_param(ptype)) {
+                    var atype: String = this.infer_expr(args[i])
+                    if (this.scalar_mismatch(ptype, atype)) {
+                        this.error("argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+
     fun is_subtype(child: String, parent: String): Bool {
         if (child == parent) return true
         if (parent == "Any") return true
@@ -893,7 +1041,7 @@ class NullChecker {
     fun is_map_get_expr(expr: AST.Expr): Bool {
         // Returns true if expr is a MethodCall with method "get" on a map
         return match (expr) {
-            MethodCall(obj, method, args) => method == "get"
+            MethodCall(obj, method, args, __ks) => method == "get"
             _ => false
         }
     }
@@ -1074,7 +1222,7 @@ class NullChecker {
 
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
                 // not an AST.Type node. type_node_to_string() matched a String
                 // against AST.Type patterns and fell through to the first arm, so
@@ -1093,7 +1241,7 @@ class NullChecker {
                 var rpi: Float = 0
                 while (rpi < params.length()) {
                     var p: AST.Param = params[rpi]
-                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
                     var pt_str: String = this.type_node_to_string(pt)
                     if (pt_str.starts_with("Fun[")) {
                         // Record: "funcname:index" → receiver class name
@@ -1108,12 +1256,12 @@ class NullChecker {
                 // parameters, so a block-syntax argument can be typed (BUGS #86).
                 this.register_fun_param_sigs(name, params)
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 this.register_enum(name, variants)
                 this.register_type_visibility(name, e_vis)
                 this.register_module_decl(name, e_vis)
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 if (doc.starts_with("@actor")) {
                     this.actor_classes.set(name, true)
                 }
@@ -1153,24 +1301,24 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mn
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mn
                         _ => ""
                     }
                     // A bodyless method is abstract: it is a requirement on
                     // subclasses. A method with a body is inherited as-is.
                     var method_body: List<AST.Stmt> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mb
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mb
                         _ => []
                     }
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
                     var method_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mr
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
                         _ => "Any"
                     }
                     var method_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, f_vis) => mp
+                        FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                         _ => []
                     }
                     if (method_name.length() > 0) {
@@ -1203,23 +1351,23 @@ class NullChecker {
                     var ami: Float = 0
                     while (ami < methods.length()) {
                         var am_name: String = match (methods[ami]) {
-                            FunDecl(mn, mp, mr, mb, md, f_vis) => mn
+                            FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mn
                             _ => ""
                         }
                         if (am_name.length() > 0 and am_name != "init") {
                             var am_params: List<AST.Param> = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md, f_vis) => mp
+                                FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mp
                                 _ => []
                             }
                             var am_ret: String = match (methods[ami]) {
-                                FunDecl(mn, mp, mr, mb, md, f_vis) => mr
+                                FunDecl(mn, mp, mr, mb, md, f_vis, __ns, __fs) => mr
                                 _ => "Nil"
                             }
                             var api: Float = 0
                             while (api < am_params.length()) {
                                 var ap: AST.Param = am_params[api]
-                                var ap_name: String = match (ap) { Param(n, t, d, p_vis) => n }
-                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis) => t }
+                                var ap_name: String = match (ap) { Param(n, t, d, p_vis, __ns) => n }
+                                var ap_type: AST.Type = match (ap) { Param(n, t, d, p_vis, __ns) => t }
                                 var ap_type_str: String = this.type_node_to_string(ap_type)
                                 if (ap_type_str != "Any" and !this.is_sendable(ap_type_str)) {
                                     this.warn("actor '" + name + "' method '" + am_name + "' parameter '" + ap_name + "' has non-Sendable type '" + ap_type_str + "'")
@@ -1235,7 +1383,7 @@ class NullChecker {
                     }
                 }
             }
-            VarDecl(n, t, i, d, v_vis) => {
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {
                 // `type Name = T` reaches the checker as a VarDecl carrying the
                 // docstring "@type_alias", not as a TypeAlias node — the parser
                 // desugars it (parser.sf's parse_stmt). So the alias's visibility
@@ -1280,8 +1428,8 @@ class NullChecker {
         var i: Float = 0
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
-            var vname: String = match (v) { Variant(n, f) => n }
-            var vfields: String = match (v) { Variant(n, f) => f }
+            var vname: String = match (v) { Variant(n, f, __ns) => n }
+            var vfields: String = match (v) { Variant(n, f, __ns) => f }
             variant_names.push(vname)
             if (vfields.length() > 0) {
                 this.env.enum_fields.set(name + "." + vname, vfields)
@@ -1620,12 +1768,12 @@ class NullChecker {
 
     fun check_leaks_in_decl(stmt: AST.Stmt) {
         match (stmt) {
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 if (f_vis != "private") {
                     this.check_fun_leaks(this.exposure_label(f_vis) + " fun '" + name + "'", params, ret_type)
                 }
             }
-            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // L4: a member of a private class is a no-op, and so is the class's
                 // own parent list. Every path to any of it is already gated by the
                 // enclosing private type, so erroring would force annotating every
@@ -1652,9 +1800,9 @@ class NullChecker {
                 // L1: fields reachable from outside — everything but `private`.
                 var fi: Float = 0
                 while (fi < fields.length()) {
-                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
-                    var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
-                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pt }
+                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+                    var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => p_vis }
+                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
                     if (f_vis != "private") {
                         this.check_leak(this.exposure_label(f_vis) + " field '" + name + "." + f_name + "'",
                             "its declared type", this.type_to_str(f_type))
@@ -1665,19 +1813,19 @@ class NullChecker {
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var m_name: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mn
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mn
                         _ => ""
                     }
                     var m_vis: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mv
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mv
                         _ => "public"
                     }
                     var m_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mp
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mp
                         _ => []
                     }
                     var m_ret: String = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md, mv) => mr
+                        FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mr
                         _ => ""
                     }
                     if (m_name.length() > 0 and m_vis != "private") {
@@ -1687,12 +1835,12 @@ class NullChecker {
                     mi = mi + 1
                 }
             }
-            VarDecl(n, t, i, d, v_vis) => {
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {
                 if (v_vis != "private" and d != "@type_alias") {
                     this.check_var_leaks(n, t, i, v_vis)
                 }
             }
-            EnumDecl(name, variants, doc, e_vis) => {
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
                 // A variant's payload spelling is a String on the Variant node
                 // ("field:Type,field:Type"), and mentioned_type_names splits on
                 // the punctuation that separates them, so a private type anywhere
@@ -1700,8 +1848,8 @@ class NullChecker {
                 if (e_vis != "private") {
                     var vi: Float = 0
                     while (vi < variants.length()) {
-                        var v_name: String = match (variants[vi]) { Variant(vn, vf) => vn }
-                        var v_fields: String = match (variants[vi]) { Variant(vn, vf) => vf }
+                        var v_name: String = match (variants[vi]) { Variant(vn, vf, __ns) => vn }
+                        var v_fields: String = match (variants[vi]) { Variant(vn, vf, __ns) => vf }
                         this.check_leak(this.exposure_label(e_vis) + " enum '" + name + "." + v_name + "'",
                             "its payload", v_fields)
                         vi = vi + 1
@@ -1740,8 +1888,8 @@ class NullChecker {
     fun check_fun_leaks(subject: String, params: List<AST.Param>, ret_type: String) {
         var pi: Float = 0
         while (pi < params.length()) {
-            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis) => pn }
-            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis) => pt }
+            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
             // AST.Param is the node for both a class field and a function
             // parameter, so type_to_str is the one renderer for both — the raw
             // String / AST.Type split that forces two entry points here is I3's
@@ -1791,17 +1939,17 @@ class NullChecker {
     /// syntactically one. Both spellings: `Slot()` and `Mod.Slot()`.
     fun constructor_call_name(expr: AST.Expr): String {
         var name: String = match (expr) {
-            Call(callee, args) => match (callee) {
-                Variable(n) => n
-                Ref(rk, rn, rs) => rn
-                MemberAccess(o, f) => f
+            Call(callee, args, __cs) => match (callee) {
+                Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
+                MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             // `Mod.Slot()` parses as a MethodCall with the module alias as the
             // receiver, not as a Call — the same asymmetry that made `private init`
             // enforceable only through bare references until it was covered in both
             // places.
-            MethodCall(obj, method, args) => method
+            MethodCall(obj, method, args, __ks) => method
             _ => ""
         }
         if (name.length() == 0) { return "" }
@@ -1826,11 +1974,11 @@ class NullChecker {
                     AST.Type.GenericType("List", [this.infer_type_readonly(elements[0])])
                 }
             }
-            Call(callee, args) => {
+            Call(callee, args, __cs) => {
                 var cname: String = match (callee) {
-                    Variable(n) => n
-                    Ref(rk, rn, rs) => rn
-                    MemberAccess(o, f) => f
+                    Variable(n, __vs) => n
+                    Ref(rk, rn, rs, __rs) => rn
+                    MemberAccess(o, f, __ms) => f
                     _ => ""
                 }
                 if (cname.length() == 0) {
@@ -1851,8 +1999,8 @@ class NullChecker {
         var qualified: String = this.current_prefix + name
         var fi: Float = 0
         while (fi < fields.length()) {
-            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => pn }
-            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis) => p_vis }
+            var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+            var f_vis: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => p_vis }
             if (this.is_restricting_visibility(f_vis)) {
                 this.mark_restricted_member(name, qualified, f_name, f_vis)
             }
@@ -1861,15 +2009,15 @@ class NullChecker {
         var mi: Float = 0
         while (mi < methods.length()) {
             var m_name: String = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, m_vis) => mn
+                FunDecl(mn, mp, mr, mb, md, m_vis, __ns, __fs) => mn
                 _ => ""
             }
             var m_vis: String = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, mv) => mv
+                FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mv
                 _ => "public"
             }
             var m_body: List<AST.Stmt> = match (methods[mi]) {
-                FunDecl(mn, mp, mr, mb, md, mv) => mb
+                FunDecl(mn, mp, mr, mb, md, mv, __ns, __fs) => mb
                 _ => []
             }
             if (m_name.length() > 0 and this.is_restricting_visibility(m_vis)) {
@@ -2210,12 +2358,12 @@ class NullChecker {
 
     fun check_spawn_captures(expr: AST.Expr) {
         var spawn_method: String = match (expr) {
-            MethodCall(obj, method, args) => method
+            MethodCall(obj, method, args, __ks) => method
             _ => ""
         }
         if (spawn_method == "spawn") {
             var spawn_args = match (expr) {
-                MethodCall(obj, method, args) => args
+                MethodCall(obj, method, args, __ks) => args
                 _ => []
             }
             if (spawn_args.length() > 0) {
@@ -2236,7 +2384,7 @@ class NullChecker {
 
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            VarDecl(name, type_ann, init, doc, v_vis) => {
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
@@ -2258,7 +2406,7 @@ class NullChecker {
                     // synthetic NilLit initializer and doc "@type_alias"; that nil is
                     // an implementation artifact, not a real assignment, so skip it.
                     if (doc != "@type_alias" and !this.is_nullable_type(type_ann_node) and this.is_nil_init(init)) {
-                        this.error(name + ": cannot assign nil to non-nullable " + type_ann_str)
+                        this.error_at(__ns, name + ": cannot assign nil to non-nullable " + type_ann_str)
                     }
                     // Provable-scalar-mismatch check. The old code stored the
                     // annotation and never looked at the initializer's type, so
@@ -2270,7 +2418,7 @@ class NullChecker {
                     // subtype test would reject `var xs: List<Int> = [1,2,3]`);
                     // tightening those is a separate, measured step.
                     if (doc != "@type_alias" and this.scalar_mismatch(type_ann_str, init_type)) {
-                        this.error(name + ": cannot assign " + init_type + " to " + type_ann_str)
+                        this.error_at(__ns, name + ": cannot assign " + init_type + " to " + type_ann_str)
                     }
                     this.env.define_var(name, type_ann_node)
                 } else if (init_type != "Any") {
@@ -2290,12 +2438,12 @@ class NullChecker {
                     // already exempt from the unused-variable warning at line 399
                     // for the same reason.
                     if (!name.starts_with("__")) {
-                        this.warn(name + ": cannot infer type, add explicit annotation")
+                        this.warn_at(__ns, name + ": cannot infer type, add explicit annotation")
                     }
                     this.env.define_var(name, AST.Type.AnyType)
                 }
             }
-            FunDecl(name, params, ret_type, body, doc, f_vis) => {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
                 // Register method with class prefix if inside a class
                 var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {
@@ -2329,8 +2477,8 @@ class NullChecker {
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
-                    var pname: String = match (p) { Param(n, t, d, p_vis) => n }
-                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+                    var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+                    var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
                     this.env.define_var(pname, pt)
                     j = j + 1
                 }
@@ -2351,7 +2499,7 @@ class NullChecker {
                 }
             }
             If(cond, then_branch, else_branch) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "if")
                 // Then-branch: apply narrowing from condition
                 this.env.push_scope()
                 this.apply_narrowing(cond)
@@ -2366,7 +2514,7 @@ class NullChecker {
                 this.env.pop_scope()
             }
             While(cond, body) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "while")
                 this.env.push_scope()
                 this.loop_depth = this.loop_depth + 1
                 this.check_stmts(body)
@@ -2383,7 +2531,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
             }
-            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis) => {
+            ClassDecl(name, __tps, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
                 // Unlike register_decl this runs only over the statements being
                 // checked, never over the imported list, so the class here is
                 // the one whose body is about to be walked. Setting the bare key
@@ -2421,7 +2569,7 @@ class NullChecker {
                 this.check_stmts(methods)
                 this.current_class = saved_class
             }
-            EnumDecl(n, v, d, e_vis) => {}
+            EnumDecl(n, v, d, e_vis, __ns, __fs) => {}
             Break => {
                 if (this.loop_depth <= 0) {
                     this.error("break: 'break' outside of a loop")
@@ -2469,7 +2617,7 @@ class NullChecker {
         // Single-match approach: extract all narrowing info in one pass
         // to avoid re-matching the same expression (causes native segfault).
         match (cond) {
-            MethodCall(o, m, a) => {
+            MethodCall(o, m, a, __ks) => {
                 // map.has() guard
                 if (m == "has") {
                     this.env.narrow("__has_guard", AST.Type.ClassType("active"))
@@ -2497,14 +2645,14 @@ class NullChecker {
                     }
                 }
             }
-            Variable(n) => {
+            Variable(n, __vs) => {
                 // Truthy check: if (x) { ... } → x is non-nullable
                 var var_type_node: AST.Type = this.env.get_var_type(n)
                 if (this.is_nullable_type(var_type_node)) {
                     this.env.narrow(n, this.strip_nil_from_node(var_type_node))
                 }
             }
-            Ref(rk, rn, rs) => {
+            Ref(rk, rn, rs, __rs) => {
                 var ref_type_node: AST.Type = this.env.get_var_type(rn)
                 if (this.is_nullable_type(ref_type_node)) {
                     this.env.narrow(rn, this.strip_nil_from_node(ref_type_node))
@@ -2594,8 +2742,8 @@ class NullChecker {
 
     fun get_variable_name_from_expr(expr: AST.Expr): String {
         return match (expr) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
             _ => ""
         }
     }
@@ -2678,11 +2826,11 @@ class NullChecker {
             BoolLit(v) => AST.Type.BoolType
             StringLit(s) => AST.Type.StringType
             NilLit => AST.Type.NilType
-            Variable(name) => {
+            Variable(name, __vs) => {
                 this.env.mark_used(name)
                 this.env.get_var_type(name)
             }
-            Ref(rkind, rname, rslot) => {
+            Ref(rkind, rname, rslot, __rs) => {
                 this.env.mark_used(rname)
                 // A global or func Ref carries the DEFINING module's prefix in
                 // rslot (resolve.sf resolve_variable), so a bare cross-module
@@ -2697,9 +2845,19 @@ class NullChecker {
                 this.env.get_var_type(rname)
             }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
-            Unary(op, right) => this.infer_type(right)
-            Call(callee, args) => this.parse_type_node(this.infer_call(callee, args))
-            Assign(name, value) => this.parse_type_node(this.check_assign(name, value))
+            // `!` is a condition site too (BUGS #143) and its RESULT is Bool,
+            // not the operand's type — returning the operand type made `!42`
+            // infer as Int, which then passed as a condition and as an Int
+            // elsewhere. `-` and `~` are arithmetic and keep the operand type.
+            Unary(op, right) => match (op) {
+                "!" => {
+                    this.check_condition(right, "`!`")
+                    AST.Type.BoolType
+                }
+                _ => this.infer_type(right)
+            }
+            Call(callee, args, __cs) => this.parse_type_node(this.infer_call(callee, args))
+            Assign(name, value, __as) => this.parse_type_node(this.check_assign(name, value, __as))
             // Both operands are code, so walk them. Returning BoolType without
             // visiting `left` and `right` meant a variable used ONLY inside an
             // `and`/`or` operand was never marked used and drew a false "unused
@@ -2726,19 +2884,25 @@ class NullChecker {
             // codegen/stmts_body.sf. The scope is pushed and popped so the
             // narrowing cannot escape into the enclosing expression — `(a != nil
             // and b) or a.f` must still reject `a.f`.
+            // Both operands are conditions and go through check_condition
+            // (BUGS #143) — `and`/`or` reach the same `to_i1` low-bit lowering
+            // as `if`, so `42 and true` was false for the same reason `if (42)`
+            // was. The right operand is still checked INSIDE the pushed scope,
+            // for the reason spelled out above: checking it unnarrowed is a new
+            // false error, not a stricter check.
             Logical(left, op, right) => {
-                this.infer_type(left)
+                this.check_condition(left, op)
                 this.env.push_scope()
                 if (op == "and") {
                     this.apply_narrowing(left)
                 } else {
                     this.apply_inverse_narrowing(left)
                 }
-                this.infer_type(right)
+                this.check_condition(right, op)
                 this.env.pop_scope()
                 AST.Type.BoolType
             }
-            MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
+            MemberAccess(obj, field, __ms) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
             // A lambda's body is code, so walk it. Returning the FuncType without
@@ -2751,8 +2915,8 @@ class NullChecker {
                 this.check_lambda_body(p, b)
                 AST.Type.FuncType([], AST.Type.AnyType)
             }
-            GetField(obj, field) => AST.Type.AnyType
-            SetField(obj, field, value) => {
+            GetField(obj, field, __gs) => AST.Type.AnyType
+            SetField(obj, field, value, __ss) => {
                 // A write is an access. This arm used to infer only `value` and
                 // never look at `obj` at all, so `private` stopped a field from
                 // being READ while still permitting it to be MUTATED — which is
@@ -2810,7 +2974,7 @@ class NullChecker {
                 }
             }
             IndexSet(obj, index, value) => this.infer_type(value)
-            MethodCall(obj, method, args) => this.parse_type_node(this.infer_method_call(obj, method, args))
+            MethodCall(obj, method, args, __ks) => this.parse_type_node(this.infer_method_call(obj, method, args, __ks))
             MapLit => AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
             BlockExpr(stmts, value) => {
                 this.check_stmts(stmts)
@@ -2821,7 +2985,7 @@ class NullChecker {
                 AST.Type.BoolType
             }
             IfExpr(cond, then_body, then_val, else_body, else_val) => {
-                this.infer_expr(cond)
+                this.check_condition(cond, "if-expression")
                 this.check_stmts(then_body)
                 var then_type: AST.Type = this.infer_type(then_val)
                 this.check_stmts(else_body)
@@ -2892,8 +3056,8 @@ class NullChecker {
         var li: Float = 0
         while (li < params.length()) {
             var lp: AST.Param = params[li]
-            var lp_name: String = match (lp) { Param(n, t, d, p_vis) => n }
-            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis) => t }
+            var lp_name: String = match (lp) { Param(n, t, d, p_vis, __ns) => n }
+            var lp_type: AST.Type = match (lp) { Param(n, t, d, p_vis, __ns) => t }
             this.env.define_var(lp_name, lp_type)
             li = li + 1
         }
@@ -2946,8 +3110,8 @@ class NullChecker {
             // TryExpr, Yield and TupleLit were never added, so those four fell
             // through to an indeterminate value instead of "" (BUGS #76).
             var obj_name: String = match (obj) {
-                Variable(n) => n
-                Ref(rk, rn, rs) => rn
+                Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             // Enum variant access (Color.Red, Option.Some, etc.)
@@ -3279,9 +3443,9 @@ class NullChecker {
 
     fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
         var name: String = match (callee) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
-            MemberAccess(o, f) => f
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
+            MemberAccess(o, f, __ms) => f
             // Anything else in callee position is an indirect call — a lambda
             // value, a field holding a function, an element of a list of
             // functions. There is no name to look up, and "" is what every
@@ -3356,6 +3520,11 @@ class NullChecker {
         // through here at all (infer_method_call handles those).
         if (name.length() > 0 and this.env.class_fields.has(this.qualified_class_key(name))) {
             this.check_constructor_visibility(name)
+            // A construction's parameters live under "Class__init", not under the
+            // class name, so it needs its own check_call_args call (BUGS #145).
+            // register_decl registers the class as a function returning its own
+            // type, so the `name` lookup below finds a return type but no params.
+            this.check_call_args(this.generic_base(name) + "__init", "constructor '" + name + "'", args)
         }
         // Look up declared return type
         if (name.length() > 0) {
@@ -3363,6 +3532,11 @@ class NullChecker {
             if (this.is_generic_func(name)) {
                 this.check_generic_constraints(name, args)
             }
+            // Compare each argument against its declared parameter type (BUGS
+            // #145). Placed before the return-type work below because that path
+            // has several early returns, and an argument mismatch has to be
+            // reported whatever the return type turns out to be.
+            this.check_call_args(name, "'" + name + "'", args)
             var ret: String = this.env.get_func_ret(name)
             if (ret != "Any") {
                 // If return type contains a type parameter, try to resolve it
@@ -3397,18 +3571,18 @@ class NullChecker {
         return "Any"
     }
 
-    fun check_assign(name: String, value: AST.Expr): String {
+    fun check_assign(name: String, value: AST.Expr, name_span: AST.Span): String {
         var val_type: String = this.infer_expr(value)
         var var_type: String = this.env.get_var(name)
         if (var_type != "Any" and !this.is_nullable(var_type) and this.is_nullable(val_type)) {
-            this.error(name + ": cannot assign nullable " + val_type + " to non-nullable " + var_type)
+            this.error_at(name_span, name + ": cannot assign nullable " + val_type + " to non-nullable " + var_type)
         }
         return val_type
     }
 
     // --- Method call inference (the key null-safety check) ---
 
-    fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): String {
+    fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>, method_span: AST.Span): String {
         var obj_type: String = this.infer_expr(obj)
 
         // `__iter_get` — the for-in desugaring's element read (BUGS #62). It is
@@ -3431,8 +3605,8 @@ class NullChecker {
         // Desugar receiver closures for method calls too
         // Check both "ClassName__method:idx" and "method:idx" patterns
         var obj_name: String = match (obj) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
             _ => ""
         }
         var mdi: Float = 0
@@ -3470,8 +3644,8 @@ class NullChecker {
         // Enum variant construction: Shape.Circle(5) → type is "Shape"
         if (obj_type == "Any") {
             var obj_name: String = match (obj) {
-                Variable(n) => n
-                Ref(rk, rn, rs) => rn
+                Variable(n, __vs) => n
+                Ref(rk, rn, rs, __rs) => rn
                 _ => ""
             }
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
@@ -3541,10 +3715,12 @@ class NullChecker {
         // Check: calling method on nullable object
         if (this.is_nullable(obj_type) and this.requires_non_nil(method)) {
             var obj_name: String = this.get_variable_name_from_expr(obj)
+            // Located on the METHOD name, not the object: the fault is calling
+            // this method without a nil check, and that is where the caret helps.
             if (obj_name.length() > 0) {
-                this.error("cannot call ." + method + "() on nullable '" + obj_name + "' (type " + obj_type + "); add a nil check first")
+                this.error_at(method_span, "cannot call ." + method + "() on nullable '" + obj_name + "' (type " + obj_type + "); add a nil check first")
             } else {
-                this.error("cannot call ." + method + "() on nullable type " + obj_type + "; add a nil check first")
+                this.error_at(method_span, "cannot call ." + method + "() on nullable type " + obj_type + "; add a nil check first")
             }
         }
 
@@ -3599,6 +3775,12 @@ class NullChecker {
             if (this.is_generic_func(full_name)) {
                 this.check_generic_constraints(full_name, args)
             }
+            // Argument types against declared parameter types (BUGS #145).
+            // Methods register their params under the same "Class__method" key
+            // free functions use, so check_call_args needs no method-specific
+            // logic. Placed before the return-type work, which has several early
+            // returns.
+            this.check_call_args(full_name, "method '" + method + "'", args)
             var ret: String = this.env.get_func_ret(full_name)
             // A class type parameter is substituted from the receiver's own
             // declared type — `Box<String>` says `T` is `String` — before
@@ -3750,7 +3932,7 @@ class NullChecker {
             // gets the subject's type rather than a payload field's.
             var named_wc: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
             if (named_wc.length() > 0) {
-                this.env.define_var(named_wc, this.parse_type_node(subj_type))
+                this.env.define_pattern_var(named_wc, this.parse_type_node(subj_type))
             }
             var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
             if (subj_type != "Any") {
@@ -3760,7 +3942,7 @@ class NullChecker {
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
                 var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
-                this.env.define_var(bindings[bi], this.parse_type_node(field_type))
+                this.env.define_pattern_var(bindings[bi], this.parse_type_node(field_type))
                 bi = bi + 1
             }
 
@@ -4101,7 +4283,7 @@ class NullChecker {
         var i: Float = 0
         while (i < params.length()) {
             var p: AST.Param = params[i]
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
             var sig: String = this.fun_param_sig_of(pt)
             if (sig != "!") {
                 this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
@@ -4135,13 +4317,13 @@ class NullChecker {
         var changed: Bool = false
         var i: Float = 0
         while (i < params.length()) {
-            var pname: String = match (params[i]) { Param(n, t, d, p_vis) => n }
-            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis) => t }
-            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis) => d }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            var pdef: AST.Expr = match (params[i]) { Param(n, t, d, p_vis, __ns) => d }
             // Rebuilding an existing Param below, so carry its visibility across
             // rather than resetting to "public": this rewrite exists only to fill in
             // an inferred type and must not otherwise alter the declaration.
-            var pvis: String = match (params[i]) { Param(n, t, d, p_vis) => p_vis }
+            var pvis: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => p_vis }
             if (this.is_any_type(pt) and pname != "self") {
                 if (i < declared.length()) {
                     var declared_str: String = declared[i].trim()
@@ -4167,7 +4349,7 @@ class NullChecker {
                         + " so a block can be typed from it.")
                 }
             }
-            new_params.push(AST.Param.Param(pname, pt, pdef, pvis))
+            new_params.push(AST.Param.Param(pname, pt, pdef, pvis, __ns))
             i = i + 1
         }
         if (changed) {
@@ -4184,7 +4366,7 @@ class NullChecker {
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
         if (params.length() > 0) {
-            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis) => n }
+            var first_param_name: String = match (params[0]) { Param(n, t, d, p_vis, __ns) => n }
             if (first_param_name == "self") return nil
         }
 
@@ -4203,7 +4385,9 @@ class NullChecker {
 
         // Build new params: prepend 'self' parameter
         var new_params: List<AST.Param> = []
-        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public"))
+        // Synthesized, so it has no source region: the user never wrote `self`
+        // here, and pointing an editor at one would be a lie.
+        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit, "public", AST.span_none()))
         var pi: Float = 0
         while (pi < params.length()) {
             new_params.push(params[pi])
@@ -4228,8 +4412,8 @@ class NullChecker {
                 var result: AST.Stmt = AST.Stmt.ExprStmt(rewritten)
                 result
             }
-            VarDecl(name, type_ann, init, doc, v_vis) => {
-                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis)
+            VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
+                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc, v_vis, __ns, __fs)
             }
             Return(value) => {
                 AST.Stmt.Return(this.rewrite_receiver_expr(value, fields, methods))
@@ -4280,15 +4464,15 @@ class NullChecker {
 
     fun classify_receiver_expr(expr: AST.Expr): String {
         return match (expr) {
-            Assign(n, v) => "assign"
-            Variable(n) => "variable"
-            Ref(rk, rn, rs) => "variable"
-            Call(c, a) => "call"
+            Assign(n, v, __as) => "assign"
+            Variable(n, __vs) => "variable"
+            Ref(rk, rn, rs, __rs) => "variable"
+            Call(c, a, __cs) => "call"
             Binary(l, o, r) => "binary"
             Unary(o, r) => "unary"
-            MethodCall(o, m, a) => "method_call"
-            SetField(o, f, v) => "set_field"
-            GetField(o, f) => "get_field"
+            MethodCall(o, m, a, __ks) => "method_call"
+            SetField(o, f, v, __ss) => "set_field"
+            GetField(o, f, __gs) => "get_field"
             IndexGet(o, i) => "index_get"
             IndexSet(o, i, v) => "index_set"
             Logical(l, o, r) => "logical"
@@ -4299,41 +4483,52 @@ class NullChecker {
     }
 
     fun rewrite_recv_assign(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var name: String = match (expr) { Assign(n, v) => n    _ => "" }
-        var value: AST.Expr = match (expr) { Assign(n, v) => v    _ => AST.Expr.NilLit }
+        var name: String = match (expr) { Assign(n, v, __as) => n    _ => "" }
+        var value: AST.Expr = match (expr) { Assign(n, v, __as) => v    _ => AST.Expr.NilLit }
+        var name_span: AST.Span = match (expr) { Assign(n, v, __as) => __as    _ => AST.span_none() }
         if (fields.contains(name)) {
-            return AST.Expr.SetField(AST.Expr.This, name, this.rewrite_receiver_expr(value, fields, methods))
+            return AST.Expr.SetField(AST.Expr.This, name, this.rewrite_receiver_expr(value, fields, methods), name_span)
         }
-        return AST.Expr.Assign(name, this.rewrite_receiver_expr(value, fields, methods))
+        return AST.Expr.Assign(name, this.rewrite_receiver_expr(value, fields, methods), name_span)
     }
 
     fun rewrite_recv_variable(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var name: String = match (expr) { Variable(n) => n   Ref(rk, rn, rs) => rn   _ => "" }
+        var name: String = match (expr) { Variable(n, __vs) => n   Ref(rk, rn, rs, __rs) => rn   _ => "" }
+        var name_span: AST.Span = match (expr) { Variable(n, __vs) => __vs   Ref(rk, rn, rs, __rs) => __rs   _ => AST.span_none() }
         if (fields.contains(name)) {
-            return AST.Expr.GetField(AST.Expr.This, name)
+            return AST.Expr.GetField(AST.Expr.This, name, name_span)
         }
         return expr
     }
 
     fun rewrite_recv_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var callee: AST.Expr = match (expr) { Call(c, a) => c    _ => AST.Expr.NilLit }
-        var args: List<AST.Expr> = match (expr) { Call(c, a) => a    _ => [] }
+        var callee: AST.Expr = match (expr) { Call(c, a, __cs) => c    _ => AST.Expr.NilLit }
+        var args: List<AST.Expr> = match (expr) { Call(c, a, __cs) => a    _ => [] }
         var callee_name: String = match (callee) {
-            Variable(n) => n
-            Ref(rk, rn, rs) => rn
+            Variable(n, __vs) => n
+            Ref(rk, rn, rs, __rs) => rn
             _ => ""
         }
+        // `bare(x)` becoming `this.bare(x)` keeps pointing at `bare`, and the
+        // rebuilt Call keeps the original's extent — the rewrite is invisible to
+        // the user, so it must be invisible to their editor too.
+        var callee_span: AST.Span = match (callee) {
+            Variable(n, __vs) => __vs
+            Ref(rk, rn, rs, __rs) => __rs
+            _ => AST.span_none()
+        }
+        var call_span: AST.Span = match (expr) { Call(c, a, __cs) => __cs    _ => AST.span_none() }
         var name_ok: Bool = callee_name.length() > 0
         var in_methods: Bool = methods.contains(callee_name)
         var is_method: Bool = name_ok and in_methods
         var result: AST.Expr = expr
         if (is_method) {
             var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
-            result = AST.Expr.MethodCall(AST.Expr.This, callee_name, new_args)
+            result = AST.Expr.MethodCall(AST.Expr.This, callee_name, new_args, callee_span)
         } else {
             var new_callee: AST.Expr = this.rewrite_receiver_expr(callee, fields, methods)
             var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
-            result = AST.Expr.Call(new_callee, new_args)
+            result = AST.Expr.Call(new_callee, new_args, call_span)
         }
         return result
     }
@@ -4352,25 +4547,28 @@ class NullChecker {
     }
 
     fun rewrite_recv_method_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o    _ => AST.Expr.NilLit }
-        var method: String = match (expr) { MethodCall(o, m, a) => m    _ => "" }
-        var args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a    _ => [] }
+        var obj: AST.Expr = match (expr) { MethodCall(o, m, a, __ks) => o    _ => AST.Expr.NilLit }
+        var method: String = match (expr) { MethodCall(o, m, a, __ks) => m    _ => "" }
+        var args: List<AST.Expr> = match (expr) { MethodCall(o, m, a, __ks) => a    _ => [] }
+        var m_span: AST.Span = match (expr) { MethodCall(o, m, a, __ks) => __ks    _ => AST.span_none() }
         var new_obj: AST.Expr = this.rewrite_receiver_expr(obj, fields, methods)
         var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
-        return AST.Expr.MethodCall(new_obj, method, new_args)
+        return AST.Expr.MethodCall(new_obj, method, new_args, m_span)
     }
 
     fun rewrite_recv_set_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { SetField(o, f, v) => o    _ => AST.Expr.NilLit }
-        var field: String = match (expr) { SetField(o, f, v) => f    _ => "" }
-        var value: AST.Expr = match (expr) { SetField(o, f, v) => v    _ => AST.Expr.NilLit }
-        return AST.Expr.SetField(this.rewrite_receiver_expr(obj, fields, methods), field, this.rewrite_receiver_expr(value, fields, methods))
+        var obj: AST.Expr = match (expr) { SetField(o, f, v, __ss) => o    _ => AST.Expr.NilLit }
+        var field: String = match (expr) { SetField(o, f, v, __ss) => f    _ => "" }
+        var value: AST.Expr = match (expr) { SetField(o, f, v, __ss) => v    _ => AST.Expr.NilLit }
+        var f_span: AST.Span = match (expr) { SetField(o, f, v, __ss) => __ss    _ => AST.span_none() }
+        return AST.Expr.SetField(this.rewrite_receiver_expr(obj, fields, methods), field, this.rewrite_receiver_expr(value, fields, methods), f_span)
     }
 
     fun rewrite_recv_get_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var obj: AST.Expr = match (expr) { GetField(o, f) => o    _ => AST.Expr.NilLit }
-        var field: String = match (expr) { GetField(o, f) => f    _ => "" }
-        return AST.Expr.GetField(this.rewrite_receiver_expr(obj, fields, methods), field)
+        var obj: AST.Expr = match (expr) { GetField(o, f, __gs) => o    _ => AST.Expr.NilLit }
+        var field: String = match (expr) { GetField(o, f, __gs) => f    _ => "" }
+        var f_span: AST.Span = match (expr) { GetField(o, f, __gs) => __gs    _ => AST.span_none() }
+        return AST.Expr.GetField(this.rewrite_receiver_expr(obj, fields, methods), field, f_span)
     }
 
     fun rewrite_recv_index_get(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
@@ -4564,8 +4762,11 @@ class NullChecker {
     }
 
     fun error_report(): String {
-        // Print warnings (non-blocking) to stderr
-        if (this.warnings.length() > 0) {
+        // Print warnings (non-blocking). Suppressed under --json, where the sink
+        // (each warn already recorded into it) is the data channel and stdout
+        // must stay parseable JSON. The errors returned below are likewise gated
+        // by the driver before printing.
+        if (this.warnings.length() > 0 and !Diag.is_quiet()) {
             var wi: Float = 0
             while (wi < this.warnings.length()) {
                 IO.println("[checker] Warning: " + this.warnings[wi])

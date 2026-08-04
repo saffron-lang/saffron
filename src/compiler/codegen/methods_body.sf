@@ -55,7 +55,7 @@
 
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
-        MethodCall(o, m, a) => "method_call"
+        MethodCall(o, m, a, __ks) => "method_call"
         ListLit(e) => "list_lit"
         IndexGet(o, i) => "index_get"
         IndexSet(o, i, v) => "index_set"
@@ -64,20 +64,20 @@
         IntLit(v) => "int"
         FloatLit(v) => "float"
         BoolLit(v) => "bool"
-        Variable(n) => "variable"
-        Ref(rk, rn, rs) => "variable"
+        Variable(n, __vs) => "variable"
+        Ref(rk, rn, rs, __rs) => "variable"
         Binary(l, o, r) => "binary"
         Unary(o, r) => "unary"
-        Call(c, a) => "call"
-        Assign(n, v) => "assign"
+        Call(c, a, __cs) => "call"
+        Assign(n, v, __as) => "assign"
         Logical(l, o, r) => "logical"
-        MemberAccess(o, f) => "member"
+        MemberAccess(o, f, __ms) => "member"
         NilLit => "nil"
         Match(s, a) => "match_expr"
         EnumConstruct(e, v, a) => "enum"
         Lambda(p, r, b) => "lambda"
-        GetField(o, f) => "get_field"
-        SetField(o, f, v) => "set_field"
+        GetField(o, f, __gs) => "get_field"
+        SetField(o, f, v, __ss) => "set_field"
         This => "this"
         BlockExpr(s, v) => "block_expr"
         IsCheck(val, t) => "is_check"
@@ -95,8 +95,8 @@
     // result was bound as `Any`, so the declared String return type was never
     // actually checked (BUGS #76).
     return match (expr) {
-        Variable(n) => n
-        Ref(rk, rn, rs) => rn
+        Variable(n, __vs) => n
+        Ref(rk, rn, rs, __rs) => rn
         _ => ""
     }
     }
@@ -153,13 +153,13 @@
     if (ek == "this") return this.current_class
     if (ek == "get_field" or ek == "member") {
         var gf_inner_obj: AST.Expr = match (expr) {
-            GetField(o, f) => o
-            MemberAccess(o, f) => o
+            GetField(o, f, __gs) => o
+            MemberAccess(o, f, __ms) => o
             _ => AST.Expr.NilLit
         }
         var gf_field: String = match (expr) {
-            GetField(o, f) => f
-            MemberAccess(o, f) => f
+            GetField(o, f, __gs) => f
+            MemberAccess(o, f, __ms) => f
             _ => ""
         }
         var gf_obj_name: String = this.get_variable_name(gf_inner_obj)
@@ -180,11 +180,11 @@
     }
     if (ek == "method_call") {
         var mc_method: String = match (expr) {
-            MethodCall(o, m, a) => m
+            MethodCall(o, m, a, __ks) => m
             _ => ""
         }
         var mc_obj: AST.Expr = match (expr) {
-            MethodCall(o, m, a) => o
+            MethodCall(o, m, a, __ks) => o
             _ => AST.Expr.NilLit
         }
         // Check if method call is on a user class (resolve obj type)
@@ -206,13 +206,13 @@
         } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
             // Handle chained field access: this.field.method()
             var inner_obj: AST.Expr = match (mc_obj) {
-                GetField(o, f) => o
-                MemberAccess(o, f) => o
+                GetField(o, f, __gs) => o
+                MemberAccess(o, f, __ms) => o
                 _ => AST.Expr.NilLit
             }
             var inner_field: String = match (mc_obj) {
-                GetField(o, f) => f
-                MemberAccess(o, f) => f
+                GetField(o, f, __gs) => f
+                MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             var inner_class: String = ""
@@ -314,7 +314,7 @@
     }
     if (ek == "call") {
         var call_callee: AST.Expr = match (expr) {
-            Call(c, a) => c
+            Call(c, a, __cs) => c
             x => AST.Expr.NilLit
         }
         var callee_name: String = this.resolve_callee(call_callee)
@@ -424,7 +424,14 @@
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_ttype.starts_with("Tuple<")) {
+            // Recorded into the sink for --json, but deliberately NOT routed through
+            // codegen_error: unlike every other site here, this one prints an error
+            // and never sets has_errors, so the compile currently exits 0. That is
+            // a latent BUGS #37 shape, but flipping it to fatal is a behavior change
+            // that belongs in its own commit, not smuggled in under a diagnostics
+            // refactor. Preserve the current fatality; surface the message as data.
             IO.println("[codegen] Error: use ._0, ._1 etc. to access tuple fields (not indexing)")
+            Diag.record_error("codegen", AST.span_none(), "use ._0, ._1 etc. to access tuple fields (not indexing)")
         }
     }
     // Map indexing: map["key"] → __map_get(map, key)
@@ -893,8 +900,7 @@
         // func_prefix_map or known_functions before any body is lowered, so reaching
         // here means the method genuinely does not exist. Report it instead of
         // emitting a call to a name that was never defined.
-        IO.println("[codegen] Error: no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
-        this.has_errors = true
+        this.codegen_error("no symbol for method '" + method + "' on class '" + bare_class + "' — expected '" + full + "' or a module-prefixed form, found neither.")
         return full
     }
 
@@ -1646,11 +1652,11 @@
                             var __mp_si: Float = 0
                             while (__mp_si < __mp_tc_args.length()) {
                                 if (this.classify_expr(__mp_tc_args[__mp_si]) == "assign") {
-                                    var __mp_an: String = match (__mp_tc_args[__mp_si]) { Assign(n, v) => n
+                                    var __mp_an: String = match (__mp_tc_args[__mp_si]) { Assign(n, v, __as) => n
                                         _ => ""
                                     }
                                     if (__mp_an == __mp_pn) {
-                                        var __mp_av: AST.Expr = match (__mp_tc_args[__mp_si]) { Assign(n, v) => v
+                                        var __mp_av: AST.Expr = match (__mp_tc_args[__mp_si]) { Assign(n, v, __as) => v
                                             _ => AST.Expr.NilLit
                                         }
                                         __mp_tc_new.push(__mp_av)
@@ -1711,11 +1717,11 @@
                     var __mp_si2: Float = 0
                     while (__mp_si2 < args.length()) {
                         if (this.classify_expr(args[__mp_si2]) == "assign") {
-                            var __mp_an2: String = match (args[__mp_si2]) { Assign(n, v) => n
+                            var __mp_an2: String = match (args[__mp_si2]) { Assign(n, v, __as) => n
                                 _ => ""
                             }
                             if (__mp_an2 == __mp_pn2) {
-                                var __mp_av2: AST.Expr = match (args[__mp_si2]) { Assign(n, v) => v
+                                var __mp_av2: AST.Expr = match (args[__mp_si2]) { Assign(n, v, __as) => v
                                     _ => AST.Expr.NilLit
                                 }
                                 __mp_new_args.push(__mp_av2)
@@ -2043,7 +2049,7 @@
     if (obj_name.length() == 0) {
         var obj_kind: String = this.classify_expr(object)
         if (obj_kind == "member") {
-            var inner_field: String = match (object) { MemberAccess(o, f) => f
+            var inner_field: String = match (object) { MemberAccess(o, f, __ms) => f
                 _ => ""
             }
             var enum_key2: String = inner_field + "." + method
@@ -2071,7 +2077,7 @@
                         var ret_expr: AST.Expr = match (lambda_body[0]) { Return(v) => v   _ => AST.Expr.NilLit }
                         var ret_ek: String = this.classify_expr(ret_expr)
                         if (ret_ek == "call") {
-                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a) => c   _ => AST.Expr.NilLit }
+                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a, __cs) => c   _ => AST.Expr.NilLit }
                             var ret_callee_name: String = this.get_variable_name(ret_callee)
                             if (ret_callee_name.length() > 0) {
                                 var prefixed_callee: String = this.current_prefix + ret_callee_name
@@ -2082,8 +2088,8 @@
                                 }
                             }
                         } else if (ret_ek == "method_call") {
-                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
-                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
+                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a, __ks) => m   _ => "" }
+                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a, __ks) => o   _ => AST.Expr.NilLit }
                             var mc_ns: String = this.get_variable_name(mc_obj_expr)
                             if (mc_ns.length() > 0 and this.has_module_alias(mc_ns)) {
                                 var mc_full: String = this.module_alias_prefix(mc_ns) + mc_method_name
@@ -3393,8 +3399,7 @@
             if (__fields_str.contains(method + ":")) { __method_exists = true }
         }
         if (!__method_exists) {
-            IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + class_name + "' has no method '" + method + "'")
             this.last_type = AST.Type.IntType
             return "0"
         }
@@ -3531,25 +3536,22 @@
             }
         }
         if (!__ft_exists) {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
-            this.has_errors = true
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
     } else if (is_builtin_type) {
         // A builtin or `Any` receiver with no matching arm above. `Any` is the
         // common shape and deserves the annotation hint; a concrete builtin
         // means the method genuinely does not exist on that type.
         if (obj_type == "Any") {
-            IO.println("[codegen] Error: cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
+            this.codegen_error("cannot dispatch '" + method + "' on an untyped ('Any') receiver — the call would be dropped. Annotate the value with the concrete type that defines '" + method + "'.")
         } else {
-            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+            this.codegen_error("type '" + obj_type + "' has no method '" + method + "'")
         }
-        this.has_errors = true
     } else {
         // Receiver type unknown to codegen entirely: an empty type string, or a
         // named type with no registered fields. Either way there is nothing to
         // dispatch to, and silently returning 0 is what BUGS #37 is.
-        IO.println("[codegen] Error: cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
-        this.has_errors = true
+        this.codegen_error("cannot dispatch '" + method + "' on unresolved receiver type '" + obj_type + "' — the call would be dropped.")
     }
     this.last_type = AST.Type.IntType
     return "0"

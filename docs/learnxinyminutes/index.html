@@ -134,18 +134,31 @@
 
 <span class="c">// Type annotations go after a colon. They&#x27;re optional when the type is</span>
 <span class="c">// obvious from the initializer.</span>
-<span class="k">var</span> pi: <span class="t">Number</span> = <span class="n">3.14159</span>
+<span class="k">var</span> pi: <span class="t">Float</span> = <span class="n">3.14159</span>
 <span class="k">var</span> greeting = <span class="s">"hello"</span>      <span class="c">// inferred as String</span>
 <span class="k">var</span> ready = <span class="k">true</span>            <span class="c">// inferred as Bool</span>
 <span class="k">var</span> nothing = <span class="k">nil</span>           <span class="c">// Nil</span>
 
-<span class="c">// The primitive types are Number, String, Bool, and Nil. Int and Float</span>
-<span class="c">// are also accepted, and kept distinct internally for optimization.</span>
+<span class="c">// The primitive types are Int, Float, String, Bool, and Nil. The two</span>
+<span class="c">// numeric types are separate: Int is an integer, Float a double.</span>
 <span class="k">var</span> tick: <span class="t">Int</span> = <span class="n">42</span>
 <span class="k">var</span> ratio: <span class="t">Float</span> = <span class="n">0.5</span>
 
+<span class="c">// Int widens to Float implicitly, because every Int has an exact Float</span>
+<span class="c">// value. This is fine:</span>
+<span class="k">var</span> widened: <span class="t">Float</span> = tick      <span class="c">// 42</span>
+
+<span class="c">// The reverse is not, because it would silently lose the fraction. You</span>
+<span class="c">// have to say what you want with .floor(), .ceil() or .round():</span>
+<span class="c">// var narrowed: Int = ratio     // Error: cannot assign Float to Int</span>
+<span class="k">var</span> narrowed: <span class="t">Int</span> = ratio.floor()
+
+<span class="c">// `Number` is still accepted as a spelling, but it is an ALIAS FOR Int,</span>
+<span class="c">// not a supertype of both numeric types. `var x: Number = 1.5` therefore</span>
+<span class="c">// annotates x as an Int. Prefer writing Int or Float — say which you mean.</span>
+
 <span class="c">// Types are checked at compile time. This would not compile:</span>
-<span class="c">// var oops: Number = &quot;hello&quot;   // Error: expected Number, got String</span>
+<span class="c">// var oops: Int = &quot;hello&quot;   // Error: cannot assign String to Int</span>
 
 <span class="c">////////////////////////////////////////////////</span>
 <span class="c">// 2. Operators</span>
@@ -175,11 +188,22 @@
 <span class="t">IO</span>.println(~<span class="n">0</span>)           <span class="c">// -1</span>
 
 <span class="c">// `is` tests a value&#x27;s type at runtime. Types are first-class values.</span>
-<span class="t">IO</span>.println(<span class="n">42</span> <span class="k">is</span> <span class="t">Number</span>)   <span class="c">// true</span>
 <span class="t">IO</span>.println(<span class="s">"hi"</span> <span class="k">is</span> <span class="t">String</span>) <span class="c">// true</span>
 <span class="t">IO</span>.println(<span class="k">nil</span> <span class="k">is</span> <span class="t">Nil</span>)     <span class="c">// true</span>
 
-<span class="c">// Numbers and Bools have methods. Parenthesize a literal to call one.</span>
+<span class="c">// Caveat: `is` does not currently discriminate the numeric types. Every</span>
+<span class="c">// numeric answers true to all three spellings, so these are not the</span>
+<span class="c">// narrowing test they look like:</span>
+<span class="t">IO</span>.println(<span class="n">42</span> <span class="k">is</span> <span class="t">Int</span>)      <span class="c">// true</span>
+<span class="t">IO</span>.println(<span class="n">42</span> <span class="k">is</span> <span class="t">Float</span>)    <span class="c">// true  — also true, despite 42 being an Int</span>
+<span class="t">IO</span>.println(<span class="n">3.5</span> <span class="k">is</span> <span class="t">Int</span>)     <span class="c">// true  — likewise</span>
+
+<span class="c">// `is` is also unreliable on union types: for a `String|Nil`, both</span>
+<span class="c">// `v is String` and `v is Nil` evaluate false, which silently kills both</span>
+<span class="c">// branches. Compare against nil instead — that both narrows and works:</span>
+<span class="c">//     if (v != nil) { ... }</span>
+
+<span class="c">// Ints, Floats and Bools have methods. Parenthesize a literal to call one.</span>
 <span class="t">IO</span>.println((-<span class="n">5</span>).abs())     <span class="c">// 5</span>
 <span class="t">IO</span>.println((<span class="n">3.7</span>).floor())  <span class="c">// 3</span>
 <span class="t">IO</span>.println((<span class="n">3.2</span>).ceil())   <span class="c">// 4</span>

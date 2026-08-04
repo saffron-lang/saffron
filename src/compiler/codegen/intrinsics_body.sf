@@ -224,8 +224,7 @@
             // Reject an unconvertible declared C type here, at the signature,
             // rather than letting the `else` below claim it is an i64 (BUGS #24).
             if (!this.extern_param_type_supported(norm)) {
-                IO.println("[codegen] Error: @extern \"" + sig + "\": parameter " + (i + 1).floor().to_string() + " has C type '" + ptype + "', which the FFI boundary cannot convert. Supported: i64, i32, double, void*/i8*, void**/i8**.")
-                this.has_errors = true
+                this.codegen_error("@extern \"" + sig + "\": parameter " + (i + 1).floor().to_string() + " has C type '" + ptype + "', which the FFI boundary cannot convert. Supported: i64, i32, double, void*/i8*, void**/i8**.")
             }
             // An `Any` i64 param is an opaque box in transit: the C side only
             // stores and returns it, so the value must arrive with its tag
@@ -275,8 +274,7 @@
         // return LLVM does not already hold in an i64. `void**` and `i1` both
         // reach it today and both produce IR that fails to assemble.
         if (!this.extern_ret_type_supported(llvm_ret)) {
-            IO.println("[codegen] Error: @extern \"" + sig + "\": return C type '" + ret_c + "' cannot be boxed at the FFI boundary. Supported: void, i64, i32, double, void*/i8*.")
-            this.has_errors = true
+            this.codegen_error("@extern \"" + sig + "\": return C type '" + ret_c + "' cannot be boxed at the FFI boundary. Supported: void, i64, i32, double, void*/i8*.")
         }
         if (llvm_ret == "void") {
             this.emit_indent("call void @" + c_name + "(" + call_args.join(", ") + ")")

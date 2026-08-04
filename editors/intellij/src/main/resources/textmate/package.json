@@ -4,7 +4,8 @@
     "languages": [
       {
         "id": "saffron",
-        "extensions": [".sf"]
+        "extensions": [".sf"],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [

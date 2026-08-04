@@ -7,27 +7,27 @@
 //! ```
 
 import "../compiler/lexer.sf" as Lexer
-import "../compiler/parser.sf" as Internal
-import "../compiler/ast.sf" as AST
+import "../compiler/parser.sf" as InternalParser
+import "../compiler/ast.sf" as InternalAst
 
 /// Parse a source string into a list of top-level statements.
-fun parse(source: String): List<AST.Stmt> {
+fun parse(source: String): List<InternalAst.Stmt> {
     var lexer = Lexer.Lexer(source)
     var tokens = lexer.tokenize()
-    var parser = Internal.Parser(tokens)
+    var parser = InternalParser.Parser(tokens)
     return parser.parse_program()
 }
 
 /// Parse a file by path into a list of top-level statements.
-fun parse_file(path: String): List<AST.Stmt> {
+fun parse_file(path: String): List<InternalAst.Stmt> {
     var source = IO.read_file(path)
     return parse(source)
 }
 
 /// Parse a single expression from a source string.
-fun parse_expr(source: String): AST.Expr {
+fun parse_expr(source: String): InternalAst.Expr {
     var lexer = Lexer.Lexer(source)
     var tokens = lexer.tokenize()
-    var parser = Internal.Parser(tokens)
+    var parser = InternalParser.Parser(tokens)
     return parser.parse_expr()
 }

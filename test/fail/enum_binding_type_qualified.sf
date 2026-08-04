@@ -15,13 +15,18 @@
 
 import "@ast" as AST
 
-var s: AST.Stmt = AST.Stmt.VarDecl("x", "Int", AST.Expr.NilLit, "", "public")
+var s: AST.Stmt = AST.Stmt.VarDecl("x", "Int", AST.Expr.NilLit, "", "public",
+    AST.span_none(), AST.span_none())
 
 fun fallback(): String { return "0" }
 
 // VarDecl's first field is declared String. Assigning it to Int must be an error.
+//
+// The arm must bind ALL of VarDecl's fields, spans included: an arm short of the
+// declared arity is itself a hard error, which would make this test fail for the
+// wrong reason and stop testing #98(c) at all.
 var bad: Int = match (s) {
-    VarDecl(name, type_ann, initializer, docstring, v_vis) => name
+    VarDecl(name, type_ann, initializer, docstring, v_vis, name_span, full_span) => name
     _ => fallback()
 }
 

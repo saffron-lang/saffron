@@ -3,7 +3,13 @@
 ## Open
 
 **11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147, #148. Next free number is **#149**.
+#147, #148. Next free number is **#150**.
+
+#149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
+`## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
+five times at merge — #142 → #143 → #145 → #146 → #149 — each time origin/main
+turned out to already own the number it had reached. The lesson below about
+reading the next-free number from `main` is exactly why.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -14,7 +20,8 @@ three separate worktrees each numbered a different bug #137, and two of them als
 claimed #138: the `as`-as-expression bug (this file's #137), ph5's List/Map `==`
 bug (re-filed as #142), and ide-stage0-spans' `var X = Module.Type` alias bug
 (still unmerged and still mis-numbered). ph5's had *already* been renumbered once,
-from an internal task ID that collided with the resolved #28. A worktree branched
+from an internal task ID that collided with the resolved #28. The alias bug has
+since merged and been renumbered to #143 to settle the collision. A worktree branched
 before a filing carries the pre-filing note forward and reads it as authoritative,
 so the collision is the default outcome rather than an accident, and it is only
 visible at merge time — by which point the number is in commit messages, code
@@ -29,6 +36,13 @@ These two entries were renumbered to #146/#147 rather than making three worktree
 renumber, which is the general tie-break: the side with fewer commits, comments and
 test names carrying the number moves. Before filing, check the worktrees too:
 `grep -h "Next free number" .claude/worktrees/*/BUGS.md BUGS.md`.
+
+The same tie-break settled the ide-stage0-spans alias fix when that worktree was
+finally merged: it had reached #146 through prior renumberings but had zero commits
+or test files citing any final number, while `main`'s #146 (inferred-global typed
+`Int`) had two commits and two test files carrying it, and `main` had since also
+filed #148 (nonexistent class-member read) from another session. Ide's entry moved
+to #149; the ambient rule did not change.
 
 Everything with a resolution lives under `## Resolved` below, full narrative
 intact; `## Fixed` at the end is the older one-line-bullet log. **An entry whose
@@ -61,6 +75,55 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 143. A non-`Bool` condition is lowered as its low bit, so `if (42)` is false and `if ("x")` depends on the allocator
+
+**Severity: high.** Silent wrong branch, no diagnostic, and for pointers the
+answer is not even deterministic across runs.
+
+Every condition site funnels through `to_i1` (`codegen/stmts_body.sf:1293`),
+which emits
+
+```llvm
+%t3 = trunc i64 %val to i1
+br i1 %t3, label %then, label %else
+```
+
+`trunc … to i1` keeps **the low bit of the NaN-boxed i64**. That is correct for a
+real `Bool` purely by accident of the encoding — `__val_tag_bool` returns
+`0x7FFA000000000001` for true and `…0000` for false, so the low bit happens to be
+the truth value. For anything else it is arithmetic nonsense:
+
+```saffron
+if (1)    { }   // taken     — 1 is odd
+if (42)   { }   // NOT taken — 42 is even
+if (0)    { }   // not taken — coincidentally "right"
+if ("x")  { }   // depends on the low bit of the string's pointer
+if ([])   { }   // likewise
+```
+
+So `if (42)` and `if (43)` disagree, and `if (some_string)` can flip between
+runs as the allocator hands out a different address. `0` being falsey is not a
+truthiness rule anyone implemented — it is `0 & 1 == 0`.
+
+The root cause is upstream of codegen: the checker's `If` and `While` arms
+(`checker.sf:2306` and `:2321`) call `infer_expr(cond)` and **discard the
+result**. Nothing ever requires the condition to be `Bool`, so a `Int`, `String`
+or `List` condition type checks clean and reaches `to_i1`. The ternary and the
+`and`/`or` operands reach the same helper (5 call sites total).
+
+**Resolution: require `Bool`.** Saffron is statically typed and already refuses
+`Float`→`Int` and narrows unions; a language that rejects `var i: Int = 2.5`
+should not accept `if (2.5)`. Python/JS-style truthiness was considered and
+rejected — it would need a runtime `__val_truthy` call per condition on all four
+IR bases, and it converts a type error into a silent branch, which is the class
+of defect this entry is about. `if (v)` on a nullable was also considered as
+sugar for `v != nil` and rejected for now: it is the one genuinely useful case,
+but mixing "must be Bool" with "except when nullable" is the kind of exception
+that makes the rule unmemorable. Write the comparison.
+
+The fix is a diagnostic in the checker, not a change to `to_i1`: once the
+condition is provably `Bool`, `trunc` is correct and stays.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -784,6 +847,209 @@ Full narratives for bugs that are closed. Kept in the file rather than deleted
 because several of these entries are the only written record of *why* a
 subsystem is shaped the way it is, and of the measurement mistakes that let the
 bug survive.
+
+### 149. FIXED — `var X = Module.SomeType` looked like a type re-export, emitted a call to a symbol nothing defines, and forced every signature in `@ast` to `Any`
+
+**Severity: high.** Broke `@ast`, `@lexer` and `@lang` completely — any program
+that so much as imported one died — and the workaround it forced switched off
+exhaustive match checking for their callers.
+
+**Reproduction** — two lines:
+
+```saffron
+import "@ast" as AST
+fun main() { IO.println("never gets here") }
+```
+
+fails with:
+
+```
+saffron: the compiler emitted invalid LLVM IR
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:472:17: error: use of undefined value '@compiler_ast_Expr'
+    %r = call i64 @compiler_ast_Expr()
+```
+
+Note the program never mentions `Expr`. The bad IR comes from `src/lib/ast.sf`
+itself, which is why the failure looked like a compiler bug rather than a
+library one.
+
+**Cause.** `src/lib/ast.sf` re-exported the compiler's AST types with
+`var Expr = Internal.Expr`. `var` binds a name in the **value** namespace, so
+codegen resolved it as a function reference, wrapped it in a closure
+(`@__wrap_201_compiler_ast_Expr`) and emitted a call to `@compiler_ast_Expr` — a
+symbol nothing defines, because `Expr` is a type. `type X = Y` is the real alias
+form; the parser has supported it all along (`parse_stmt`, desugared to a
+`VarDecl` carrying the docstring `@type_alias`).
+
+**The second-order cost was larger than the crash.** Because no annotation could
+name a `var`-bound type, every signature in `src/lib/ast.sf` fell back to `Any`
+— 29 occurrences. `Any` disables exhaustive match checking for callers, and that
+is precisely how five non-exhaustive matches sat unnoticed in
+`tools/gen_docs.sf`, one of which had a stale arity that survived the WS1a span
+sweep. Switching to `type` and restoring real annotations made the checker report
+all five immediately.
+
+**Fix.** `type` instead of `var` in `src/lib/{ast,lexer,lang}.sf`, real
+`Stmt`/`Span`/`Expr`/`Param` annotations throughout `src/lib/ast.sf` (only the
+two `visitor` callbacks remain `Any`, correctly — they are function values), and
+explicit `_ => {}` arms in `tools/gen_docs.sf` for the matches that intentionally
+handle one variant. Regression test: `test/pass/module_type_reexport.sf`, which
+asserts the aliases work as annotations at both hops — `@ast` aliases the
+compiler's definitions and `@lang` aliases `@ast`'s aliases.
+
+**A second, distinct bug sat underneath this one.** With the aliases fixed, the
+link then failed with `Undefined symbols: _compiler_ast_Parser` —
+`src/lib/{ast,lexer,parser}.sf` each bind `Internal` to a different compiler
+file, and aliases were resolved through one whole-program map with
+first-writer-wins, so the three collapsed onto one. That is **#123**, fixed
+independently and concurrently by making an alias file-local, which is what the
+syntax already reads as. The three `Internal` bindings were renamed here
+(`InternalAst`, `InternalLexer`, `InternalParser`, plus `PubAst` in `@lang` and
+`gen_docs.sf`) before #123 landed; the renames are no longer load-bearing but are
+kept, since a reader of `src/lib/lexer.sf` should not have to know which
+`Internal` is meant.
+
+**The lesson worth keeping:** the failure announced itself as "this is a compiler
+bug, not an error in your program", and it was a two-word error in a library.
+A diagnostic that confidently assigns blame can still be pointing the wrong way.
+
+**Renumbered #142 → #143 → #145 → #146 → #149 across four merges.** This entry was
+written on the ide-stage0-spans worktree as #142; ph5's List/Map `==` fix owned
+#142, so it moved to #143 at the first merge. Then origin/main's own #143
+(non-`Bool` condition lowering) landed, colliding again, so it took #145. Then
+origin/main's #145 (call-site argument checking) landed, so it took #146. At the
+final merge origin/main's own #146 (inferred-global typed `Int`) owned that number
+with two commits and two test files citing it, and origin/main had since also filed
+#148 (nonexistent class-member read), so this entry took #149 — the next free number
+on `main` after those. Four times bitten by the same per-worktree collision the note
+at the top of `## Open` warns about: read the next-free number from `main`, never
+from a worktree.
+
+### 145. FIXED — the checker never compared a call's arguments to the callee's parameter types
+
+**Severity: high.** A statically typed language accepted `f(42)` for `fun f(x:
+String)`, compiled clean, exited 0, and segfaulted at runtime. Every call in
+every program was unchecked: free functions, methods, constructors, and
+`List<Int>.push("hello")` alike.
+
+What made it hard to notice is that the surrounding type system *did* work.
+`var s: String = 42` was rejected with `cannot assign Int to String`. Arity was
+enforced too — `'add' expects 3 arguments, got 2` is a real diagnostic. So a
+casual test of "does the checker catch type errors" passed, and the answer was
+yes, everywhere except the one boundary where a value crosses into a function.
+Arity is also not checked *here*: it lives in codegen (`expr_body.sf:2559`),
+which is why the two halves of "is this call well-formed" drifted apart.
+
+This surfaced from the other direction. An audit of excessive `Any` usage was
+asked to replace `Any` annotations with real types, and the finding that mattered
+was that doing so buys **zero** enforcement: retyping a parameter from `Any` to
+`String` changes no diagnostic if no one ever compares an argument against it. So
+the call-site gap had to close first, or the `Any` cleanup would have been
+cosmetic. (`Any` does cause real misdispatch, verified separately: with `class B
+extends A`, `via_any(B())` returns A's answer `10` while `via_b(B())` returns
+`20`.)
+
+The data needed for the fix was already stored. `func_params: Map<String,
+String>` (`checker.sf:48`) is populated by `define_func_params` for free
+functions *and* methods, encoded `"name:Type"` comma-separated by
+`params_list_to_string`, and four existing sites already parse it back with
+`split_type_args` to resolve generic return types. Nobody had compared it to the
+arguments.
+
+**Fix:** a `check_call_args` helper, wired at three sites — the free-function
+path in `infer_call`, `infer_method_call`, and the class-construction branch of
+`infer_call`. Three sites, not one, because the params are keyed differently per
+form: `name`, `Class__method`, `Class__init`. That was found by testing each call
+form separately rather than assuming one site covered calls in general — the
+first version wired only the free-function path and both the method and
+constructor negatives printed `NOT CAUGHT`.
+
+The check reuses `scalar_mismatch`, inheriting the same one-sided discipline
+#143 used: it fires only on a pair it can *prove* wrong (two different scalars,
+with `Int`->`Float` allowed as a widening) and lets `Any`, `Nil`, unions,
+generics, type params, class and enum types through. That is deliberately
+narrower than real subtyping. The asymmetry is not timidity about false
+negatives, it is about where a false *positive* lands: the checker type-checks
+the compiler's own source, so one bad error breaks the bootstrap. Widening the
+proof set is a separate, measured step.
+
+The diagnostic reports the name as written, not the `func_params` key: an error
+about `C__m` would leak an internal mangling into user-facing output, so
+`check_call_args` takes the lookup key and the display spelling separately and
+only the latter reaches the message.
+
+**Verified:** bootstrap green through Stage 2 (`gen3 compiles itself; gen4 links
+and compiles`) with **0** `argument N of ...` errors over the compiler's own
+source — the real test, since the compiler makes thousands of method calls on
+itself. Four negatives all rejected (free function, method, constructor, and a
+mismatch in the *second* argument, to confirm the index is right), and the
+positives still accepted: `Int`->`Float` widening, `Any`, and `String|Nil`
+taking `nil`.
+
+The suite went 269/11 to 266/14, and all three new failures were the check doing
+its job: `test/async_coop.sf`, `test/pass/gc_coro_root_order.sf` and
+`test/test_async.sf` each declared a sleep-delay parameter `Int` and then called
+it with `0.1`/`0.03`/`0.01`. `src/lib/async.sf:10` spells the same parameter
+`Float`, so the annotations were simply wrong and had been wrong invisibly. Fixed
+in the tests, not worked around in the checker — three real type errors found on
+the first run is the argument for the check, not against it.
+
+**Left open:** `Map<K,V>` value types are still entirely unenforced, and `is`
+folds to a literal `true` on an un-annotated `Map.get()` (`gen_is_check`,
+`expr_body.sf:511-596`). Both were found during the same audit and are not
+fixed here.
+
+### 144. FIXED — the unused-variable warning was 98% noise, because it fired on match-arm bindings the language forces you to write
+
+**Severity: medium.** Not a miscompile — warnings are non-blocking
+(`error_report`, `checker.sf`; `has_errors` reads only `errors`). The damage was
+to every log: a bootstrap emitted **1458** `unused variable` lines while gen3
+compiled the compiler's own source, and the 38-odd real findings among them were
+unfindable. A diagnostic nobody can read is a diagnostic that does not exist.
+
+The warning was *accurate* about "never read" and wrong about "defect".
+`check_pattern_arity` **requires** every payload field of a variant to be named:
+shortening a pattern is a hard error (`match arm A binds 1 field(s) but A
+declares 3`). So a four-field variant must spell all four bindings, and the
+checker then warned about the three you did not read. `src/compiler/ast.sf` is
+built out of exactly that idiom — `match (s) { Span(line, col, offset, len) =>
+line }`, three warnings per accessor — and `checker.sf`'s own `TypeAlias(ta_n,
+ta_t, ta_vis) => {}` was three warnings from an *empty* arm. Match-arm bindings
+were registered with plain `define_var`, into the same unused-tracked scope as an
+ordinary `var`, so nothing distinguished "the author declared this and ignored
+it" from "the grammar made the author write this".
+
+Attribution was measured, not estimated. On `build/stage3/ast.sf`: 19 warnings,
+19 statically-unused single-line pattern bindings, **identical name multiset**
+(`col`×4, `offset`×4, `len`×4, `line`×3, …) — an exact match, not a correlation.
+Across the five stage3 modules: 1763 warnings, 1725 attributable to pattern
+bindings (97.8%), 38 residual. Four sampled residuals were all true positives
+(`module_doc` and `alias` in `parser.sf`, assigned then never re-read;
+`parent_tag`, a never-used parameter).
+
+**Fix:** `Scope` gains a `pattern_bound: Map<String, Bool>` set, populated by a
+new `define_pattern_var` used at the two match-arm binding sites (payload
+bindings and `NamedWildcard`), and `check_unused_in_scope` skips those names.
+
+The exemption is by **binding kind**, deliberately, rather than by skipping the
+arm scope wholesale — which would have been a one-line deletion. `BlockExpr`
+pushes no scope of its own, so a `var` declared inside a match-arm *body* lands
+in the arm's scope; dropping the scope's check would have silently stopped
+reporting those. Verified after the fix: an unread arm binding is silent, while
+`var arm_dead` inside an arm body, an unused `catch` binding, an unused function
+parameter and a dead function-scope `var` are all still reported.
+
+Measured on the same workload (gen3 compiling the compiler's source, Stage 2 of
+the bootstrap): **1458 → 118 warnings, −92%.** Bootstrap green through Stage 2,
+no gen2 promotion needed — the change uses only `Map<String, Bool>` and
+`.set`/`.has`, both already in this file.
+
+Two incidental findings, not fixed here. `_` and a `_`-prefix already silence the
+warning, and several `_` bindings per pattern parse and check correctly. And
+`check_let_pattern` (`checker.sf`) is **dead code — zero callers**: the
+`LetPattern` arm only infers the value, so `let`-destructuring bindings are never
+registered for unused-tracking and never arity-checked either.
 
 ### 142. FIXED — `==` on two Lists or two Maps compared addresses, not contents
 
@@ -1568,8 +1834,6 @@ standalone path (`strip_nil_from_node`'s if-expression branches typing as
 `AST.Type vs NilType`); verified pre-existing by applying the hoist alone to main's
 `checker.sf`, which produces them with no #126 walk present. Not fixed — that is
 **#130**.
-
----
 
 ### 66. FIXED — binary files could not be read or served: `IO.read_file` truncated at the first NUL, so `static_files` served any wasm module as 0 bytes
 

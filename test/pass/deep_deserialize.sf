@@ -1,48 +1,69 @@
-import "reflect" as Reflect
+// Deserialization into nested class instances, four levels deep.
+//
+// Originally written against the dead C VM's `data class` form plus two Reflect
+// APIs that do not exist in the self-hosted compiler:
+//
+//   Reflect.construct(Person, info, true)  -- a third "deep" flag
+//   Reflect.field_types(Person)            -- no such function in src/lib/reflect.sf
+//
+// `Reflect.construct` here takes exactly two arguments and is SHALLOW: it stores
+// whatever the map holds straight into the field slot, so a nested object stays
+// a Map instead of becoming an instance. The extra argument was accepted
+// silently (arity is not checked across a module boundary) and `field_types`
+// compiled clean and then failed at link time with an undefined symbol.
+//
+// So the nesting is built explicitly, innermost first. That exercises the same
+// four-level shape using only APIs that exist.
+//
+// This file still SEGFAULTS, for the same two codegen bugs as test/json.sf: a
+// bare class name as a value emits a closure box while
+// `__reflect_construct_from_map` compares against a raw ctor pointer (so it
+// returns 0), and that function tags its map keys with `ptr_to_val` instead of
+// `emit_tag_ptr` (so no key ever matches). Patching only the emitted IR makes
+// every line below print correctly. Keep this in run_tests.sh's KNOWN_FAIL
+// until those two fixes land.
 
-// Nested data classes
-data class Coord {
-    var lat: Int
-    var lng: Int
+import "@reflect" as Reflect
+
+class Coord {
+    var lat: Float
+    var lng: Float
 }
 
-data class Address {
+class Address {
     var street: String
     var city: String
     var zip: Int
     var coord: Coord
 }
 
-data class Company {
+class Company {
     var name: String
     var address: Address
 }
 
-data class Person {
+class Person {
     var name: String
     var age: Int
     var company: Company
 }
 
-// 4-level deep deserialization
-var info = {
-    "name": "Alice",
-    "age": 30,
-    "company": {
-        "name": "Acme",
-        "address": {
-            "street": "123 Main St",
-            "city": "NYC",
-            "zip": 10001,
-            "coord": {
-                "lat": 40.7128,
-                "lng": -74.006
-            }
-        }
-    }
-}
+var coord_map: Map<String, Any> = {"lat": 40.7128, "lng": -74.006}
+var coord: Coord = Reflect.construct(Coord, coord_map)
 
-var person = Reflect.construct(Person, info, true)
+var addr_map: Map<String, Any> = {
+    "street": "123 Main St",
+    "city": "NYC",
+    "zip": 10001,
+    "coord": coord
+}
+var address: Address = Reflect.construct(Address, addr_map)
+
+var company_map: Map<String, Any> = {"name": "Acme", "address": address}
+var company: Company = Reflect.construct(Company, company_map)
+
+var person_map: Map<String, Any> = {"name": "Alice", "age": 30, "company": company}
+var person: Person = Reflect.construct(Person, person_map)
 
 // Verify top level
 IO.println(person.name)
@@ -60,6 +81,7 @@ IO.println(person.company.address.zip)
 IO.println(person.company.address.coord.lat)
 IO.println(person.company.address.coord.lng)
 
-// Verify field_types introspection
-IO.println(Reflect.field_types(Person))
-IO.println(Reflect.field_types(Address))
+// Field introspection with the API that DOES exist: Reflect.fields on an
+// instance, rather than Reflect.field_types on a class.
+IO.println(Reflect.fields(coord).keys())
+IO.println(Reflect.fields(person).keys())
