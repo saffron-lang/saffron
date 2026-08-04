@@ -73,6 +73,82 @@
 # purely the five test/fail/cond_not_bool*.sf files and test/pass/cond_bool_ok.sf.
 # A `passed` count that moves while the compiler does not is the clearest possible
 # case for this file's rule about comparing sets rather than totals.
+#
+# Confirmed 2026-08-04 after the BUGS #115 and #156 fixes: 294 passed, 8 failed,
+# 14 skipped, 0 known-fail. The SET is unchanged. Two things about the counts are
+# worth spelling out because each looks like a result on its own:
+#
+#   - `known-fail` went 1 -> 0. #115's fix made oracle_println_class_not_bits pass,
+#     and a KNOWN_FAIL test that passes is reported as an `xpass` *failure*, so its
+#     entry had to be dropped from tools/run_tests.sh in the same commit. The
+#     KNOWN_FAIL list is now empty.
+#   - `passed` 291 -> 294 is three added tests, not three repairs:
+#     pass/list_lit_elem_type (#117, later strengthened), the strengthened
+#     oracle_println_class_not_bits (#115), and pass/nil_init_infers_any (#156, filed as #155).
+#
+# oracle_enum_println stays on this list on purpose — it is the untouched enum half
+# of #115's problem, now filed as #154, and its output was byte-identical before
+# and after both fixes.
+#
+# Confirmed 2026-08-04 on the merged tree (#147 + #155 from main, #156 and #157
+# from this line): 296 passed, 8 failed, 14 skipped, 0 known-fail. The SET is
+# unchanged, and the +2 over the previous note are this line's two new tests
+# (pass/import_alias_punctuation for #157, and pass/nil_init_infers_any counted
+# once #156 landed) — no name entered or left.
+#
+# Worth recording that this run is a MERGE check, not just a change check. #147
+# moved the "was an annotation written?" sentinel from "Any" to "" in the same
+# checker VarDecl arm #156 rewrote, so the two could have composed badly while each
+# passed alone. They do not: 8/8 and 14/14 respectively, plus first_class_types
+# unchanged. An auto-merge that produces no conflict is not evidence the result is
+# correct — the two sides' tests have to be re-run together, which is what this
+# line records.
+#
+# Confirmed 2026-08-04 with the BUGS #159 fix (a class- or enum-typed condition is
+# now a checker error): 299 passed, 8 failed, 14 skipped, 0 known-fail. The SET is
+# unchanged and the +3 is this fix's own three tests (fail/cond_not_bool_class,
+# fail/cond_not_bool_enum, pass/cond_class_enum_ok).
+#
+# This particular change is one where an unchanged SET is the *interesting* result
+# rather than a formality. #159 makes the checker reject a shape it used to accept,
+# so the risk is not that it fails to fire but that it fires too widely — and every
+# over-firing would show up here as a name entering the list. None did, and the same
+# rule ran clean over the compiler's own source in the stage 2 gen4 fixed point.
+# `pass/cond_class_enum_ok.sf` is the deliberate record of the let-through set
+# (interface-typed and union-typed conditions still compile), so the boundary is
+# asserted in a test rather than only argued in BUGS.md.
+#
+# Updated 2026-08-04 rebasing the lsp-symbol-payload line (located expression
+# diagnostics, WS1c) onto 9ca7def: 300 passed, 8 failed, 14 skipped, 0 known-fail.
+# The SET below is UNCHANGED — comm-diffed both directions, empty each way, no
+# name fixed and none regressed. The +1 over #159's 299 is this line's own
+# test/pass/located_checker_diagnostics.sf, confirmed PASS by name in the log.
+#
+# By now this file's own history has recorded SIX different `passed` totals
+# against the very same 8-name set — 286, 291, 295, 296, 299 and 300 — and not one
+# of the moves was a repair. Every one was tests arriving: #143's, #115/#117's,
+# the base's pass/explicit_any_annotation, #156/#157's pair, #159's three, and now
+# this line's one. Six totals, one set.
+#
+# The merge-check point two notes up applies to this rebase too, and this is the
+# case it was written for. #159 added two `hint` branches to the very same
+# `check_condition` line this line converted from `error` to `error_at` — so the
+# two changes were not merely in the same file, they were on the same statement.
+# Git flagged it, both sides were kept (the enum/class hints AND the span), and the
+# result was then verified three ways rather than assumed:
+#
+#   - fail/cond_not_bool_class and fail/cond_not_bool_enum are still REJECTED, so
+#     #159's rule still fires. Keeping a diagnostic's text while silently losing
+#     its trigger is the failure mode a green `passed` count would have hidden.
+#   - `--json` on a class-typed condition returns located:true with line 5,
+#     column 9 — the condition identifier itself, not the enclosing statement — so
+#     the span half works on the merged line, not just the message half.
+#   - the message carries #159's hint verbatim, so neither side was flattened into
+#     the other.
+#
+# A conflict here was the good outcome. Had git auto-merged these two edits, one
+# side would have been lost silently and every count in this file would still have
+# looked exactly like this.
 
 async
 docstrings

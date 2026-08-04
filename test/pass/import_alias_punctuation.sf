@@ -1,0 +1,34 @@
+// BUGS #157 — a trailing semicolon or comment on an `import ... as Name` line was
+// swallowed into the alias itself, so the module became unreachable under the name
+// the author wrote.
+//
+// Imports are not parsed as AST: main.sf scans raw source lines to build the
+// alias -> path map. Both scan sites took `slice(as_idx + 4, line.length()).trim()`,
+// i.e. everything to end of line. `.trim()` strips whitespace but not punctuation,
+// so `import "@iter" as Iter;` registered the alias `Iter;` and the next line's
+// `Iter.map(...)` failed with "undefined variable 'Iter'" — a diagnostic blaming
+// the author's spelling for the scanner's mistake.
+//
+// The fix stops at the first character that cannot appear in an identifier, which
+// covers the whole class rather than the semicolon alone.
+import "@iter" as Iter;
+import "@test" as Test  // a trailing comment is the same failure mode
+import "@math" as Math ;
+
+fun main() {
+    // Each of the three import lines above ends differently. That the module is
+    // callable at all is the assertion — a broken alias is a compile error, so
+    // this file failing to compile IS the regression signal.
+    var doubled: List<Int> = Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
+    Test.assert_eq("${doubled}", "[2, 4, 6]", "semicolon-terminated import is reachable")
+
+    // Math.max is declared `: Float`, so compare as a formatted string rather
+    // than against an Int literal — the point here is reachability, not numerics.
+    Test.assert_eq("${Math.max(2, 7)}", "7", "space-then-semicolon import is reachable")
+
+    // Test itself came in on the trailing-comment line, so every assertion in this
+    // file is also evidence for that spelling.
+    Test.assert(true, "comment-terminated import is reachable")
+
+    Test.summary()
+}
