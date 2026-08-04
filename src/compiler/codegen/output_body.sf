@@ -861,8 +861,13 @@
                     // declares itself (BUGS #50 virtual dispatch), before any
                     // forwarder mixing. A bodyless method is abstract — it has no
                     // own symbol to dispatch to — so it does not count as "own".
+                    // It is still a DECLARATION, though, and class_own_abstract
+                    // records it so gen_virtual_dispatch can tell "the receiver's
+                    // type does not know this method" apart from "it knows it but
+                    // supplies no body" (BUGS #150).
                     this.class_bare_of.set(pr_type_name, pr_cname)
                     var pr_own: List<String> = []
+                    var pr_abs: List<String> = []
                     // Register all method names as ClassName__method
                     var pr_mi: Float = 0
                     while (pr_mi < pr_methods.length()) {
@@ -870,6 +875,8 @@
                         if (pr_mname.length() > 0) {
                             if (this.get_fun_body(pr_methods[pr_mi]).length() > 0) {
                                 pr_own.push(pr_mname)
+                            } else {
+                                pr_abs.push(pr_mname)
                             }
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = this.current_prefix + pr_full
@@ -883,6 +890,7 @@
                         pr_mi = pr_mi + 1
                     }
                     this.class_own_methods.set(pr_type_name, pr_own)
+                    this.class_own_abstract.set(pr_type_name, pr_abs)
                 }
                 EnumDecl(pr_ename, pr_variants, pr_edoc, e_vis) => {
                     // Register enum variant constructor names AND variant tags

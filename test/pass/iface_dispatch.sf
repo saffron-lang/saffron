@@ -1,0 +1,84 @@
+// BUGS #150: a call through an interface-typed receiver bound statically to the
+// interface's abstract method, which codegen emits as an empty `ret i64 0` stub.
+// The call silently did nothing and returned 0 — no diagnostic, exit 0. Class
+// virtual dispatch already worked; interfaces were excluded because an abstract
+// method has no body and so was not recorded as one the class "declares".
+import "@test" as Test
+
+interface Handler {
+    fun handle(n: Int): Int
+}
+
+class Counter extends Handler {
+    var count: Int
+    fun init() { this.count = 0 }
+    fun handle(n: Int): Int {
+        this.count = this.count + n
+        return this.count
+    }
+}
+
+class Doubler extends Handler {
+    var seen: Int
+    fun init() { this.seen = 0 }
+    fun handle(n: Int): Int {
+        this.seen = n * 2
+        return this.seen
+    }
+}
+
+// 1. Interface-typed local. The annotation is the whole point — dropping it made
+//    the call work, which is what made this bug look like a library problem.
+var c1 = Counter()
+var as_iface: Handler = c1
+as_iface.handle(5)
+Test.assert_eq(c1.count, 5, "interface-typed local dispatches to the implementor")
+
+// 2. Interface-typed parameter.
+fun invoke(h: Handler, n: Int): Int {
+    return h.handle(n)
+}
+var c2 = Counter()
+Test.assert_eq(invoke(c2, 7), 7, "interface-typed parameter returns the real value")
+Test.assert_eq(c2.count, 7, "interface-typed parameter reaches the implementor")
+
+// 3. List<Interface> walked by index — the shape src/lib/log.sf uses to fan a
+//    record out to its handlers, and the reason test_log reported zero records.
+var handlers: List<Handler> = []
+var c3 = Counter()
+var d3 = Doubler()
+handlers.push(c3)
+handlers.push(d3)
+var i = 0
+while (i < handlers.length()) {
+    handlers[i].handle(3)
+    i = i + 1
+}
+Test.assert_eq(c3.count, 3, "List<Interface> element 0 dispatches to Counter")
+Test.assert_eq(d3.seen, 6, "List<Interface> element 1 dispatches to Doubler")
+
+// 4. Two implementors behind one interface-typed slot, reassigned. Confirms the
+//    dispatch is on the runtime class, not on whatever was assigned first.
+var slot: Handler = c3
+slot.handle(1)
+Test.assert_eq(c3.count, 4, "reassignable slot, first implementor")
+slot = d3
+slot.handle(10)
+Test.assert_eq(d3.seen, 20, "reassignable slot, second implementor")
+
+// 5. A default (bodied) interface method still resolves — the fix must not turn
+//    "declared abstractly" into "always dispatch dynamically".
+interface Greeter {
+    fun name(): String
+    fun greet(): String { return "hello " + this.name() }
+}
+
+class French extends Greeter {
+    fun init() {}
+    fun name(): String { return "monde" }
+}
+
+var g: Greeter = French()
+Test.assert_eq(g.greet(), "hello monde", "default interface method calls the override")
+
+Test.summary()
