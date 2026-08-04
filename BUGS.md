@@ -2,8 +2,8 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147, #148. Next free number is **#153**.
+**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147. Next free number is **#153**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -664,7 +664,11 @@ a separate `has_annotation` flag on the AST node, distinguishes the two. Note th
 `type_ann` field is a raw `String` on the AST (not an `AST.Type`), so this is also
 one of the sites rewrite stage 3 has to touch.
 
-### 148. OPEN — reading a nonexistent member of a CLASS instance compiles clean, then reads field 0 or emits invalid IR
+---
+
+## Resolved
+
+### 148. FIXED — reading a nonexistent member of a CLASS instance compiled clean, then read field 0 or emitted invalid IR
 
 **Severity: high.** The class-side twin of #118/#122, which closed the same hole
 for *module* members only. A typo in a field or method name on a class receiver is
@@ -703,32 +707,62 @@ declaring the same name), but indistinguishable here from a plain typo. Codegen'
 check that the field exists, so a populated class reads slot 0 and a fieldless one
 produces a GEP that `opt` rejects.
 
-The predicate to gate on already exists: `dispatch_declaring_class(base, member)`
-(`checker.sf:2026`) does a DAG-wide, declaration-order walk of fields *and* methods
-across the whole `class_parents` hierarchy and returns `""` when nothing declares
-the member. The guard belongs in `infer_member_access`, on the resolved-class path
-(`class_fields.has(ma_base)`), and must fire only when the class is unambiguous
-(`!is_ambiguous_class`, matching `get_class_field_type`'s existing `"Any"` escape)
-so a genuinely ambiguous name still widens rather than false-erroring.
+Fixed by `Checker.member_is_absent`, called from `infer_member_access` on the
+resolved-class path (`class_fields.has(ma_base)`) — the one place a class receiver
+is pinned down well enough for absence to mean anything. It answers via
+`dispatch_declaring_class(cls, member)`, which already did the DAG-wide,
+declaration-order walk of fields *and* methods across `class_parents` and returns
+`""` when nothing declares the member; that it covers methods is what makes the
+bare-method-reference face of the bug come out right, since `a.finish` has to
+resolve as a member and not as a missing field.
 
-**Two landmines for the fix, both capable of reddening the whole bootstrap:**
+**Both landmines were real, and one of them changed the fix:**
 
-1. `extend fun` methods may not appear in `class_method_names`, so a naive "member
-   absent → error" would falsely reject an extension-method reference. Verify
-   against the extend-fun tests before promoting.
-2. The guard must not fire on an `Any`-typed or unresolved receiver (the existing
-   `check_member_visibility` soft-fail posture, and the reason #56 warns against
-   erroring on that fallback — it "broke pass/math and test_reflect").
+1. `extend fun` was worse than "may not appear in `class_method_names`" — the
+   checker had **zero** `@extend` awareness (`grep -c "@extend" checker.sf` → 0).
+   `extend fun Foo.bar()` parses to a FREE `FunDecl` whose only trace of the
+   receiver is the docstring `"@extend:Foo"`, so no existing checker map could see
+   it and the naive guard would have rejected every extension-method reference. The
+   fix adds `extend_member_names`, populated in `register_decl` from that docstring
+   — the checker's mirror of codegen's `extend_map` (`codegen.sf:95`). It is keyed
+   by member name alone rather than `class#member`: codegen must resolve the exact
+   receiver because it picks a body to call, but the guard only needs to know the
+   name is not a typo, and the loose key errs toward under-reporting rather than
+   inventing errors.
+2. The `Any`/unresolved-receiver posture is untouched, because the guard sits
+   *inside* the resolved-class branch and every other path still falls through to
+   `check_member_visibility`'s soft fail. #56's warning about erroring on that
+   fallback still stands; nothing here goes near it.
+
+One near-miss worth recording: the first draft also bailed when the class had no
+recorded members, which reads like the same caution the ambiguous-class clause
+applies but is not — the only caller has already established the class is
+registered, so an empty field list means a class that genuinely declares no
+fields, i.e. exactly the second repro. That clause would have silently re-opened
+the invalid-IR half while the suite stayed green, which is why
+`test/fail/class_member_missing_no_fields.sf` is its own file rather than a second
+read in the first one.
+
+Tests: `test/fail/class_member_missing.sf` and
+`test/fail/class_member_missing_no_fields.sf` (both repros, each must be rejected),
+plus `test/pass/class_member_present.sf` for the reads that must keep working —
+inherited field, inherited method, bare method reference, and an `extend fun`
+member. The pass-side file matters more than the fail-side ones here: an over-eager
+member-not-found check rejects working programs, and the compiler's own source is
+the largest working program in the tree.
+
+Verified at `0a78599` in an isolated worktree: bootstrap green including the STAGE 2
+gen4 fixed point, suite 279 passed / 9 failed with a failure set identical to the
+9-name baseline (the +1 over the previous 278 is `pass/cross_module_subclass`, which
+arrived with upstream's `c28ebca` for #151, not from this change).
 
 Found while triaging the suite failure baseline: `inheritance` and `imports` were
-attributed to a codegen IR bug, but the root cause is a missing checker diagnostic,
+attributed to a codegen IR bug, but the root cause was a missing checker diagnostic,
 and the two other baseline entries `pass/data_equality`/`pass/deep_deserialize`
 (`data class`) and `pass/expressions`/`pass/varargs`/`pass/overloading` are
 separate stale-feature failures, not this.
 
 ---
-
-## Resolved
 
 ### 146. FIXED — an inferred global read from inside a function was typed `Int`, so every method on it was rejected
 

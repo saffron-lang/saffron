@@ -43,6 +43,15 @@
 # origin's #146 before the collision renumber) fixed test_base64 and test_log,
 # both removed below. No regressions: the 9 remaining names are a strict subset
 # of the previous 11.
+#
+# Updated 2026-08-03 at the BUGS #148 fix (nonexistent class-member read): 282
+# passed, 9 failed, 14 skipped, 1 known-fail. The failure SET below is unchanged —
+# nothing was fixed or broken. The count moved for two reasons that are worth
+# spelling out, because each one on its own looks like a result: +3 are this fix's
+# own tests (fail/class_member_missing, fail/class_member_missing_no_fields,
+# pass/class_member_present), and +1 earlier was pass/cross_module_subclass
+# arriving with upstream's c28ebca for #151. Exactly the case this file's header
+# warns about — a rising `passed` proving nothing about the set.
 
 async
 docstrings
