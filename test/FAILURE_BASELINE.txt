@@ -76,7 +76,7 @@
 
 # Confirmed 2026-08-04 with the payload half of BUGS #154 (payload enums get a GC
 # header and an emit_val_to_string arm): 295 passed, 8 failed, 14 skipped, 1
-# known-fail (pass/arg_temp_rooted, BUGS #156 — see below). The SET
+# known-fail (pass/arg_temp_rooted, BUGS #162 — see below). The SET
 # is unchanged and that is the expected result, not a null one — oracle_enum_println
 # stays on this list because its FIELDLESS half is still broken, so the file's own
 # rule applies in reverse here: an unchanged set does not mean nothing moved. What
@@ -100,9 +100,9 @@
 #
 # The KNOWN_FAIL table is non-empty again, with one entry: pass/arg_temp_rooted 156.
 # That test is new in this commit and fails BY DESIGN — it asserts the invariant
-# #156's fix must satisfy (an object constructed as argument 0 survives argument 1
+# #162's fix must satisfy (an object constructed as argument 0 survives argument 1
 # allocating; currently 49-51 of 200 reads are corrupt). It reports as `xfail`, so
-# it does not fail the suite, and when #156 is fixed it reports `xpass`, which DOES
+# it does not fail the suite, and when #162 is fixed it reports `xpass`, which DOES
 # fail the suite until the entry is dropped. That is the intended ratchet, not an
 # exemption: parking a genuinely broken test here would be the misuse the table's
 # own comment warns against.

@@ -2,13 +2,21 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #156.
+**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #162.
 Next free number is **#157**.
 
-#156 was found by #154's own regression test and is filed separately on purpose:
+#162 was found by #154's own regression test and is filed separately on purpose:
 it is an argument-temp rooting hole in codegen, reproducible with classes, and
 #63 — which reads like the same bug — is closed and was about the *moving*
 nursery. Retiring that nursery removed the move, not the missing root.
+
+It was filed as #156 first and renumbered twice before landing, which is worth a
+line because the procedure is what caught it. The pre-merge
+`grep -h "Next free number"` across live worktrees found #156 already taken by
+`main` (the `var x = nil` fix) and #161 already claimed by the `sfx` worktree
+(cross-module method binding), so the first genuinely free number was #162. The
+grep is cheap and the alternative is a renumber after the merge, when the number
+is already in a commit message and a KNOWN_FAIL entry.
 
 #154 and #155 were filed on the same day on two lines of work that had not yet
 met — origin/main's "an enum inside a printed collection prints a bit pattern"
@@ -824,7 +832,7 @@ a 400-iteration GC stress loop and a recursive `Tree` formatted byte-exactly aga
 an independently built expected string. Those found the two rooting bugs listed
 above, which the sixteen never reached — an enum whose to_string does not itself
 allocate past the threshold never triggers a collection mid-format. They also found
-#156, which is *not* fixed here: the recursive assertions hoist both operands into
+#162, which is *not* fixed here: the recursive assertions hoist both operands into
 locals, because passing them directly leaves argument 0 unrooted across argument 1's
 allocation. That is an argument-temp rooting hole in codegen, reproducible with
 classes, and it is filed separately rather than papered over silently.
@@ -6262,10 +6270,10 @@ the full explanation of why it is off. Two notes for whoever revives it:
   SSA temps are not roots, so no moving collector can be correct against this
   codegen. Sink the receiver load below all allocating argument code first
   (`methods_body.sf` / `expr_body.sf`), or make the young generation non-moving.
-  **That blocker is now its own open entry, #156** — and retiring the nursery did
+  **That blocker is now its own open entry, #162** — and retiring the nursery did
   not close it. With no move left, the non-moving major collector *frees* the
   unrooted temp instead of relocating it, so `f(Box(7), allocating())` still reads
-  a dead object 51 times in 200. Fixing #156 is a precondition for reviving the
+  a dead object 51 times in 200. Fixing #162 is a precondition for reviving the
   nursery, not a separate cleanup.
 - The forwarding pass has its own tag bug on top of that — see #101 and the
   comment in `__gc_minor_visit_slot`.

@@ -1,5 +1,5 @@
 // arg_temp_rooted.sf — an object constructed as argument 0 must survive argument 1
-// allocating. BUGS #156, and this test is expected to FAIL until it is fixed
+// allocating. BUGS #162, and this test is expected to FAIL until it is fixed
 // (run_tests.sh lists it under KNOWN_FAIL, so its failure is an `xfail` and its
 // eventual success is an `xpass` that tells you to close the entry).
 //
@@ -14,7 +14,7 @@
 // collector frees the temp instead of relocating it. Retiring the nursery narrowed
 // #63's window without supplying the missing root.
 //
-// Two controls, both clean, are recorded in the #156 entry and pin the cause:
+// Two controls, both clean, are recorded in the #162 entry and pin the cause:
 // __gc_disable() gives 0 mismatches, and hoisting both arguments into locals gives
 // 0 mismatches. The second is the shape of the fix — a local gets a root slot, an
 // argument temp does not — and is the workaround available today.
@@ -62,7 +62,7 @@ while (t < 200) {
 Test.assert_eq(mismatches, 0, "an argument temp survives a later argument's allocation")
 
 // The control, in the test itself: the identical work with both arguments hoisted
-// into locals must pass. If this half ever fails, the cause is not #156 and the
+// into locals must pass. If this half ever fails, the cause is not #162 and the
 // diagnosis above is wrong.
 var hoisted_mismatches: Int = 0
 var u: Int = 0
