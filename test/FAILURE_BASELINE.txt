@@ -192,6 +192,23 @@
 # better argument for this file's compare-sets-not-totals rule than any of the green
 # runs above: the set diff was empty and correct the whole time the prose about the
 # totals was being invented and re-invented.
+#
+# Confirmed 2026-08-04 after merging the #154 payload half into main (#157, #158,
+# #159, #160, the located-diagnostics and ret_type/check_assign work): 306 passed, 8
+# failed, 14 skipped, 1 known-fail. The SET is unchanged and is identical to main's
+# own copy of this file in both `comm` directions — the two lines of work compose
+# with no name entering or leaving. Bootstrap green through STAGE 2 gen4 with 0
+# unresolved inference fallbacks after the merge, which is the check that matters
+# here: both sides edited src/compiler/codegen/{stmts,output}_body.sf, so a textual
+# merge succeeding proves nothing about whether the merged codegen is coherent.
+#
+# The +11 over the 295 above is entirely main's side (its own new tests for #157 /
+# #158 / #160 / assign-type / return-type / located diagnostics, all of which were
+# already passing there), and eligible files went 318 → 329. The one known-fail is
+# still pass/arg_temp_rooted, renumbered from #156 to #162: main had already taken
+# #156 for the `var x = nil` fix and the sfx worktree had claimed #161, so the
+# pre-merge next-free grep moved it twice. Worth noting against this file's rule
+# about totals — 295 → 306 is a large jump with an entirely empty set diff.
 
 async
 docstrings
