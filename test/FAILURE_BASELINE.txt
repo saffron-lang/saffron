@@ -22,11 +22,13 @@
 # stale ones by default, so a test can leave this list by being skipped rather
 # than by being fixed.
 #
-# test_glob is nondeterministic — it has flipped in both directions across runs at
-# an unchanged HEAD, so treat its presence or absence as noise, not signal.
-# gc_roots_test and test_reflect used to be in that category and are not any more:
-# both were genuinely fixed on 2026-08-03 (unguarded `ptr - 24` on an Any, and a
-# bare inttoptr in load64/store64), so a failure from either is now real.
+# gc_roots_test, test_reflect and test_glob were all once in the "nondeterministic,
+# treat as noise" category. None of them are any more — each was genuinely fixed on
+# 2026-08-03: an unguarded `ptr - 24` on an Any, a bare inttoptr in load64/store64,
+# and (test_glob) BUGS #153 plus two logic errors in `@glob` itself. A failure from
+# any of the three is now real signal. test_glob's apparent nondeterminism was a
+# segfault from indexing a NaN-tagged String, which is allocator-dependent and so
+# looked flaky; it now passes 5/5 at a fixed HEAD.
 #
 # Recorded 2026-08-03 at 4fb2690 (merge of phase5-internal): 262 passed, 16
 # failed, 14 skipped, 1 known-fail.
@@ -53,6 +55,12 @@
 # arriving with upstream's c28ebca for #151. Exactly the case this file's header
 # warns about — a rising `passed` proving nothing about the set.
 
+# Updated 2026-08-03 at the ph5 #153 merge (unresolved-type subscript routed to a
+# runtime dispatch): 281 passed, 8 failed, 14 skipped, 1 known-fail. One name
+# removed, test_glob — the subscript fix plus real recursive descent in `@glob`'s
+# find_in and a trailing-slash fix in _ignore_matches. No regressions: the 8
+# remaining names are a strict subset of the previous 9.
+
 async
 docstrings
 json
@@ -61,4 +69,3 @@ pass/deep_deserialize
 pass/expressions
 pass/overloading
 pass/varargs
-test_glob

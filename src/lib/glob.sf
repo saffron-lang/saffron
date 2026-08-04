@@ -249,11 +249,31 @@ fun split_prefix(pattern: String): List<String> {
 /// If pattern has no slash, match against basename only.
 /// If pattern has a slash, match against the full path.
 private fun _ignore_matches(pattern: String, path: String): Bool {
-    // Strip trailing slash (directory indicator)
-    var pat = pattern
-    if (pat.length() > 0 and pat.char_at(pat.length() - 1) == "/") {
-        pat = pat.slice(0, pat.length() - 1)
+    // A trailing slash means "this directory and everything under it" —
+    // gitignore's `build/` ignores `build/out.o`. Handle it BEFORE stripping,
+    // because stripping first turns `build/` into `build`, which has no slash and
+    // therefore fell through to the basename branch below and was tested against
+    // `out.o`: the directory form never matched anything. Match the segment
+    // against the path's leading segments instead.
+    if (pattern.length() > 1 and pattern.char_at(pattern.length() - 1) == "/") {
+        var dir_pat = pattern.slice(0, pattern.length() - 1)
+        if (matches(dir_pat, path)) {
+            return true
+        }
+        // `dir/` also covers everything beneath it. Compare segment-wise rather
+        // than with starts_with, so `bui/` does not match `build/x`.
+        var segs = path.split("/")
+        var si = 0
+        while (si < segs.length() - 1) {
+            if (matches(dir_pat, segs[si])) {
+                return true
+            }
+            si = si + 1
+        }
+        return false
     }
+
+    var pat = pattern
 
     // If pattern contains a slash, match against full path
     if (pat.contains("/")) {
@@ -272,8 +292,49 @@ private fun _ignore_matches(pattern: String, path: String): Bool {
 /// import "@glob" as Glob
 /// var configs = Glob.find_in("/etc", "**/*.conf")
 /// ```
+/// Collect every file at or below `dir`, as paths relative to `dir`.
+///
+/// `IO.walk_dir` is a misnomer: it is `ls -1`, returning the BARE NAMES of one
+/// directory's entries and never descending. It is a straight alias of
+/// `IO.list_dir` over the same `__io_walk_dir`. Both callers in the stdlib were
+/// written against a Python `os.walk` that does not exist here — they treated each
+/// entry as a `[root, dirs, files]` triple, so `entry[0]` and `entry[2]` indexed
+/// into a *filename string* and yielded single characters. That crashed rather than
+/// merely returning nothing, because subscripting a NaN-tagged String hit the list
+/// path in codegen (BUGS #153), which is what hid the logic error for so long: the
+/// segfault looked like the whole story.
+///
+/// So do the descent here. `**` is documented, exercised by `test_glob`, and cannot
+/// work over a single non-recursive listing.
+private fun _walk_files(dir: String, rel_prefix: String): List<String> {
+    var out: List<String> = []
+    var names: List<String> = IO.walk_dir(dir)
+    var i = 0
+    while (i < names.length()) {
+        var name: String = names[i]
+        var full: String = Path.join([dir, name])
+        var rel: String = name
+        if (rel_prefix.length() > 0) {
+            rel = rel_prefix + "/" + name
+        }
+        if (IO.is_dir(full)) {
+            var sub: List<String> = _walk_files(full, rel)
+            var k = 0
+            while (k < sub.length()) {
+                out.push(sub[k])
+                k = k + 1
+            }
+        } else {
+            out.push(rel)
+        }
+        i = i + 1
+    }
+    return out
+}
+
 fun find_in(base: String, pattern: String): List<String> {
-    // Optimize: use split_prefix to narrow the search directory
+    // Narrow the search to the pattern's fixed leading directories, so
+    // "src/lib/*.sf" does not walk the whole tree.
     var split = split_prefix(pattern)
     var prefix: String = split[0]
     var suffix: String = split[1]
@@ -287,50 +348,19 @@ fun find_in(base: String, pattern: String): List<String> {
     }
 
     var results: List<String> = []
-    var entries = IO.walk_dir(search_dir)
+    // Already relative to search_dir, which is exactly what the glob suffix is
+    // written against — no prefix-stripping dance needed.
+    var rels: List<String> = _walk_files(search_dir, "")
     var i = 0
-
-    while (i < entries.length()) {
-        var entry = entries[i]
-        var root: String = entry[0]
-        var file_list = entry[2]
-        var j = 0
-
-        while (j < file_list.length()) {
-            var name: String = file_list[j]
-            var full_path = Path.join([root, name])
-
-            // Compute the relative path from the search dir
-            var rel = ""
-            if (search_dir == ".") {
-                rel = full_path
-                // Remove leading "./" if present
-                if (rel.length() > 2 and rel.starts_with("./")) {
-                    rel = rel.slice(2, rel.length())
-                }
+    while (i < rels.length()) {
+        var rel: String = rels[i]
+        if (matches(suffix, rel)) {
+            // Report relative to `base`, not to the narrowed search dir.
+            if (prefix == ".") {
+                results.push(rel)
             } else {
-                // Strip the search_dir prefix
-                if (full_path.starts_with(search_dir)) {
-                    var start = search_dir.length()
-                    if (start < full_path.length() and full_path.char_at(start) == "/") {
-                        start = start + 1
-                    }
-                    rel = full_path.slice(start, full_path.length())
-                } else {
-                    rel = full_path
-                }
+                results.push(Path.join([prefix, rel]))
             }
-
-            // Match the relative path against the glob suffix
-            if (matches(suffix, rel)) {
-                // Return path relative to base
-                if (prefix == ".") {
-                    results.push(rel)
-                } else {
-                    results.push(Path.join([prefix, rel]))
-                }
-            }
-            j = j + 1
         }
         i = i + 1
     }
