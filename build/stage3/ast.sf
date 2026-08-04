@@ -180,6 +180,49 @@ enum Expr {
     Ref(kind: String, name: String, slot: String, name_span: Span)
 }
 
+/// Where to point a diagnostic that is about `expr`.
+///
+/// MUST stay below `enum Expr`. Codegen registers variant tags as it generates
+/// the enum declaration, so a match textually above it finds no tags, silently
+/// takes the unknown-enum path, and compiles to an unconditional destructure of
+/// the first arm with no tag check at all — reading past the allocation and
+/// segfaulting on any variant with fewer fields. Moving this function up is a
+/// mechanical-looking edit that miscompiles it. See BUGS #153.
+///
+/// Every expression that carries a span answers with it; anything else answers
+/// `span_none()`, which `error_at` renders exactly as `error` did. So a caller
+/// can hand this any expression and the result is never worse than no span.
+///
+/// `Call` answers with its full extent (callee through the closing paren) rather
+/// than its callee's name, because a call's *shape* is what a wrong-arity or
+/// wrong-argument-type message is about. A `Call` wrapping a named callee is the
+/// one node where both would be defensible; the extent is chosen because it is
+/// what the reader needs to see to judge the message.
+///
+/// Deliberately not recursive: `Binary`/`Unary`/`Index` have no span of their
+/// own, and descending into a child would point at a sub-expression the message
+/// is not about — a plausible-looking location is worse than an honest absent
+/// one, because the reader trusts it. Callers with a better idea of which child
+/// is at fault should ask about that child directly, which is what
+/// `check_call_args` does with `args[i]`.
+///
+/// This lives here, not in `src/lib/ast.sf`'s wrapper of the same name, because
+/// the checker imports this file and cannot import the stdlib (see the
+/// no-stdlib-deps rule at the top of `diag.sf`).
+fun expr_span(expr: Expr): Span {
+    return match (expr) {
+        Call(__callee, __args, __cs) => __cs
+        Variable(__n, __vs) => __vs
+        Ref(__k, __rn, __slot, __rs) => __rs
+        Assign(__an, __av, __as) => __as
+        MemberAccess(__mo, __mf, __ms) => __ms
+        GetField(__go, __gf, __gs) => __gs
+        SetField(__so, __sf, __sv, __ss) => __ss
+        MethodCall(__ko, __km, __ka, __ks) => __ks
+        _ => span_none()
+    }
+}
+
 enum MatchArm {
     Arm(pattern: Pattern, body: Expr)
 }
