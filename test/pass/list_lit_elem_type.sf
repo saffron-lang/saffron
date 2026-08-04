@@ -48,10 +48,14 @@ Test.assert_eq(row[0], 3, "list of int lists")
 var empty: List<Int> = []
 Test.assert_eq(empty.length(), 0, "empty list")
 
-// Mixed stays Any. Reading a scalar back out still works; a class instance out
-// of a List<Any> is BUGS #115 and deliberately not asserted here.
+// Mixed stays Any, which is the point: Any routes to runtime tag dispatch, so
+// both elements still format correctly even though the literal has no single
+// element type. (When this test was written the class element printed its bit
+// pattern — that was BUGS #115, fixed separately, and this assertion is now the
+// evidence the two fixes compose.)
 var mixed = [Pt(1), 2]
 Test.assert_eq(mixed[1], 2, "mixed literal falls back to List<Any>")
+Test.assert_eq("${mixed}", "[Pt(1), 2]", "and Any elements still format via runtime dispatch")
 
 // A variable used only inside a list literal drew a false "unused variable"
 // warning, because the checker's ListLit arm never walked its elements — the

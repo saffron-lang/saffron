@@ -2,8 +2,8 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #115, #131, #132,
-#147. Next free number is **#154**.
+**8 open entries:** #2, #49, #65, #75, #107, #131, #132, #147.
+Next free number is **#154**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -462,67 +462,6 @@ test()
 **Impact:** Can't write mutually recursive helper functions inside a parent scope.
 **Note:** Design choice — compile-time local resolution. Same as Lua/Python.
 
-### 115. A class instance reaching a formatter prints its raw bit pattern
-
-**Severity: high.** Silent wrong answer. The class-shaped sibling of #105, with a
-*different* mechanism, so #105's fix does not reach it.
-
-```saffron
-class Pt { var x: Number
-           fun init(x: Number) { this.x = x }
-           fun to_string(): String { return "Pt(${this.x})" } }
-var p: Pt = Pt(3)
-IO.println(p)          // 5.21502e-310   — WRONG, and this is TOP LEVEL
-IO.println("${p}")     // Pt(3)          — correct
-var ps: List<Pt> = [Pt(1), Pt(2)]
-IO.println("${ps}")    // [5.21502e-310, 5.21502e-310]
-```
-
-Verified directly at HEAD, not merely reported: `IO.println(p)` prints
-`5.21502e-310` while `"${p}"` prints `Pt(3)`.
-
-#105 was cured by `methods_body.sf:1543` inserting `<Enum>__to_string()` when the
-argument's **static** type is a known enum (`enum_defs.has(type)`). That is
-static-type-driven, so it covers exactly what the checker can see through and
-nothing else — no list element, and **no class arm at all**.
-
-**The runtime cannot fix this alone, and the class case is what proves the
-prerequisite is insufficient.** A class instance *does* carry a GC header
-(`__gc_alloc(size, class_tag)`, tags allocated from 10) and `__val_class_tag`
-reads it safely — so unlike a fieldless enum, the value **is** identifiable. It
-still prints as bits. What is missing is the mapping from tag to that class's
-`to_string()`, which only codegen holds (`class_type_ids`, `class_own_methods`).
-So "give payload enums a GC header" is necessary but *not* sufficient for the
-enum half either.
-
-Proposed fix: emit a tag-switch `__val_to_string(i64)` in
-`emit_class_hierarchy_helpers()` (`stmts_body.sf:1740`), beside the
-`__class_parent_tag` / `__class_is_a` switches it already generates from exactly
-these tables, and call it from `__any_to_string` (`base_nanbox.ll:1355`) before
-the `do_float` fallthrough. Payload enums join by allocating via `__gc_alloc` in
-`gen_enum_construct` (`expr_body.sf:3101`) instead of `__sf_malloc`, with tags
-from the same allocator as `next_class_type_id` (`codegen.sf:198`) to avoid
-collision. `__val_to_string` must return a raw `char*` like its siblings — no
-tag/untag step, which is what would re-create #102's segfault.
-
-**Fieldless enums cannot join this scheme.** `tag << 56` is a bare immediate with
-no allocation and no identity; there is nothing to key on. A bit-pattern heuristic
-was deliberately not written, because a wrong guess is worse than visible garbage.
-
-Two caveats to accept explicitly if this is implemented: `__any_to_string` is
-**absent from `wasm_base.ll`** (0 definitions; the other three bases have it), so
-**wasm64 silently loses the behaviour**; and the emit site is gated
-`if (!this.identity_mode)`, so **bootstrap can never validate it** — the
-identity-mode blind spot again.
-
-Regression test `test/oracle_println_class_not_bits.sf` is **6/8, failing on
-purpose**. The garbage is an address reinterpreted as a subnormal, so it varies
-per run and per `-O` level; recording it would make the eventual fix look like a
-regression (#107 discipline). Working paths are asserted positively as the
-reference; broken paths only negatively.
-
----
-
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
 **Severity: high**, and the remaining half of #125 — wasm64 output is no longer
@@ -624,6 +563,109 @@ one of the sites rewrite stage 3 has to touch.
 ---
 
 ## Resolved
+
+### 115. FIXED — a class instance reaching a formatter printed its raw bit pattern
+
+```saffron
+class Pt { var x: Number
+           fun init(x: Number) { this.x = x }
+           fun to_string(): String { return "Pt(${this.x})" } }
+var p: Pt = Pt(3)
+IO.println(p)          // was 5.21502e-310, now Pt(3)   — and this was TOP LEVEL
+IO.println("${p}")     // Pt(3)                          — always worked
+var ps: List<Pt> = [Pt(1), Pt(2)]
+IO.println("${ps}")    // was [5.21502e-310, ...], now [Pt(1), Pt(2)]
+```
+
+**Severity was high:** a silent wrong answer. The class-shaped sibling of #105
+with a *different* mechanism, so #105's fix never reached it.
+
+**Why the runtime could not answer it alone, and why that is the whole story.**
+`__any_to_string`'s `do_ptr` arm returned the instance pointer unchanged, and an
+*untagged* instance pointer — a constructor returns one bare — failed
+`__val_is_ptr` and fell through to `do_float`, where the address was formatted as
+a subnormal double. That is where `5.21502e-310` came from. But both remaining
+arms were wrong for a class: `do_ptr` would have `puts` the address. The value
+was never unidentifiable — a class instance carries a GC header
+(`__gc_alloc(size, class_tag)`, tags from 10) and `__val_class_tag` reads it
+safely, returning 0 for non-classes. What was missing was the *other* half: the
+map from a class tag to that class's `to_string` symbol, and that map exists only
+in codegen (`class_type_ids`, `class_own_methods`). A `.ll` file cannot spell a
+symbol it does not know the name of, which is why no amount of runtime work could
+close this.
+
+**The fix is a generated tag switch, not a per-caller patch.** The original
+diagnosis floated adding a class arm wherever a formatter was reached; that is one
+edit per caller and each new caller re-opens the bug. Instead
+`emit_val_to_string()` (`stmts_body.sf`) emits a `__val_to_string(i64)` beside the
+`__class_parent_tag` / `__class_is_a` switches that
+`emit_class_hierarchy_helpers()` already generates from exactly these tables, and
+`__any_to_string` calls it once before the string/float split. Every present and
+future path through `__any_to_string` is covered by construction.
+
+**Three details that are load-bearing:**
+
+- **The tagged→raw contract.** A generated `<Class>__to_string` returns a
+  **NaN-tagged** string — its tail is `__val_tag_ptr`. Every arm of
+  `__any_to_string` returns a **raw `char*`**. So the switch arm must untag what
+  it gets back. #102 was the mirror-image mistake — tagging an already-raw value —
+  and it segfaulted, so the direction is not a matter of taste. Measured in IR,
+  not assumed.
+- **`effective_method_owner`, not a raw `class_own_methods` lookup.** `Leaf
+  extends Mid` inheriting `to_string` without redeclaring it gets **no
+  forwarder**, so deriving the symbol from the concrete class would name a symbol
+  that does not exist — the #135 shape. The arm for Leaf's tag calls *Mid's*
+  symbol. `test/oracle_println_class_not_bits.sf` asserts `[Base(1), Mid(2),
+  Mid(3)]` for exactly this.
+- **0 is the fall-through sentinel.** `__val_to_string` returns 0 for anything it
+  cannot name, and `__any_to_string` treats 0 as "not a class" and proceeds to the
+  arms that were already there. That keeps the change composable instead of
+  authoritative, and it is why the definition is emitted even for a program with
+  **zero** classes: the call site in `base_nanbox.ll` is unconditional, so the
+  reference is hard rather than weak.
+
+**wasm32 joined; wasm64 deliberately did not.** wasm32 qualifies on all three
+counts — NaN-boxed values, the GC magic sentinel, and both `__val_class_tag` and
+`__gc_get_type_tag` defined in-file — so it got the same two edits and was
+verified by actually running the module, not just linking it. wasm64's
+`__any_to_string` is a bare pass-through stub under its identity discipline; that
+is **#131**, still open, and this fix does not pretend to change it.
+
+**Two deliberate non-goals, both verified rather than assumed:**
+
+- A class that declares no `to_string` at all *still* prints its bit pattern.
+  Inventing `<Pt object>` would be a new output format decided by a bug fix.
+- **Fieldless enums cannot join.** `tag << 56` is a bare immediate with no
+  allocation and no identity; there is nothing to key on. A bit-pattern heuristic
+  was deliberately not written — a wrong guess is worse than visible garbage.
+  Payload enums *could* join by allocating via `__gc_alloc` in
+  `gen_enum_construct` (`expr_body.sf`) with tags from the same allocator as
+  `next_class_type_id`, and `oracle_enum_println` still shows the bit patterns;
+  that residual is filed separately.
+
+**It closed the gap #117 deferred to it.** #117's entry documented heterogeneous
+literals and explicit `List<Any>` slots as belonging to #115, and both now format
+correctly: `[Pt(1), 2]` renders as `[Pt(1), 2]`. #117 routes `Any` to runtime
+dispatch and #115 makes runtime dispatch answer for classes, so the two compose —
+asserted in `test/pass/list_lit_elem_type.sf`.
+
+**A note on why the identity-mode gate matters here.** The emit site is gated
+`if (!this.identity_mode)`, so the **bootstrap can never validate this path** —
+the identity-mode blind spot. Every claim above was therefore checked with user
+programs compiled by gen3, never inferred from a green bootstrap.
+
+Verified: bootstrap green through stage 2 (gen3→gen4 fixed point, only the known
+benign `undefined variable 'private'` line); `oracle_println_class_not_bits.sf`
+strengthened from 6/8-failing-on-purpose to **12/12** and its `KNOWN_FAIL` entry
+removed (a KNOWN_FAIL test that passes is reported as an `xpass` *failure*);
+inheritance, interface-default `to_string`, and every non-class value (`42`,
+`3.5`, `str`, `true`, `nil`, `[1, 2]`, `{a: 1}`, and both enum shapes) unchanged;
+wasm32 links 7706→7905 bytes, so the switch is really in the module, and runs
+identically under `node tools/oracle/wasm_run.mjs`; suite **293 passed / 8
+failed** with a failure set identical to `test/FAILURE_BASELINE.txt` and an
+unchanged `md5` across the run.
+
+---
 
 ### 117. FIXED — an unannotated list literal of class instances lost its element type
 
