@@ -3,14 +3,44 @@
 import "@path" as Path
 import "@os" as OS
 
-/// Holds a directory listing for querying files and subdirectories.
+/// Holds a recursive directory listing for querying files and subdirectories.
+///
+/// `file_paths` and `dir_paths` are both full paths under `base_dir`, collected
+/// eagerly at construction.
+///
+/// This used to store `IO.walk_dir(dir)` as a `List<List<Any>>` and read each
+/// entry as a Python `os.walk` `[root, dirs, files]` triple. `IO.walk_dir` is
+/// really `ls -1` — bare names, one level, no descent — so `entry[0]` indexed into
+/// a *filename string* and produced single characters. `files()` returned garbage
+/// and nothing was recursive despite the docs. See the same defect and the same fix
+/// in `@glob`'s `find_in`, and BUGS #153 for why it crashed instead of just
+/// returning nothing.
 class FileFinder {
-    var entries: List<List<Any>>
+    var file_paths: List<String>
+    var dir_paths: List<String>
     var base_dir: String
 
     fun init(dir: String) {
         this.base_dir = dir
-        this.entries = IO.walk_dir(dir)
+        this.file_paths = []
+        this.dir_paths = []
+        this._scan(dir)
+    }
+
+    /// Depth-first descent, pushing full paths into the two flat lists.
+    fun _scan(dir: String) {
+        var names: List<String> = IO.walk_dir(dir)
+        var i = 0
+        while (i < names.length()) {
+            var full: String = Path.join([dir, names[i]])
+            if (IO.is_dir(full)) {
+                this.dir_paths.push(full)
+                this._scan(full)
+            } else {
+                this.file_paths.push(full)
+            }
+            i = i + 1
+        }
     }
 }
 
@@ -19,42 +49,14 @@ fun from(dir: String): FileFinder {
     return FileFinder(dir)
 }
 
-/// Return all file paths found under the finder's root directory.
+/// Return all file paths found recursively under the finder's root directory.
 fun files(finder: FileFinder): List<String> {
-    var result = []
-    var i = 0
-    while (i < finder.entries.length()) {
-        var entry = finder.entries[i]
-        var root: String = entry[0]
-        var file_list = entry[2]
-        var j = 0
-        while (j < file_list.length()) {
-            var name: String = file_list[j]
-            result.push(Path.join([root, name]))
-            j = j + 1
-        }
-        i = i + 1
-    }
-    return result
+    return finder.file_paths
 }
 
-/// Return all subdirectory paths found under the finder's root directory.
+/// Return all subdirectory paths found recursively under the finder's root directory.
 fun dirs(finder: FileFinder): List<String> {
-    var result = []
-    var i = 0
-    while (i < finder.entries.length()) {
-        var entry = finder.entries[i]
-        var root: String = entry[0]
-        var dir_list = entry[1]
-        var j = 0
-        while (j < dir_list.length()) {
-            var name: String = dir_list[j]
-            result.push(Path.join([root, name]))
-            j = j + 1
-        }
-        i = i + 1
-    }
-    return result
+    return finder.dir_paths
 }
 
 /// Filter files by file extension (e.g. ".sf").

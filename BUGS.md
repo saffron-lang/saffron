@@ -2,8 +2,8 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#147. Next free number is **#153**.
+**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#143, #147. Next free number is **#154**.
 
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
@@ -11,13 +11,26 @@ five times at merge — #142 → #143 → #145 → #146 → #149 — each time o
 turned out to already own the number it had reached. The lesson below about
 reading the next-free number from `main` is exactly why.
 
-#144, #145, #146, #150, #151 and #152 were each filed and fixed in the same
+#144, #145, #146, #150, #151, #152 and #153 were each filed and fixed in the same
 sitting — the unused-variable warning firing on compiler-mandated match-arm
 bindings, call-site argument types never being checked at all, an inferred
 global read from inside a function being typed `Int`, interface-typed dispatch
 binding to the empty abstract stub, a cross-module subclass emitting an
-unprefixed inherited-method forwarder, and the lexer silently discarding `\xNN`
-escapes — and all six are under `## Resolved`.
+unprefixed inherited-method forwarder, the lexer silently discarding `\xNN`
+escapes, and an unresolved-type subscript falling through to the list path — and
+all seven are under `## Resolved`.
+
+**#152 collided the same way #146 did, and the subscript fix moved to #153.** ph5
+filed the unresolved-subscript crash as #152 while reading "next free is #153" from
+its own out-of-date header; origin/main had meanwhile given #152 to the lexer-escape
+entry above. The tie-break resolved it in seconds this time: the escape fix was
+already merged and cited by number in `lexer.sf` and `test/FAILURE_BASELINE.txt`,
+while the subscript entry existed only in one unpushed worktree, so the subscript
+entry moved. Its five in-source citations (`runtime.sf`, `glob.sf`, `find.sf`,
+`methods_body.sf`, `test/pass/unresolved_index.sf`) were rewritten in the merge.
+That is three collisions in this file's history now, all with the same cause:
+**re-read this header from `main` immediately before filing, not from the worktree
+you have been in all day.**
 
 **#146 collided across two unpushed lines of work, and the escape fix moved to
 #152.** Two different bugs were both filed as #146: locally "an inferred global
@@ -1034,6 +1047,91 @@ The audit for siblings found none: the other direct `emit("define` sites are the
 deliberately global, and the module-init functions build their own name from the
 prefix (`"__mod_init_" + prefix`), so they are unique by construction. The
 forwarder was the only class symbol not named by `gen_function`.
+
+### 153. FIXED — indexing a receiver whose static type is unresolved fell through to the list path, so `s[i]` on a NaN-tagged String segfaulted
+
+**Severity: high** — a silent SIGSEGV with no diagnostic, and the *fifth* symptom of
+one root cause.
+
+```saffron
+var entries = IO.walk_dir("src/lib")   // List<String>, but unannotated
+var entry = entries[0]                 // a String; static type now unresolved
+var x = entry[2]                       // a one-character String
+IO.println(x.length().to_string())     // SIGSEGV
+```
+
+`gen_index_get` (`codegen/methods_body.sf`) checks the receiver's static type in
+order: Tuple (rejected), Map, a class declaring `getItem`, String. Everything else
+falls into the list path, which calls `__list_length` / `__list_get` on the value as
+given — and those `inttoptr` it. For a List, stored untagged, that is correct. For a
+NaN-tagged String it reads character bytes as a list header.
+
+The list path was acting as the default for *"no idea what this is"*, and that is
+the shared root of four already-closed entries, each fixed by adding one more known
+type above it: **#29** (String), **#93** (`String|Nil` reaching `.length()`), **#94**
+(`getItem` classes), **#95** (generic `getItem`). `.length()` was given a runtime
+fallback — `__any_length`, which reads the GC type tag — but the subscript never was.
+
+Fixed by routing the unresolved case to a new `__any_index_get`, the subscript
+sibling of `__any_iter_get`. It is deliberately a *separate* helper: on a Map,
+`m["key"]` is a key lookup, while for-in's element read is an ordinal walk yielding
+a `[key, value]` pair, so sharing one function would silently turn every unresolved
+map subscript into a positional read. It takes the subscript still NaN-boxed,
+because which representation is correct depends on the receiver — a Map key must
+stay boxed for `__map_key_cmp` to tell `"1"` from `1`, a List/String index must be
+untagged — and the receiver is precisely what codegen did not know.
+
+`Any` routes to the runtime helper too. The first version of this fix excluded it,
+on the theory that an untyped receiver reaching a subscript is usually a List and
+that keeping it static costs nothing — and that version left the reported crash
+completely intact. `Any` is not a hint that the value is a List; it is the compiler
+saying it does not know, which is exactly the condition that requires a runtime tag
+check. It is also what the new arm *returns*, so under the exclusion an unannotated
+`a[i][j]` fed `Any` straight back in and the second subscript took the crashing path
+— the repro above is that shape, and it still segfaulted after a fully green
+bootstrap. The already-working `.length()` precedent (`methods_body.sf`, from #93)
+had it right: `if (obj_type == "Any" or length_unresolved)`.
+
+That is worth stating as a rule, because the reasoning is seductive and it is the
+same reasoning that produced #29/#93/#94/#95 one type at a time: only List and Tuple
+— spellings that pin the representation — may keep the static path. Every other
+answer, `Any` included, means *unknown*.
+
+**Two stdlib bugs were hiding behind the crash.** `IO.walk_dir` is a misnomer — it
+is `ls -1`, returning bare names for one directory with no descent, and a straight
+alias of `IO.list_dir`. Both stdlib callers were written against a Python `os.walk`
+that does not exist here, treating each entry as a `[root, dirs, files]` triple:
+`@glob`'s `find_in` and `@find`'s `FileFinder` therefore indexed into a *filename
+string*. `find_in` never matched anything and `**` could not have worked over a
+single non-recursive listing; `FileFinder.files()` returned garbage while its docs
+promised recursion. Both now do a real recursive descent via `IO.is_dir`. Separately
+`_ignore_matches` stripped a pattern's trailing slash *before* testing for a slash,
+so `build/` became `build`, took the basename branch, and was compared against
+`out.o` — the gitignore directory form never matched. That is why the fix is three
+files and not one: a correct compiler would have turned `test_glob`'s segfault into
+an assertion failure, not a pass.
+
+The lesson worth keeping: a crash this deterministic reads like the whole story, and
+here it was masking two logic errors in the caller. `test_glob` had been failing as
+`segfault` for long enough to be background noise.
+
+**Verification.** Bootstrap green through stage 2 (`gen3 compiles itself; gen4 links
+and compiles`) — stage 1 alone would not have been evidence, since the compiler's own
+source annotates its subscript receivers and never exercises the unresolved path.
+`test/pass/unresolved_index.sf` is the regression test: 10 assertions covering the
+original `walk_dir` chain, every position of an unresolved String, negative indices
+through both `__str_get` and `__list_get`, and an unresolved Map subscript asserting a
+*key* lookup rather than an ordinal read. `test/test_glob.sf` went from `segfault` to
+23/23. Suite 281 passed / 8 failed after the origin/main merge, one name removed
+(`test_glob`) and nothing added against `test/FAILURE_BASELINE.txt`;
+`build/saffronc`'s md5 was unchanged across the run.
+
+`test_glob` had been recorded in the baseline as *nondeterministic — treat its
+presence or absence as noise*, and that note is now removed: it passes 5/5 at a
+fixed HEAD. The flakiness was the bug. A segfault from indexing a NaN-tagged String
+depends on what the allocator happened to put where, so the same test at the same
+commit could pass or fault — which is exactly how a hard crash got filed as flake
+and then read as background noise for weeks.
 
 ### 150. FIXED — a call through an interface-typed receiver bound to the interface's empty abstract stub, so it silently did nothing and returned 0
 
