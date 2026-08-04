@@ -287,6 +287,57 @@ Rules:
 *Kills the parsing-types-out-of-strings hazard visible in
 `resolve_type_params(ret_type: String, params_str: String, ...)`.*
 
+The count above says 41; it is **59** as of 2026-08-04 (`grep -cE '\): String \{'
+src/compiler/checker.sf`). The number moved because the file grew, not because
+anything regressed — but a stale count in a plan is the same failure mode the plan
+is about, so measure it rather than quoting this line.
+
+#### Landed 2026-08-04: the first slice, and what a string type costs
+
+BUGS #147 was taken first because it is both an owed bug and a genuine I3 site:
+`VarDecl.type_ann` is a raw `String`, and the defect was entirely a consequence of
+that. The parser used the string `"Any"` to mean "no annotation was written", and
+the checker asked "was an annotation written?" by comparing against it. A `String`
+has no room for "absent", so an in-band value was drafted to carry it — and then
+`: Any`, a legitimate annotation, was indistinguishable from silence.
+
+Moving the sentinel to `""` fixed the bug and made **three dead branches live**,
+each of which had been returning the right answer only because the offending input
+never arrived:
+
+1. `is_nullable_type(AnyType)` answered `false`. `Any` is the top type, so `nil`
+   inhabits it — the compiler immediately rejected eight of its own
+   `var llvm_end_bb: Any = nil` declarations.
+2. The `Return` check tested nullability where it meant subtyping, so
+   `return <Any expr>` from a `: Float` function became an error and `lexer.sf`
+   stopped compiling.
+3. `is_gc_root_type("")` answered `false`, so every unannotated local lost its
+   `__gc_push_root`. `toml_test` died on a list the collector had freed, ~40 lines
+   past the code that lost the root.
+
+That is the shape to expect from the rest of stage 3, and it is worth stating as a
+prediction rather than a surprise: **the sites that consume a string type have
+guards keyed to the specific strings that happen to reach them.** Each of the
+three above is a `length() == 0` or `== "Any"` test that meant something narrower
+than it said. A `Type` enum with an explicit `Unknown` variant (I2) removes the
+need for an in-band sentinel at all, which is the actual argument for stage 3 —
+not that strings are slow, but that they have no way to spell "I don't know" that
+isn't also a valid answer.
+
+Two operational notes for the remaining slices:
+
+- **Trace every consumer before moving a sentinel.** The three defects above were
+  each found by a *different* failure mode (a stage-1 compile error, a stage-2
+  compile error, a suite runtime error 40 lines from its cause), and only the
+  first two were cheap. `grep` for the old spelling across `src/compiler/` and
+  `src/lib/` is the minimum.
+- **A suite failure with no compile error attached is probably codegen.** Link
+  HEAD's gen3 from the checked-in `build/stage3/*.ll`, point `SAFFRONC` at it, and
+  diff its IR against the new compiler's for the same input. That named defect 3
+  directly. Note the `GEN2_OK=false` fallback relinks gen3 from those same `.ll`
+  files, so a previous failed run's artifacts can make a fix look rejected — `git
+  checkout -- build/stage3/` first.
+
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
 A dedicated resolve pass sits between parse and check. It walks scopes and
@@ -674,7 +725,7 @@ resolve to exist first.
 | 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
 | 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
 | 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
-| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | Touches checker and AST broadly. |
+| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** First slice landed 2026-08-04: BUGS #147, `VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches (see I3 above). Remaining: `FunDecl.ret_type` and `Lambda.ret_type` are still `String`; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
 | 6 | LIR with `Val`/`Raw`/`Ptr` + rep-check; delete `--identity-mode` | M3 → #23/#24/#25/#28 + the GC-sweep hazard | Requires stage 5. Convert in the atomic groups #23 already identifies (enum construction with match field loads; closures with `gen_indirect_call`; instances with `gen_get_field`) — a partial conversion turns a printing bug into a segfault. |
@@ -686,14 +737,23 @@ resolve to exist first.
 Stages 0-2 and 9 are independent and can proceed concurrently. Stage 4 is the
 inflection point: after it, the "codegen guessed a type" bug class is gone.
 
-**Where the plan stands (2026-08-03).** Stages 0, 1 and 2 are landed. The next
-stage in the critical path is **3** (types as one interned enum), and it is the
-right next one for a reason stage 1 just demonstrated: every piece of stage 1's
-residue — `T`/`E` in `get_variant_field_type`, `Any` operands in `binary` — is a
-question a string type cannot answer. Stage 1 made those visible and countable;
-stage 3 is what makes them representable. Stage 9 (generated runtime) remains
-independent of everything and can be picked up in parallel at any time; stage 10
-is still blocked on the single `resolve_method_symbol` bug described below.
+**Where the plan stands (2026-08-04).** Stages 0, 1 and 2 are landed. Stage **3**
+(types as one interned enum) is in progress, and it is the right next one for a
+reason stage 1 demonstrated: every piece of stage 1's residue — `T`/`E` in
+`get_variant_field_type`, `Any` operands in `binary` — is a question a string type
+cannot answer. Stage 1 made those visible and countable; stage 3 is what makes them
+representable.
+
+Its first slice (BUGS #147, `VarDecl.type_ann`) landed 2026-08-04 and is worth
+reading before starting the next one: fixing one in-band sentinel exposed three
+latent defects, one of them a lost GC root that surfaced as a runtime IndexError
+40 lines from its cause. The write-up under I3 above records both the pattern to
+expect and the two techniques that found them. Next slices: `FunDecl.ret_type`,
+`Lambda.ret_type`, then the 59 `: String`-returning functions in `checker.sf`.
+
+Stage 9 (generated runtime) remains independent of everything and can be picked up
+in parallel at any time; stage 10 is still blocked on the single
+`resolve_method_symbol` bug described below.
 
 ### What actually blocks stage 10 (measured 2026-08-02)
 
