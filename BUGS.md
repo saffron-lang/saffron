@@ -2,8 +2,8 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
-#146, #147. Next free number is **#148**.
+**10 open entries:** #2, #49, #65, #75, #107, #115, #117, #131, #132,
+#147. Next free number is **#148**.
 
 #140 was never filed — the count was bumped past it in the same commit that
 closed five entries, so the number is burnt rather than in use. Do not reuse it;
@@ -545,54 +545,6 @@ a one-line edit.
 
 ---
 
-### 146. OPEN — an inferred global read from inside a function is typed `Int`, so every method on it is rejected
-
-**Severity: high.** This is now the blocker for the `bazaar/frontend` build, and it
-was hidden behind #139: the checker aborted before codegen ran, so fixing #139 is
-what made it visible. It is not new — the same error reproduces on the pre-#139
-gen3 binary.
-
-Repro, no modules or generics needed (9 lines):
-
-```saffron
-class Box {
-    var n: Int
-    fun init(n: Int) { this.n = n }
-    fun bump() { this.n = this.n + 1 }
-}
-fun make(): Box { return Box(1) }
-var b = make()                  // global, type INFERRED (not annotated)
-fun go() { b.bump() }           // [codegen] Error: type 'Int' has no method 'bump'
-go()
-```
-
-Three variants isolate it exactly. All were measured, not reasoned:
-
-| variant | result |
-|---|---|
-| `b.bump()` at top level, not inside a function | OK |
-| `var b = make()` declared *local* to the function | OK |
-| `var b: Box = make()` — same global, annotated | OK |
-| `var b = make()` global, read inside a function | **`type 'Int' has no method 'bump'`** |
-
-So it is the combination "inferred global" + "read from a function body", and the
-annotation is a complete workaround. `Int` is the tell: it is codegen's fallback
-for a type it could not determine (`types_body.sf` `str_to_type` has no Unknown
-arm, and `IntType` is the first arm), which is exactly the class of silent-wrong-
-answer that rewrite stage 1 exists to convert into a diagnostic. See
-`project_nonexhaustive_match_indeterminate` and the M2 fallback list.
-
-The bazaar frontend hits it 16 times through `var packages_query = Api.getPackages()`
-read inside `do_search`/`on_data`/render bodies, reported as no method `refetch`,
-`go`, `on_data`, `current`, `mutate`, `on_success`, `render`.
-
-The reference build path:
-
-```
-cd bazaar/frontend
-../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
-```
-
 ### 147. OPEN — an explicit `: Any` annotation is indistinguishable from no annotation, so the initializer's type wins
 
 **Severity: low.** Split out of #139, where it was point 1 ("it ignores explicit
@@ -628,6 +580,83 @@ one of the sites rewrite stage 3 has to touch.
 ---
 
 ## Resolved
+
+### 146. FIXED — an inferred global read from inside a function was typed `Int`, so every method on it was rejected
+
+**Severity: high.** The blocker for the `bazaar/frontend` build after #139, and
+hidden behind it: the checker aborted before codegen ran, so fixing #139 is what
+made it visible. It was not new — the same error reproduced on the pre-#139 gen3
+binary.
+
+Repro, no modules or generics needed:
+
+```saffron
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun bump() { this.n = this.n + 1 }
+}
+fun make(): Box { return Box(1) }
+var b = make()                  // global, type INFERRED (not annotated)
+fun go() { b.bump() }           // was: [codegen] Error: type 'Int' has no method 'bump'
+go()
+```
+
+Four variants isolated it exactly. All were measured, not reasoned:
+
+| variant | result |
+|---|---|
+| `b.bump()` at top level, not inside a function | OK |
+| `var b = make()` declared *local* to the function | OK |
+| `var b: Box = make()` — same global, annotated | OK |
+| `var b = make()` global, read inside a function | **`type 'Int' has no method 'bump'`** |
+
+So it was the combination "inferred global" + "read from a function body", with the
+annotation a complete workaround. `Int` was the tell: codegen's fallback for a type
+it could not determine (`types_body.sf` `str_to_type` has no Unknown arm, and
+`IntType` is the first arm) — the same silent-wrong-answer class rewrite stage 1
+exists to convert into a diagnostic.
+
+**Two independent defects had to be fixed, which is why the repro needed both a
+plain and an alias-qualified form.**
+
+*Defect 1 — the global pre-registration pass could not type a call.* Codegen
+registers global `var`s (the `@__g_*` emission) before any IR generation, but a
+call's return type comes from `func_ret_types`, which `prescan_decls` fills — and
+that runs *after* the global pass at all three entry points. So the global pass saw
+an empty `func_ret_types` and could only resolve literal shapes; its guard was
+literally `if (vinit.starts_with("List") or vinit.starts_with("Map") or vinit ==
+"String")`. A class instance matched nothing, stayed out of `global_var_types`, and
+dispatch fell through to the `Int` default. Fixed by a second pass,
+`prescan_global_call_types` (`codegen/utils_body.sf`), that runs *after*
+`prescan_decls` and only adds a type for a still-untyped global whose initializer is
+a `call`/`method_call` with a known non-`Any` return — it never overrides an
+annotated or literal-initialized global. Wired into all three entry points in
+`codegen.sf`, always after `prescan_decls`, and per module prefix so a
+module-qualified global registers under both its bare and prefixed name.
+
+*Defect 2 — `get_expr_type` had no alias arm for `method_call`.* `Lib.make()` is a
+`method_call` to the parser: the receiver is a module alias, not a value, so none
+of the class lookups in `get_expr_type`'s `method_call` arm could resolve it — the
+alias has no type for them to key on — and it answered `Any`. The `call` arm had
+carried such a branch all along; the `method_call` arm just never grew one, so even
+with the second pass in place an alias-qualified inferred global still typed `Any`.
+Fixed by adding the branch (`methods_body.sf`, keyed on `has_module_alias(receiver)`
+and placed above the class lookups, since a module alias is never a class
+instance).
+
+Regression coverage: `test/pass/global_call_inferred_type.sf` (the plain form, all
+four variants asserted so a future change cannot fix one and break another) and
+`test/pass/global_call_alias_inferred.sf` + `test/fixtures/global_call_alias_lib.sf`
+(the module-alias form, which exercises defect 2). Suite after the fix: 265 passed /
+16 failed, failure set identical to the baseline in both `comm` directions.
+
+The reference build this unblocks:
+
+```
+cd bazaar/frontend
+../../tools/saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm
+```
 
 ### 139. FIXED — a free function decided the type of any same-named method call on an unresolved receiver
 

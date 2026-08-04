@@ -1464,5 +1464,59 @@
         }
     }
 
+    /// Second pass over global `var`s, typing the ones the FIRST pass had to give
+    /// up on: those whose type is only knowable from a *call* in the initializer.
+    ///
+    /// Two passes rather than one because of an ordering the first pass cannot
+    /// escape. Globals must be registered in `module_globals` and emitted as
+    /// `@__g_*` before any IR generation, but a call's type comes from
+    /// `func_ret_types`, which `prescan_decls` fills — and that runs *after* the
+    /// global pass at all three entry points. So the first pass sees an empty
+    /// `func_ret_types` and can only resolve literal shapes (list/map/string),
+    /// which is exactly what its `starts_with("List")` allowlist encodes.
+    ///
+    /// That allowlist is BUGS #146: `var b = make()` where `make(): Box` matched
+    /// nothing in it, so the global stayed out of `global_var_types`, dispatch fell
+    /// through to codegen's `Int` default, and every method on it was rejected with
+    /// "type 'Int' has no method 'bump'" — but only when read from inside a
+    /// function body. At top level the statement walk has already typed the
+    /// variable through `typed_vars`, and a *local* `var b = make()` is typed the
+    /// same way, which is why the bug needed the global-plus-function-body
+    /// combination to appear.
+    ///
+    /// Call this AFTER prescan_decls, for the same corpus and prefix. It only ever
+    /// adds: a global already typed by the first pass is left alone, so annotated
+    /// and literal-initialized globals cannot be perturbed by this pass at all.
+    fun prescan_global_call_types(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var si: Float = start
+        while (si < end) {
+            if (this.classify_stmt(stmts[si]) == "var") {
+                var name: String = this.get_var_name(stmts[si])
+                // Already decided — by an annotation, or by the first pass's
+                // literal inference. Never overwrite either.
+                if (name.length() > 0 and !this.global_var_types.has(prefix + name) and !this.global_var_types.has(name)) {
+                    var vtype: String = this.get_var_type(stmts[si])
+                    if (vtype.length() == 0 or vtype == "Any") {
+                        // Only a call's type is new information here; the literal
+                        // shapes were already resolved by the first pass, and
+                        // re-deriving them would just duplicate its allowlist.
+                        var init: AST.Expr = this.get_var_init(stmts[si])
+                        var ik: String = this.classify_expr(init)
+                        if (ik == "call" or ik == "method_call") {
+                            var ity: String = this.get_expr_type(init)
+                            if (ity.length() > 0 and ity != "Any" and ity != "Nil") {
+                                this.global_var_types.set(name, ity)
+                                if (prefix.length() > 0) {
+                                    this.global_var_types.set(prefix + name, ity)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            si = si + 1
+        }
+    }
+
     // --- Statement codegen ---
 
