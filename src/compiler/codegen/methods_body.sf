@@ -929,6 +929,31 @@
         return ""
     }
 
+    // Does `struct_c`, or anything it inherits from, DECLARE `method` without a
+    // body? Searched over the ancestors too, so a class extending an interface
+    // that itself extends another interface still finds the declaration.
+    //
+    // The companion to effective_method_owner: that one answers "who supplies a
+    // body", this one "is the name known but bodyless". Together they let
+    // gen_virtual_dispatch distinguish an unrelated method from an abstract one
+    // (BUGS #150).
+    fun declares_abstract(struct_c: String, method: String): Bool {
+        if (this.class_own_abstract.has(struct_c)) {
+            var abs0: List<String> = this.class_own_abstract.get(struct_c)
+            if (abs0.contains(method)) { return true }
+        }
+        var anc: List<String> = this.all_ancestor_structs(struct_c)
+        var ai: Float = 0
+        while (ai < anc.length()) {
+            if (this.class_own_abstract.has(anc[ai])) {
+                var absn: List<String> = this.class_own_abstract.get(anc[ai])
+                if (absn.contains(method)) { return true }
+            }
+            ai = ai + 1
+        }
+        return false
+    }
+
     // BUGS #50. A call statically bound to <ns>__<method> is only right when the
     // receiver is exactly ns; a subclass in an ns-typed slot (or `this` inside an
     // inherited method) needs its own override. Emit a switch on the receiver's
@@ -947,7 +972,18 @@
         if (this.class_struct_names.has(ns)) { struct_ns = this.class_struct_names.get(ns) }
         if (!this.class_type_ids.has(struct_ns)) { return "" }
         var ns_owner: String = this.effective_method_owner(struct_ns, method)
-        if (ns_owner.length() == 0) { return "" }
+        if (ns_owner.length() == 0) {
+            // No class at or above ns supplies a body. That is either "ns has
+            // nothing to do with this method" — bail, as before — or "ns declares
+            // it abstractly", which is an interface. The second case is exactly
+            // where dispatch matters MOST: the static call would go to the
+            // abstract method's stub, which codegen emits as a bare `ret i64 0`,
+            // so before BUGS #150 every call through an interface-typed receiver
+            // silently did nothing and returned 0. Fall through with ns_owner ""
+            // — no implementation to be equal to means every implementor below
+            // is an override, which is precisely right for an interface.
+            if (!this.declares_abstract(struct_ns, method)) { return "" }
+        }
         // Collect descendant structs whose effective owner differs from ns's.
         var arm_tags: List<String> = []
         var arm_syms: List<String> = []
