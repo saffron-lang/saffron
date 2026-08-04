@@ -1,0 +1,16 @@
+// Fixture for test/pass/global_call_alias_inferred.sf (BUGS #146).
+//
+// Deliberately plain: a class and a factory returning it. The bug being guarded
+// is entirely on the importing side — how codegen types
+// `var g = Lib.make_gauge(...)` — so nothing here needs to be unusual.
+
+class Gauge {
+    var reading: Int
+    fun init(reading: Int) { this.reading = reading }
+    fun tick() { this.reading = this.reading + 1 }
+    fun read(): Int { return this.reading }
+}
+
+fun make_gauge(start: Int): Gauge {
+    return Gauge(start)
+}

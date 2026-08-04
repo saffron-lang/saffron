@@ -1,0 +1,47 @@
+// BUGS #146, module half: a global typed by an ALIAS-QUALIFIED call, read from
+// inside a function body.
+//
+// Two separate defects had to be fixed for this shape, which is why it gets its
+// own file rather than another assertion in global_call_inferred_type.sf:
+//
+// 1. The global pre-registration pass could not type a call at all — see that
+//    file's header (prescan_global_call_types).
+//
+// 2. `Lib.make_gauge(1)` is a METHOD CALL to the parser: the receiver is a module
+//    alias, not a value. get_expr_type's method_call arm had no alias branch, only
+//    class lookups, and a module alias has no type for those to resolve — so even
+//    with the second pass in place it still answered Any. The `call` arm had had
+//    such a branch all along; the method_call arm just never grew one.
+//
+// The fix for (2) is that branch, keyed on has_module_alias(receiver) and placed
+// above the class lookups, since a module alias is never a class instance.
+//
+// This file must COMPILE AND RUN. A `type 'Int' has no method 'tick'` codegen
+// error is the bug returning.
+
+import "@test" as Test
+import "../fixtures/global_call_alias_lib.sf" as Lib
+
+// The bug's shape: global, inferred, initialized through a module alias.
+var g_gauge = Lib.make_gauge(5)
+
+// Control: same call, annotated with the alias-qualified type.
+var g_annotated: Lib.Gauge = Lib.make_gauge(50)
+
+fun tick_inferred() {
+    g_gauge.tick()
+}
+
+fun tick_annotated() {
+    g_annotated.tick()
+}
+
+tick_inferred()
+tick_inferred()
+tick_inferred()
+Test.assert_eq(g_gauge.read(), 8, "alias-inferred global keeps its type from a function body")
+
+tick_annotated()
+Test.assert_eq(g_annotated.read(), 51, "alias-annotated global still works")
+
+Test.summary()

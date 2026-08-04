@@ -229,6 +229,20 @@
                 mc_obj_type = this.get_field_type(inner_resolved, inner_field)
             }
         }
+        // Alias-qualified free function: `Lib.make()`. The parser builds this as a
+        // MethodCall whose receiver is a module alias, not a value, so none of the
+        // class lookups below can resolve it — the alias has no type. The `call`
+        // arm further down already handles this shape for a bare Call; without the
+        // same arm here, `var b = Lib.make()` typed as Any and dispatch fell
+        // through to Int (BUGS #146). Checked before the class lookups because a
+        // module alias is never a class instance, so there is nothing to lose by
+        // answering first.
+        if (mc_obj_name.length() > 0 and this.has_module_alias(mc_obj_name)) {
+            var alias_full: String = this.module_alias_prefix(mc_obj_name) + mc_method
+            if (this.func_ret_types.has(alias_full)) {
+                return this.type_to_string(this.func_ret_types.get(alias_full))
+            }
+        }
         // If object is a user class, look up method return type
         var mc_resolved: String = this.resolve_class_type(mc_obj_type)
         if (mc_resolved.length() > 0) {
