@@ -1284,6 +1284,10 @@ declare i64 @__rt_as_list_ptr(i64)
 declare i64 @__list_to_string(i64)
 declare i64 @__rt_as_map_ptr(i64)
 declare i64 @__map_to_string(i64)
+; Generated per-program by emit_val_to_string (stmts_body.sf). Always defined,
+; even for a program with no classes, so this is a hard reference rather than a
+; weak one — see the comment at its emit site.
+declare i64 @__val_to_string(i64)
 ; __any_eq delegates to this deep-equality body defined in runtime.sf.
 declare i64 @__rt_val_eq(i64, i64)
 
@@ -1334,6 +1338,27 @@ do_map:
   ret i64 %map_str
 
 check_ptr:
+  ; A class instance is tested BEFORE the string/float split, for the same
+  ; reason list and map are: it is a heap pointer, so both remaining arms would
+  ; accept it and both would be wrong. do_ptr would hand the address to puts as
+  ; though it were a char*, and an untagged instance pointer (constructors
+  ; return one bare) fails __val_is_ptr and reached do_float, which formatted the
+  ; address as a subnormal double — the 5.21502e-310 of BUGS #115.
+  ;
+  ; __val_to_string is GENERATED, not written here: the tag -> to_string mapping
+  ; exists only in codegen's class tables (see emit_val_to_string in
+  ; stmts_body.sf, emitted beside __class_parent_tag from the same tables). It
+  ; returns a raw char*, matching every arm below, and 0 for anything it cannot
+  ; name — a non-class value, or a class that declares no to_string — so those
+  ; keep falling through to exactly the behaviour they had before.
+  %cls_str = call i64 @__val_to_string(i64 %val)
+  %has_cls = icmp ne i64 %cls_str, 0
+  br i1 %has_cls, label %do_class, label %check_ptr_tag
+
+do_class:
+  ret i64 %cls_str
+
+check_ptr_tag:
   %is_ptr = call i1 @__val_is_ptr(i64 %val)
   br i1 %is_ptr, label %do_ptr, label %do_float
 

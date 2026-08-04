@@ -1647,6 +1647,9 @@ declare i64 @__rt_as_list_ptr(i64)
 declare i64 @__list_to_string(i64)
 declare i64 @__rt_as_map_ptr(i64)
 declare i64 @__map_to_string(i64)
+; Generated per-program by emit_val_to_string (stmts_body.sf), always defined —
+; see the comment at its emit site.
+declare i64 @__val_to_string(i64)
 ; __any_eq delegates to this deep-equality body defined in runtime.sf.
 declare i64 @__rt_val_eq(i64, i64)
 
@@ -1699,6 +1702,21 @@ do_map:
   ret i64 %map_str
 
 check_ptr:
+  ; Class instances, tested before the string/float split for the same reason
+  ; list and map are: both remaining arms accept a heap pointer and both are
+  ; wrong for one. Mirrors base_nanbox.ll (BUGS #115). wasm32 qualifies where
+  ; wasm64 does not: values here are NaN-boxed, the GC header carries the magic
+  ; sentinel, and __val_class_tag/__gc_get_type_tag are both defined in this
+  ; file. wasm64's identity discipline has none of that (BUGS #131), so its
+  ; __any_to_string stays the pass-through stub and gains no class arm.
+  %cls_str = call i64 @__val_to_string(i64 %val)
+  %has_cls = icmp ne i64 %cls_str, 0
+  br i1 %has_cls, label %do_class, label %check_ptr_tag
+
+do_class:
+  ret i64 %cls_str
+
+check_ptr_tag:
   %is_ptr = call i1 @__val_is_ptr(i64 %val)
   br i1 %is_ptr, label %do_ptr, label %do_float
 
