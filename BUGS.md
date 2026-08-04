@@ -2,8 +2,43 @@
 
 ## Open
 
-**9 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155.
-Next free number is **#156**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#160. Next free number is **#161**.
+
+#160 took its number without a collision — the first entry in a while to do so.
+The pre-commit re-read (see the note below) was run against `origin/main` and
+found #160 free, which is the whole procedure working as intended rather than
+detecting a clash. Worth recording that the quiet case happens too; five
+consecutive collision narratives make the scheme look worse than it is.
+
+#160 is also the second half of #147, which is the more useful thing about it: the
+checker stopped conflating `: Any` with silence, and codegen never did. A fix
+recorded as landed had reached one of two consumers, and nothing in the tree said
+so. That is the argument for invariant I10 (one source of truth per fact) stated as
+a measurement rather than a principle — the inference in question exists in five
+pasted copies.
+
+#158 is the entry the previous revision of this header described as "claimed but
+not present" — the lsp worktree's `match`-above-its-enum bug. This is that merge,
+so it is now present and the claimed set and the written set agree again. The
+observation that made the placeholder necessary still holds and is worth keeping:
+a number can be taken without its text being in this file yet, so the next-free
+number is one past the highest *claimed*, not one past the highest written.
+
+**The fifth collision, and the first one the pre-commit re-read actually caught.**
+The rule at the end of the note below — re-read the next-free number from `main`
+*immediately before committing* — was added in response to #156's collision, which
+no amount of reading-at-start could have prevented. Running it here found that
+`#158` had been claimed and **committed** by the lsp worktree (for the `match`
+textually above its enum declaration, listed above) while this line's
+condition-type tightening was still uncommitted. So the tightening became **#159**.
+The tie-break was the same as every one before it, and for once cheap: the
+committed, cited side keeps the number, the uncommitted side moves. Worth noting
+that the lsp entry had already been renumbered four times by then, so honouring
+"committed wins" also avoided forcing a sixth rename on the more-settled entry.
+Five collisions in, the pattern is not that the numbering scheme is fragile but
+that a single counter shared by four concurrent worktrees has no owner; the
+pre-commit re-read is the cheapest thing that makes it converge.
 
 #154 and #155 were filed on the same day on two lines of work that had not yet
 met — origin/main's "an enum inside a printed collection prints a bit pattern"
@@ -13,6 +48,18 @@ already claimed (by the lsp-symbol-payload worktree, for a `match` above its enu
 declaration). This time the cross-worktree grep did its job: the two picked
 different numbers, so the merge only had to place both entries rather than
 renumber either. That is the note two collisions up working as intended.
+
+**And then #155 collided anyway, on the very next merge — the fourth collision.**
+The nil-initializer fix (`var x = nil` typed the variable `Nil` forever) was
+written on a worktree that read "next free is #156" from a header where #155 was
+still unclaimed, filed itself as #155, and was committed before the `no return`
+entry above landed on `main`. It is now **#156**, under `## Resolved`. The tie-break
+was the same as #152's and cost about as little: the `no return` entry was already
+pushed and cited from `main`, the nil entry existed only in one unpushed worktree,
+so the unpushed one moved. What makes this one worth recording separately is that
+the cross-worktree grep the note above credits **would not have caught it** — the
+number was genuinely free when it was read. The rule that does catch it is the one
+below: re-read from `main` immediately *before committing*, not when you start.
 #149 is the alias/type-re-export fix (`var X = Module.SomeType`), under
 `## Resolved`. It was written on the ide-stage0-spans worktree and renumbered
 five times at merge — #142 → #143 → #145 → #146 → #149 — each time origin/main
@@ -536,6 +583,118 @@ a one-line edit.
 
 ---
 
+### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
+
+**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
+and only when the initializer is a list, map or string literal.
+
+`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
+prints a bit pattern or segfaults. The identical *local* is correct — that is the
+half #147 fixed:
+
+```saffron
+var g: Any = "abc"
+fun r() { g = 42
+    IO.println("g=${g}") }
+r()                             // segfault
+
+fun s() { var l: Any = "abc"
+    l = 42
+    IO.println("l=${l}") }
+s()                             // l=42   — correct
+```
+
+#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
+moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
+apart. It did — but **codegen's global pre-scans still collapse the two**, in five
+copies, all of the same shape:
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") {
+    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+        gvtype = gvinit
+    }
+}
+```
+
+`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
+`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
+fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
+initializer and `global_var_types` says `String`; the store writes a tagged Int and
+the load untags a pointer.
+
+The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
+`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
+three collapsed shapes break, which is the kind of partial correctness that reads as
+"works" until it doesn't.
+
+**Why the five copies exist, and why that is the actual entry.** Each one has a
+comment citing the bug that motivated it (#36, #37, #80) — they were added
+independently, and the inference was pasted rather than shared. One source of truth
+(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
+them is a real change with real risk, and the pre-scans differ in which corpus and
+prefix they walk, so this is filed rather than fixed in passing.
+
+Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
+behaviour and documents in a comment that the `: Any` global is excluded for this
+reason.
+
+---
+
+### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
+
+`enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the
+declaration (`codegen/stmts_body.sf:843` via `register_variant`), so the table is
+only correct for matches that appear after the enum in the file. A match above it
+asks `find_enum_for_variant` (`codegen/utils_body.sf:124`) for a variant that is
+not registered yet, gets `"Unknown"`, and falls into the unknown-enum branch at
+`codegen/match_body.sf:92`, which is documented as "just generate the first arm's
+body as default" — it GEPs the first arm's bindings out of the subject
+unconditionally and drops every other arm.
+
+The result is not a diagnostic and not a wrong branch. It is *no branch*: the
+emitted function has zero `icmp`/`br`/`switch` instructions and treats every
+input as the first arm's variant. If that arm has more fields than the value
+actually passed, the GEP reads past the allocation and the program segfaults on
+a load of whatever followed.
+
+Measured on `AST.expr_span` while adding it to `src/compiler/ast.sf` above
+`enum Expr`:
+
+```
+expr_span      : branches = 0     <- silently miscompiled
+type_to_string : branches = 15    <- same file, matches Type (declared above it)
+span_merge     : branches = 10    <- same file, matches Span (declared above it)
+```
+
+Calling it on a `Variable` (2 fields) through the first arm `Call` (3 fields)
+segfaulted; moving the function below `enum Expr` produced 10 branches and
+correct results for `Variable`, `Call` and a `Binary` falling through to `_`.
+
+Two things make this nastier than it looks:
+
+- **Declaration order is the only thing that matters, not scope.** Saffron
+  otherwise lets a function call another declared later in the file, so nothing
+  else in the language teaches you to expect this. Reordering two top-level
+  items — a mechanical, apparently meaningless edit — is the whole fix, and the
+  whole cause.
+- **Zero existing occurrences in the tree.** A scan of every `.sf` in `src/` and
+  `tools/` for a match arm naming a variant of an enum declared later in the same
+  file finds none, which is exactly why this has never been hit. It is a trap for
+  new code, not a live defect, so nothing regresses today and nothing will warn
+  the next person.
+
+The real fix is a prepass that registers every enum in the module before any body
+is generated. `register_external_enums` (`codegen/stmts_body.sf:1215`) is that
+prepass and **has no callers** — it is dead code. Either wire it up, or make
+`find_enum_for_variant` returning `"Unknown"` for a name that is a known variant
+somewhere a hard error instead of a silent fallthrough. The unknown-enum branch
+is legitimately needed for class patterns (`is Dog(d)`), so it cannot simply be
+deleted.
+
+---
+
 ### 155. OPEN (narrowed) — a `return` is checked against its declared return type only for scalar-vs-scalar; the class-typed segfault is still live
 
 **Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for
@@ -719,7 +878,213 @@ which is how the residual stayed measured rather than assumed.
 
 ---
 
+### 157. Punctuation after an import alias is swallowed into the alias
+
+```saffron
+import "@iter" as Iter;
+var xs = Iter.map([1, 2], fun (x: Int): Int => x * 2)
+// Error: undefined variable 'Iter'
+```
+
+**Severity: low, but the diagnostic actively misleads.** The alias registered is
+`Iter;`, semicolon included, so the module is present and reachable — just not
+under the name the author wrote. The error blames the *use* site for a name the
+*import* line mangled, and it names `Iter`, which looks correct in the source, so
+there is nothing in the message pointing at the real cause. A trailing comment
+(`as Iter // the iterator module`) fails identically.
+
+**Imports are not parsed as AST.** `main.sf` resolves them by scanning raw source
+lines, before the parser runs, because the import graph has to be walked to know
+what to parse at all. Two sites did the alias extraction, and both wrote the same
+expression inline:
+
+```saffron
+line.slice(as_idx + 4, line.length()).trim()
+```
+
+That is everything to end of line. `.trim()` strips whitespace and nothing else,
+which is correct for `as Iter` and wrong for every other line ending.
+
+**One expression written twice was two bugs.** The second site is
+`check_duplicate_aliases`, which hashes the extracted alias to detect a name
+imported twice in one file. There, `as X` and `as X;` produce different keys, so
+the check silently misses a real duplicate — it does not report a wrong alias, it
+reports nothing. That makes the shared-helper fix the systematic one rather than a
+tidiness preference: patching only the site that produced the visible error would
+have left the duplicate check broken with no symptom to lead anyone back to it.
+
+**Fix**: one `extract_alias_from_line(line, as_idx)` helper used by both, stopping
+at the first character that cannot appear in an identifier. That covers the whole
+class — semicolon, comment, trailing brace, stray punctuation — rather than the
+semicolon alone.
+
+---
+
 ## Resolved
+
+### 159. FIXED — a class or enum used as a condition was deterministically always false
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n } }
+
+var b = Box(1)
+if (b) { IO.println("taken") }      // never printed, no diagnostic
+```
+
+**Severity: medium.** This is #143's residual — the half its check deliberately let
+through — and it is *worse* than the cases #143 caught, not milder.
+
+`to_i1` is `trunc i64 %v to i1`: the low bit. #143's examples were wrong in ways
+that at least vary — `if (42)` false because 42 is even, `if (some_str)` answering
+on the low bit of a heap address, so it could flip between runs. A class instance is
+a pointer `__gc_alloc` returns **8-byte aligned**, so its low bit is always 0. The
+then-branch is unreachable on every run of every build, and nothing is printed. A
+"sometimes wrong" bug gets noticed; a consistently-false one gets designed around.
+
+Enums are the same outcome by a different route: a fieldless variant is a tag
+shifted into position rather than a pointer, and it also lands on 0.
+
+**Why #143 let them through, and why that grouping was wrong.** Its check is
+one-sided by design — it fires only on types it can *prove* are not Bool — and it
+put class and enum in the let-through set alongside `Any`, `Nil` and unions. Those
+are two different kinds of unknown. An `Any`-typed slot might genuinely hold a Bool
+at runtime, so erroring on it would reject correct programs (and redden the
+bootstrap, since the checker type-checks the compiler's own source). A variable
+whose static type is a declared class or enum can never hold one. The proof is
+available; #143 just did not take it.
+
+**Fix**: `check_condition` consults `env.class_fields` and `env.enum_variants`,
+which only contain names actually declared in this compilation, so an unresolved
+name is still left alone per #56. Each gets a hint naming the comparison to write.
+
+**This needed a new registry, which is the interesting part.** `class`, `interface`
+and `actor` are all parsed by `parse_class_decl_vis` into a single `ClassDecl`, and
+all three register in `class_fields` identically — the checker had **no way to tell
+an interface from a class**, and every `ClassDecl` arm spelled the field `__intro`
+to mark it unused. Interfaces must stay let through: an interface-typed slot holds
+some implementor, and nothing here can prove none of them is Bool-like. So
+`register_decl` now records the parser's `introducer` into `interface_names`. That
+field was added for exactly this reason — see the note at `parser.sf`'s
+`introducer`, which argues against re-deriving the answer from the `@actor` doc
+prefix.
+
+**Two residuals, both deliberate:**
+
+- **Unions.** `var maybe: Box|Nil = Box(1); if (maybe)` reads like a nil test and is
+  also always false, and it stays let through. Proving a union means proving every
+  member non-Bool, which is a bigger change to union handling here and — unlike the
+  class case — carries real risk of rejecting the compiler's own source.
+- **Interfaces**, as above. Provable in principle (walk every implementor), not
+  provable with what the checker has.
+
+`test/pass/cond_class_enum_ok.sf` asserts both residuals rather than leaving them
+as prose, so if either later becomes an error the test says so.
+
+**Verified.** Bootstrap green through stage 2 — gen3 compiles itself, gen4 links and
+compiles, 0 unresolved inference fallbacks — which is the check that matters here,
+because the failure mode of a too-eager condition rule is a false error on the
+compiler's own source. `test/fail/cond_not_bool_class.sf` and `_enum.sf` both report
+and exit 1, with the type-specific hint (`test a field, or compare it, e.g. `x !=
+nil`` / `match on it, or compare a variant, e.g. `c == Color.Variant``). #143's five
+existing fail tests still report, and `pass/cond_bool_ok.sf` and
+`pass/cond_class_enum_ok.sf` pass 3/3 and 6/6. Full suite: 299 passed, 8 failed, 14
+skipped, 0 known-fail, with the failure SET byte-identical to
+`test/FAILURE_BASELINE.txt` — zero regressions, zero incidental fixes. The +3 in
+`passed` is exactly this entry's three new tests.
+
+**Filed as #158, renumbered to #159 at commit time** — the lsp worktree had already
+committed #158 for an unrelated bug. See the fifth-collision note at the top of
+`## Open`; this is the first collision the pre-commit re-read caught rather than
+merely explained afterwards.
+
+One process note. The first read of those five #143 tests said they had started
+exiting 0, which would have meant this change broke the earlier one. It was a
+measurement bug: `$?` inside the reporting loop captured the `echo`, not the
+compiler. Re-measured one file per command and all five exit 1. The lesson is the
+one in CLAUDE.md's `## Known Issues` — verify that the thing you think you measured
+actually happened — and it cuts both ways: a harness bug can invent a regression as
+easily as it can hide one.
+
+---
+
+
+### 156. FIXED — `var x = nil` typed the variable as the singleton `Nil` forever
+
+**Filed as #155, renumbered to #156 at merge** — see the fourth-collision note
+under `## Open`. #155 is the unrelated `no return` / declared-return-type entry.
+
+```saffron
+var x = nil
+x = 5                  // accepted SILENTLY — no error, no widening
+IO.println("${x}")     // ERROR: cannot call .to_string() on nullable 'x' (type Nil)
+```
+
+**Severity: medium**, and unusually clear-cut: this **rejected a correct
+program**. Not a silent wrong answer — the assignment was swallowed without
+complaint and then every *use* of the variable was a hard compile error, which is
+the worst pairing of the two failure modes. The write looks fine; the read is
+fatal.
+
+**What made it airtight rather than merely annoying: the diagnostic's own advice
+did not work.** "add a nil check first" is what the error says, and
+
+```saffron
+var b = nil
+b = 5
+if (b != nil) { IO.println("${b}") }   // STILL an error
+```
+
+fails too, because narrowing `Nil` by removing `Nil` leaves `Nil`. There was no
+spelling of the program that kept the bare initializer and compiled. The only way
+out was an annotation (`var c: Int|Nil = nil`), i.e. not using the feature.
+
+**One site, in `checker.sf`'s `VarDecl` arm.** `infer_type(NilLit)` correctly
+answers `NilType` — that arm is right about the *expression*. The defect was the
+declaration consuming it: the branch reads `init_type != "Any"` and stores
+whatever it got, so `Nil` was treated as a real inferred type rather than as the
+absence of one. Verified this is the only such site: the other two `VarDecl` arms
+are visibility passes, not inference.
+
+**Why `Any` and not something cleverer.** A bare `nil` initializer carries no
+information about what the variable is *for*, which is exactly what the existing
+cannot-infer branch already means — so `Nil` joins it. Two independent reasons
+this is the honest answer rather than a workaround:
+
+- **Codegen had already made the same call.** `merge_entry_type`
+  (`types_body.sf`) folds an observed `"Nil"` into `"Any"` for map entry types,
+  on the same reasoning. The checker was the outlier.
+- **A flow-sensitive "widen on first assignment" rule would be a bigger, worse
+  change.** It would make the declaration's type depend on a later statement,
+  and it still could not answer for a variable assigned in two branches with
+  different types. `Any` is what the language already says for "unknown".
+
+**The one case that genuinely wants the singleton still works.**
+`test/pass/first_class_types.sf` asserts `x is Nil` on exactly this shape. `is`
+answers correctly through an `Any` slot — verified, not assumed — so widening the
+*static* type loses nothing here, and the runtime value is of course still nil
+until assigned.
+
+**The warning got its own wording rather than reusing the branch's.** "cannot
+infer type, add explicit annotation" would be false: nothing failed, the
+initializer is explicit, and the message reads as a compiler shortcoming. It now
+says `x: initialized to nil with no type; annotate it (e.g. 'var x: Int|Nil =
+nil') to get a checked type` — the true statement, plus the actual advice, which
+is to name the type the variable will eventually hold. It stays a warning, not an
+error: `var x = nil` is legal and sometimes what you mean.
+
+Verified: bootstrap green through stage 2 (gen3→gen4 fixed point; only the three
+known benign gen2 `@extern private` lines, identical to the pre-change baseline
+log); `test/pass/nil_init_infers_any.sf` **8/8**, covering the reported case, a
+String, a class instance (which also shows this composes with #115's runtime tag
+switch), the nil guard that used to be unrescuable, an unassigned var still being
+nil, `is Nil`, two successive assignments of different types, and the annotated
+spelling; `first_class_types.sf` unchanged; the four bare `var x = nil` sites in
+the tree (two in `src/lib/template.sf`, plus two tests) all still behave — note
+`template.sf` only survived the bug by passing the value to a function instead of
+calling a method on it.
+
+---
 
 ### 147. FIXED — an explicit `: Any` annotation was indistinguishable from no annotation, so the initializer's type won
 
@@ -805,8 +1170,6 @@ baseline names.
 
 `type_ann` is still a raw `String` on the AST, so this remains one of the sites
 rewrite stage 3 has to touch; the sentinel is at least unambiguous now.
-
----
 
 ---
 

@@ -1,0 +1,20 @@
+// BUGS #159, an enum condition. See test/fail/cond_not_bool_class.sf for why the
+// class/enum half is deterministic rather than merely undiagnosed.
+//
+// Its own file because enums travel a different clause: they register in
+// env.enum_variants, not env.class_fields, so a fix written against the class case
+// alone would not cover this. A fieldless variant is also not a pointer at all —
+// it is a tag shifted into place — so it reaches `trunc` as a different shape of
+// value than Box(1) does and still comes out 0.
+enum Color {
+    Red,
+    Green
+}
+
+fun main(): Int {
+    var c: Color = Color.Red
+    while (c) {
+        IO.println("taken")
+    }
+    return 0
+}

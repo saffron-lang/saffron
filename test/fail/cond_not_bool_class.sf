@@ -1,0 +1,30 @@
+// BUGS #159, a class-instance condition. See test/fail/cond_not_bool.sf for the
+// mechanism; this file covers the half #143 deliberately let through.
+//
+// Worse than the scalar cases rather than merely undiagnosed. `trunc i64 %v to i1`
+// reads the low bit of the value, and a class instance is a heap pointer that
+// __gc_alloc returns 8-byte aligned — so the low bit is ALWAYS 0. This is not
+// "wrong sometimes" like `if (42)` (even) or `if (some_str)` (allocator-dependent);
+// the then-branch is unreachable on every run, deterministically, with nothing
+// printed to say why.
+//
+// #143's check let class types through because it grouped them with Any and
+// unions. They do not belong together: an Any-typed slot might really hold a Bool
+// at runtime, so erroring on it would reject correct programs, whereas a variable
+// whose static type is a declared class can never be one.
+//
+// Actors are covered by the same clause and deliberately so — they register in
+// class_fields like classes do, and an actor instance is equally a pointer. Only
+// `interface` is excluded, via the interface_names registry.
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+}
+
+fun main(): Int {
+    var b: Box = Box(1)
+    if (b) {
+        IO.println("taken")
+    }
+    return 0
+}
