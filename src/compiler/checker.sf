@@ -982,7 +982,10 @@ class NullChecker {
         else if (this.env.class_fields.has(t)) {
             hint = "; test a field, or compare it, e.g. `x != nil`"
         }
-        this.error(ctx + " condition must be Bool, got " + t + hint)
+        // The condition expression itself, which is what the message is about --
+        // and one span here locates all six callers (if, while, `!`, `and`,
+        // `or`, if-expression).
+        this.error_at(AST.expr_span(cond), ctx + " condition must be Bool, got " + t + hint)
     }
 
     // Check a call's argument types against the callee's declared parameter
@@ -1029,7 +1032,11 @@ class NullChecker {
                 if (!this.is_type_param(ptype)) {
                     var atype: String = this.infer_expr(args[i])
                     if (this.scalar_mismatch(ptype, atype)) {
-                        this.error("argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
+                        // Point at the offending argument, not at the call: this
+                        // is the most common expression-level type error, and
+                        // without a span it reached the editor with no position
+                        // at all and so could not be shown in place.
+                        this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
                     }
                 }
             }
@@ -2678,7 +2685,7 @@ class NullChecker {
                     if (!this.is_nullable_type(this.current_func_ret) and this.is_nullable_type(val_type_node)) {
                         var val_str: String = this.type_to_str(val_type_node)
                         var ret_str: String = this.type_to_str(this.current_func_ret)
-                        this.error("return: cannot return nullable " + val_str + " from function expecting " + ret_str)
+                        this.error_at(AST.expr_span(value), "return: cannot return nullable " + val_str + " from function expecting " + ret_str)
                     }
                 }
             }
@@ -3219,7 +3226,11 @@ class NullChecker {
                 var then_str: String = this.type_to_str(then_type)
                 var else_str: String = this.type_to_str(else_type)
                 if (then_str != else_str and then_str != "Any" and else_str != "Any" and then_str != "Nil" and else_str != "Nil") {
-                    this.error("if-expression branches have incompatible types: " + then_str + " vs " + else_str)
+                    // Point at the else value, not the whole expression: the then
+                    // branch sets the expectation and the else branch is what
+                    // departs from it. Arbitrary when both are odd, but a
+                    // consistent choice beats no location.
+                    this.error_at(AST.expr_span(else_val), "if-expression branches have incompatible types: " + then_str + " vs " + else_str)
                 }
                 then_type
             }
@@ -3234,7 +3245,7 @@ class NullChecker {
                 var try_str: String = this.type_to_str(try_type)
                 var catch_str: String = this.type_to_str(catch_type)
                 if (try_str != catch_str and try_str != "Any" and catch_str != "Any" and try_str != "Nil" and catch_str != "Nil") {
-                    this.error("try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
+                    this.error_at(AST.expr_span(catch_val), "try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
                 }
                 // A try body that diverges (throws) has no value — its value slot
                 // types as Nil. In that case the expression's type is whatever the
