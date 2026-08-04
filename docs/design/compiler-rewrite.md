@@ -657,9 +657,9 @@ resolve to exist first.
 
 | # | Stage | Retires | Notes |
 |---|---|---|---|
-| 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | Mechanical. No semantic change. Do first — it makes everything after it debuggable. |
+| 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
 | 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
-| 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | Self-contained; the backend keeps its string paths until stage 4 flips them. |
+| 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
 | 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
@@ -671,6 +671,15 @@ resolve to exist first.
 
 Stages 0-2 and 9 are independent and can proceed concurrently. Stage 4 is the
 inflection point: after it, the "codegen guessed a type" bug class is gone.
+
+**Where the plan stands (2026-08-03).** Stages 0, 1 and 2 are landed. The next
+stage in the critical path is **3** (types as one interned enum), and it is the
+right next one for a reason stage 1 just demonstrated: every piece of stage 1's
+residue — `T`/`E` in `get_variant_field_type`, `Any` operands in `binary` — is a
+question a string type cannot answer. Stage 1 made those visible and countable;
+stage 3 is what makes them representable. Stage 9 (generated runtime) remains
+independent of everything and can be picked up in parallel at any time; stage 10
+is still blocked on the single `resolve_method_symbol` bug described below.
 
 ### What actually blocks stage 10 (measured 2026-08-02)
 
