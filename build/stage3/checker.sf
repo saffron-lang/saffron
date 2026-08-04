@@ -86,6 +86,23 @@ class TypeEnv {
         return AST.Type.AnyType
     }
 
+    // True when `name` is bound as a variable in some enclosing scope. Distinct
+    // from `get_var_type(name) == AnyType`, which cannot tell an unbound name
+    // apart from one declared `Any` — both answer AnyType. A module alias is
+    // exactly an unbound name, so this is what separates `Mod.helper()` from
+    // `value.helper()` when both present as a MethodCall on an Any receiver
+    // (BUGS #139).
+    fun has_var(name: String): Bool {
+        var i: Float = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: Scope = this.scopes[i]
+            if (scope.narrowed.has(name)) { return true }
+            if (scope.vars.has(name)) { return true }
+            i = i - 1
+        }
+        return false
+    }
+
     // String wrapper — for backward compat during transition
     fun get_var(name: String): String {
         var t: AST.Type = this.get_var_type(name)
@@ -3607,8 +3624,32 @@ class NullChecker {
                 return ret
             }
         }
-        var ret: String = this.env.get_func_ret(method)
-        if (ret != "Any") return ret
+        // Last resort: read the method name out of the FREE-function table. This
+        // arm exists for the alias-qualified call `Mod.helper()`, which the parser
+        // builds as a MethodCall whose receiver is a module alias — a name the
+        // checker has no type for — so the callee's declared return type is only
+        // reachable under its bare name.
+        //
+        // Gated on the receiver being a bare name that is NOT a bound variable,
+        // because that is the only shape a module alias can take. Ungated, this
+        // arm typed EVERY unresolved `x.foo()` from whatever free `fun foo` the
+        // program happened to declare, and the wrong answer then propagated as
+        // fact. That is BUGS #139: basil/fetch.sf declares `fun get(url, cb)`
+        // with no return annotation, the parser defaults an omitted return type
+        // to "Nil" (parser.sf:2438), so `data.get("k")` on an Any-typed receiver
+        // — an ordinary Map read — inferred `Nil`, and the very next line's
+        // `.length()` tripped the nullable-receiver check with
+        // "cannot call .length() on nullable 'pkgs' (type Nil)". Nothing in the
+        // user's file was wrong; an unrelated function three modules away, whose
+        // only sin was sharing a name with a Map method, decided the type.
+        //
+        // An empty obj_name means the receiver is an expression rather than a
+        // name (`q.data.get(k)`), which cannot be an alias, so it is excluded by
+        // the same length check.
+        if (obj_name.length() > 0 and !this.env.has_var(obj_name)) {
+            var ret: String = this.env.get_func_ret(method)
+            if (ret != "Any") return ret
+        }
 
         return "Any"
     }
