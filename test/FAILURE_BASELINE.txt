@@ -103,6 +103,20 @@
 # unchanged. An auto-merge that produces no conflict is not evidence the result is
 # correct — the two sides' tests have to be re-run together, which is what this
 # line records.
+#
+# Confirmed 2026-08-04 with the BUGS #159 fix (a class- or enum-typed condition is
+# now a checker error): 299 passed, 8 failed, 14 skipped, 0 known-fail. The SET is
+# unchanged and the +3 is this fix's own three tests (fail/cond_not_bool_class,
+# fail/cond_not_bool_enum, pass/cond_class_enum_ok).
+#
+# This particular change is one where an unchanged SET is the *interesting* result
+# rather than a formality. #159 makes the checker reject a shape it used to accept,
+# so the risk is not that it fails to fire but that it fires too widely — and every
+# over-firing would show up here as a name entering the list. None did, and the same
+# rule ran clean over the compiler's own source in the stage 2 gen4 fixed point.
+# `pass/cond_class_enum_ok.sf` is the deliberate record of the let-through set
+# (interface-typed and union-typed conditions still compile), so the boundary is
+# asserted in a test rather than only argued in BUGS.md.
 
 async
 docstrings

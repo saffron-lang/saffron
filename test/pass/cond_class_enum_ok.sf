@@ -1,0 +1,64 @@
+// BUGS #159's other half: the shapes that must KEEP compiling after class and enum
+// conditions became errors. A one-sided check is only useful if its let-through set
+// is right, and a too-eager version here does not merely annoy — the checker
+// type-checks the compiler's own source, so a false error is a broken bootstrap.
+import "@test" as Test
+
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun is_empty(): Bool { return this.n == 0 }
+}
+
+enum Color {
+    Red,
+    Green
+}
+
+interface Shape {
+    fun sides(): Int
+}
+
+class Square extends Shape {
+    fun init() {}
+    fun sides(): Int { return 4 }
+}
+
+fun main() {
+    var b: Box = Box(3)
+
+    // The comparisons the diagnostic's hints recommend. These are the whole point:
+    // the error tells you to write one of these, so they had better work.
+    Test.assert(b != nil, "a class instance compared against nil is a valid condition")
+    Test.assert(b.n > 0, "a field comparison is a valid condition")
+    Test.assert(!b.is_empty(), "a Bool-returning method is a valid condition")
+
+    var c: Color = Color.Red
+    Test.assert(c == Color.Red, "an enum variant comparison is a valid condition")
+
+    // An INTERFACE-typed condition is deliberately still let through, and this
+    // assertion is the record of that decision rather than an accident. All three
+    // of class/interface/actor parse to ClassDecl and register in class_fields
+    // identically, so distinguishing them took a new interface_names registry fed
+    // from the parser's `introducer`. The reason for the split: an interface-typed
+    // slot holds some implementor, and nothing in the checker can prove that none of
+    // them is Bool-like, whereas a declared class provably is not one.
+    //
+    // So this compiles. It is still always-false at runtime for the same
+    // low-bit reason, which is the residual #159 names explicitly.
+    var s: Shape = Square()
+    if (s) {
+        Test.assert(false, "an interface condition is let through but still falsy")
+    } else {
+        Test.assert(true, "interface-typed condition compiles (and is falsy)")
+    }
+
+    // A nullable class is let through too — proving a union means proving every
+    // member, which is the other residual #159 records.
+    var maybe: Box|Nil = Box(1)
+    if (maybe != nil) {
+        Test.assert(true, "the explicit nil comparison on a nullable class works")
+    }
+
+    Test.summary()
+}
