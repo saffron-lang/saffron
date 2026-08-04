@@ -393,6 +393,79 @@ rejected `lexer.sf` — and a scan confirmed it is the only such site in the
 compiler. It is the identity-mode analog of `Int`→`Float` widening and becomes an
 error when I5 introduces `Ptr<T>`.
 
+#### Landed 2026-08-04: the third slice, and a sentinel that meant two things
+
+`FunDecl.ret_type` and `Lambda.ret_type` became `AST.Type` nodes with an explicit
+`UnknownType`. This is the slice the second one deferred to: with the omitted
+annotation no longer spelled as a real type name, the `: Nil` case is expressible,
+and `fun f(): Nil { return 42 }` is now an error. The migration touched 11 files —
+parser, checker, six `codegen/*_body.sf`, `main.sf`, `src/lib/ast.sf` — and
+*removed* round-trips rather than adding any: ~15 consumers were calling
+`str_to_type` on the string they had just been handed, and `checker.define_func_str`
+(a string→type adapter kept "for callers passing string ret types from AST") had
+zero callers afterward and was deleted.
+
+**The two omitted-annotation sentinels meant opposite things.** This is the
+finding to carry into every remaining slice. Measured on the pre-migration binary,
+before touching anything:
+
+| form | old sentinel | implicit return |
+|---|---|---|
+| `fun unannotated() { 44 }` | `"Nil"` | suppressed |
+| `fun annotated(): Int { 45 }` | `Int` | active |
+| `fun () { 42 }` (block lambda) | `"Int"` | active |
+| `fun (): Nil { 99 }` | `Nil` | suppressed |
+
+`gen_function`'s implicit-return guard was spelled `ret_type != "Nil" and ret_type
+!= "void"`, which reads the *parser's sentinel* rather than any property of the
+type — and the two sentinels sat on opposite sides of it. So `UnknownType` could
+not replace both: collapsing them either way silently breaks one construct.
+`gen_function` now recovers the distinction from the construct itself (`__lambda`
+in the emit name, which `gen_lambda` always supplies) and branches on that when the
+type is Unknown. The same asymmetry exists in `func_ret_types` registration, where
+an unannotated lambda registered `Int` and an unannotated `FunDecl` registered
+`Nil`; call-site typing reads that map, so it needed the same special case rather
+than a uniform collapse.
+
+Nothing in the suite named the lambda case. A note written in the previous slice
+said only that the guard "must exclude UnknownType as well" — following it would
+have made every `fun () { 42 }` return 0. **Measure the sentinel's behaviour on
+the old binary before replacing it**, one probe file per construct; the four rows
+above took about a minute to produce and were the difference between a correct
+slice and a silent regression.
+
+**The guard removed to enable the `: Nil` case had been shielding a second,
+unrelated check.** Dropping the outer `!is_nil_type_node(current_func_ret)` wrapper
+exposed the *nullable-return* test to every unannotated function, and `lexer.sf`
+stopped compiling with `cannot return nullable Nil from function expecting
+Unknown` — a diagnostic naming `Unknown` as if it were a type the author had
+written, which is exactly what I2 says must never reach a user. The nullable check
+had never been written with unannotated functions in mind; it excluded them
+incidentally, because they carried the same spelling as the case the wrapper was
+actually for. That is the **inverse of the second slice's lesson**: a sentinel
+blocks the checks that inspect it, and sometimes also the checks merely standing
+next to it. Two facts that used to travel as one spelling now need two guards.
+
+Two smaller items:
+
+- **The remaining debt is named in the code.** `ret_type_for_registration`
+  collapses `UnknownType` back to `NilType` for `func_ret_types`, so every
+  downstream reader sees exactly what it saw before and the slice stays confined
+  to parser and checker. A later slice teaches call-site typing to ask "was
+  anything declared?" instead of reading a stand-in type, and that function
+  disappears with the question.
+- **`type_to_string` is deliberately lossy** — it collapses `GenericType` to its
+  base and `UnionType` to `"Union"` — and ~20 callers compare against those
+  spellings. Rendering a type back to source needed a second function,
+  `type_to_source`, rather than a fix to the first. Writing it also closed an LSP
+  bug: `render_signature`'s `length() > 0` guard was never false, so every
+  unannotated function's hover claimed `: Nil`.
+
+One note correction worth recording, because it cuts the other way: a note claimed
+`codegen.sf`'s free-function tail held ~58 pattern sites needing the same sweep. A
+grep for `FunDecl(`/`Lambda(` there returned one line, and it was a comment. The
+file needed no edit. Both directions of note-drift showed up in one slice.
+
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
 A dedicated resolve pass sits between parse and check. It walks scopes and
@@ -780,7 +853,7 @@ resolve to exist first.
 | 0 | Spans on AST + one `compile()` entry + delete inactive mirrors | diagnosis cost; the 3-copies hazard | **Landed 2026-08-03** (`ide-stage0-spans`). `AST.Span` carries line/col/len with `span_none()` as the absent value; the non-`_body` copies in `codegen/` are deleted and `bootstrap.sh` now fails assembly if a `*_body.sf` has no marker. Unified diagnostics, LSP and formatter came with it. |
 | 1 | Introduce `Unknown`/`Never`; make `Int` fallback an error | M2 | **Landed 2026-08-03.** `Unknown`/`Never` in `ast.sf`; all 9 fallbacks report via `Diag.record_unresolved`; `--report-unresolved` measures. Count on the compiler's own source is **0** (from 8620), so the flip to a hard error is now a one-line change. Residue is generic params and `Any` operands — stage 3/4 work. See M2 above. |
 | 2 | Resolve pass → `DefId` | #40, #22, #30, #2, #6 | **Landed 2026-08-03.** `src/compiler/resolve.sf`, on by default (`--no-resolve` to opt out), load-bearing. Closed #40, #22, #30 and #6; #2's runtime half is gone, leaving a cosmetic warning. The backend keeps its string paths until stage 4 flips them. |
-| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** Two slices landed 2026-08-04: BUGS #147 (`VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches) and BUGS #155's scalar half (the `Return` arm compared no types at all; the class-typed segfault is deferred to I4). Both write-ups are under I3 above. Remaining: `FunDecl.ret_type` and `Lambda.ret_type` are still `String`; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
+| 3 | Types as one interned enum; kill string types | the `resolve_type_params` string-surgery class | **In progress.** Three slices landed 2026-08-04: BUGS #147 (`VarDecl.type_ann`'s in-band `"Any"` sentinel, which exposed three dead branches); BUGS #155's scalar half (the `Return` arm compared no types at all; the class-typed segfault is deferred to I4); and `FunDecl.ret_type`/`Lambda.ret_type` → `AST.Type` with an explicit `UnknownType`, which closed #155's `: Nil` case and found two sentinels that meant opposite things. All three write-ups are under I3 above. Remaining: `VarDecl.type_ann` is *still* a `String` (`ast.sf:228`) — #147 moved its sentinel to `""` but not its type; 59 `: String`-returning functions in `checker.sf`; interning behind a `TypeId`. Touches checker and AST broadly. |
 | 4 | Elaborate: checker emits HIR; delete `last_type` + `get_expr_type` | M1 → #32/#33/#36/#37/#38/#25 | The big one. 265 `last_type` sites go away because the field does. |
 | 5 | Language: opaque/newtype or `Raw<T>`/`Ptr<T>` in Saffron; promote gen2 | — | Prerequisite for stage 6. A language feature, developed under the existing bootstrap rules. |
 | 6 | LIR with `Val`/`Raw`/`Ptr` + rep-check; delete `--identity-mode` | M3 → #23/#24/#25/#28 + the GC-sweep hazard | Requires stage 5. Convert in the atomic groups #23 already identifies (enum construction with match field loads; closures with `gen_indirect_call`; instances with `gen_get_field`) — a partial conversion turns a printing bug into a segfault. |
@@ -799,16 +872,24 @@ reason stage 1 demonstrated: every piece of stage 1's residue — `T`/`E` in
 cannot answer. Stage 1 made those visible and countable; stage 3 is what makes them
 representable.
 
-Its first two slices landed 2026-08-04 and are worth reading before starting the
+Its first three slices landed 2026-08-04 and are worth reading before starting the
 next one. #147 (`VarDecl.type_ann`) showed that fixing one in-band sentinel exposes
 latent defects — three of them, one a lost GC root that surfaced as a runtime
 IndexError 40 lines from its cause. #155 (the `Return` arm) showed the other half
 of the lesson: a check can often be turned on *before* its neighbouring sentinel
 moves, and the part that genuinely cannot wait — comparing a declared class against
-a returned value — is gated on I4's resolution rather than on stage 3 at all. Both
-write-ups under I3 above record the techniques that found each defect. Next slices:
-`FunDecl.ret_type`, `Lambda.ret_type` (which unblocks the `: Nil` case #155 left
-open), then the 59 `: String`-returning functions in `checker.sf`.
+a returned value — is gated on I4's resolution rather than on stage 3 at all. The
+`ret_type` slice added the sharpest one: **two sentinels for the same absence meant
+opposite things** (`FunDecl`'s `"Nil"` suppressed implicit return, `Lambda`'s
+`"Int"` enabled it), so measure a sentinel's behaviour on the old binary, one probe
+per construct, before replacing it. All three write-ups under I3 above record the
+techniques that found each defect.
+
+Next slice: **`VarDecl.type_ann`** (`ast.sf:228`), which is still a `String`. #147
+moved its sentinel out of band but left the field's type alone, so it is now the
+last string type on a *declaration* node and the one with the most consumers. Then
+the 59 `: String`-returning functions in `checker.sf`, then interning behind a
+`TypeId`.
 
 Stage 9 (generated runtime) remains independent of everything and can be picked up
 in parallel at any time; stage 10 is still blocked on the single
