@@ -2591,6 +2591,44 @@ class NullChecker {
                         var ret_str: String = this.type_to_str(this.current_func_ret)
                         this.error("return: cannot return nullable " + val_str + " from function expecting " + ret_str)
                     }
+                    // BUGS #155: check that the return value's type is compatible
+                    // with the declared return type. One check, deliberately
+                    // one-sided: scalar_mismatch fires only when BOTH sides are
+                    // concrete scalars and they differ (Int vs String, Bool vs Int).
+                    // It inherits check_call_args' discipline — Any, Nil, unions,
+                    // generics, class/enum types, and Int→Float widening all pass.
+                    //
+                    // NilType on the declared side is skipped entirely: that is the
+                    // FunDecl sentinel for an unannotated function (parser.sf:2561
+                    // defaults ret_type to the string "Nil"), so a strict check here
+                    // would reject every `fun f() { return 42 }`. Distinguishing the
+                    // sentinel from a written `: Nil` needs ret_type to become an
+                    // AST.Type with an explicit Unknown — rewrite stage 3.
+                    if (!this.is_nil_type_node(this.current_func_ret)) {
+                        var ret_s: String = this.type_to_str(this.current_func_ret)
+                        var val_s: String = this.type_to_str(val_type_node)
+                        if (ret_s != "Unknown" and ret_s != "Never" and val_s != "Unknown" and val_s != "Never" and val_s != "Nil") {
+                            // Int→String is allowed: in the NaN-boxed runtime, an Int
+                            // that holds a heap address IS a valid String (a pointer to
+                            // a NUL-terminated buffer). lexer.sf:byte_to_char uses this
+                            // to return a malloc'd buffer from a `: String` function.
+                            // This is the identity-mode analog of Int→Float widening,
+                            // and will disappear when I5 introduces Ptr<T>.
+                            if (ret_s == "String" and val_s == "Int") {
+                                // allowed — raw pointer returned as String
+                            } else if (this.scalar_mismatch(ret_s, val_s)) {
+                                this.error("return: cannot return " + val_s + " from function expecting " + ret_s)
+                            }
+                            // NOTE: class-vs-scalar and scalar-vs-class checks are
+                            // deferred. They fire false positives on:
+                            //   - nullable unions ("String|Nil" not scalar → triggers)
+                            //   - type parameters ("T" not scalar → triggers)
+                            //   - inference gaps (module member types as raw names)
+                            // The segfault case (`: Box` returning a String) needs
+                            // either is_subtype or a class-name registry query, both
+                            // of which require the full resolve pass (I4) to be safe.
+                        }
+                    }
                 }
             }
             If(cond, then_branch, else_branch) => {
