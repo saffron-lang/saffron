@@ -149,6 +149,32 @@
 # A conflict here was the good outcome. Had git auto-merged these two edits, one
 # side would have been lost silently and every count in this file would still have
 # looked exactly like this.
+#
+# Confirmed 2026-08-04 with the BUGS #163 fix (three import-line defects): 308
+# passed, 8 failed, 14 skipped, 0 known-fail. The SET below is UNCHANGED --
+# comm-diffed both directions, empty each way. The +3 over the merged tree's 305
+# is this fix's own three tests, each traced BY NAME in the run's log:
+# fail/import_missing_from and fail/import_unquoted_path (both `rejected, exit 1`)
+# and pass/import_forms_ok. That is a SEVENTH total against the same 8-name set.
+#
+# One methodology note, because it cost a wrong answer once in this session: do
+# not `comm` this file directly. It is mostly comments, and `comm -23` happily
+# reported all ~130 comment lines as "fixed by your change" -- a diff that looks
+# alarming and means nothing. Strip them first:
+#
+#   grep -vE '^\s*#|^\s*$' test/FAILURE_BASELINE.txt | sort -u > /tmp/base.txt
+#
+# The extraction recipe at the top of this file produces names only, so only the
+# baseline side needs stripping. The header says to compare sets by name; this is
+# the mechanical corollary nobody had written down.
+#
+# Why an unchanged set is the load-bearing result here: two of the three fixes add
+# parse errors, so the risk is over-firing, and every import line in the tree
+# (411 `import "path"`, 7 `import { names } from "path"`) goes through the changed
+# code. A single over-fire would have taken out most of the suite at once. It is
+# also why bootstrap green proves little on its own -- the compiler's own source
+# contains no malformed import, so all three defects were invisible to the gen4
+# fixed point while fully present.
 
 async
 docstrings
