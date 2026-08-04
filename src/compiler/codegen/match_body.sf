@@ -597,18 +597,46 @@
         this.emit_indent("store i64 " + extracted + ", i64* " + this.arm_slot_ref(bname))
     }
 
+    /// The declared type of one payload field of one enum variant, as a string.
+    ///
+    /// Five of the nine M2 fallbacks in docs/design/compiler-rewrite.md are the
+    /// five misses in this function, and each is a *different* failure to read
+    /// enum metadata, which is why each reports its own message instead of
+    /// sharing one "cannot infer". `Int` is still the value returned — see the
+    /// block comment above Diag.record_unresolved for why the conversion is
+    /// measure-then-fail rather than fail-now — but it is no longer silent, so
+    /// the count is a build statistic and a wrong answer here names itself.
     fun get_variant_field_type(enum_name: String, variant_name: String, field_idx: Float): String {
         var key: String = enum_name + "." + variant_name
-        if (!this.enum_variant_fields.has(key)) return "Int"
+        if (!this.enum_variant_fields.has(key)) {
+            Diag.record_unresolved("get_variant_field_type: variant not registered", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var fields: String = this.enum_variant_fields.get(key)
-        if (fields.length() == 0) return "Int"
+        if (fields.length() == 0) {
+            Diag.record_unresolved("get_variant_field_type: variant has no recorded fields", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var parts: List<String> = this.split_respecting_generics(fields, ",")
-        if (field_idx >= parts.length()) return "Int"
+        if (field_idx >= parts.length()) {
+            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + parts.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+            return "Int"
+        }
         var field_def: String = parts[field_idx.floor()]
         var name_type: List<String> = field_def.split(":")
-        if (name_type.length() < 2) return "Int"
+        if (name_type.length() < 2) {
+            Diag.record_unresolved("get_variant_field_type: field definition has no name:type split", "'" + field_def + "' in " + key, "Int")
+            return "Int"
+        }
         var ftype: String = name_type[1]
         if (ftype == "String") return "String"
+        // `Int` was never in this list, so an honestly-Int field fell all the way
+        // through to the bottom and was answered by the *fallback* — the right
+        // value reached by the wrong route, and indistinguishable from a guess.
+        // 27 of the reports in test/pass/enum_payload_value_equality.sf alone were
+        // this. Answering it here is the difference the whole stage is about: two
+        // textually identical `Int`s, one a conclusion and one a shrug.
+        if (ftype == "Int") return "Int"
         // Float must stay Float. Collapsing it to Int made arithmetic on a
         // match binding emit integer ops against a NaN-boxed double, so
         // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
@@ -616,6 +644,42 @@
         if (ftype == "Float" or ftype == "Number") return "Float"
         if (ftype == "Bool") return "Int"
         if (ftype.starts_with("List")) return "List<String>"
+        // Same accidental-correctness as `Int` above, one step further out: a
+        // field declared `Any` or `Nil` genuinely has no more specific codegen
+        // type than the i64 slot, so `Int` here is the answer and not a guess.
+        // `Map` is listed for the same reason `List` is — the payload is a
+        // pointer either way, and the element types are not consulted.
+        if (ftype == "Any" or ftype == "Nil") return "Int"
+        if (ftype.starts_with("Map")) return "Map<String, String>"
+        // Past the builtin spellings. The metadata was read fine; `ftype` is a
+        // name — an enum, a class, possibly module-qualified. Those used to
+        // collapse to `Int`, which is the M2 fallback in its purest form: the
+        // declared type was right there in the string and got thrown away. All
+        // 2350 remaining reports on the compiler's own source were this one arm,
+        // and every one of them named a type the codegen tables already know
+        // ('Expr', 'Span', 'Types.Value', ...).
+        //
+        // So answer with the name when the tables confirm it, and keep the
+        // report for the case where they do not. Enums are checked before
+        // classes because a generic enum's bare name is what enum_defs is keyed
+        // by, and because a name that is both would be a redeclaration the
+        // checker rejects earlier.
+        if (this.enum_defs.has(ftype)) { return ftype }
+        var vft_resolved: String = this.resolve_class_type(ftype)
+        if (vft_resolved.length() > 0) { return vft_resolved }
+        // A module-qualified enum: `AST.Span` is keyed in enum_defs by its bare
+        // name plus whatever prefix the declaring module got, neither of which is
+        // the spelling the field declaration used.
+        if (ftype.contains(".")) {
+            var vft_bare: String = ftype.slice(ftype.index_of(".") + 1, ftype.length())
+            if (this.enum_defs.has(vft_bare)) { return vft_bare }
+            if (this.current_prefix.length() > 0 and this.enum_defs.has(this.current_prefix + vft_bare)) {
+                return this.current_prefix + vft_bare
+            }
+        }
+        // Genuinely unknown: a type name no table in codegen has heard of. This
+        // is the residue stage 1 is meant to leave visible rather than paper over.
+        Diag.record_unresolved("get_variant_field_type: unknown declared type '" + ftype + "'", "field " + field_idx.floor().to_string() + " of " + key, "Int")
         return "Int"
     }
 
