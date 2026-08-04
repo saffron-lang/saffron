@@ -19,6 +19,9 @@ import {
   CompletionParams,
   CompletionItem,
   CompletionItemKind,
+  DocumentFormattingParams,
+  TextEdit,
+  Range,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { execFile } from "child_process";
@@ -80,6 +83,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
         // trigger the client applies on typing.
         triggerCharacters: ["."],
       },
+      documentFormattingProvider: true,
     },
   };
 });
@@ -770,6 +774,89 @@ connection.onCompletion(
       items.push({ label: name, kind: CompletionItemKind.Module });
     }
     return items;
+  },
+);
+
+// --- Formatting --------------------------------------------------------------
+//
+// Formats the OPEN BUFFER and returns edits. It deliberately does not invoke
+// `saffronc format --write`:
+//
+//   * --write reformats the file on disk, which is not what the editor asked
+//     for. The buffer is usually ahead of disk (format-on-save runs before the
+//     write in most clients), so --write would format stale text and then the
+//     editor would overwrite it with the unformatted buffer.
+//   * Writing behind the editor's back also loses the undo entry. An edit the
+//     client applies is undoable with one keystroke; a file mutated underneath
+//     it is not.
+//
+// So the buffer text goes in through a temp file and the formatted text comes
+// back on stdout, and the result is handed to the client as a single
+// whole-document replacement. `format` writes nothing without --write, which is
+// exactly the default this relies on.
+//
+// A single full-range edit rather than a computed minimal diff: the formatter
+// only ever changes whitespace, so a full replacement is semantically identical
+// to the minimal set, and LSP clients preserve the cursor across it. Computing a
+// real diff would be strictly more code for the same visible behaviour.
+async function formatBuffer(uri: string, text: string): Promise<string | null> {
+  const realPath = decodeURIComponent(uri.replace("file://", ""));
+  // Beside the real file and keeping the .sf extension, same as runCheck: the
+  // formatter resolves no imports, but a .sf name keeps the compiler's own
+  // extension check happy and the location keeps behaviour identical if that
+  // ever changes.
+  const tempPath = path.join(
+    path.dirname(realPath),
+    `.${path.basename(realPath)}.fmt-${process.pid}.tmp.sf`,
+  );
+  try {
+    fs.writeFileSync(tempPath, text);
+  } catch {
+    // Read-only directory. Formatting a buffer we cannot stage is a no-op rather
+    // than an error dialog; the user did not ask about the filesystem.
+    return null;
+  }
+  try {
+    const { stdout } = await execFileAsync(
+      compilerPath,
+      ["format", tempPath],
+      { timeout: 10000 },
+    );
+    return stdout;
+  } catch (err: any) {
+    // A compiler too old to know the `format` subcommand, or any other failure.
+    // Return null so the client keeps the buffer untouched: silently leaving
+    // text alone is the only safe failure mode for a formatter.
+    connection.console.log(
+      `Saffron LSP: format failed (${err?.message ?? "unknown error"})`,
+    );
+    return null;
+  } finally {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
+connection.onDocumentFormatting(
+  async (params: DocumentFormattingParams): Promise<TextEdit[]> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const original = doc.getText();
+    const formatted = await formatBuffer(params.textDocument.uri, original);
+    // No edit when formatting failed OR when the text is already formatted.
+    // Returning an identical edit would mark the document dirty and, under
+    // format-on-save, make every save of an already-formatted file a change.
+    if (formatted === null || formatted === original) return [];
+
+    const fullRange: Range = {
+      start: { line: 0, character: 0 },
+      end: doc.positionAt(original.length),
+    };
+    return [TextEdit.replace(fullRange, formatted)];
   },
 );
 
