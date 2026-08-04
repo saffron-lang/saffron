@@ -360,6 +360,21 @@ class NullChecker {
     // warning is only worth printing when the name being read is restricted
     // somewhere — i.e. when there is genuinely a check that could not be made.
     var restricted_member_names: Map<String, Bool>
+    // Every member name reachable on some class through `extend fun` — the
+    // checker's mirror of codegen's `extend_map` (codegen.sf:95). An
+    // `extend fun Foo.bar()` parses to a FREE FunDecl carrying the docstring
+    // "@extend:Foo", so it is never registered in class_fields or
+    // class_method_names, and nothing that asks "does this class declare this
+    // member?" can see it. That was invisible while every unknown member read
+    // silently widened to Any; the member-not-found guard in
+    // infer_member_access is the first code to ask the question, and without
+    // this map it would reject every extension-method reference.
+    //
+    // Keyed by member name alone, not class#member. Codegen resolves the exact
+    // receiver class because it must pick a body to call; the guard only needs
+    // to know the name is not a typo, and the loose key is the safe direction to
+    // be wrong in — it under-reports errors rather than inventing them.
+    var extend_member_names: Map<String, Bool>
     // Type names declared `private` — classes, interfaces, actors, enums and type
     // aliases. This is the input to the leak pass (§6b), and it is the FIRST
     // reader of a top-level declaration's visibility: module-level enforcement
@@ -423,6 +438,7 @@ class NullChecker {
         this.registering_local = false
         this.member_visibility = {}
         this.restricted_member_names = {}
+        this.extend_member_names = {}
         this.private_types = {}
         this.decl_visibility = {}
         this.entry_aliases = {}
@@ -1237,6 +1253,14 @@ class NullChecker {
                 this.register_module_decl(name, f_vis)
                 // Extract generic type params from docstring: @generic:T,U:Constraint\n
                 this.extract_and_register_generics(name, doc)
+                // `extend fun Foo.bar()` arrives here as a free function whose
+                // doc is "@extend:Foo" — the only trace of the receiver class on
+                // the AST. Record the member name so the member-not-found guard
+                // does not read an extension method as a typo. Mirrors codegen's
+                // extend_map registration (codegen.sf:813).
+                if (doc.starts_with("@extend:")) {
+                    this.extend_member_names.set(name, true)
+                }
                 // Detect receiver-typed parameters: Fun[Type](...):Ret
                 var rpi: Float = 0
                 while (rpi < params.length()) {
@@ -2191,6 +2215,39 @@ class NullChecker {
         return ""
     }
 
+    /// True when reading `member` off a receiver of class `cls` is a typo rather
+    /// than something the program actually declares somewhere (BUGS #148).
+    ///
+    /// This answers a narrower question than it looks like, deliberately. Before
+    /// this guard existed, get_class_field_type answered "not found" by returning
+    /// "Any", which is the honest widen for a receiver the checker cannot pin down
+    /// and indistinguishable from a misspelling — so `box.nmae` type checked, then
+    /// codegen read field 0, or emitted invalid IR on a class with no fields at
+    /// all. Every clause below is a case where "absent" is not conclusive, and
+    /// each returns false so the old widening behaviour survives untouched:
+    ///
+    ///  - an ambiguous class name: two declarations share the bare name, so the
+    ///    field list we would consult may belong to the other one.
+    ///  - an `extend fun` member: never in class_fields or class_method_names at
+    ///    all (see extend_member_names).
+    ///
+    /// It does NOT also bail when the class has no recorded members. That looks
+    /// like the same kind of caution but is not: the only caller reaches this
+    /// from inside `env.class_fields.has(ma_base)`, so the class is registered by
+    /// construction and an empty field list means a class that genuinely declares
+    /// no fields — which is precisely the repro that emitted invalid IR rather
+    /// than reading field 0.
+    ///
+    /// dispatch_declaring_class does the ancestry walk, and it checks methods as
+    /// well as fields — which matters because a bare method reference (`a.finish`
+    /// with no parens) is a MemberAccess, not a MethodCall, and must not be read
+    /// as a missing field.
+    fun member_is_absent(cls: String, member: String): Bool {
+        if (this.is_ambiguous_class(cls)) { return false }
+        if (this.extend_member_names.has(member)) { return false }
+        return this.dispatch_declaring_class(cls, member).length() == 0
+    }
+
     /// May code at the current position read or call `member` on `obj_type`?
     ///
     /// Class-private means the class BODY (Kotlin's rule for members, §6a), so
@@ -3099,6 +3156,10 @@ class NullChecker {
             // above returns before reaching here, which is correct — reading your
             // own class's private field is exactly what private permits.
             this.check_member_visibility(obj_type, field, "field")
+            if (this.member_is_absent(ma_base, field)) {
+                this.error("type '" + ma_base + "' has no member '" + field + "'")
+                return "Any"
+            }
             return this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type)
         }
         // Known module members
