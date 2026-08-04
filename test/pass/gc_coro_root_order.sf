@@ -25,7 +25,7 @@ fun mark(label: String) {
     IO.println(seq.to_string() + ": " + label + " depth=" + d.to_string())
 }
 
-fun sleepy(duration: Int) {
+fun sleepy(duration: Float) {
     yield [1, duration]
 }
 

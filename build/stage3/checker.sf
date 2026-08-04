@@ -868,6 +868,58 @@ class NullChecker {
         this.error(ctx + " condition must be Bool, got " + t + hint)
     }
 
+    // Check a call's argument types against the callee's declared parameter
+    // types (BUGS #145).
+    //
+    // Nothing did this before. `fun f(x: String)` called as `f(42)` compiled
+    // clean and segfaulted at runtime, because the checker never compared an
+    // argument to a parameter — for functions, methods, constructors or
+    // `List<Int>.push`. Only *arity* was checked, and even that lives in codegen
+    // (`expr_body.sf:2559`), not here. Meanwhile `var s: String = 42` WAS
+    // rejected, so the type system looked like it worked; the hole was exactly at
+    // the call boundary.
+    //
+    // `func_params` already held what this needs — `params_list_to_string`
+    // encodes "name:Type" pairs and three call sites already parse them back for
+    // generic return-type resolution. The data was there; nobody compared it.
+    //
+    // Reuses `scalar_mismatch`, so this inherits its one-sided discipline: it
+    // fires only on a pair we can PROVE wrong (two different scalars, with
+    // Int->Float allowed as a widening), and lets Any, Nil, unions, generics,
+    // class and enum types through. That is deliberately narrower than a real
+    // subtyping check. A broader version would need `is_subtype` on every
+    // annotation spelling the codebase uses, and a false error here does not
+    // merely annoy — the checker type-checks the compiler's own source, so it
+    // breaks the bootstrap. Widening the proof set is a separate, measured step.
+    //
+    // Type parameters are skipped: a param typed `T` is resolved from the
+    // argument, not checked against it, which is what resolve_type_params does
+    // just below.
+    //
+    // `key` is the func_params key (mangled: `Class__method`, `Class__init`);
+    // `disp` is what the user wrote and is the only one that reaches the message.
+    fun check_call_args(key: String, disp: String, args: List<AST.Expr>) {
+        var params_str: String = this.env.get_func_params(key)
+        if (params_str.length() == 0) return
+        var entries: List<String> = this.split_type_args(params_str)
+        var i: Float = 0
+        while (i < entries.length() and i < args.length()) {
+            var entry: String = entries[i]
+            var colon_pos: Float = entry.index_of(":")
+            if (colon_pos >= 0) {
+                var pname: String = entry.slice(0, colon_pos)
+                var ptype: String = entry.slice(colon_pos + 1, entry.length())
+                if (!this.is_type_param(ptype)) {
+                    var atype: String = this.infer_expr(args[i])
+                    if (this.scalar_mismatch(ptype, atype)) {
+                        this.error("argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+
     fun is_subtype(child: String, parent: String): Bool {
         if (child == parent) return true
         if (parent == "Any") return true
@@ -3427,6 +3479,11 @@ class NullChecker {
         // through here at all (infer_method_call handles those).
         if (name.length() > 0 and this.env.class_fields.has(this.qualified_class_key(name))) {
             this.check_constructor_visibility(name)
+            // A construction's parameters live under "Class__init", not under the
+            // class name, so it needs its own check_call_args call (BUGS #145).
+            // register_decl registers the class as a function returning its own
+            // type, so the `name` lookup below finds a return type but no params.
+            this.check_call_args(this.generic_base(name) + "__init", "constructor '" + name + "'", args)
         }
         // Look up declared return type
         if (name.length() > 0) {
@@ -3434,6 +3491,11 @@ class NullChecker {
             if (this.is_generic_func(name)) {
                 this.check_generic_constraints(name, args)
             }
+            // Compare each argument against its declared parameter type (BUGS
+            // #145). Placed before the return-type work below because that path
+            // has several early returns, and an argument mismatch has to be
+            // reported whatever the return type turns out to be.
+            this.check_call_args(name, "'" + name + "'", args)
             var ret: String = this.env.get_func_ret(name)
             if (ret != "Any") {
                 // If return type contains a type parameter, try to resolve it
@@ -3670,6 +3732,12 @@ class NullChecker {
             if (this.is_generic_func(full_name)) {
                 this.check_generic_constraints(full_name, args)
             }
+            // Argument types against declared parameter types (BUGS #145).
+            // Methods register their params under the same "Class__method" key
+            // free functions use, so check_call_args needs no method-specific
+            // logic. Placed before the return-type work, which has several early
+            // returns.
+            this.check_call_args(full_name, "method '" + method + "'", args)
             var ret: String = this.env.get_func_ret(full_name)
             // A class type parameter is substituted from the receiver's own
             // declared type — `Box<String>` says `T` is `String` — before
