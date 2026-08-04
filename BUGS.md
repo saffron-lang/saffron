@@ -3,7 +3,26 @@
 ## Open
 
 **10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157.
-Next free number is **#158**.
+Next free number is **#160**. #158 is claimed but not present here: it is the lsp
+worktree's committed entry (the `match` above its enum declaration) and will arrive
+with that merge. A number can be taken without its text being in this file yet, so
+the next-free number is one past the highest *claimed*, not one past the highest
+written.
+
+**The fifth collision, and the first one the pre-commit re-read actually caught.**
+The rule at the end of the note below — re-read the next-free number from `main`
+*immediately before committing* — was added in response to #156's collision, which
+no amount of reading-at-start could have prevented. Running it here found that
+`#158` had been claimed and **committed** by the lsp worktree (for the `match`
+textually above its enum declaration, listed above) while this line's
+condition-type tightening was still uncommitted. So the tightening became **#159**.
+The tie-break was the same as every one before it, and for once cheap: the
+committed, cited side keeps the number, the uncommitted side moves. Worth noting
+that the lsp entry had already been renumbered four times by then, so honouring
+"committed wins" also avoided forcing a sixth rename on the more-settled entry.
+Five collisions in, the pattern is not that the numbering scheme is fragile but
+that a single counter shared by four concurrent worktrees has no owner; the
+pre-commit re-read is the cheapest thing that makes it converge.
 
 #154 and #155 were filed on the same day on two lines of work that had not yet
 met — origin/main's "an enum inside a printed collection prints a bit pattern"
@@ -713,6 +732,93 @@ semicolon alone.
 ---
 
 ## Resolved
+
+### 159. FIXED — a class or enum used as a condition was deterministically always false
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n } }
+
+var b = Box(1)
+if (b) { IO.println("taken") }      // never printed, no diagnostic
+```
+
+**Severity: medium.** This is #143's residual — the half its check deliberately let
+through — and it is *worse* than the cases #143 caught, not milder.
+
+`to_i1` is `trunc i64 %v to i1`: the low bit. #143's examples were wrong in ways
+that at least vary — `if (42)` false because 42 is even, `if (some_str)` answering
+on the low bit of a heap address, so it could flip between runs. A class instance is
+a pointer `__gc_alloc` returns **8-byte aligned**, so its low bit is always 0. The
+then-branch is unreachable on every run of every build, and nothing is printed. A
+"sometimes wrong" bug gets noticed; a consistently-false one gets designed around.
+
+Enums are the same outcome by a different route: a fieldless variant is a tag
+shifted into position rather than a pointer, and it also lands on 0.
+
+**Why #143 let them through, and why that grouping was wrong.** Its check is
+one-sided by design — it fires only on types it can *prove* are not Bool — and it
+put class and enum in the let-through set alongside `Any`, `Nil` and unions. Those
+are two different kinds of unknown. An `Any`-typed slot might genuinely hold a Bool
+at runtime, so erroring on it would reject correct programs (and redden the
+bootstrap, since the checker type-checks the compiler's own source). A variable
+whose static type is a declared class or enum can never hold one. The proof is
+available; #143 just did not take it.
+
+**Fix**: `check_condition` consults `env.class_fields` and `env.enum_variants`,
+which only contain names actually declared in this compilation, so an unresolved
+name is still left alone per #56. Each gets a hint naming the comparison to write.
+
+**This needed a new registry, which is the interesting part.** `class`, `interface`
+and `actor` are all parsed by `parse_class_decl_vis` into a single `ClassDecl`, and
+all three register in `class_fields` identically — the checker had **no way to tell
+an interface from a class**, and every `ClassDecl` arm spelled the field `__intro`
+to mark it unused. Interfaces must stay let through: an interface-typed slot holds
+some implementor, and nothing here can prove none of them is Bool-like. So
+`register_decl` now records the parser's `introducer` into `interface_names`. That
+field was added for exactly this reason — see the note at `parser.sf`'s
+`introducer`, which argues against re-deriving the answer from the `@actor` doc
+prefix.
+
+**Two residuals, both deliberate:**
+
+- **Unions.** `var maybe: Box|Nil = Box(1); if (maybe)` reads like a nil test and is
+  also always false, and it stays let through. Proving a union means proving every
+  member non-Bool, which is a bigger change to union handling here and — unlike the
+  class case — carries real risk of rejecting the compiler's own source.
+- **Interfaces**, as above. Provable in principle (walk every implementor), not
+  provable with what the checker has.
+
+`test/pass/cond_class_enum_ok.sf` asserts both residuals rather than leaving them
+as prose, so if either later becomes an error the test says so.
+
+**Verified.** Bootstrap green through stage 2 — gen3 compiles itself, gen4 links and
+compiles, 0 unresolved inference fallbacks — which is the check that matters here,
+because the failure mode of a too-eager condition rule is a false error on the
+compiler's own source. `test/fail/cond_not_bool_class.sf` and `_enum.sf` both report
+and exit 1, with the type-specific hint (`test a field, or compare it, e.g. `x !=
+nil`` / `match on it, or compare a variant, e.g. `c == Color.Variant``). #143's five
+existing fail tests still report, and `pass/cond_bool_ok.sf` and
+`pass/cond_class_enum_ok.sf` pass 3/3 and 6/6. Full suite: 299 passed, 8 failed, 14
+skipped, 0 known-fail, with the failure SET byte-identical to
+`test/FAILURE_BASELINE.txt` — zero regressions, zero incidental fixes. The +3 in
+`passed` is exactly this entry's three new tests.
+
+**Filed as #158, renumbered to #159 at commit time** — the lsp worktree had already
+committed #158 for an unrelated bug. See the fifth-collision note at the top of
+`## Open`; this is the first collision the pre-commit re-read caught rather than
+merely explained afterwards.
+
+One process note. The first read of those five #143 tests said they had started
+exiting 0, which would have meant this change broke the earlier one. It was a
+measurement bug: `$?` inside the reporting loop captured the `echo`, not the
+compiler. Re-measured one file per command and all five exit 1. The lesson is the
+one in CLAUDE.md's `## Known Issues` — verify that the thing you think you measured
+actually happened — and it cuts both ways: a harness bug can invent a regression as
+easily as it can hide one.
+
+---
+
 
 ### 156. FIXED — `var x = nil` typed the variable as the singleton `Nil` forever
 
