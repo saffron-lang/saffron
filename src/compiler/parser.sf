@@ -46,7 +46,29 @@ class Parser {
         return "_" + this.map_counter.to_string()
     }
 
+    /// The token at the cursor, clamped to the terminating EOF token.
+    ///
+    /// The clamp is what makes error recovery survivable. `parse_error` reports
+    /// and returns *without consuming* — deliberately, so the caller decides how
+    /// to resynchronize — so a parser that has run out of tokens keeps calling
+    /// `advance()` past the end. Unclamped, `this.tokens[this.pos]` then raised
+    /// `IndexError: index 6 out of bounds (length 6)`, which is a **fatal**
+    /// runtime error, not a diagnostic: it routes to `__runtime_error_fatal` and
+    /// exits, so the compiler died with no diagnostic and no JSON on stdout.
+    ///
+    /// Every incomplete-but-ordinary source produced it — `var x =`, `fun f(`,
+    /// `if (`, `1 +`. Which is to say: an editor buffer mid-keystroke. That made
+    /// it invisible to bootstrap and the suite (whose inputs are all complete
+    /// files, well-formed or deliberately malformed) and unavoidable in an LSP.
+    ///
+    /// The lexer always terminates the stream with `TkEof` (`lexer.sf:767`), so
+    /// clamping yields EOF forever rather than an out-of-range read. Loops that
+    /// scan for a closing token therefore need an explicit `eof` guard or they
+    /// spin — a hang being strictly worse than a crash in an editor. All such
+    /// loops in this file were audited when this clamp landed.
     fun current(): Lexer.Token {
+        var last: Float = this.tokens.length() - 1
+        if (this.pos > last) { return this.tokens[last] }
         return this.tokens[this.pos]
     }
 
@@ -818,8 +840,8 @@ class Parser {
             }
             var recv_name: String = "__inc_recv" + uid
             var idx_name: String = "__inc_idx" + uid
-            stmts.push(AST.Stmt.VarDecl(recv_name, "", iobj, "", "public", synth, synth))
-            stmts.push(AST.Stmt.VarDecl(idx_name, "", iidx, "", "public", synth, synth))
+            stmts.push(AST.Stmt.VarDecl(recv_name, AST.Type.UnknownType, iobj, "", "public", synth, synth))
+            stmts.push(AST.Stmt.VarDecl(idx_name, AST.Type.UnknownType, iidx, "", "public", synth, synth))
             place = AST.Expr.IndexGet(AST.Expr.Variable(recv_name, synth), AST.Expr.Variable(idx_name, synth))
         } else if (ek == "member" or ek == "get_field") {
             var mobj: AST.Expr = match (target) { MemberAccess(o, f, __ms) => o
@@ -848,11 +870,11 @@ class Parser {
                 place = AST.Expr.GetField(AST.Expr.This, mfield, mfs)
             } else {
                 var mrecv_name: String = "__inc_recv" + uid
-                stmts.push(AST.Stmt.VarDecl(mrecv_name, "", mobj, "", "public", synth, synth))
+                stmts.push(AST.Stmt.VarDecl(mrecv_name, AST.Type.UnknownType, mobj, "", "public", synth, synth))
                 place = AST.Expr.MemberAccess(AST.Expr.Variable(mrecv_name, synth), mfield, mfs)
             }
         }
-        stmts.push(AST.Stmt.VarDecl(val_name, "", place, "", "public", synth, synth))
+        stmts.push(AST.Stmt.VarDecl(val_name, AST.Type.UnknownType, place, "", "public", synth, synth))
         var updated: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(val_name, synth), op, AST.Expr.IntLit(1))
         stmts.push(this.build_assign(place, updated))
         return AST.Expr.BlockExpr(stmts, AST.Expr.Variable(val_name, synth))
@@ -1107,7 +1129,7 @@ class Parser {
                 // nested literals and bumps the counter.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public", AST.span_none(), AST.span_none()))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, AST.Type.ClassType("Map"), AST.Expr.MapLit, "", "public", AST.span_none(), AST.span_none()))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
@@ -1890,7 +1912,7 @@ class Parser {
             var alias_name_span: AST.Span = this.ident_span()
             var alias_name: String = this.expect_ident()
             this.consume("=")
-            var alias_target: String = this.parse_type()
+            var alias_target: AST.Type = this.parse_type_ast(this.parse_type())
             return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias", visibility,
                 alias_name_span, this.span_from(alias_start))
         }
@@ -2404,19 +2426,23 @@ class Parser {
             var pat_val: AST.Expr = this.parse_expr()
             return AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, bindings), pat_val)
         }
-        // "" means "no annotation was written", NOT "Any". This used to default to
-        // "Any", which made an explicit `var x: Any = f()` indistinguishable from
-        // an unannotated `var x = f()` — so the checker took the infer-from-
-        // initializer branch and bound the initializer's type, and `: Any` could
-        // not widen a binding, the one thing an author writes it for (BUGS #147).
+        // `UnknownType` means "no annotation was written", NOT `AnyType`. This used
+        // to default to "Any", which made an explicit `var x: Any = f()`
+        // indistinguishable from an unannotated `var x = f()` — so the checker took
+        // the infer-from-initializer branch and bound the initializer's type, and
+        // `: Any` could not widen a binding, the one thing an author writes it for
+        // (BUGS #147).
         //
-        // Every downstream reader already treated empty and "Any" alike (see the
-        // `vtype.length() == 0 or vtype == "Any"` guards in codegen.sf's global
-        // pre-scans), so "" is the value that was already safe to send; what was
-        // missing was the parser ever sending it.
-        var type_ann: String = ""
+        // The String encoding fixed that by sending "" here, which every downstream
+        // reader then had to test with `length() == 0 or == "Any"` — one disjunction
+        // asking two different questions, "was anything written" and "what does it
+        // say". Codegen's five global pre-scans still spelled it that way after the
+        // checker was fixed, which is why an explicit `: Any` widened a local and
+        // not a global (BUGS #160). Two type-system members answer the two questions
+        // separately and there is no third spelling to keep in sync.
+        var type_ann: AST.Type = AST.Type.UnknownType
         if (this.match_kind(":")) {
-            type_ann = this.parse_type()
+            type_ann = this.parse_type_ast(this.parse_type())
         }
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
@@ -2462,11 +2488,11 @@ class Parser {
         var init: AST.Expr = this.parse_expr()
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "", init, "", "public", AST.span_none(), AST.span_none()))
+        stmts.push(AST.Stmt.VarDecl(tmp_name, AST.Type.UnknownType, init, "", "public", AST.span_none(), AST.span_none()))
         var i: Float = 0
         while (i < names.length()) {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name, AST.span_none()), AST.Expr.IntLit(i))
-            stmts.push(AST.Stmt.VarDecl(names[i], "", idx_expr, "", "public", AST.span_none(), AST.span_none()))
+            stmts.push(AST.Stmt.VarDecl(names[i], AST.Type.UnknownType, idx_expr, "", "public", AST.span_none(), AST.span_none()))
             i = i + 1
         }
         return AST.Stmt.Block(stmts)
@@ -2704,7 +2730,15 @@ class Parser {
             if (this.match_kind("(")) {
                 var fields_sb: StringBuilder = StringBuilder()
                 var first: Bool = true
-                while (!this.match_kind_check(")")) {
+                // The `eof` half of this condition is what keeps a truncated
+                // `enum E { V(` from spinning forever. `current()` clamps to the
+                // EOF token rather than reading out of bounds (BUGS #164), so a
+                // loop scanning for `)` that never arrives would otherwise see
+                // EOF on every iteration and never advance — a hang, which in an
+                // editor is worse than the crash the clamp removed. This was the
+                // only negative-condition token loop in the file missing the
+                // guard; `consume(")")` below still reports the missing paren.
+                while (!this.match_kind_check(")") and !this.match_kind_check("eof")) {
                     if (!first) {
                         fields_sb.append(",")
                         this.consume(",")
@@ -3184,12 +3218,24 @@ class Parser {
             this.advance() // consume var
             var name: String = this.expect_ident()
             // The annotation is optional: `for (var i = 0; ...)` infers from the
-            // initializer, like every other binding form. "Any" is the inference
-            // sentinel parse_var_decl_with_doc uses (parser.sf:1493) — the
-            // checker's VarDecl arm reads it as "infer from the initializer".
-            var vtype: String = "Any"
+            // initializer, like every other binding form.
+            //
+            // UnknownType, not AnyType. Both C-style `for` paths used to default the
+            // loop variable's annotation to "Any" while `parse_var_decl_with_doc`
+            // defaulted to "" — two spellings of "the author wrote nothing", and only
+            // one of them was the spelling the readers tested for. The comment that
+            // was here claimed this line used "" and cited a line number for it; it
+            // used "Any".
+            //
+            // No behavioural difference is measurable from the change on its own: the
+            // readers all tested `length() == 0 or == "Any"`, so both spellings took
+            // the same branch, which is exactly why the divergence survived. It
+            // matters because that disjunction is what this slice removes — once the
+            // omission is a distinct node, an omission spelled AnyType would start
+            // reading as a real annotation and stop inferring from the initializer.
+            var vtype: AST.Type = AST.Type.UnknownType
             if (this.match_kind(":")) {
-                vtype = this.parse_type()
+                vtype = this.parse_type_ast(this.parse_type())
             }
             this.consume("=")
             var init_expr: AST.Expr = this.parse_expr()
@@ -3228,7 +3274,7 @@ class Parser {
             var desugar_body: List<AST.Stmt> = []
             var pdi: Float = 0
             while (pdi < pat_names.length()) {
-                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "", AST.Expr.IndexGet(AST.Expr.Variable("__for_item", AST.span_none()), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], AST.Type.UnknownType, AST.Expr.IndexGet(AST.Expr.Variable("__for_item", AST.span_none()), AST.Expr.IntLit(pdi)), "", "public", AST.span_none(), AST.span_none()))
                 pdi = pdi + 1
             }
             pdi = 0
@@ -3260,10 +3306,11 @@ class Parser {
             return this.parse_for_in(name)
         }
         // C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
-        // The annotation is optional here too, so `for (i = 0; ...)` infers.
-        var vtype: String = "Any"
+        // The annotation is optional here too, so `for (i = 0; ...)` infers —
+        // UnknownType for the same reason as the `var`-keyword form above.
+        var vtype: AST.Type = AST.Type.UnknownType
         if (this.match_kind(":")) {
-            vtype = this.parse_type()
+            vtype = this.parse_type_ast(this.parse_type())
         }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
@@ -3311,8 +3358,8 @@ class Parser {
         var uid: String = this.next_for_uid()
         var list_var: String = "__for_src" + uid
         var idx_var: String = "__for_i" + uid
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "", iter_expr, "", "public", AST.span_none(), AST.span_none())
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "", "public", AST.span_none(), AST.span_none())
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, AST.Type.UnknownType, iter_expr, "", "public", AST.span_none(), AST.span_none())
+        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, AST.Type.IntType, AST.Expr.IntLit(0), "", "public", AST.span_none(), AST.span_none())
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "length", [], AST.span_none()))
         // The element read is `__iter_get`, NOT an ordinary `src[i]` (BUGS #62).
         // For a List or String the two are the same thing, but for a Map `m[k]`
@@ -3327,7 +3374,7 @@ class Parser {
         // variant deliberately: a variant would need arms at ~30 match sites,
         // and a missing arm yields an indeterminate value rather than an error
         // (BUGS #76), so the variant is the riskier encoding of the same thing.
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "", AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "__iter_get", [AST.Expr.Variable(idx_var, AST.span_none())], AST.span_none()), "", "public", AST.span_none(), AST.span_none())
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, AST.Type.UnknownType, AST.Expr.MethodCall(AST.Expr.Variable(list_var, AST.span_none()), "__iter_get", [AST.Expr.Variable(idx_var, AST.span_none())], AST.span_none()), "", "public", AST.span_none(), AST.span_none())
         var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var, AST.span_none()), "+", AST.Expr.IntLit(1)), AST.span_none()))
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
@@ -3656,7 +3703,7 @@ class Parser {
                 // (BUGS #41). Bind before the recursive parse_expr calls below.
                 var mvar: String = "__map" + this.next_map_uid()
                 var map_stmts: List<AST.Stmt> = []
-                map_stmts.push(AST.Stmt.VarDecl(mvar, "Map", AST.Expr.MapLit, "", "public", AST.span_none(), AST.span_none()))
+                map_stmts.push(AST.Stmt.VarDecl(mvar, AST.Type.ClassType("Map"), AST.Expr.MapLit, "", "public", AST.span_none(), AST.span_none()))
                 // First entry
                 var key: AST.Expr = this.parse_map_key()
                 this.consume(":")

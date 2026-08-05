@@ -946,6 +946,7 @@
                         pr_vi = pr_vi + 1
                     }
                     this.enum_defs.set(pr_ename, pr_vnames)
+                    this.register_enum_tag(pr_ename)
                 }
                 VarDecl(n, t, init, d, v_vis, __ns, __fs) => {}
                 ExprStmt(e) => {}

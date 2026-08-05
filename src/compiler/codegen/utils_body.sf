@@ -1507,8 +1507,15 @@
                 // Already decided — by an annotation, or by the first pass's
                 // literal inference. Never overwrite either.
                 if (name.length() > 0 and !this.global_var_types.has(prefix + name) and !this.global_var_types.has(name)) {
-                    var vtype: String = this.get_var_type(stmts[si])
-                    if (vtype.length() == 0 or vtype == "Any") {
+                    // Unannotated only. The has() guard above is not enough to
+                    // protect an explicit `: Any`: the first pass declines to
+                    // record a global it reads as Any, so an `: Any` global is
+                    // absent from global_var_types and reaches this line — and
+                    // then took its type from the initializer's call, which is
+                    // BUGS #160 arriving by the one pre-scan that was otherwise
+                    // safe. Asking `is_unknown_type` asks only whether the author
+                    // wrote an annotation, which is the question this branch means.
+                    if (this.is_unknown_type(this.get_var_type(stmts[si]))) {
                         // Only a call's type is new information here; the literal
                         // shapes were already resolved by the first pass, and
                         // re-deriving them would just duplicate its allowlist.
