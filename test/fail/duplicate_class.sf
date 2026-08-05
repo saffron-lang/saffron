@@ -1,4 +1,4 @@
-// BUGS #164: two top-level type declarations binding one name.
+// BUGS #166: two top-level type declarations binding one name.
 //
 // The MUST-REJECT here is not pedantry about redeclaration. Before the fix this
 // file compiled clean and printed 1: the checker type checked `f.b` against the

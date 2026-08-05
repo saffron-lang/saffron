@@ -3,29 +3,43 @@
 ## Open
 
 **13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #161. Next free number is **#166**. Only **#162** is claimed but not written
-here — the saffron_154 line's SSA-temp GC bug, which arrives with that merge. #158
-and #160 were in that category one revision ago and are present now; this is the
-merge that brought them, so the claimed set and the written set almost agree again.
-The rule that made the placeholders necessary still holds: a number can be taken
-without its text being in this file yet, so the next-free number is one past the
-highest *claimed*, not one past the highest written. (The open count counts what is
-*written here*, so #162 is excluded on purpose and the `awk` self-check over this
-file agrees with the number.)
+#160, #161. Next free number is **#167**. Two numbers are claimed but not written
+here: **#162**, the saffron_154 line's SSA-temp GC bug, and **#164**, which is
+`main`'s fatal-`IndexError`-on-incomplete-source fix — already resolved there, so
+it will land under Resolved with that merge rather than joining the open list.
+#158 and #160 were in this category one revision ago and are present now; this is
+the merge that brought them. The rule that made the placeholders necessary still
+holds: a number can be taken without its text being in this file yet, so the
+next-free number is one past the highest *claimed*, not one past the highest
+written. (The open count counts what is *written here*, so #162 and #164 are
+excluded on purpose and the `awk` self-check over this file agrees with the number.)
 
-**The sixth collision, and the first one to cost a renumber after the work was
-done.** This line's duplicate-declaration fix was written as #160 and its
-cross-module dispatch bug as #161. By the time the GC work below was finished,
-`main` had claimed **#160** for something else entirely (the `: Any` widening
-entry) and **#162** for the saffron_154 line's SSA-temp bug. #161 survived because
-`main` had *reserved* it by name for this line — the reservation note is what saved
-it. So the duplicate-declaration fix became **#164** and the GC fix took **#165**.
-The lesson is not "re-read the number" — that rule was already in force and is what
-caught this. It is that a reservation note in `main` is worth writing even for a
-number you have not pushed yet: the one entry that had one kept its number, and the
-one that did not, moved.
+**This line's duplicate-declaration fix was renumbered three times: #160 → #164 →
+#166.** Written as #160, with the cross-module dispatch bug as #161. By the time
+the GC work below was finished, `main` had claimed **#160** for the `: Any`
+widening entry and **#162** for the saffron_154 line's SSA-temp bug, so it became
+**#164** and the GC fix took **#165**. Then, during the bootstrap and suite run
+that verified the merge, `main` landed its own **#164** (a fatal `IndexError` on
+incomplete source). Mine was unpushed, so per the rule below mine moved again, to
+**#166**. #165 was never contested — `main`'s own header still reads "next free is
+#165", so the GC entry keeps it.
 
-**#161 was found by writing #164's test, not by looking for it.** The
+Two lessons, and the second is the one that is new:
+
+- A reservation note in `main` is worth writing even for a number you have not
+  pushed yet. #161 survived all of this *only* because `main` had reserved it by
+  name for this line. The two entries that had no reservation both moved; the one
+  that had one did not.
+- **The re-read has to happen after the last long-running verification, not before
+  it.** The rule as written says "immediately before committing", and that is what
+  was done — the pre-commit grep found #164 free and it was. What it did not
+  survive was the ~15 minutes of bootstrap-plus-suite that came *after* the commit
+  and before the push, which is exactly long enough for `main` to move. The
+  operative moment is the push, not the commit. This cost a renumber across four
+  files and one `### ` heading; catching it required re-fetching after the suite
+  finished, which was luck rather than procedure.
+
+**#161 was found by writing #166's test, not by looking for it.** The
 duplicate-declaration check had to prove it did *not* reject two modules declaring
 one name, and the fixture that exercises that — two `Marker` classes — turned out
 to dispatch both receivers' methods to the second module. The general lesson is
@@ -969,19 +983,89 @@ receiver's static type is available and never consulted; the guard the cluster
 keeps asking for is the same one here.
 
 **Not a duplicate-declaration problem.** Two modules declaring one name is legal —
-#164 deliberately does not reject it, and `register_class_identity`'s prefix keying
+#166 deliberately does not reject it, and `register_class_identity`'s prefix keying
 is what keeps the two classes distinguishable in the checker. The bug is that
 codegen's method dispatch does not use that distinction. `test/pass/duplicate_decl_ok.sf`
 asserts the constructors and explicitly documents why it stops short of the
 methods.
 
-**It predates the #164 work.** gen2 and gen3 emit byte-identical wrong calls, so
-this was found while writing #164's non-regression test rather than caused by it.
+**It predates the #166 work.** gen2 and gen3 emit byte-identical wrong calls, so
+this was found while writing #166's non-regression test rather than caused by it.
 The `alias_scope_target_a/b.sf` fixtures reproduce it as-is.
 
 ---
 
 ## Resolved
+
+### 166. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
+
+```saffron
+class Foo {
+    var a: Int
+    fun init() { this.a = 1 }
+}
+class Foo {
+    var b: String
+    fun init() { this.b = "x" }
+}
+var f = Foo()
+IO.println(f.b)     // prints 1 — an Int, from the other class's field
+```
+
+**The two halves of the compiler picked different classes, silently.** The checker
+type checked `f.b` against the *second* `Foo`, where `b: String` exists, so no
+error. Codegen emitted a read of the *first* `Foo`'s slot 0, where `a: Int` lives.
+The program compiled with exit 0 and printed `1` — an integer, from a field that
+was never named, through a member access that the checker had just approved
+against a different declaration.
+
+That is BUGS #148's shape (a nonexistent member reading field 0 and emitting
+invalid IR) arrived at by a different route, and it is the argument for making this
+an error rather than a warning: the failure mode is not "the later declaration
+wins", which would at least be predictable, but "the checker and codegen each pick
+a winner and they are not the same one".
+
+Every kind was affected. `enum E` twice, `class Foo` then `enum Foo`, and the
+`interface`/`actor` spellings all registered the same way, and none of them
+reported anything.
+
+**Fix**: a fifth pass in `check_program`, `check_duplicate_decls`, over the
+module's own statement list. Scoping it to *that list* is the load-bearing detail
+and the reason it is a separate pass rather than a check inside `register_decl`:
+registration is also fed every imported declaration, so a check that lived there
+would reject two *modules* declaring one name — legal, common, and already handled
+by `register_class_identity`'s prefix keying (the `Response` collision). Same
+structural reason `check_leaks` is its own pass over `stmts`.
+
+**Types only — `class`, `interface`, `actor`, `enum`.** Duplicate `fun` and
+duplicate `var` are silent too (last declaration wins; `fun f` twice returns the
+first, `var x` twice reads the second — both probed), and are deliberately left
+open. A function name is genuinely redeclarable across the stdlib's files today,
+and folding those in would turn one bug into a broad source-compatibility change
+that wants its own decision. What this closes is the case where the winner and
+the memory layout disagree.
+
+The diagnostic names the consequence, but only claims the layout disagreement
+where it actually holds: two classes do diverge that way, while an enum on either
+side is a plain overwrite. Attaching the class explanation to the enum case would
+have been a wrong reason on a right error.
+
+**Verified**: bootstrap green through stage 2 (`gen3 compiles itself`, 0 unresolved
+inference fallbacks), so the compiler's own ~40 source files contain no duplicate
+type declaration — checked independently with a `grep`/`uniq -d` sweep over
+`src/compiler`, `src/lib` and all three test directories, which found none. Three
+tests: `test/fail/duplicate_class.sf` (the wrong-layout case above),
+`test/fail/duplicate_enum_class.sf` (the cross-kind case), and
+`test/pass/duplicate_decl_ok.sf` (9 assertions on the let-through set — two
+modules sharing a class name, a function name and a global name; a local class
+shadowing an imported one; and `class`/`enum`/`interface`/`actor` coexisting with
+distinct names).
+
+Writing that pass test is what turned up **#161**: `ma.describe()` binds to the
+other module's method even with an explicit annotation. The test asserts the
+constructors, which #166 must not break, and says in a comment why it stops short
+of the methods — a test that pins a second bug fails for the wrong reason and
+teaches the next reader nothing about the first.
 
 ### 165. FIXED — every container constructor allocated its child buffers while the parent was invisible to the collector, so a well-timed GC freed the object being built
 
@@ -1088,8 +1172,8 @@ saffron_154 recorded before #165 existed. Fixing six constructors moved it not a
 all, which is the cleanest available evidence that they are separate bugs rather
 than two descriptions of one.
 
-**#162 is why `pass/check_module_imports` enters the failure baseline with #164.**
-That test runs the checker in-process, so #164's new pass executes, and its single
+**#162 is why `pass/check_module_imports` enters the failure baseline with #166.**
+That test runs the checker in-process, so #166's new pass executes, and its single
 `var seen: Map<String, String> = {}` per module is enough extra allocation to move
 a collection onto #162's window. Established by A/B rather than inferred:
 neutralising the pass to an early `return` placed *after* the Map allocation still
@@ -1097,75 +1181,6 @@ segfaults, moving the same early return *before* it passes, and `GC.disable()`
 makes the test pass 4/4. #165 does not fix it, which is the useful part — if the
 runtime constructors had been the only bug, this test would have gone green here.
 
-### 164. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
-
-```saffron
-class Foo {
-    var a: Int
-    fun init() { this.a = 1 }
-}
-class Foo {
-    var b: String
-    fun init() { this.b = "x" }
-}
-var f = Foo()
-IO.println(f.b)     // prints 1 — an Int, from the other class's field
-```
-
-**The two halves of the compiler picked different classes, silently.** The checker
-type checked `f.b` against the *second* `Foo`, where `b: String` exists, so no
-error. Codegen emitted a read of the *first* `Foo`'s slot 0, where `a: Int` lives.
-The program compiled with exit 0 and printed `1` — an integer, from a field that
-was never named, through a member access that the checker had just approved
-against a different declaration.
-
-That is BUGS #148's shape (a nonexistent member reading field 0 and emitting
-invalid IR) arrived at by a different route, and it is the argument for making this
-an error rather than a warning: the failure mode is not "the later declaration
-wins", which would at least be predictable, but "the checker and codegen each pick
-a winner and they are not the same one".
-
-Every kind was affected. `enum E` twice, `class Foo` then `enum Foo`, and the
-`interface`/`actor` spellings all registered the same way, and none of them
-reported anything.
-
-**Fix**: a fifth pass in `check_program`, `check_duplicate_decls`, over the
-module's own statement list. Scoping it to *that list* is the load-bearing detail
-and the reason it is a separate pass rather than a check inside `register_decl`:
-registration is also fed every imported declaration, so a check that lived there
-would reject two *modules* declaring one name — legal, common, and already handled
-by `register_class_identity`'s prefix keying (the `Response` collision). Same
-structural reason `check_leaks` is its own pass over `stmts`.
-
-**Types only — `class`, `interface`, `actor`, `enum`.** Duplicate `fun` and
-duplicate `var` are silent too (last declaration wins; `fun f` twice returns the
-first, `var x` twice reads the second — both probed), and are deliberately left
-open. A function name is genuinely redeclarable across the stdlib's files today,
-and folding those in would turn one bug into a broad source-compatibility change
-that wants its own decision. What this closes is the case where the winner and
-the memory layout disagree.
-
-The diagnostic names the consequence, but only claims the layout disagreement
-where it actually holds: two classes do diverge that way, while an enum on either
-side is a plain overwrite. Attaching the class explanation to the enum case would
-have been a wrong reason on a right error.
-
-**Verified**: bootstrap green through stage 2 (`gen3 compiles itself`, 0 unresolved
-inference fallbacks), so the compiler's own ~40 source files contain no duplicate
-type declaration — checked independently with a `grep`/`uniq -d` sweep over
-`src/compiler`, `src/lib` and all three test directories, which found none. Three
-tests: `test/fail/duplicate_class.sf` (the wrong-layout case above),
-`test/fail/duplicate_enum_class.sf` (the cross-kind case), and
-`test/pass/duplicate_decl_ok.sf` (9 assertions on the let-through set — two
-modules sharing a class name, a function name and a global name; a local class
-shadowing an imported one; and `class`/`enum`/`interface`/`actor` coexisting with
-distinct names).
-
-Writing that pass test is what turned up **#161**: `ma.describe()` binds to the
-other module's method even with an explicit annotation. The test asserts the
-constructors, which #164 must not break, and says in a comment why it stops short
-of the methods — a test that pins a second bug fails for the wrong reason and
-teaches the next reader nothing about the first.
 ### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
 
 ```saffron
