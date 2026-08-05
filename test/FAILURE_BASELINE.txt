@@ -235,6 +235,23 @@
 # #156 for the `var x = nil` fix and the sfx worktree had claimed #161, so the
 # pre-merge next-free grep moved it twice. Worth noting against this file's rule
 # about totals — 295 → 306 is a large jump with an entirely empty set diff.
+#
+# Confirmed 2026-08-04 after a second merge of main, picking up #163 (three
+# malformed-`import` defects that failed at link time rather than parse time): 309
+# passed, 8 failed, 14 skipped, 1 known-fail. SET unchanged, comm-diffed empty both
+# directions against main's own copy. The +3 is #163's three tests
+# (fail/import_missing_from, fail/import_unquoted_path, pass/import_forms_ok), all
+# already passing on main; eligible files 329 → 332. Bootstrap green through STAGE 2
+# gen4, 0 unresolved inference fallbacks.
+#
+# This second merge is the one worth reading twice, because #163 tightened the
+# *import* path while this line's change is in codegen — and imports are resolved by
+# main.sf's text scanners rather than the parser, so the two touch genuinely separate
+# machinery and the empty set diff is the expected result rather than a lucky one.
+# The reason to record it anyway: the first merge attempt into the shared checkout
+# was aborted by git because a teammate's bootstrap was mid-write on
+# build/stage3/codegen.ll. Waiting for it, then re-merging, is what turned #163 from
+# something this branch would have silently reverted into something it composes with.
 
 async
 docstrings
