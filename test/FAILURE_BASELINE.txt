@@ -301,11 +301,47 @@
 # build/stage3/codegen.ll. Waiting for it, then re-merging, is what turned #163 from
 # something this branch would have silently reverted into something it composes with.
 
+# Updated 2026-08-05 on the twice-merged tree (this line's #165/#166 plus origin's
+# #160 closure, #164, and the VarDecl.type_ann -> AST.Type migration): 315 passed,
+# 8 failed, 14 skipped, 1 known-fail. Bootstrap green through STAGE 2 (0 unresolved
+# inference fallbacks; gen3 compiles itself, gen4 links and compiles).
+#
+# ONE NAME REMOVED, pass/check_module_imports — and it is removed for the reason
+# this file's header calls out as suspect. It is NOT a fix. BUGS #162 is still
+# wide open, and three independent measurements at this exact HEAD say so:
+#
+#   - test/pass/arg_temp_rooted.sf, #162's own regression test (origin added it as
+#     a KNOWN_FAIL), still XFAILs: 1/2 assertions, expected 10, actual 49.
+#   - The standalone repro under GC.set_threshold(1) — take(Box(7), alloc()) over
+#     200 rounds — now reports mismatches=200. Not 51 as it did two merges ago:
+#     ALL 200.
+#   - Nothing in either merge touched SSA-temp rooting. origin's codegen commits
+#     were the type_ann migration and #154's payload half.
+#
+# So the name left this list because allocation timing shifted underneath it, not
+# because the defect it exposes was repaired. It is deterministic in both
+# directions, which is the trap: 12/12 passing runs at this HEAD, and it was
+# reliably segfaulting before. A test that flips from always-red to always-green
+# with no fix in between is indistinguishable from a repair if you only read the
+# totals — and the totals here look great (+4 passed, -1 failed).
+#
+# What replaces it as #162's acceptance test is pass/arg_temp_rooted, which is
+# strictly better: it is the bug's own repro rather than a bystander, and it is
+# registered as a KNOWN_FAIL so an actual fix reports as an `xpass` failure and
+# forces the entry to be dropped deliberately. That is the mechanism that was
+# missing when check_module_imports was carrying the signal.
+#
+# The count arithmetic, since a merge is where it stops closing: origin's 309
+# passed / 8 failed, PLUS this line's four new tests (pass/gc_constructor_rule,
+# pass/duplicate_decl_ok, fail/duplicate_class, fail/duplicate_enum_class), PLUS
+# pass/check_module_imports returning to the passing column, MINUS
+# pass/arg_temp_rooted leaving `passed` for the known-fail bucket. 309 + 4 + 1 + 1
+# = 315 with the xfail counted separately, and 8 failed unchanged by name.
+
 async
 docstrings
 json
 oracle_enum_println
-pass/check_module_imports
 pass/deep_deserialize
 pass/expressions
 pass/overloading

@@ -675,7 +675,14 @@ does not move the object, it **frees** it, because the shadow stack never learne
 about it either. Retiring the nursery narrowed #63's window; it did not close
 this one.
 
-**Reproduction** — deterministic, 51 corrupted reads out of 200:
+**Reproduction** — deterministic, but the *rate* is not a constant. It was 51
+corrupted reads out of 200 when this was filed; on the tree that merged #160's
+closure, #164 and the `VarDecl.type_ann` migration it is **200 out of 200**. The
+rate is a property of one binary's allocation layout, not of the defect, so do not
+read a change in it as progress in either direction — and do not conclude the bug
+is fixed because some *other* test stopped failing. See the note under #165, where
+a bystander (`pass/check_module_imports`) went from always-red to always-green
+while this got strictly worse.
 
 ```saffron
 class Box {
@@ -699,7 +706,7 @@ while (t < 200) {
     if (got != 7) { bad = bad + 1 }
     t = t + 1
 }
-IO.println("mismatches=${bad}")   // mismatches=51
+IO.println("mismatches=${bad}")   // 51 when filed; 200 after the #164 merge
 ```
 
 **Cause.** Argument 0 is evaluated to an SSA temp, then argument 1 runs and
@@ -1329,14 +1336,36 @@ saffron_154 recorded before #165 existed. Fixing six constructors moved it not a
 all, which is the cleanest available evidence that they are separate bugs rather
 than two descriptions of one.
 
-**#162 is why `pass/check_module_imports` enters the failure baseline with #166.**
-That test runs the checker in-process, so #166's new pass executes, and its single
+**#162 is why `pass/check_module_imports` briefly entered the failure baseline with
+#166, and why it left again two merges later without anything being fixed.** That
+test runs the checker in-process, so #166's new pass executes, and its single
 `var seen: Map<String, String> = {}` per module is enough extra allocation to move
 a collection onto #162's window. Established by A/B rather than inferred:
 neutralising the pass to an early `return` placed *after* the Map allocation still
-segfaults, moving the same early return *before* it passes, and `GC.disable()`
-makes the test pass 4/4. #165 does not fix it, which is the useful part — if the
-runtime constructors had been the only bug, this test would have gone green here.
+segfaulted, moving the same early return *before* it passed, and `GC.disable()`
+made the test pass 4/4. #165 did not fix it, which was the useful part — if the
+runtime constructors had been the only bug, this test would have gone green there.
+
+Then it went green anyway. After merging origin's #160 closure, #164 and the
+`VarDecl.type_ann` migration, `pass/check_module_imports` passes 12/12 while #162
+is *more* broken than before: the standalone repro under `GC.set_threshold(1)` went
+from `mismatches=51` to `mismatches=200` out of 200, and #162's own regression test
+`pass/arg_temp_rooted` still XFAILs with `expected 10, actual 49`. Allocation
+timing shifted underneath a bystander; nothing touched SSA-temp rooting.
+
+**The lesson is about which test carries a bug's signal.** A bystander that flips
+from always-red to always-green is indistinguishable from a repair when you read
+totals, and *deterministic in both directions* is worse than flaky, because
+re-running it does not reveal the problem. The replacement is `pass/arg_temp_rooted`
+— the bug's own repro, registered as a KNOWN_FAIL so that an actual fix reports as
+an `xpass` *failure* and forces its entry to be dropped on purpose. The general
+form: an open bug's acceptance test should be its own repro, and it should be wired
+so that fixing it breaks the build until someone acknowledges the fix.
+
+Also worth keeping: the "51 out of 200" figure recorded above was correct when
+written and is not a constant. A corruption rate is a property of one binary's
+allocation layout, not of the defect, so quoting one as if it were stable invites
+exactly the misreading this paragraph exists to prevent.
 
 ### 160. FIXED — an explicit `: Any` on a module-level global could not widen it, and read back wrong even unreassigned; #147 was fixed in the checker only
 
