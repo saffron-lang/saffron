@@ -338,6 +338,30 @@
 # pass/arg_temp_rooted leaving `passed` for the known-fail bucket. 309 + 4 + 1 + 1
 # = 315 with the xfail counted separately, and 8 failed unchanged by name.
 
+# Confirmed 2026-08-05 after merging origin's gen2 PROMOTION (VarDecl.type_ann as an
+# AST.Type node): 315 passed, 8 failed, 14 skipped, 1 known-fail. The SET below is
+# UNCHANGED, comm-diffed both directions, empty each way.
+#
+# The load-bearing detail is not the set, it is the hash: md5 of build/saffronc is
+# 0044ed810447dee0976339d13dfa963c, BYTE-IDENTICAL to the gen3 built from the
+# previous gen2 before the promotion. A promotion replaces the root of trust for the
+# whole chain, so it is the one merge that cannot be waved through on "only a binary
+# changed" — and the way to check it is that the new root reproduces the same gen3,
+# not that the suite is still green. Same source, same output, different compiler
+# compiling it.
+#
+# One visible difference in the log, and it is the expected one: STAGE 1 no longer
+# prints "gen2 outdated, bootstrapping via checked-in .ll artifacts...". That line
+# had been appearing on every bootstrap in this line's history, because the old gen2
+# could not compile the current source directly and fell back to the checked-in .ll
+# files. The promoted gen2 compiles it. Bootstrap dropped from ~6 minutes to ~2.
+#
+# Also recorded because it cost nothing and could have cost a false RED: this
+# bootstrap sat on bootstrap.sh's LOCK for several minutes waiting for
+# /tmp/saffron_154's run to finish (pid 80107, identified via `lsof -p ... | grep
+# cwd`). The lock did its job. A bootstrap that appears hung with a one-line log is
+# usually this, not a failure -- check for the [LOCK] line before diagnosing.
+
 async
 docstrings
 json
