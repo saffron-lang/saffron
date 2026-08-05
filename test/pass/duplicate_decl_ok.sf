@@ -1,0 +1,63 @@
+// BUGS #168's non-regression half: what the duplicate-declaration check must
+// NOT reject.
+//
+// The check exists because two type declarations in ONE file leave the checker
+// and codegen disagreeing about which one a name means. Two declarations in TWO
+// modules are a different thing entirely — legal, common, and already
+// distinguished by register_class_identity's prefix keying. If the new pass ran
+// over the registration stream instead of the module's own statement list, this
+// file would fail to compile, so it is asserted rather than assumed.
+//
+// alias_scope_target_a.sf and alias_scope_target_b.sf both declare `Marker`,
+// both declare `who()`, and both declare `label`. They are the #123 fixtures,
+// reused here precisely because they collide on every kind of top-level name.
+import "../fixtures/alias_scope_target_a.sf" as TargetA
+import "../fixtures/alias_scope_target_b.sf" as TargetB
+import "@test" as Test
+
+// Functions and module globals sharing a name across two modules.
+Test.assert_eq(TargetA.who(), "target-a", "same function name in two modules")
+Test.assert_eq(TargetB.who(), "target-b", "the other module's is distinct")
+Test.assert_eq(TargetA.label, "target-a-global", "same global name in two modules")
+Test.assert_eq(TargetB.label, "target-b-global", "the other module's is distinct")
+
+// Both modules' `Marker` is constructible. The two constructors resolve to
+// distinct symbols (@fixtures_alias_scope_target_a_Marker and ..._b_Marker in
+// the IR), which is the part #168 must not break.
+//
+// Their METHODS are deliberately not asserted here: `ma.describe()` binds to
+// target_b's describe for both receivers, even with an explicit
+// `TargetA.Marker` annotation, because find_class_for_method scans
+// class_methods globally and takes the first class holding the name. That is
+// BUGS #161, it predates this change (gen2 and gen3 emit the identical wrong
+// call), and pinning it here would make this file fail for a reason that has
+// nothing to do with duplicate declarations.
+var ma = TargetA.Marker("x")
+var mb = TargetB.Marker("x")
+Test.assert(ma != nil, "module A's Marker constructs")
+Test.assert(mb != nil, "module B's Marker constructs")
+
+// A local declaration may share a name with an imported one: the local wins
+// outright (check_program sets registering_local for exactly this), and that is
+// still one declaration per file, so the pass has nothing to report.
+class Marker {
+    var tag: String
+    fun init(tag: String) { this.tag = tag }
+    fun describe(): String { return "local:" + this.tag }
+}
+var local_marker = Marker("y")
+Test.assert_eq(local_marker.describe(), "local:y", "a local class may shadow an imported name")
+
+// Several kinds in one file, one name each: distinct names never collide no
+// matter how many introducing keywords are in play.
+enum Colour { Red, Green }
+interface Named { fun name_of(): String }
+actor Counter {
+    var n: Int
+    fun init() { this.n = 0 }
+    fun get(): Int { return this.n }
+}
+Test.assert(Colour.Red == Colour.Red, "an enum alongside a class is fine")
+Test.assert_eq(Counter().get(), 0, "an actor alongside a class and an enum is fine")
+
+Test.summary()

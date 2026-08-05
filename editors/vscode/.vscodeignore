@@ -1,0 +1,14 @@
+# What NOT to put in the .vsix.
+#
+# out/ holds only the compiled extension client; the LSP server lives in
+# ../shared and is located at runtime (see findServer in src/extension.ts), so it
+# is deliberately not bundled. `out/server.js` was a stale artifact from an older
+# layout that vsce happily packaged — dead weight that read like the real server.
+out/server.js
+src/**
+tsconfig.json
+node_modules/typescript/**
+node_modules/@types/**
+package-lock.json
+.gitignore
+**/*.map

@@ -227,10 +227,34 @@ class TypeEnv {
         return AST.Type.AnyType
     }
 
-    // String wrapper for backward compat
+    // The declared return type as a string, rendered the way the type PARSER
+    // spells it rather than the way a diagnostic does.
+    //
+    // This used to render through `AST.type_to_string`, which is deliberately
+    // lossy: `GenericType(base, args)` collapses to the bare `base`, so a
+    // function declared `List<String>` came back as the string "List", and a
+    // union came back as the literal word "Union". Both losses were live:
+    //
+    //   - `infer_call` and `infer_method_call` each guard a branch on
+    //     `ret.contains("<")`, and neither could ever be entered, because the
+    //     one renderer feeding them had already removed the "<". Every
+    //     generic-returning function inferred as bare `List`, which is why
+    //     `var n = names()` then `n[0]` warned "cannot infer type" while the
+    //     identical read through an annotated variable did not — variables are
+    //     stored as nodes and never went through this function.
+    //   - `is_type_param("Union")` answers TRUE (uppercase first letter, not a
+    //     known class), so a union-returning function's return type was being
+    //     fed to `resolve_type_params` as though "Union" were a type parameter
+    //     to resolve from the argument list.
+    //
+    // `type_to_source` is the renderer whose output `parse_type_ast` reads back,
+    // so it keeps the type arguments and spells a union with its members. That
+    // is what every caller here actually wanted: all six of them treat the
+    // result as a type to compare, substitute into, or hand back as an inferred
+    // type, and none of them is printing it to a user.
     fun get_func_ret(name: String): String {
         var t: AST.Type = this.get_func_ret_type(name)
-        return AST.type_to_string(t)
+        return AST.type_to_source(t)
     }
 }
 
@@ -785,27 +809,11 @@ class NullChecker {
         return false
     }
 
-    fun strip_nil(typ: String): String {
-        if (typ == "Nil") return "Nil"
-        // Shorthand: "String?" → "String"
-        if (typ.ends_with("?")) {
-            return typ.slice(0, typ.length() - 1)
-        }
-        if (!typ.contains("|")) return typ
-        var parts: List<String> = typ.split("|")
-        var filtered: List<String> = []
-        var i: Float = 0
-        while (i < parts.length()) {
-            if (parts[i] != "Nil") {
-                filtered.push(parts[i])
-            }
-            i = i + 1
-        }
-        if (filtered.length() == 0) return "Nil"
-        if (filtered.length() == 1) return filtered[0]
-        return filtered.join("|")
-    }
-
+    // `strip_nil(typ: String)` used to sit here, doing the same job by splitting on
+    // "|" and slicing a trailing "?". It had no callers left once
+    // `strip_nil_from_node` existed, and a dead string twin of a live node function
+    // is worse than no twin: the next person to need nil-stripping had two
+    // implementations to choose between, only one of which is exercised by anything.
     fun strip_nil_from_node(t: AST.Type): AST.Type {
         return match (t) {
             UnionType(types) => {
@@ -1221,6 +1229,11 @@ class NullChecker {
         // ordinary, so neither earlier walk has the information when it passes the
         // declaration. Signatures only; it never descends into a body.
         this.check_leaks(stmts)
+        // Fifth pass: two type declarations in this file binding one name. Its
+        // own pass over `stmts` for the same reason check_leaks is one — it must
+        // see only the module under check, not the imported declarations that
+        // registration also walked.
+        this.check_duplicate_decls(stmts)
     }
 
     fun check_conformance() {
@@ -1917,6 +1930,82 @@ class NullChecker {
         this.report_leak(subject, position, leaked, spelling)
     }
 
+    /// The name a duplicate-declaration diagnostic should use for a statement's
+    /// introducing keyword. `class`, `interface` and `actor` all parse into one
+    /// ClassDecl, so the keyword is read from `introducer` rather than guessed —
+    /// the same reason check_condition reads it (BUGS #159).
+    fun decl_kind_of(stmt: AST.Stmt): String {
+        return match (stmt) {
+            ClassDecl(n, tp, ps, fs, ms, d, v, __ns, __fs, intro) => intro
+            EnumDecl(n, vs, d, v, __ns, __fs) => "enum"
+            _ => ""
+        }
+    }
+
+    /// The name a type declaration binds, or "" if the statement is not one.
+    fun decl_type_name_of(stmt: AST.Stmt): String {
+        return match (stmt) {
+            ClassDecl(n, tp, ps, fs, ms, d, v, __ns, __fs, intro) => n
+            EnumDecl(n, vs, d, v, __ns, __fs) => n
+            _ => ""
+        }
+    }
+
+    /// Reject two top-level type declarations that bind the same name.
+    ///
+    /// A fifth pass over the module's own statements, and deliberately scoped to
+    /// those: registration is fed imported declarations too, and two MODULES
+    /// declaring the same class is legal and already handled by
+    /// register_class_identity's prefix keying (the `Response` collision). The
+    /// error here is two declarations in ONE file, where there is no prefix to
+    /// tell them apart and the second silently overwrites the first's entry in
+    /// class_fields.
+    ///
+    /// Silently is the whole harm. `class Foo { var a: Int }` followed by
+    /// `class Foo { var b: String }` type checked against the SECOND Foo's fields
+    /// while codegen emitted a read of the FIRST one's slot 0 — `f.b` compiled
+    /// clean and printed the other class's `a`. That is BUGS #148's shape
+    /// (a nonexistent member reading field 0) reached by a different route, and
+    /// the reason this is a checker error rather than a warning.
+    ///
+    /// Types only — `class`, `interface`, `actor`, `enum`. Duplicate `fun` and
+    /// duplicate `var` are also silent (the last declaration wins) and are NOT
+    /// covered here: a function is genuinely redeclarable in the stdlib's
+    /// prelude-ish files today, and folding both in would turn one bug into a
+    /// broad source-compatibility change. Those stay open; this closes the case
+    /// where the winner and the layout disagree.
+    fun check_duplicate_decls(stmts: List<AST.Stmt>) {
+        var seen: Map<String, String> = {}
+        var i: Float = 0
+        while (i < stmts.length()) {
+            var dname: String = this.decl_type_name_of(stmts[i])
+            if (dname.length() > 0) {
+                if (seen.has(dname)) {
+                    var first_kind: String = seen.get(dname)
+                    var this_kind: String = this.decl_kind_of(stmts[i])
+                    // The tail names the consequence rather than restating the
+                    // rule, but only claims the layout disagreement where it
+                    // actually applies. Two classes DO diverge that way — the
+                    // checker takes the second's fields, codegen the first's
+                    // slots. An enum on either side is a plainer overwrite: the
+                    // later declaration wins the name everywhere, so saying
+                    // "field access reads the first one's layout" would be a
+                    // wrong explanation attached to a right error.
+                    var tail: String = " silently replaces the first"
+                    if (first_kind != "enum" and this_kind != "enum") {
+                        tail = " silently replaces the first for type checking, while field access still reads the first one's layout"
+                    }
+                    this.error("duplicate declaration of '" + dname + "': already declared as "
+                        + first_kind + " '" + dname + "' in this file; the second "
+                        + this_kind + tail)
+                } else {
+                    seen.set(dname, this.decl_kind_of(stmts[i]))
+                }
+            }
+            i = i + 1
+        }
+    }
+
     /// The leak pass: a public declaration must not expose a private type in its
     /// signature (§6b). A fourth pass, sibling to check_conformance, run after
     /// registration — it needs EVERY declaration's visibility resolved before it
@@ -2088,10 +2177,20 @@ class NullChecker {
     /// "traded one silent wrong answer for a batch of false rejections". So that
     /// case warns. The asymmetry is deliberate — say what you know, and say when
     /// you do not know.
-    fun check_var_leaks(name: String, type_ann: String, initializer: AST.Expr, visibility: String) {
+    fun check_var_leaks(name: String, type_ann: AST.Type, initializer: AST.Expr, visibility: String) {
         var subject: String = this.exposure_label(visibility) + " var '" + name + "'"
-        if (type_ann != "Any" and type_ann.length() > 0) {
-            this.check_leak(subject, "its declared type", type_ann)
+        // Another `!= "Any" and length() > 0` that was two questions in one guard,
+        // and here they happen to want the same answer for different reasons: an
+        // omitted annotation has no type names to scan, and `: Any` names only a
+        // builtin. Both fall through to the initializer-based check below. Spelling
+        // them as two tests keeps that a stated coincidence rather than an accident
+        // of the encoding — if `: Any` ever needs to suppress the inference warning
+        // (the author did say Any), it is one arm to change.
+        if (!this.is_unknown_type(type_ann) and !this.is_any_type(type_ann)) {
+            // check_leak scans a rendered type for private names, so it needs the
+            // faithful spelling: `type_to_str` collapses a declared function type to
+            // "Fun", hiding a private type in its parameter or return position.
+            this.check_leak(subject, "its declared type", AST.type_to_source(type_ann))
             return nil
         }
         // No annotation: look for a constructor call in the initializer.
@@ -2597,23 +2696,34 @@ class NullChecker {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
-                // type_ann is a raw String on the AST (ast.sf VarDecl.type_ann),
-                // NOT an AST.Type node. Passing it straight to the node-typed
+                // type_ann is an AST.Type node now, so there is nothing to parse
+                // and nothing to re-render before asking a type question. It was a
+                // String, and passing that String straight to the node-typed
                 // helpers (type_node_to_string / is_nullable_type / define_var)
                 // made every match arm miss and fall through to the first one —
                 // so every declared variable's stored type collapsed to Int, and
                 // `match (d)` on an enum variable saw Int, missed enum_variants,
-                // and silently skipped the exhaustiveness check. Parse it first.
-                var type_ann_str: String = type_ann
-                var type_ann_node: AST.Type = this.parse_type_node(type_ann)
-                // Emptiness, not `!= "Any"`. The parser now writes "" for an
-                // omitted annotation, so an explicit `: Any` reaches this branch
-                // and widens the binding as written. It used to fall to the
-                // infer-from-initializer branch below and bind the initializer's
-                // type instead, which meant `: Any` could not widen anything —
-                // BUGS #147, found because #139's documented workaround
+                // and silently skipped the exhaustiveness check. That whole class
+                // of defect is unrepresentable once the field carries the node.
+                var type_ann_node: AST.Type = type_ann
+                // `type_to_source`, not `type_to_str`: this string is what the two
+                // diagnostics below print, and the value it replaces was the raw
+                // `parse_type()` text, which type_to_source reproduces exactly.
+                // type_to_str would collapse a declared function type to the bare
+                // word "Fun", so `var f: Fun(Int):Bool = 1` would name a type the
+                // author did not write. Neither spelling changes what
+                // scalar_mismatch decides — a function type is not a scalar either
+                // way — so this is purely about the message.
+                var type_ann_str: String = AST.type_to_source(type_ann_node)
+                // `UnknownType`, not "was the rendered string empty". An omitted
+                // annotation and an explicit `: Any` are two different nodes, so
+                // this asks one question instead of the old two-in-one. `: Any`
+                // reaches this branch and widens the binding as written; it used
+                // to fall to the infer-from-initializer branch below and bind the
+                // initializer's type instead, which meant `: Any` could not widen
+                // anything — BUGS #147, found because #139's documented workaround
                 // (`var data: Any = ...`) silently failed to launder.
-                if (type_ann_str.length() > 0) {
+                if (!this.is_unknown_type(type_ann_node)) {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.
@@ -3049,25 +3159,16 @@ class NullChecker {
         return this.extract_var_from_nil_check(right, left)
     }
 
-    fun get_eq_nil_var_name(expr: AST.Expr): String {
-        // For Binary(left, "==", right), extract variable name if one side is NilLit
-        var ek: String = this.classify_cond(expr)
-        if (ek != "binary") return ""
-        var left_expr: AST.Expr = this.get_binary_left(expr)
-        var right_expr: AST.Expr = this.get_binary_right(expr)
-        var left_name: String = this.extract_var_from_nil_check(left_expr, right_expr)
-        if (left_name.length() > 0) return left_name
-        return this.extract_var_from_nil_check(right_expr, left_expr)
-    }
-
-    fun extract_is_check_var(cond: AST.Expr): String {
-        // Get the value expression from IsCheck, then get its variable name
-        var val_expr: AST.Expr = match (cond) {
-            IsCheck(val, typ) => val
-            _ => AST.Expr.NilLit
-        }
-        return this.get_variable_name_from_expr(val_expr)
-    }
+    // Three dead functions used to sit here: `get_eq_nil_var_name`,
+    // `get_expr_var_name` and `extract_is_check_var`. The first two had *identical*
+    // bodies, and their comments disagreed about which operator they were for —
+    // one said `==`, the other `!=`, and neither body looked at the operator at all.
+    // Both were the same code as `nil_check_var_from_binary` above, reached through
+    // `classify_cond` instead of a match. Nothing called any of the three.
+    //
+    // Worth noting for the next reader: a comment on dead code cannot be wrong in a
+    // way anything detects, so two copies drifted into claiming opposite things
+    // while doing the same thing. `nil_check_var_from_binary` is the live one.
 
     fun get_variable_name_from_expr(expr: AST.Expr): String {
         return match (expr) {
@@ -3075,17 +3176,6 @@ class NullChecker {
             Ref(rk, rn, rs, __rs) => rn
             _ => ""
         }
-    }
-
-    fun get_expr_var_name(expr: AST.Expr): String {
-        // For Binary(left, "!=", right), extract variable name if one side is NilLit
-        var ek: String = this.classify_cond(expr)
-        if (ek != "binary") return ""
-        var left_expr: AST.Expr = this.get_binary_left(expr)
-        var right_expr: AST.Expr = this.get_binary_right(expr)
-        var left_name: String = this.extract_var_from_nil_check(left_expr, right_expr)
-        if (left_name.length() > 0) return left_name
-        return this.extract_var_from_nil_check(right_expr, left_expr)
     }
 
     fun classify_cond(expr: AST.Expr): String {
@@ -3173,7 +3263,7 @@ class NullChecker {
                 }
                 this.env.get_var_type(rname)
             }
-            Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
+            Binary(left, op, right) => this.infer_binary_node(left, op, right)
             // `!` is a condition site too (BUGS #143) and its RESULT is Bool,
             // not the operand's type — returning the operand type made `!42`
             // infer as Int, which then passed as a condition and as an Int
@@ -3185,8 +3275,42 @@ class NullChecker {
                 }
                 _ => this.infer_type(right)
             }
+            // The four remaining `parse_type_node(this.infer_*())` arms —
+            // this one, `MemberAccess`, `Match` and `MethodCall` — look like the
+            // same round trip that `infer_binary` and `check_assign` were, and
+            // they are NOT. Recording that here because the migration checklist
+            // in docs/design/compiler-rewrite.md listed all six together, and
+            // acting on that list without reading the bodies would have been a
+            // mechanical rewrite of four functions that do genuine string work:
+            //
+            //   infer_call         builds its answer from `env.get_func_ret`,
+            //                      `resolve_type_params` and `resolve_generic_return`
+            //                      — string surgery on comma-joined param lists.
+            //   infer_member_access  ends `return field`, the FIELD NAME, as the
+            //                      type when no class resolves. A bare name is
+            //                      indistinguishable from a class type in this
+            //                      encoding, which is exactly what I3 exists to
+            //                      remove — but removing it changes what the
+            //                      fallback MEANS, not just how it is spelled.
+            //   infer_match        unifies arm types by string concatenation
+            //                      (`result_type + "|" + arm_type`) and consults
+            //                      `get_enum_binding_type`, also strings.
+            //   infer_method_call  the largest of the four, with
+            //                      `substitute_class_type_params` and the Map
+            //                      K/V extractors all keyed off rendered forms.
+            //
+            // So these four are blocked on the string-surgery helpers below them
+            // (`generic_base` with 23 callers, `fun_param_types_of` with 13, and
+            // ten more), not on the arm. Migrating an arm whose body cannot yet
+            // answer in nodes would mean building the node from a string one line
+            // lower down — the same round trip, moved, and harder to find.
+            //
+            // What reading them for this DID find is BUGS #169: `get_func_ret`
+            // rendered through the lossy `type_to_string`, so two branches guarded
+            // on `ret.contains("<")` could never run. That is the argument for
+            // classifying before migrating.
             Call(callee, args, __cs) => this.parse_type_node(this.infer_call(callee, args))
-            Assign(name, value, __as) => this.parse_type_node(this.check_assign(name, value, __as))
+            Assign(name, value, __as) => this.check_assign_node(name, value, __as)
             // Both operands are code, so walk them. Returning BoolType without
             // visiting `left` and `right` meant a variable used ONLY inside an
             // `and`/`or` operand was never marked used and drew a false "unused
@@ -3698,25 +3822,52 @@ class NullChecker {
         return this.substitute_class_type_params(ret, recv_type)
     }
 
-    fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
-        var lt: String = this.infer_expr(left)
-        var rt: String = this.infer_expr(right)
+    // The type of a binary expression, as a node.
+    //
+    // This replaced `infer_binary(...): String`, whose result `infer_type` fed
+    // straight back into `parse_type_node` — a node → string → node round trip
+    // inside one function, for no reason but that the middle step was how the
+    // function had always been written.
+    //
+    // The decision logic is unchanged, deliberately: same operator sets, same
+    // order, same `Any`-absorbs-the-other rule, same `Int` fallback. What changes
+    // is only that the answer is not rendered and re-parsed on the way out, so the
+    // `lt == rt` path — the one that returns an *operand's* type rather than a
+    // literal spelling — no longer loses whatever `parse_type_node` cannot rebuild.
+    // It cannot rebuild a `FuncType` (`type_to_str` renders every one as the bare
+    // "Fun", which comes back as `ClassType("Fun")`) and it never produces an
+    // `EnumType` at all (every unrecognised name becomes a `ClassType`).
+    //
+    // Operand comparison stays on the rendered form via `type_to_str`. That is not
+    // an oversight: there is no node equality function, and `is_subtype_node`
+    // itself compares two rendered strings. Writing one here would be a second,
+    // separate change with its own false-positive surface — the comparisons below
+    // decide the *result type*, and a stricter equality would silently reroute
+    // pairs that currently take `lt == rt` into the `Int` fallback.
+    fun infer_binary_node(left: AST.Expr, op: String, right: AST.Expr): AST.Type {
+        var ln: AST.Type = this.infer_type(left)
+        var rn: AST.Type = this.infer_type(right)
         if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
-            return "Bool"
+            return AST.Type.BoolType
         }
+        var lt: String = this.type_to_str(ln)
+        var rt: String = this.type_to_str(rn)
         if (op == "+") {
-            if (lt == "String" or rt == "String") return "String"
+            if (lt == "String" or rt == "String") return AST.Type.StringType
         }
-        if (lt == rt) return lt
-        if (lt == "Any") return rt
-        if (rt == "Any") return lt
-        return "Int"
+        if (lt == rt) return ln
+        if (lt == "Any") return rn
+        if (rt == "Any") return ln
+        return AST.Type.IntType
     }
 
-    fun infer_unary(op: String, right: AST.Expr): String {
-        if (op == "!") return "Bool"
-        return this.infer_expr(right)
-    }
+    // `infer_unary(op, right)` used to sit here and was dead. Its live replacement
+    // is `infer_type`'s `Unary` arm, which does strictly more: on `!` it calls
+    // `check_condition(right, "`!`")` before answering BoolType, so the operand is
+    // both type-checked and walked. This version answered "Bool" without looking at
+    // the operand — the same un-walked-subtree shape as BUGS #133/#121/#126, except
+    // that nothing reached it, so it never cost a false "unused variable".
+    // A dead copy of a checking function is a checking hole waiting for a caller.
 
     // Check if a type string is a type parameter (e.g., "T", "U", "V", "Element")
     // Type parameters are: single uppercase letters, or names that aren't known
@@ -3730,6 +3881,17 @@ class NullChecker {
         if (typ == "StringBuilder") return false
         if (typ.contains("<")) return false
         if (typ.contains("|")) return false
+        // A function type spelled the way `AST.type_to_source` spells it:
+        // "Fun(Int):Int", or bare "Fun" caught by the equality above. The bare
+        // form was the only one that could arrive here while `get_func_ret`
+        // rendered through the lossy `type_to_string`; now that it renders
+        // through `type_to_source`, the parameter list and return type come with
+        // it, and "Fun(Int):Int" would otherwise pass every test below — no "<",
+        // no "|", uppercase first letter, not a declared class — and be handed to
+        // `resolve_type_params` as though it were a type parameter named
+        // "Fun(Int):Int". Keyed on the punctuation rather than the "Fun" prefix
+        // so a user class actually named `Function` is unaffected.
+        if (typ.contains("(")) return false
         // Single uppercase letter: definitely a type param
         if (typ.length() == 1) {
             var ch: String = typ.char_at(0)
@@ -3963,8 +4125,30 @@ class NullChecker {
     // The declared type is the one that constrains the store, so this asks
     // `get_declared_var_type` rather than `get_var`; see the note there for the
     // narrowing case it would otherwise reject.
-    fun check_assign(name: String, value: AST.Expr, name_span: AST.Span): String {
-        var val_type: String = this.infer_expr(value)
+    // Type-check `name = value` and answer the assignment's own type, as a node.
+    //
+    // This replaced `check_assign(...): String`, whose result `infer_type` fed
+    // straight back into `parse_type_node`. That was a genuine round trip and not
+    // merely a string-typed signature: the value returned IS `infer_type(value)`,
+    // so a node was rendered and re-parsed with nothing in between reading the
+    // string form. Worth naming because the round trip is not faithful — an
+    // assignment whose value is a lambda came back as `ClassType("Fun")` rather
+    // than the `FuncType` it started as, since `type_to_str` collapses every
+    // function type to the bare word "Fun" and `parse_type_node` has no arm that
+    // reads it back. Nothing observable depended on that, because assignment is a
+    // statement here and its value is almost never consumed — but "almost never
+    // consumed" is the wrong reason for a type to be wrong.
+    //
+    // The two checks below are unchanged, deliberately, including which form each
+    // one asks. The nullability guard keeps asking the NODE (`decl_node`), and
+    // `scalar_mismatch` keeps receiving `AST.type_to_string`'s lossy rendering,
+    // because that predicate's whole proof set is written against the lossy
+    // spellings — "Union" as a word, a generic collapsed to its base — and
+    // handing it the faithful form would widen what it fires on. That is the
+    // #155 false-positive surface, and it is not this change's to move.
+    fun check_assign_node(name: String, value: AST.Expr, name_span: AST.Span): AST.Type {
+        var val_node: AST.Type = this.infer_type(value)
+        var val_type: String = this.type_to_str(val_node)
         var decl_node: AST.Type = this.env.get_declared_var_type(name)
         var var_type: String = this.env.get_var(name)
         // Ask the NODE whether the binding is nullable, not the rendered string.
@@ -3986,7 +4170,7 @@ class NullChecker {
         if (this.scalar_mismatch(decl_type, val_type)) {
             this.error_at(name_span, name + ": cannot assign " + val_type + " to " + decl_type + " variable")
         }
-        return val_type
+        return val_node
     }
 
     // --- Method call inference (the key null-safety check) ---
