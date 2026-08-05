@@ -117,11 +117,38 @@
 # `pass/cond_class_enum_ok.sf` is the deliberate record of the let-through set
 # (interface-typed and union-typed conditions still compile), so the boundary is
 # asserted in a test rather than only argued in BUGS.md.
+#
+# Updated 2026-08-04 at the #164/#165 work: 302 passed, 9 failed, 14 skipped.
+# ONE NAME ADDED, pass/check_module_imports, and it is added under protest — the
+# test is right, the compiler is wrong, and the bug is BUGS #162 (an object held
+# only in an LLVM SSA temp is never rooted, so a collection frees it) rather than
+# anything in #164's duplicate-declaration pass.
+#
+# The evidence, because "my change is innocent" is exactly the claim that needs
+# it. check_module_imports runs the checker IN-PROCESS, so it executes the new
+# pass. Neutralising the pass to `if (stmts.length() >= 0) { return }` placed
+# AFTER its `var seen: Map<String, String> = {}` still segfaults; moving the same
+# early return BEFORE the Map allocation passes. One extra Map allocation per
+# module checked is the entire difference. `GC.disable()` also makes the test pass
+# 4/4. So the pass's logic is not reachable by the crash — only its allocation is,
+# and what it perturbs is allocation timing.
+#
+# #165 fixed the runtime half of that family (six container constructors that
+# allocated child buffers while the parent was unrooted) and this test is not
+# fixed by it, which is the useful negative result: two independent layers, and
+# only one is closed. #162's own repro still yields 51 corrupted reads out of 200
+# after #165, unchanged. It is owned by the saffron_154 line, so it is recorded
+# here rather than fixed here.
+#
+# Removing this name again is the acceptance test for #162. If someone lands an
+# SSA-temp rooting fix in codegen, this is the test that should start passing
+# without being touched.
 
 async
 docstrings
 json
 oracle_enum_println
+pass/check_module_imports
 pass/deep_deserialize
 pass/expressions
 pass/overloading
