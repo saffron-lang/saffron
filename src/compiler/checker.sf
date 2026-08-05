@@ -2088,10 +2088,20 @@ class NullChecker {
     /// "traded one silent wrong answer for a batch of false rejections". So that
     /// case warns. The asymmetry is deliberate — say what you know, and say when
     /// you do not know.
-    fun check_var_leaks(name: String, type_ann: String, initializer: AST.Expr, visibility: String) {
+    fun check_var_leaks(name: String, type_ann: AST.Type, initializer: AST.Expr, visibility: String) {
         var subject: String = this.exposure_label(visibility) + " var '" + name + "'"
-        if (type_ann != "Any" and type_ann.length() > 0) {
-            this.check_leak(subject, "its declared type", type_ann)
+        // Another `!= "Any" and length() > 0` that was two questions in one guard,
+        // and here they happen to want the same answer for different reasons: an
+        // omitted annotation has no type names to scan, and `: Any` names only a
+        // builtin. Both fall through to the initializer-based check below. Spelling
+        // them as two tests keeps that a stated coincidence rather than an accident
+        // of the encoding — if `: Any` ever needs to suppress the inference warning
+        // (the author did say Any), it is one arm to change.
+        if (!this.is_unknown_type(type_ann) and !this.is_any_type(type_ann)) {
+            // check_leak scans a rendered type for private names, so it needs the
+            // faithful spelling: `type_to_str` collapses a declared function type to
+            // "Fun", hiding a private type in its parameter or return position.
+            this.check_leak(subject, "its declared type", AST.type_to_source(type_ann))
             return nil
         }
         // No annotation: look for a constructor call in the initializer.
@@ -2597,23 +2607,34 @@ class NullChecker {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
-                // type_ann is a raw String on the AST (ast.sf VarDecl.type_ann),
-                // NOT an AST.Type node. Passing it straight to the node-typed
+                // type_ann is an AST.Type node now, so there is nothing to parse
+                // and nothing to re-render before asking a type question. It was a
+                // String, and passing that String straight to the node-typed
                 // helpers (type_node_to_string / is_nullable_type / define_var)
                 // made every match arm miss and fall through to the first one —
                 // so every declared variable's stored type collapsed to Int, and
                 // `match (d)` on an enum variable saw Int, missed enum_variants,
-                // and silently skipped the exhaustiveness check. Parse it first.
-                var type_ann_str: String = type_ann
-                var type_ann_node: AST.Type = this.parse_type_node(type_ann)
-                // Emptiness, not `!= "Any"`. The parser now writes "" for an
-                // omitted annotation, so an explicit `: Any` reaches this branch
-                // and widens the binding as written. It used to fall to the
-                // infer-from-initializer branch below and bind the initializer's
-                // type instead, which meant `: Any` could not widen anything —
-                // BUGS #147, found because #139's documented workaround
+                // and silently skipped the exhaustiveness check. That whole class
+                // of defect is unrepresentable once the field carries the node.
+                var type_ann_node: AST.Type = type_ann
+                // `type_to_source`, not `type_to_str`: this string is what the two
+                // diagnostics below print, and the value it replaces was the raw
+                // `parse_type()` text, which type_to_source reproduces exactly.
+                // type_to_str would collapse a declared function type to the bare
+                // word "Fun", so `var f: Fun(Int):Bool = 1` would name a type the
+                // author did not write. Neither spelling changes what
+                // scalar_mismatch decides — a function type is not a scalar either
+                // way — so this is purely about the message.
+                var type_ann_str: String = AST.type_to_source(type_ann_node)
+                // `UnknownType`, not "was the rendered string empty". An omitted
+                // annotation and an explicit `: Any` are two different nodes, so
+                // this asks one question instead of the old two-in-one. `: Any`
+                // reaches this branch and widens the binding as written; it used
+                // to fall to the infer-from-initializer branch below and bind the
+                // initializer's type instead, which meant `: Any` could not widen
+                // anything — BUGS #147, found because #139's documented workaround
                 // (`var data: Any = ...`) silently failed to launder.
-                if (type_ann_str.length() > 0) {
+                if (!this.is_unknown_type(type_ann_node)) {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.

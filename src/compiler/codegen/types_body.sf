@@ -422,6 +422,36 @@
         }
     }
 
+    /// True when the author wrote `Any` — the honest "runtime decides", as opposed
+    /// to `is_unknown_type` above, which means inference has not answered yet.
+    ///
+    /// These two exist as separate predicates because the String encoding of
+    /// `VarDecl.type_ann` had no way to keep them apart, and the five global
+    /// pre-scans in codegen.sf all tested `vtype.length() == 0 or vtype == "Any"` —
+    /// one disjunction asking "was an annotation written" and "what does it say" at
+    /// the same time. Only the first question belongs in the infer-from-initializer
+    /// guard; answering both made an explicit `: Any` on a module-level global
+    /// unable to widen it, which is BUGS #160. Migrating the field to a node is
+    /// what made the two answerable separately.
+    fun is_any_type(t: AST.Type): Bool {
+        return match (t) {
+            AnyType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+            UnknownType => false
+            NeverType => false
+        }
+    }
+
     /// The return type to record in `func_ret_types` for a declaration.
     ///
     /// `func_ret_types` is read at every call site to type that call's result,

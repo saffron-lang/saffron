@@ -147,10 +147,23 @@ fun expr_to_source(expr: Any): String {
     }
 }
 
+/// A `var`'s declared type as a source suffix — `": Int"`, or `""` when the
+/// declaration carried no annotation.
+fun var_type_suffix(t: Any): String {
+    if (PubAst.type_is_unknown(t)) { return "" }
+    return ": " + PubAst.type_to_source(t)
+}
+
 /// Convert a statement back to source code.
 fun stmt_to_source(stmt: Any): String {
     return match (stmt) {
-        VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => "var " + name + ": " + type_ann + " = " + expr_to_source(init)
+        // The annotation is optional, and this printed `": " + type_ann`
+        // unconditionally — so an unannotated `var x = 1` rendered as
+        // `var x:  = 1`, which is not source this compiler would accept back. It
+        // could not be spotted from the field alone while the omission was spelled
+        // "", since concatenating "" produces exactly that stray colon; the node
+        // makes the absence a case you have to handle.
+        VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => "var " + name + var_type_suffix(type_ann) + " = " + expr_to_source(init)
         FunDecl(name, params, ret, body, doc, f_vis, __ns, __fs) => "fun " + name + "(...) { ... }"
         ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => "class " + name + " { ... }"
         EnumDecl(name, variants, doc, e_vis, __ns, __fs) => "enum " + name + " { ... }"

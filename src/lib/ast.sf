@@ -119,6 +119,31 @@ fun span_len(s: Span): Float { return InternalAst.span_len(s) }
 fun span_merge(a: Span, b: Span): Span { return InternalAst.span_merge(a, b) }
 fun span_to_string(s: Span): String { return InternalAst.span_to_string(s) }
 
+// Type rendering, re-exported for the same reason as the span accessors: a
+// consumer of `@ast` gets `Type` nodes off `VarDecl.type_ann`, `FunDecl.ret_type`
+// and `Param.type_ann`, and cannot render one without reaching past this module.
+//
+// Two renderers, deliberately. `type_to_source` round-trips — it is what to use
+// when the string goes back into source, a tooltip, or anything the author reads
+// as their own spelling. `type_to_string` is the diagnostic form and collapses
+// `Map<String,Int>` to "Map" and any union to the word "Union"; it is here because
+// the compiler's own comparisons are written against those spellings, not because
+// it is the one to prefer. See the note on both in src/compiler/ast.sf.
+fun type_to_source(t: Type): String { return InternalAst.type_to_source(t) }
+fun type_to_string(t: Type): String { return InternalAst.type_to_string(t) }
+
+/// True when no annotation was written — `VarDecl.type_ann` and `FunDecl.ret_type`
+/// both spell that `UnknownType`, and it is a different value from an explicit
+/// `: Any` (`AnyType`). A renderer that does not check this prints the literal word
+/// "Unknown" into user-facing text; one that checks the rendering instead of the
+/// node cannot tell an omission from a class someone named `Unknown`.
+fun type_is_unknown(t: Type): Bool {
+    return match (t) {
+        UnknownType => true
+        _ => false
+    }
+}
+
 // =============================================================================
 // AST Traversal
 // =============================================================================
