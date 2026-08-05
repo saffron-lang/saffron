@@ -511,10 +511,20 @@ Both halves are compiled, so a sweep over AST node shapes must cover
 
 ## Known Issues
 
-`BUGS.md` is the list. Its `## Open` heading carries the current count and the
-open numbers; trust that over any summary here, including this one. Do not read
-the count by measuring the section — `## Resolved` keeps closed entries in the
-file for their narratives, so the file is long by design.
+`BUGS.md` is the list. The count and open set are **derived, not stored**: run
+`tools/bugs.sh` to print them (`--check` also flags any FIXED-titled entry
+stranded in `## Open`). It reads the section an entry physically sits in — OPEN
+iff its `### N.` heading is above the first `## Resolved` — which is the one
+fact a merge cannot silently corrupt. `## Resolved` keeps closed entries in the
+file for their narratives, so the file is long by design; do not try to eyeball
+the count from its length.
+
+The header still carries a hand-written `**N open entries: #...**` tally for
+now. It is the single largest source of merge conflicts in this repo — every
+branch that opens or closes an entry rewrites that one line, and concurrent
+worktrees then collide on it — so trust `tools/bugs.sh` over it when they
+disagree, and expect the stored line to be retired once the in-flight worktree
+headers converge.
 
 The one long-standing design limitation:
 - **#2**: forward references in nested closures — compile-time local resolution,
