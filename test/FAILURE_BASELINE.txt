@@ -118,6 +118,64 @@
 # (interface-typed and union-typed conditions still compile), so the boundary is
 # asserted in a test rather than only argued in BUGS.md.
 #
+# Updated 2026-08-04 rebasing the lsp-symbol-payload line (located expression
+# diagnostics, WS1c) onto 9ca7def: 300 passed, 8 failed, 14 skipped, 0 known-fail.
+# The SET below is UNCHANGED — comm-diffed both directions, empty each way, no
+# name fixed and none regressed. The +1 over #159's 299 is this line's own
+# test/pass/located_checker_diagnostics.sf, confirmed PASS by name in the log.
+#
+# By now this file's own history has recorded SIX different `passed` totals
+# against the very same 8-name set — 286, 291, 295, 296, 299 and 300 — and not one
+# of the moves was a repair. Every one was tests arriving: #143's, #115/#117's,
+# the base's pass/explicit_any_annotation, #156/#157's pair, #159's three, and now
+# this line's one. Six totals, one set.
+#
+# The merge-check point two notes up applies to this rebase too, and this is the
+# case it was written for. #159 added two `hint` branches to the very same
+# `check_condition` line this line converted from `error` to `error_at` — so the
+# two changes were not merely in the same file, they were on the same statement.
+# Git flagged it, both sides were kept (the enum/class hints AND the span), and the
+# result was then verified three ways rather than assumed:
+#
+#   - fail/cond_not_bool_class and fail/cond_not_bool_enum are still REJECTED, so
+#     #159's rule still fires. Keeping a diagnostic's text while silently losing
+#     its trigger is the failure mode a green `passed` count would have hidden.
+#   - `--json` on a class-typed condition returns located:true with line 5,
+#     column 9 — the condition identifier itself, not the enclosing statement — so
+#     the span half works on the merged line, not just the message half.
+#   - the message carries #159's hint verbatim, so neither side was flattened into
+#     the other.
+#
+# A conflict here was the good outcome. Had git auto-merged these two edits, one
+# side would have been lost silently and every count in this file would still have
+# looked exactly like this.
+#
+# Confirmed 2026-08-04 with the BUGS #163 fix (three import-line defects): 308
+# passed, 8 failed, 14 skipped, 0 known-fail. The SET below is UNCHANGED --
+# comm-diffed both directions, empty each way. The +3 over the merged tree's 305
+# is this fix's own three tests, each traced BY NAME in the run's log:
+# fail/import_missing_from and fail/import_unquoted_path (both `rejected, exit 1`)
+# and pass/import_forms_ok. That is a SEVENTH total against the same 8-name set.
+#
+# One methodology note, because it cost a wrong answer once in this session: do
+# not `comm` this file directly. It is mostly comments, and `comm -23` happily
+# reported all ~130 comment lines as "fixed by your change" -- a diff that looks
+# alarming and means nothing. Strip them first:
+#
+#   grep -vE '^\s*#|^\s*$' test/FAILURE_BASELINE.txt | sort -u > /tmp/base.txt
+#
+# The extraction recipe at the top of this file produces names only, so only the
+# baseline side needs stripping. The header says to compare sets by name; this is
+# the mechanical corollary nobody had written down.
+#
+# Why an unchanged set is the load-bearing result here: two of the three fixes add
+# parse errors, so the risk is over-firing, and every import line in the tree
+# (411 `import "path"`, 7 `import { names } from "path"`) goes through the changed
+# code. A single over-fire would have taken out most of the suite at once. It is
+# also why bootstrap green proves little on its own -- the compiler's own source
+# contains no malformed import, so all three defects were invisible to the gen4
+# fixed point while fully present.
+#
 # Updated 2026-08-04 at the #164/#165 work: 302 passed, 9 failed, 14 skipped.
 # ONE NAME ADDED, pass/check_module_imports, and it is added under protest — the
 # test is right, the compiler is wrong, and the bug is BUGS #162 (an object held

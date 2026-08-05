@@ -1385,8 +1385,7 @@
             this.known_functions.push(xemit)
             this.extern_sigs.set(xemit, c_sig)
             this.extern_param_types.set(xemit, this.param_types_csv(this.get_fun_params(stmt)))
-            var xret: String = this.get_fun_ret(stmt)
-            if (xret.length() > 0) { this.func_ret_types.set(xemit, this.str_to_type(xret)) }
+            this.func_ret_types.set(xemit, this.ret_type_for_registration(this.get_fun_ret(stmt)))
             return nil
         }
 
@@ -1409,12 +1408,14 @@
         // gen_function runs falls back to Int and misdispatches every method on
         // the result (BUGS #33). gen_function still sets this, but only when it
         // reaches the declaration — too late for a caller appearing earlier.
-        var ret: String = this.get_fun_ret(stmt)
-        if (ret.length() > 0) {
-            this.func_ret_types.set(emit_name, this.str_to_type(ret))
-            if (prefix.length() > 0) {
-                this.func_ret_types.set(name, this.str_to_type(ret))
-            }
+        // No emptiness probe: `ret` is a node, and the old `length() > 0` was
+        // asking a question about a String that this call site could not fail —
+        // `stmt` is already known to be a FunDecl here. An omitted annotation
+        // registers as Nil, matching the stand-in the parser used to supply.
+        var ret: AST.Type = this.ret_type_for_registration(this.get_fun_ret(stmt))
+        this.func_ret_types.set(emit_name, ret)
+        if (prefix.length() > 0) {
+            this.func_ret_types.set(name, ret)
         }
     }
 

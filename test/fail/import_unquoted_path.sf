@@ -1,0 +1,9 @@
+// A module path must be a quoted string literal.
+//
+// The `match` that reads it defaults to "" on any other token and the parser
+// carried on, so this compiled clean and exited 0. `extract_imports` keys on the
+// literal `import "`, so an unquoted path resolved to nothing and the alias was
+// undefined at every use — blaming the use site for a malformed import line.
+import bananas as B
+
+IO.println(B.something())

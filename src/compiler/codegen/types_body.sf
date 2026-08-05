@@ -390,6 +390,59 @@
         }
     }
 
+    /// True when inference has not resolved this type — invariant I2's marker.
+    ///
+    /// Codegen needs this because a FunDecl's `ret_type` is now a node, and an
+    /// *omitted* return annotation is `UnknownType` rather than a sentinel type
+    /// name. The pre-registration sites used to ask `ret.length() > 0` of the
+    /// String they got back, which answered "is this a FunDecl at all" and could
+    /// not answer "did the author write an annotation" — the two questions the
+    /// old encoding conflated.
+    ///
+    /// Every variant is spelled out rather than using `_ =>`, because a wildcard
+    /// arm here would keep answering after a new variant is added to `Type`,
+    /// and answering wrongly (BUGS #76: a missing arm yields an indeterminate
+    /// value, so an over-broad one is the safer-looking of two bad options).
+    fun is_unknown_type(t: AST.Type): Bool {
+        return match (t) {
+            UnknownType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+            NeverType => false
+        }
+    }
+
+    /// The return type to record in `func_ret_types` for a declaration.
+    ///
+    /// `func_ret_types` is read at every call site to type that call's result,
+    /// and invariant I2 keeps `UnknownType` out of those readers. The old
+    /// encoding could not produce one: an omitted return annotation arrived here
+    /// as a sentinel *type name* — `"Nil"` for a FunDecl — so every reader saw a
+    /// real type whether or not the author wrote one. Collapsing back to Nil
+    /// leaves all of them seeing exactly what they saw before, which is what
+    /// keeps this migration confined to the parser and the checker.
+    ///
+    /// The collapse is the slice's remaining debt, not its intent. A later slice
+    /// teaches the call-site typing to ask "was anything declared?" rather than
+    /// reading a stand-in type, and this function goes away with the question.
+    /// Lambdas are the exception and are handled in `gen_function`: their omitted
+    /// annotation used a *different* sentinel, `"Int"`, whose whole effect was to
+    /// switch the implicit-return path on.
+    fun ret_type_for_registration(t: AST.Type): AST.Type {
+        if (this.is_unknown_type(t)) { return AST.Type.NilType }
+        return t
+    }
+
     fun is_list_type(t: AST.Type): Bool {
         return match (t) {
             GenericType(base, args) => base == "List"

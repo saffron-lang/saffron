@@ -235,11 +235,18 @@ fun stmt_doc(stmt: Stmt): String {
     }
 }
 
-/// Get the return type of a function declaration.
-fun fun_ret_type(stmt: Stmt): String {
+/// Get the declared return type of a function declaration, as a `Type` node.
+///
+/// This was a `String` and returned "" for a non-FunDecl. Both facts changed with
+/// the field: the type is a node, and the not-a-function answer is `UnknownType`
+/// — which is also what a FunDecl with *no* declared return type carries. A caller
+/// that needs to tell those two apart should ask `is_fun` first; a caller that
+/// wants a string should render with `type_to_source`, which round-trips, rather
+/// than `type_to_string`, which collapses generics and unions for diagnostics.
+fun fun_ret_type(stmt: Stmt): Type {
     return match (stmt) {
         FunDecl(name, params, ret_type, body, docstring, f_vis, __ns, __fs) => ret_type
-        _ => ""
+        _ => InternalAst.Type.UnknownType
     }
 }
 

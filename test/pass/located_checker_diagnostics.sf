@@ -1,0 +1,173 @@
+// Checker diagnostics about an *expression* carry a source location, and that
+// location points at the right bytes.
+//
+// This is the half of Stage 0 that `test/pass/expr_spans.sf` does not cover.
+// That file asserts the parser puts spans on the AST; this one asserts they
+// survive all the way into a diagnostic a client can jump to. Both are needed:
+// a span can be correct on the node and still be dropped on the way out, which
+// is exactly what happened for the whole life of the checker — `error(msg)`
+// pushed a bare string, so a type error reached the editor with no position at
+// all and could not be shown in place.
+//
+// WHY THIS SHELLS OUT TO THE COMPILER. Same reason as
+// test/pass/unused_var_callee_position.sf: the thing under test IS a diagnostic,
+// and a pass test cannot observe one from the inside. Worse here, because
+// tools/run_tests.sh's filter_noise() strips every `[checker] Warning` line out
+// of a test's captured output, and a checker *error* aborts the compile — so a
+// test that tried to provoke one in its own source would simply fail to build.
+// Each case below writes a tiny program, runs the compiler on it in --json mode,
+// and reads the diagnostic back as data.
+//
+// WHY IT ASSERTS ON SLICES, NOT ON line/col. A line/col that reads plausibly can
+// still be one byte off, and `3:19` looks just as right whether it lands on `n`
+// or on the space before it. Every assertion here slices the ORIGINAL source
+// with offset+length and compares the text. If the slice is not the expression
+// the message is about, the span is wrong no matter how good the numbers look.
+//
+// WHAT IS DELIBERATELY NOT LOCATED. The last case asserts a diagnostic comes
+// back UNlocated, and that is the point rather than a gap: `AST.expr_span`
+// answers `span_none()` for any expression that carries no span of its own (a
+// literal, a `Binary`, a `Unary`), and it does not descend into children to find
+// one. A span pointing at a sub-expression the message is not about would be
+// worse than an absent one, because a reader trusts a location that is there.
+import "@test" as Test
+import "@os" as OS
+import "@json" as JSON
+
+// The compiler under test is the one that built this file: tools/saffron invokes
+// build/saffronc from the repo root and the tests run from the repo root.
+//
+// The output path is /dev/null and contains no ".sf" — saffronc picks its input
+// by contains(".sf") on the last matching argument, so an `out.sf.ll` would
+// silently become the input, the real file would never be read, and every case
+// here would find no diagnostic and pass vacuously (BUGS #119).
+fun compile_json(src: String, tag: String): Any {
+    var src_path: String = "/tmp/saffron_locdiag_" + tag + ".sf"
+    IO.write_file(src_path, src)
+    var out: String = OS.exec("build/saffronc --json " + src_path + " /dev/null 2>&1")
+    return JSON.parse(out)
+}
+
+// The first error diagnostic whose message contains `needle`, or nil.
+//
+// Matched by substring rather than by index, so a case does not silently start
+// asserting about a *different* diagnostic when the checker gains an unrelated
+// one. `severity` is filtered to errors for the same reason: the unused-variable
+// warning fires in several of these fixtures and is not what any of them is about.
+fun find_error(data: Any, needle: String): Any {
+    var diags: Any = data.get("diagnostics")
+    var n: Float = diags.length()
+    var i: Float = 0
+    while (i < n) {
+        var d: Any = diags[i]
+        if (d.get("severity") == "error" and d.get("message").contains(needle)) {
+            return d
+        }
+        i = i + 1
+    }
+    return nil
+}
+
+// The source text a located diagnostic points at.
+//
+// Answers a distinguishable sentinel rather than "" for each way this can go
+// wrong, so a failure says which one happened: a missing diagnostic and an
+// unlocated one are different bugs and an empty slice would conflate them with
+// a span of length zero.
+fun span_text(src: String, data: Any, needle: String): String {
+    var d: Any = find_error(data, needle)
+    if (d == nil) { return "<no such diagnostic>" }
+    if (!d.get("located")) { return "<unlocated>" }
+    var off: Float = d.get("offset")
+    var len: Float = d.get("length")
+    return src.slice(off, off + len)
+}
+
+// --- A guard on the harness itself -------------------------------------------
+//
+// If the compiler path were wrong, or the input were never read, every
+// assertion below would compare a sentinel against a sentinel or find nothing,
+// and the "must be located" cases would fail loudly rather than pass — but the
+// UNlocated case at the bottom would pass for entirely the wrong reason. So
+// establish first that this harness sees a diagnostic at all.
+var harness_src: String = "var bad: Int = \"nope\"\n"
+var harness: Any = compile_json(harness_src, "harness")
+Test.assert(find_error(harness, "Int") != nil,
+    "HARNESS: the compiler runs and its --json diagnostics parse")
+
+// --- Argument type mismatch: point at the ARGUMENT, not at the call -----------
+//
+// The most common expression-level type error there is, and the one that had no
+// position at all before this. check_call_args asks about `args[i]` rather than
+// about the call, so the span is the offending argument alone: underlining the
+// whole call would make the reader hunt for which argument is meant.
+var arg_src: String = "fun take(s: String): Int { return 1 }\nvar n: Int = 3\nvar r: Int = take(n)\n"
+var arg: Any = compile_json(arg_src, "arg")
+Test.assert_eq(span_text(arg_src, arg, "argument 1"), "n",
+    "argument mismatch points at the argument, not the whole call")
+
+// The same fixture pins the *numbers* too, once, so a slice that is right by
+// accident (offset and length both shifted onto another `n`) cannot hide. Every
+// other case below asserts the slice only, which is the stronger check.
+var arg_diag: Any = find_error(arg, "argument 1")
+Test.assert_eq(arg_diag.get("line"), 3, "and reports the line the argument is on")
+Test.assert_eq(arg_diag.get("column"), 19, "and the 1-based column of the argument")
+
+// Second argument, so the span cannot be passing by always landing on the first.
+var arg2_src: String = "fun pair(a: Int, b: String): Int { return 1 }\nvar k: Int = 2\nvar r2: Int = pair(1, k)\n"
+var arg2: Any = compile_json(arg2_src, "arg2")
+Test.assert_eq(span_text(arg2_src, arg2, "argument 2"), "k",
+    "the span tracks WHICH argument is at fault")
+
+// --- Non-Bool condition: point at the condition expression -------------------
+//
+// One `error_at` in check_condition locates all six callers (if, while, `!`,
+// `and`, `or`, if-expression), so these two cases are also a check that the
+// shared path is really shared.
+var if_src: String = "fun f(n: Int): Int {\n    if (n) { return 1 }\n    return 0\n}\n"
+var if_data: Any = compile_json(if_src, "ifcond")
+Test.assert_eq(span_text(if_src, if_data, "if condition"), "n",
+    "if condition points at the condition")
+
+// A condition that is a Call, so the span is a multi-character extent rather
+// than a single identifier — this is what catches a length hardcoded to 1.
+var while_src: String = "fun count(): Int { return 3 }\nfun g(): Int {\n    while (count()) { return 1 }\n    return 0\n}\n"
+var while_data: Any = compile_json(while_src, "whilecond")
+Test.assert_eq(span_text(while_src, while_data, "while condition"), "count()",
+    "a Call condition underlines the whole call, callee through ')'")
+
+// --- Returning a nullable where a non-nullable is required -------------------
+var ret_src: String = "fun g(v: Int|Nil): Int {\n    return v\n}\n"
+var ret_data: Any = compile_json(ret_src, "ret")
+Test.assert_eq(span_text(ret_src, ret_data, "cannot return nullable"), "v",
+    "return points at the returned expression")
+
+// --- if- and try-expression branch mismatch: point at the SECOND branch ------
+//
+// The then/try branch sets the expectation and the else/catch branch is what
+// departs from it. Arbitrary when both are odd; a consistent choice beats no
+// location.
+var ife_src: String = "var alpha: Int = 1\nvar beta: String = \"s\"\nvar pick: Int = if (true) { alpha } else { beta }\n"
+var ife_data: Any = compile_json(ife_src, "ifexpr")
+Test.assert_eq(span_text(ife_src, ife_data, "if-expression branches"), "beta",
+    "if-expression mismatch points at the else branch's value")
+
+var trye_src: String = "var s: String = \"x\"\nvar t: Int = try { 1 } catch (e) { s }\n"
+var trye_data: Any = compile_json(trye_src, "tryexpr")
+Test.assert_eq(span_text(trye_src, trye_data, "try-expression branches"), "s",
+    "try-expression mismatch points at the catch branch's value")
+
+// --- Honest absence: a literal branch declines to invent a location ----------
+//
+// `StringLit` carries no span, and expr_span does not walk down to a child to
+// manufacture one. So this diagnostic arrives with `located: false`, renders
+// exactly as it did before Stage 0, and the client shows it file-level rather
+// than at a wrong place. Asserted rather than left implicit, because the
+// tempting "fix" — descend until something has a span — would turn every one of
+// these into a confidently wrong caret.
+var lit_src: String = "var mixed: Int = if (true) { 1 } else { \"two\" }\n"
+var lit_data: Any = compile_json(lit_src, "literal")
+Test.assert_eq(span_text(lit_src, lit_data, "if-expression branches"), "<unlocated>",
+    "a spanless literal branch yields NO location rather than a wrong one")
+
+Test.summary()

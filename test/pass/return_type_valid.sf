@@ -1,0 +1,74 @@
+// BUGS #155 companion: verify that the return-type check allows all legitimate
+// patterns. This test must COMPILE AND RUN — it is in test/pass/.
+
+import "@test" as T
+
+// Same-type returns (trivial)
+fun get_int(): Int { return 42 }
+fun get_str(): String { return "hello" }
+fun get_bool(): Bool { return true }
+fun get_float(): Float { return 3.14 }
+
+// Int→Float widening (allowed by scalar_mismatch)
+fun int_as_float(): Float { return 7 }
+
+// Int→String (allowed: NaN-box identity, raw pointer IS a String)
+// This is what lexer.sf:byte_to_char does.
+fun int_as_string(): String {
+    var buf: String = "x"
+    return buf
+}
+
+// Returning nil from a nullable function
+fun maybe_nil(): String|Nil { return nil }
+fun maybe_value(): String|Nil { return "got it" }
+
+// Returning a concrete from a nullable (String is subtype of String|Nil)
+fun concrete_into_nullable(): Int|Nil { return 42 }
+
+// Returning Any (always allowed — Any on either side skips the check)
+fun return_any(): Any { return 42 }
+fun return_from_any(): Int {
+    var x: Any = 99
+    return x
+}
+
+// Unannotated functions. These carry `UnknownType` — "nobody declared a return
+// type" — which no check may fire on, because a function that declared nothing
+// constrains nothing. They used to carry the string "Nil", indistinguishable from
+// a real `: Nil` declaration, which is why the companion check in
+// test/fail/return_nil_declared.sf could not exist until FunDecl.ret_type became
+// an AST.Type node. This is the side that would break first if that guard were
+// dropped: several hundred functions in the compiler's own source look like this.
+fun unannotated() { return 42 }
+fun unannotated_str() { return "hello" }
+
+// The legitimate shapes of a `: Nil` function. `return nil`, a bare `return`, and
+// falling off the end are all "produces no value" and must stay accepted — the
+// error is reserved for returning a concrete value, which the fail-side test pins.
+fun nil_explicit(): Nil { return nil }
+fun nil_bare(): Nil { return }
+fun nil_implicit(): Nil { }
+
+fun main() {
+    T.assert_eq(get_int(), 42, "Int return")
+    T.assert_eq(get_str(), "hello", "String return")
+    T.assert_eq(get_bool(), true, "Bool return")
+    T.assert_eq(get_float(), 3.14, "Float return")
+    T.assert_eq(int_as_float(), 7, "Int→Float widening")
+    T.assert_eq(maybe_nil(), nil, "nil from nullable")
+    T.assert_eq(maybe_value(), "got it", "value from nullable")
+    T.assert_eq(concrete_into_nullable(), 42, "concrete into nullable")
+    T.assert_eq(return_any(), 42, "Any return")
+    T.assert_eq(return_from_any(), 99, "return from Any-typed local")
+    T.assert_eq(unannotated(), 42, "unannotated function returning a value")
+    T.assert_eq(unannotated_str(), "hello", "unannotated function returning a String")
+    // Calling these is the assertion: each must compile, and a `: Nil` function
+    // has no result to compare against.
+    nil_explicit()
+    nil_bare()
+    nil_implicit()
+    T.summary()
+}
+
+main()

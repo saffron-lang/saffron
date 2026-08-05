@@ -507,7 +507,7 @@ fun push_symbol(acc: String, name: String, kind: String, s: AST.Span, visibility
 // A param whose type annotation is absent renders as just its name; `AnyType` is
 // what the parser fills in for an unannotated param, and printing ": Any" would
 // claim the author wrote an annotation they did not.
-fun render_signature(params: List<AST.Param>, ret_type: String): String {
+fun render_signature(params: List<AST.Param>, ret_type: AST.Type): String {
     var out: String = "("
     var i: Float = 0
     while (i < params.length()) {
@@ -522,7 +522,12 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
         i = i + 1
     }
     out = out + ")"
-    if (ret_type.length() > 0) { out = out + ": " + ret_type }
+    // A function with no declared return type renders without one, the same way
+    // an unannotated param renders as a bare name just above. `ret_type` used to
+    // be a String and the guard was `length() > 0`, which was never false — the
+    // parser substituted the literal "Nil", so every unannotated function's
+    // hover claimed `: Nil`. UnknownType makes the absence askable.
+    if (!is_unknown_type(ret_type)) { out = out + ": " + AST.type_to_source(ret_type) }
     return out
 }
 
@@ -532,6 +537,18 @@ fun render_signature(params: List<AST.Param>, ret_type: String): String {
 fun is_any_type(t: AST.Type): Bool {
     return match (t) {
         AnyType => true
+        _ => false
+    }
+}
+
+// The same question for a *return* type, which the parser marks differently:
+// an omitted param annotation becomes AnyType, an omitted return annotation
+// becomes UnknownType. Two markers because the two positions differ — a param
+// with no annotation really does accept anything, while a function with no
+// declared result has a result nobody has stated (invariant I2).
+fun is_unknown_type(t: AST.Type): Bool {
+    return match (t) {
+        UnknownType => true
         _ => false
     }
 }
@@ -793,7 +810,41 @@ fun extract_named_imports(source: String): Map<String, List<String>> {
                         ni = ni + 1
                     }
                     if (trimmed_names.length() > 0) {
-                        result.set(imp_path, trimmed_names)
+                        // Accumulate, do not overwrite. The map is keyed by module
+                        // PATH, so a second `import { ... } from "@iter"` line used
+                        // to replace the first line's names outright: the earlier
+                        // names vanished, reached codegen as undefined functions
+                        // (a warning, exit 0) and then failed in the IR verifier
+                        // with `use of undefined value '@map'` — reported as
+                        // "this is a compiler bug", for a valid program.
+                        //
+                        // Two lines from one module is unusual enough that the
+                        // tree has no instance, which is why one `set` looked
+                        // sufficient; nothing about the shape forbids it.
+                        var merged: List<String> = trimmed_names
+                        if (result.has(imp_path)) {
+                            merged = result.get(imp_path)
+                            var mi: Float = 0
+                            while (mi < trimmed_names.length()) {
+                                // Names repeated across the two lines stay unique:
+                                // a duplicate registers the same function twice and
+                                // the second registration is what emits a redefined
+                                // symbol. Open-coded rather than calling
+                                // `str_in_list`, which is a Codegen *method*, not a
+                                // free function reachable from here.
+                                var dup: Bool = false
+                                var dj: Float = 0
+                                while (dj < merged.length()) {
+                                    if (merged[dj] == trimmed_names[mi]) { dup = true }
+                                    dj = dj + 1
+                                }
+                                if (!dup) {
+                                    merged.push(trimmed_names[mi])
+                                }
+                                mi = mi + 1
+                            }
+                        }
+                        result.set(imp_path, merged)
                     }
                 }
             }

@@ -1,0 +1,14 @@
+// `import { names } <word> "path"` must reject anything but `from`.
+//
+// This compiled cleanly before, and the failure surfaced at LINK time as
+// `ld: symbol(s) not found for architecture arm64` naming `_map` — a symbol the
+// user never wrote. The parser skipped the `from` slot with a bare advance(),
+// while the live text scanner (main.sf extract_named_imports) requires the
+// literal `from `, so the two disagreed and the names were never registered.
+//
+// `from` is a soft keyword — no token kind for it — so it must be checked by
+// text, which is why a bare advance() looked plausible.
+import { map } bananas "@iter"
+
+var r = map([1, 2], fun (x: Number): Number => x * 2)
+IO.println(r[0])
