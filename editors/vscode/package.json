@@ -32,7 +32,12 @@
         "saffron.compilerPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the saffron binary. If empty, uses 'saffron' from PATH."
+          "description": "Path to the saffronc binary. When empty, the server looks for <project>/build/saffronc, then ~/.saffron/bin/saffronc, then saffronc on PATH."
+        },
+        "saffron.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the LSP server's server.js. When empty, the extension looks beside itself, in the open workspace folders, then at ~/.saffron/lsp/server.js."
         }
       }
     }
