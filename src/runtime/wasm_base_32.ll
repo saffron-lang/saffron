@@ -1242,6 +1242,22 @@ entry:
   ret i64 0
 }
 
+; Temp value roots (BUGS #162): no-ops, same reason as wasm_base.ll — no collector.
+define void @__gc_push_temp(i64 %val) {
+entry:
+  ret void
+}
+
+define i64 @__gc_temp_depth() {
+entry:
+  ret i64 0
+}
+
+define void @__gc_pop_temps(i64 %n) {
+entry:
+  ret void
+}
+
 define void @__gc_init_shadow_stack() {
 entry:
   ret void

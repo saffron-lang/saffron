@@ -1645,6 +1645,43 @@
         return result
     }
 
+    /// Root an already-evaluated argument value as a GC temp root, for the rest of
+    /// call setup. BUGS #162: an argument lives only in an LLVM SSA register between
+    /// its own evaluation and the `call`, and the collector's roots are all *slot
+    /// addresses* (output_body.sf pushes the address of a local's or param's
+    /// alloca), so a later argument that allocates could free it. This pushes the
+    /// VALUE — sound because the collector does not move, so a root only has to keep
+    /// the object marked.
+    ///
+    /// Returns 1 if a push was emitted, 0 if not, so the caller can accumulate an
+    /// exact pop count. Callers must `gen_pop_arg_roots(n)` right after the `call`.
+    ///
+    /// Skipped in identity_mode (the bootstrap links a base.ll whose GC entry points
+    /// are no-ops, and nothing is ever collected there). That is the identity-mode
+    /// blind spot again: the bootstrap cannot exercise this, so the coverage is
+    /// test/pass/arg_temp_rooted.sf compiled by gen3.
+    fun gen_root_arg_temp(val: String): Float {
+        if (this.identity_mode) { return 0 }
+        // A literal operand ("0", "1", an inttoptr constant expression) is not a
+        // heap value and pushing it would only cost a rejected __gc_is_heap_ptr
+        // check. Registers are what matter, and they all start with '%'.
+        if (!val.starts_with("%")) { return 0 }
+        this.emit_indent("call void @__gc_push_temp(i64 " + val + ")")
+        return 1
+    }
+
+    /// Drop `n` argument temp roots. Emitted immediately after the `call` that
+    /// consumes them. A count rather than a saved depth on purpose: a depth would be
+    /// an SSA register that must dominate its use, and an argument containing a
+    /// short-circuit `and`, a ternary or a `try` expression splits the basic block.
+    fun gen_pop_arg_roots(n: Float) {
+        if (this.identity_mode) { return nil }
+        if (n <= 0) { return nil }
+        // .floor() before .to_string(): a bare Float renders as "2.000000", which is
+        // not a valid i64 literal. Same convention as the __gc_pop_roots sites.
+        this.emit_indent("call void @__gc_pop_temps(i64 " + n.floor().to_string() + ")")
+    }
+
     fun gen_arg_value(expr: AST.Expr): String {
         // Handle function references as values (e.g. passing HomePage to Router.Route)
         var expr_kind: String = this.classify_expr(expr)
@@ -2615,15 +2652,21 @@
                 if (this.str_in_list(this.known_functions,init_name)) {
                     var init_args: List<String> = []
                     init_args.push("i64 " + instance)
+                    // BUGS #162: `instance` is live across every argument, and an
+                    // argument may allocate. Root it (and each argument temp) for
+                    // the width of the window, not just the arguments.
+                    var ctor_roots: Float = this.gen_root_arg_temp(instance)
                     var i: Float = 0
                     while (i < args.length()) {
                         var val: String = this.gen_arg_value(args[i])
+                        ctor_roots = ctor_roots + this.gen_root_arg_temp(val)
                         init_args.push("i64 " + val)
                         i = i + 1
                     }
                     this.called_functions.push(init_name)
                     var discard_init: String = this.fresh_local()
                     this.emit_indent(discard_init + " = call i64 @" + init_name + "(" + init_args.join(", ") + ")")
+                    this.gen_pop_arg_roots(ctor_roots)
                 }
                 this.last_type = this.str_to_type(simple_callee)
                 return instance
@@ -2784,6 +2827,12 @@
                 }
                 reordered_args = new_args
             }
+            // BUGS #162: each evaluated argument is rooted by value until the call
+            // consumes it, because a later argument may allocate and collect. Only
+            // meaningful for two-or-more arguments — a single argument is handed
+            // straight to the callee's prologue, which gives it an alloca and a root
+            // — but rooting unconditionally keeps the accounting local to this loop.
+            var arg_roots: Float = 0
             var i: Float = 0
             while (i < reordered_args.length()) {
                 // Skip nil placeholders that signal "use default"
@@ -2793,12 +2842,14 @@
                     if (i < defs.length() and this.classify_expr(defs[i]) != "nil") {
                         var def_val: String = this.gen_arg_value(defs[i])
                         arg_strs.push("i64 " + def_val)
+                        arg_roots = arg_roots + this.gen_root_arg_temp(def_val)
                         used_default = true
                     }
                 }
                 if (!used_default) {
                     var val: String = this.gen_arg_value(reordered_args[i])
                     arg_strs.push("i64 " + val)
+                    arg_roots = arg_roots + this.gen_root_arg_temp(val)
                 }
                 i = i + 1
             }
@@ -2817,6 +2868,7 @@
                         if (!is_nil) {
                             var def_val: String = this.gen_arg_value(def_expr)
                             arg_strs.push("i64 " + def_val)
+                            arg_roots = arg_roots + this.gen_root_arg_temp(def_val)
                         } else {
                             var __nil_fill: String = this.fresh_local()
                             this.emit_indent(__nil_fill + " = call i64 @__val_nil()")
@@ -2844,6 +2896,7 @@
                 this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", call_target, arg_strs.join(", "))
             }
+            this.gen_pop_arg_roots(arg_roots)
             if (this.func_ret_types.has(resolved_callee)) {
                 this.last_type = this.func_ret_types.get(resolved_callee)
             } else if (this.func_ret_types.has(callee_name)) {
@@ -3021,6 +3074,8 @@
                 reordered_args2 = new_args2
             }
             var arg_strs: List<String> = []
+            // BUGS #162, same as the reordered_args loop above.
+            var arg_roots2: Float = 0
             var i: Float = 0
             while (i < reordered_args2.length()) {
                 var used_default2: Bool = false
@@ -3029,12 +3084,14 @@
                     if (i < defs2.length() and this.classify_expr(defs2[i]) != "nil") {
                         var def_val2: String = this.gen_arg_value(defs2[i])
                         arg_strs.push("i64 " + def_val2)
+                        arg_roots2 = arg_roots2 + this.gen_root_arg_temp(def_val2)
                         used_default2 = true
                     }
                 }
                 if (!used_default2) {
                     var val: String = this.gen_arg_value(reordered_args2[i])
                     arg_strs.push("i64 " + val)
+                    arg_roots2 = arg_roots2 + this.gen_root_arg_temp(val)
                 }
                 i = i + 1
             }
@@ -3053,6 +3110,7 @@
                         if (!is_nil2) {
                             var def_val2b: String = this.gen_arg_value(def_expr2)
                             arg_strs.push("i64 " + def_val2b)
+                            arg_roots2 = arg_roots2 + this.gen_root_arg_temp(def_val2b)
                         } else {
                             var __nil_fill2: String = this.fresh_local()
                             this.emit_indent(__nil_fill2 + " = call i64 @__val_nil()")
@@ -3080,6 +3138,7 @@
                 this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", emit_callee, arg_strs.join(", "))
             }
+            this.gen_pop_arg_roots(arg_roots2)
             if (this.func_ret_types.has(emit_callee)) {
                 this.last_type = this.func_ret_types.get(emit_callee)
             } else {
@@ -3168,10 +3227,14 @@
         // Build args: env first, then user args
         var arg_strs: List<String> = []
         arg_strs.push("i64 " + env_int)
+        // BUGS #162. The env pointer is rooted too: it was loaded out of the closure
+        // pair before the arguments run, so it is exposed for exactly as long.
+        var ind_roots: Float = this.gen_root_arg_temp(env_int)
         var i: Float = 0
         while (i < args.length()) {
             var val: String = this.gen_arg_value(args[i])
             arg_strs.push("i64 " + val)
+            ind_roots = ind_roots + this.gen_root_arg_temp(val)
             i = i + 1
         }
 
@@ -3189,6 +3252,7 @@
         var fn_ptr: String = this.val_to_fn_ptr(fn_int, fn_type)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 " + fn_ptr + "(" + arg_strs.join(", ") + ")")
+        this.gen_pop_arg_roots(ind_roots)
         // LLVM lib parallel path: track indirect call result as opaque placeholder
         if (!this.identity_mode) {
             var ic_res: LLVMTypes.Value = this.llvm_block_builder.call("__indirect_call", LLVMTypes.Type.I64, [])
@@ -3338,15 +3402,17 @@
         // What this does NOT close: __gc_alloc can itself collect (it calls
         // __gc_minor_collect, and __gc_collect on threshold), so an argument value
         // held only in a register is still exposed across that one call. That is
-        // BUGS #63 exactly, it is not specific to enums, and class construction has
-        // the identical window — `CPair(build(d-1), build(d-1))` evaluates its
-        // arguments and then calls a constructor that allocates. Fixing it here
-        // would mean rooting the array and storing each argument as it is produced,
-        // which needs an alloca; an alloca emitted in a loop body grows the stack
-        // every iteration, and there is no entry-block alloca facility in this
-        // codegen to put it in instead. So this fix deliberately brings enums up to
-        // the exposure classes already have and no further, rather than inventing a
-        // rooting convention for one node type.
+        // BUGS #162, it is not specific to enums, and class construction has the
+        // identical window — `CPair(build(d-1), build(d-1))` evaluates its arguments
+        // and then calls a constructor that allocates. So this fix deliberately
+        // brings enums up to the exposure classes already have and no further,
+        // rather than inventing a rooting convention for one node type; #162 is
+        // where the general repair lives, and it covers this loop too.
+        //
+        // (Not #63, which was the *moving* nursery and closed by retiring it. And an
+        // earlier version of this comment claimed the blocker was that no
+        // entry-block alloca facility exists — it does, at output_body.sf:420, and
+        // the non-moving collector means value rooting suffices regardless.)
         //
         // The Int->Float widening stays inline with each argument because it reads
         // `this.last_type`, which the next gen_arg_value would overwrite.

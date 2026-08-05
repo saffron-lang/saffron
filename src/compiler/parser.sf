@@ -1491,8 +1491,9 @@ class Parser {
     // had just finished encoding. Every consumer downstream then saw a FuncType with
     // no parameters returning Any, and could not tell `(Box) => String` apart from a
     // bare `Fun`. That is what made `Fun<A, B, R>` the only spelling able to type a
-    // block-syntax lambda `{ x => ... }` (BUGS #86): the checker's fun_param_types_of
-    // reads the rendered declared type, and there was nothing left in it to read.
+    // block-syntax lambda `{ x => ... }` (BUGS #86): the checker's fun_param_nodes_of
+    // reads the FuncType parameter nodes directly, and there was nothing left in them
+    // to read.
     //
     // The shape is fixed by parse_single_type (see the `=>` branch there): literal
     // "Fun(", the parameter types joined by "," with no spaces, then "):", then the

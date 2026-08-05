@@ -30,5 +30,10 @@
             implementation="dev.saffron.intellij.SaffronLspServerSupportProvider"/>
         <configurationType
             implementation="dev.saffron.intellij.SaffronPantryConfigurationType"/>
+        <!-- Suppresses the Plugin Advertiser's "install a plugin for .sf" banner,
+             which fires because TextMate-highlighted files are PlainTextLikeFileType.
+             See SaffronAdvertiserSuppressor for why this cannot be a FileType. -->
+        <postStartupActivity
+            implementation="dev.saffron.intellij.SaffronAdvertiserSuppressor"/>
     </extensions>
 </idea-plugin>

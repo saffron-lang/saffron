@@ -965,6 +965,24 @@ entry:
   ret i64 0
 }
 
+; Temp value roots (BUGS #162): no-ops. wasm's __gc_alloc is a bump/malloc with no
+; collector at all, so nothing is ever freed and an unrooted temp cannot die.
+; Codegen emits the calls unconditionally, so the symbols must exist here.
+define void @__gc_push_temp(i64 %val) {
+entry:
+  ret void
+}
+
+define i64 @__gc_temp_depth() {
+entry:
+  ret i64 0
+}
+
+define void @__gc_pop_temps(i64 %n) {
+entry:
+  ret void
+}
+
 define void @__gc_init_shadow_stack() {
 entry:
   ret void

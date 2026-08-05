@@ -477,6 +477,10 @@
     // identity mode, where the two really are one representation, and get_expr_type
     // already answers "Int" for a float there.
     var elem_type: AST.Type = AST.Type.AnyType
+    // BUGS #162: the list itself is only an SSA register until it reaches a local,
+    // and every element expression below may allocate. Rooted once for the whole
+    // loop rather than per element.
+    var list_root: Float = this.gen_root_arg_temp(list_val)
     var i: Float = 0
     while (i < elements.length()) {
         if (i == 0) {
@@ -491,15 +495,24 @@
                 elem_type = this.str_to_type(ft)
             }
         }
+        // BUGS #162. `elem` sits in a register across __list_push, which reallocates
+        // the data array and so can itself collect. Popped once the element is
+        // stored in the list and therefore reachable through it. (`list_val` is
+        // rooted once outside the loop — rooting it here would push the same pointer
+        // once per element.)
+        var ll_roots: Float = 0
         var elem: String = this.gen_arg_value(elements[i])
+        ll_roots = ll_roots + this.gen_root_arg_temp(elem)
         var discard_lp: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(discard_lp, "i64", "__list_push", "i64 " + list_val + ", i64 " + elem))
         } else {
             this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
         }
+        this.gen_pop_arg_roots(ll_roots)
         i = i + 1
     }
+    this.gen_pop_arg_roots(list_root)
     this.last_type = this.make_generic_type("List", [elem_type])
     return list_val
     }
@@ -1265,10 +1278,19 @@
 
     var arg_strs: List<String> = []
     if (has_self) { arg_strs.push("i64 " + obj) }
+    // BUGS #162: the receiver was evaluated by the caller and stays live across
+    // every argument, and an argument may allocate and collect. Root the receiver
+    // and each argument temp by value for the width of that window. Every arm
+    // below pops as soon as the call has consumed arg_strs — deliberately NOT
+    // across the await loops, since a suspension would interleave another task's
+    // pushes and pops on this count-based stack.
+    var ns_roots: Float = 0
+    if (has_self) { ns_roots = ns_roots + this.gen_root_arg_temp(obj) }
     var i: Float = 0
     while (i < args.length()) {
         var val: String = this.gen_arg_value(args[i])
         arg_strs.push("i64 " + val)
+        ns_roots = ns_roots + this.gen_root_arg_temp(val)
         i = i + 1
     }
     var full_method: String = ns + "__" + method
@@ -1294,6 +1316,11 @@
     if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
         var mc_hdl: String = this.fresh_local()
         this.emit_indent(mc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        // Pop before the await loop, not after it: the loop suspends, and the temp
+        // stack is a global count, so a task resuming in between would pop entries
+        // that are not its own. Still in the same basic block as the call, so the
+        // window the roots existed for is fully covered.
+        this.gen_pop_arg_roots(ns_roots)
         var mc_hdl_i64: String = this.fresh_local()
         this.emit_indent(mc_hdl_i64 + " = ptrtoint ptr " + mc_hdl + " to i64")
         var mc_await_loop: String = this.fresh_label("await.loop")
@@ -1336,6 +1363,7 @@
     if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
         var sc_hdl: String = this.fresh_local()
         this.emit_indent(sc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        this.gen_pop_arg_roots(ns_roots)
         var sc_i64: String = this.fresh_local()
         this.emit_indent(sc_i64 + " = ptrtoint ptr " + sc_hdl + " to i64")
         var sc_check: String = this.fresh_label("sync.check")
@@ -1377,7 +1405,9 @@
     // receiver expression (the #70 preamble hazard).
     if (has_self) {
         var vd: String = this.gen_virtual_dispatch(ns, method, obj, full_method, arg_strs, canonical)
-        if (vd.length() > 0) { return vd }
+        // The pop lands in vd_end, which post-dominates every arm, and the count is
+        // a constant so nothing has to dominate it.
+        if (vd.length() > 0) { this.gen_pop_arg_roots(ns_roots); return vd }
     }
 
     var local: String = this.fresh_local()
@@ -1402,6 +1432,7 @@
     } else {
         this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
     }
+    this.gen_pop_arg_roots(ns_roots)
     if (this.func_ret_types.has(full_method)) {
         this.last_type = this.func_ret_types.get(full_method)
     } else if (this.func_ret_types.has(canonical)) {

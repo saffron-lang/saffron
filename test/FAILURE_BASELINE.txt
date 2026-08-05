@@ -300,6 +300,38 @@
 # was aborted by git because a teammate's bootstrap was mid-write on
 # build/stage3/codegen.ll. Waiting for it, then re-merging, is what turned #163 from
 # something this branch would have silently reverted into something it composes with.
+#
+# Confirmed 2026-08-05 after FIXING #162 (argument temps GC-rooted by value across
+# call setup): 310 passed, 8 failed, 14 skipped, 0 known-fail. SET unchanged,
+# comm-diffed empty both directions against the 8 names at the bottom of this file.
+#
+# The arithmetic, checkable: 309 -> 310 passed and 1 -> 0 known-fail are the SAME
+# test moving, not two changes. pass/arg_temp_rooted was the sole KNOWN_FAIL entry;
+# #162's fix made it pass, the suite reported `xpass` and went RED, and the entry was
+# dropped in this commit — which is precisely the ratchet the paragraph 60 lines up
+# described as intended. The 9-failure run in between is real and is in the log: an
+# xpass is counted as a failure on purpose. Eligible files are unchanged at 332,
+# because no test file was added — the test already existed, it just started passing.
+#
+# Read this alongside the note above about totals. Every previous entry here argued
+# that a total moving proves nothing; this one is the inverse case worth recording,
+# where a total moving by exactly 1 in each of two columns is the only evidence in
+# the suite output that anything happened at all. The set diff is empty and STAYS
+# empty across a real fix, because the fixed test was never in the failure set — it
+# was in the known-fail table, which the set diff does not read.
+#
+# What the suite does NOT cover, and it is the reason the fix was measured with an
+# ad-hoc probe instead: the bootstrap links a base whose GC entry points are no-ops
+# and never collects, so the compiler compiling itself cannot exercise a rooting bug
+# at all. Coverage came from /tmp probes over five call forms (direct, instance
+# method, constructor, indirect closure, list literal), which is how it was found
+# that instrumenting the direct-call loop alone still left 4 of the 5 broken. Neither
+# a green bootstrap nor a green suite would have shown that.
+#
+# pass/arg_temp_rooted grew from 2 assertions to 6 in the same commit, one per call
+# form. Compiled by the PRE-fix compiler the 6-assertion version segfaults rather
+# than counting mismatches (Pair holds a freed Box and `p.a.v` dereferences it),
+# which is a sharper negative control than the 49/200 the 2-assertion version gave.
 
 # Updated 2026-08-05 on the twice-merged tree (this line's #167/#168 plus origin's
 # #160 closure, #164, and the VarDecl.type_ann -> AST.Type migration): 315 passed,
@@ -395,6 +427,27 @@
 # push was rejected. A green measurement on the wrong parent is not a weaker
 # result than no measurement; it is worse, because it reads exactly like the right
 # one. Fetch before you measure, not just before you push.
+
+#
+# Confirmed 2026-08-05 after MERGING origin/main (ff40464) into the #162 fix line:
+# 318 passed, 8 failed, 14 skipped, 0 known-fail. SET unchanged, comm-diffed empty
+# both directions against the 8 names below. Bootstrap green through STAGE 2 (0
+# unresolved inference fallbacks; gen3 compiles itself, gen4 links and compiles) on
+# origin's PROMOTED gen2 -- which is the check that matters, since the #162 fix
+# touched codegen's argument loops and this merge brought the VarDecl.type_ann and
+# get_func_ret AST.Type migrations that rewrote adjacent code. The +8 over 310 is
+# entirely origin's own new tests (its #160/#164/#167/#168/#169 suite), all already
+# passing on main; eligible files 332 -> 340.
+#
+# SUPERSEDES the "#162 still XFAILs" lines in the two notes just above (the twice-
+# merged and rebased runs): those were written on origin's line BEFORE this fix
+# landed and describe a KNOWN_FAIL table that no longer has an entry. #162 is FIXED
+# and lives under Resolved; pass/arg_temp_rooted is an ordinary passing test with 6
+# assertions. The stale sentences are left in place rather than edited because they
+# were true when written and this file records history -- this note is the correction,
+# in the position chronology puts it. The ordering hazard is real and worth naming:
+# my #162 note sits ABOVE origin's later notes because my branch forked before they
+# were written, so read the dates, not the position.
 
 async
 docstrings
