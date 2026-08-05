@@ -3459,7 +3459,8 @@ class NullChecker {
                 AST.Type.AnyType
             }
             IndexGet(obj, index) => {
-                var list_type: String = this.infer_expr(obj)
+                var list_node: AST.Type = this.infer_type(obj)
+                var list_type: String = this.type_to_str(list_node)
                 this.infer_expr(index)
                 // Subscript overloading: on a user class declaring `getItem`,
                 // `obj[k]` has getItem's declared return type. That type may
@@ -3479,9 +3480,16 @@ class NullChecker {
                 var idx_base: String = this.generic_base(list_type)
                 if (this.env.class_fields.has(idx_base)
                     and this.get_receiver_methods(idx_base).contains("getItem")) {
+                    // Still a round trip: class_method_ret_type does string surgery
+                    // (the class-type-parameter substitution documented above), so
+                    // its answer is a string and there is nothing to read as a node
+                    // yet. Blocked on that helper, not on this arm.
                     this.parse_type_node(this.class_method_ret_type(list_type, "getItem"))
                 } else {
-                    this.parse_type_node(this.extract_list_element_type(list_type))
+                    // The real-List / positional-generic case: read the element off
+                    // the node. Was parse_type_node(extract_list_element_type(...)),
+                    // a render-and-reparse whose only input is list_node itself.
+                    this.index_element_node(list_node)
                 }
             }
             IndexSet(obj, index, value) => this.infer_type(value)
@@ -3761,6 +3769,28 @@ class NullChecker {
         // "List<String>" → "String"
         if (!typ.contains("<")) return "Any"
         return this.extract_nth_generic_arg(typ, 0)
+    }
+
+    // The node form of `parse_type_node(extract_list_element_type(type_to_str(n)))`
+    // for the IndexGet arm: the element type of an indexed generic, read straight
+    // off the node instead of rendered to a string and parsed back. Matches the
+    // string helper's positional read exactly — the FIRST type argument of any
+    // generic (a real `List<E>` gives E; a `Map<K,V>` gives K, which is what the
+    // string path also did, faithful bug and all), and Any for a non-generic.
+    //
+    // Better than the round trip in one case, the same as it in every other: a
+    // `List<Fun(Int):Int>` element came back out of the string as ClassType("Fun"),
+    // because type_to_str collapses every FuncType to the bare "Fun" — the #169
+    // shape. Reading the node returns the FuncType. No test indexes a list of
+    // functions, so nothing observable moves; the point is that it CAN'T misread.
+    fun index_element_node(node: AST.Type): AST.Type {
+        var zero: Float = 0
+        return match (node) {
+            GenericType(base, args) => {
+                if (args.length() >= 1) { args[zero] } else { AST.Type.AnyType }
+            }
+            _ => AST.Type.AnyType
+        }
     }
 
     // --- Class-level generic substitution (BUGS #95) ---
