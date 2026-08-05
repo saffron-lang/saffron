@@ -107,6 +107,13 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
+    // GC type tag of each payload-carrying enum, drawn from the SAME counter as
+    // class_type_ids. Sharing the counter is the point, not an economy:
+    // __val_class_tag answers with one number space, so an enum tag that
+    // duplicated a class tag would make __val_to_string call the wrong
+    // to_string. Fieldless enums are absent — their value is the immediate
+    // `tag << 56`, which has no allocation to hang a header on (BUGS #154).
+    var enum_type_ids: Map<String, Float>
     // Parent of each class that has one. gen_class_decl_with_parents is *handed*
     // the parent name and used to discard it after inheriting fields and
     // methods, which made the hierarchy look unavailable to codegen (it is not
@@ -214,6 +221,7 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.enum_type_ids = {}
         this.class_parent_of = {}
         this.class_parents_of = {}
         this.class_own_methods = {}
@@ -1025,6 +1033,36 @@ class Codegen {
             UnionType(types) => false
             FuncType(p, r) => false
             NullableType(inner) => false
+            NeverType => false
+        }
+    }
+
+    /// True when the author wrote `Any` — the honest "runtime decides", as opposed
+    /// to `is_unknown_type` above, which means inference has not answered yet.
+    ///
+    /// These two exist as separate predicates because the String encoding of
+    /// `VarDecl.type_ann` had no way to keep them apart, and the five global
+    /// pre-scans in codegen.sf all tested `vtype.length() == 0 or vtype == "Any"` —
+    /// one disjunction asking "was an annotation written" and "what does it say" at
+    /// the same time. Only the first question belongs in the infer-from-initializer
+    /// guard; answering both made an explicit `: Any` on a module-level global
+    /// unable to widen it, which is BUGS #160. Migrating the field to a node is
+    /// what made the two answerable separately.
+    fun is_any_type(t: AST.Type): Bool {
+        return match (t) {
+            AnyType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+            UnknownType => false
             NeverType => false
         }
     }
@@ -4887,10 +4925,7 @@ class Codegen {
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
         if (args.length() == 0) {
             // No-field variant in a multi-field enum: heap-allocate to outlive function
-            var arr_raw: String = this.fresh_local()
-            this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 8)")
-            var arr_ptr: String = this.fresh_local()
-            this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [1 x i64]*")
+            var arr_ptr: String = this.emit_enum_payload_alloc(enum_name, 1)
             var tag_slot: String = this.fresh_local()
             this.emit_indent(tag_slot + " = getelementptr [1 x i64], [1 x i64]* " + arr_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
@@ -4901,19 +4936,40 @@ class Codegen {
         // Multi-field: heap-allocate array [tag, field0, field1, ...]
         // Must be heap (not stack) since enum values may outlive the creating function
         var num_slots: Float = args.length() + 1
-        var arr_bytes: Float = num_slots * 8
-        var arr_raw: String = this.fresh_local()
-        this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
-        var arr_ptr: String = this.fresh_local()
-        this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [" + num_slots.to_string() + " x i64]*")
-        // Store tag at index 0
-        var tag_slot: String = this.fresh_local()
-        this.emit_indent(tag_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 0")
-        this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
-        // Store fields at indices 1, 2, ...
-        var i: Float = 0
-        while (i < args.length()) {
-            var val: String = this.gen_arg_value(args[i])
+
+        // Evaluate the arguments FIRST, then allocate, then store.
+        //
+        // This order is load-bearing now that the payload carries a GC header. The
+        // old order was alloc-then-evaluate, which was safe only because
+        // __sf_malloc memory is never reclaimed: the array was invisible to the
+        // collector, and nothing collected it either. Under __gc_alloc the same
+        // shape is a dangling pointer — `arr_ptr` sits in an LLVM register while
+        // gen_arg_value emits a nested allocating call (for
+        // `Pair(build(d-1), build(d-1))`, an entire subtree), so a collection
+        // inside an argument reclaims the array being filled. The stores then land
+        // in freed memory and the value reads back truncated, or faults, at
+        // whatever depth allocation first crosses the 64KB threshold — which is
+        // why it presented as a nesting-depth limit rather than as a GC bug.
+        //
+        // What this does NOT close: __gc_alloc can itself collect (it calls
+        // __gc_minor_collect, and __gc_collect on threshold), so an argument value
+        // held only in a register is still exposed across that one call. That is
+        // BUGS #63 exactly, it is not specific to enums, and class construction has
+        // the identical window — `CPair(build(d-1), build(d-1))` evaluates its
+        // arguments and then calls a constructor that allocates. Fixing it here
+        // would mean rooting the array and storing each argument as it is produced,
+        // which needs an alloca; an alloca emitted in a loop body grows the stack
+        // every iteration, and there is no entry-block alloca facility in this
+        // codegen to put it in instead. So this fix deliberately brings enums up to
+        // the exposure classes already have and no further, rather than inventing a
+        // rooting convention for one node type.
+        //
+        // The Int->Float widening stays inline with each argument because it reads
+        // `this.last_type`, which the next gen_arg_value would overwrite.
+        var arg_vals: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var av: String = this.gen_arg_value(args[ai])
             // Int -> Float widening at the payload store, the same fix as BUGS #28
             // applied to enum construction instead of variable declaration.
             //
@@ -4933,16 +4989,29 @@ class Codegen {
             // Gated on !identity_mode for the reason given at the declaration site:
             // identity mode has no tags and Float *is* Int there.
             if (!this.identity_mode) {
-                var decl_type: String = this.get_variant_field_type(enum_name, variant, i)
+                var decl_type: String = this.get_variant_field_type(enum_name, variant, ai)
                 if (decl_type == "Float" and this.type_to_string(this.last_type) == "Int") {
-                    var widened: String = this.emit_untag_float(val)
-                    val = this.emit_tag_float(widened)
+                    var widened: String = this.emit_untag_float(av)
+                    av = this.emit_tag_float(widened)
                 }
             }
+            arg_vals.push(av)
+            ai = ai + 1
+        }
+
+        var arr_ptr: String = this.emit_enum_payload_alloc(enum_name, num_slots)
+        // Store tag at index 0
+        var tag_slot: String = this.fresh_local()
+        this.emit_indent(tag_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 0")
+        this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
+        // Store fields at indices 1, 2, ... — no allocation between the alloc above
+        // and the last of these, which is the property the comment relies on.
+        var i: Float = 0
+        while (i < args.length()) {
             var field_idx: Float = i + 1
             var field_slot: String = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())
-            this.emit_indent("store i64 " + val + ", i64* " + field_slot)
+            this.emit_indent("store i64 " + arg_vals[i] + ", i64* " + field_slot)
             i = i + 1
         }
         // Cast pointer to i64 for storage
@@ -7431,9 +7500,16 @@ class Codegen {
         }
     }
 
-    fun get_var_type(stmt: AST.Stmt): String {
+    /// The declared type of a `var`, as a node.
+    ///
+    /// The non-VarDecl fallback is `UnknownType`, which is also what a VarDecl with
+    /// no annotation carries — the same collision `fun_ret_type` documents in
+    /// src/lib/ast.sf. Every caller here pre-checks `classify_stmt(...) == "var"`,
+    /// so neither of them reaches the fallback; a caller that could should ask
+    /// first rather than reading the answer.
+    fun get_var_type(stmt: AST.Stmt): AST.Type {
         return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => t
-            _ => ""
+            _ => AST.Type.UnknownType
         }
     }
 
@@ -7465,12 +7541,29 @@ class Codegen {
         this.gen_var_decl_with_name(name, this.get_var_type(stmt), this.get_var_init(stmt))
     }
 
-    fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
-        // "" is the parser's "no annotation" sentinel and the only spelling that
+    fun gen_var_decl_with_name(name: String, type_ann: AST.Type, init: AST.Expr) {
+        // `UnknownType` is the parser's "no annotation" node and the only value that
         // means infer. An explicit `: Any` is a real annotation and must NOT be
         // overwritten by the initializer's type — that conflation was BUGS #147.
-        var vtype: String = type_ann
-        var vt_infer: Bool = type_ann.length() == 0
+        //
+        // `type_to_string`, not `type_to_source`: everything downstream of `vtype`
+        // in this function is written against the diagnostic spellings — the
+        // `vtype.contains("<")` generic-argument resolution below, `== "Nil"`,
+        // `starts_with("List")` at the callers. Rendering the faithful form here
+        // would hand those a string they were not written for, which is precisely
+        // the reason type_to_source was added as a second function rather than as a
+        // fix to the first (see the note on it in ast.sf).
+        //
+        // The infer path starts from "" rather than from the rendered node, because
+        // `type_to_string(UnknownType)` is the literal word "Unknown" and I2 forbids
+        // that reaching codegen. Every line below either overwrites `vtype` or tests
+        // it against a real type name, so "" is what the old String encoding put
+        // here and what those lines are written to see when nothing is known.
+        var vt_infer: Bool = this.is_unknown_type(type_ann)
+        var vtype: String = ""
+        if (!vt_infer) {
+            vtype = this.type_to_string(type_ann)
+        }
         if (vt_infer) {
             vtype = this.get_expr_type(init)
         }
@@ -8164,6 +8257,92 @@ class Codegen {
         this.block_terminated = false
     }
 
+    // Assign the GC type tag of a payload-carrying enum, from the same counter
+    // as class_type_ids (BUGS #154).
+    //
+    // Called from every place that registers an enum — gen_enum_decl,
+    // register_enum_variants, and the four prescans — for the reason
+    // class_type_ids is: a value is constructed in source order, but the tag
+    // must already exist when gen_enum_construct emits the __gc_alloc, and an
+    // enum declared below its first use would otherwise allocate with tag 0.
+    // Idempotent, same key, same value, exactly like the class writes.
+    //
+    // Requires enum_variant_fields to be populated first, since get_max_fields
+    // reads it — every caller does that immediately before.
+    //
+    // A fieldless enum gets NO tag, and that is the whole shape of the
+    // half-fix: its value is the bare immediate `tag << 56`, with no allocation
+    // to carry a header, so there is nothing for __val_class_tag to read. It
+    // keeps printing its bit pattern. Guessing from the bit pattern was
+    // deliberately rejected for #115 and is rejected here for the same reason —
+    // mistaking a real double for an enum is worse than visible garbage.
+    fun register_enum_tag(name: String) {
+        if (this.enum_type_ids.has(name)) { return }
+        if (this.get_max_fields(name) == 0) { return }
+        // The tag is 8 bits wide: __gc_pack_info stores `tag << 8` and
+        // __gc_info_tag reads it back with `and 255`, so 256 would come back as
+        // 0 and 266 as 10 — a silent collision with the first class. Refuse to
+        // register past the end instead: an unregistered enum allocates with
+        // __sf_malloc and prints its bit pattern, which is the behaviour before
+        // this change rather than a wrong to_string call.
+        if (this.next_class_type_id > 255) { return }
+        this.enum_type_ids.set(name, this.next_class_type_id)
+        this.next_class_type_id = this.next_class_type_id + 1
+    }
+
+    // Allocate the `[tag, f0, ...]` payload array of an enum and return it as a
+    // typed `[N x i64]*`. The one place the heap encoding is allocated, so the
+    // GC-header decision is made once for gen_enum_construct's two sites and
+    // emit_enum_constructor's.
+    //
+    // __gc_alloc rather than __sf_malloc, so the value carries a header and
+    // __val_class_tag can name it — which is what lets __val_to_string format an
+    // enum reached through `Any` (BUGS #154). This is a representation change,
+    // not a formatting one: the payload array grows a 24-byte header (16 on
+    // wasm32) and becomes GC-traced. Tracing needs nothing new — __gc_mark_drain
+    // routes any tag >= 10 to trace_instance, which scans size/8 slots as
+    // values, and slot 0 (the small variant tag) is rejected by
+    // __gc_is_heap_ptr's alignment/4 GB guards, so the scan is already correct
+    // for this shape.
+    //
+    // What this does expose: a payload enum becomes sweepable where it was
+    // previously an un-freed malloc, so it joins class instances in depending on
+    // shadow-stack rooting. is_gc_root_type roots every non-numeric local
+    // including the unannotated ones, and the collector is non-moving, so the
+    // remaining hole is the same one class instances already have — a live object
+    // held only in an LLVM SSA temp across an allocating call is not a root
+    // (BUGS #63). Enums are not a new case of that; they are a new instance of
+    // it.
+    //
+    // The result stays a BARE pointer, never NaN-tagged. ensure_enum_eq's
+    // shape check bails to "unequal" unless both operands' `lshr 48` is 0, so
+    // tagging an enum here would break `==` on every payload enum.
+    //
+    // identity_mode keeps __sf_malloc, the same gate emit_reflect_helpers and
+    // emit_class_hierarchy_helpers use: base.ll's __gc_alloc is a weak stub that
+    // mallocs and drops the tag, so there would be no header to read and nothing
+    // to gain. Consequence worth naming — the bootstrap compiles the compiler in
+    // identity mode, so it never exercises this path. Test with a user program
+    // built by gen3.
+    fun emit_enum_payload_alloc(enum_name: String, num_slots: Float): String {
+        var arr_bytes: Float = num_slots * 8
+        var arr_type: String = "[" + num_slots.floor().to_string() + " x i64]*"
+        // No tag means a fieldless enum (or the >255 refusal in
+        // register_enum_tag): allocate as before. gen_enum_construct can reach
+        // this via its "max_fields==0 but args>0" fall-through.
+        if (this.identity_mode or !this.enum_type_ids.has(enum_name)) {
+            var arr_raw: String = this.fresh_local()
+            this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
+            var arr_ptr: String = this.fresh_local()
+            this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to " + arr_type)
+            return arr_ptr
+        }
+        var etag: Float = this.enum_type_ids.get(enum_name)
+        var gc_raw: String = this.fresh_local()
+        this.emit_indent(gc_raw + " = call i64 @__gc_alloc(i64 " + arr_bytes.floor().to_string() + ", i64 " + etag.floor().to_string() + ")")
+        return this.val_to_typed_ptr(gc_raw, arr_type)
+    }
+
     fun get_variant_name(v: AST.Variant): String {
         return match (v) { Variant(n, f, __ns) => n
             _ => ""
@@ -8192,6 +8371,7 @@ class Codegen {
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
+        this.register_enum_tag(name)
         if (!this.register_only and !this.str_in_list(this.known_functions,"__type_" + name)) {
             this.known_functions.push("__type_" + name)
             this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
@@ -8209,7 +8389,7 @@ class Codegen {
                 _ => ""
             }
             if (vfields.length() > 0) {
-                this.emit_enum_constructor(vname, i, vfields, max_fields)
+                this.emit_enum_constructor(vname, i, vfields, max_fields, name)
             }
             i = i + 1
         }
@@ -8245,6 +8425,61 @@ class Codegen {
         // any real pointer, which is variant 0's tag, so every value of such an
         // enum stringified as its FIRST variant regardless of what it was, and
         // the "payload" it printed was the low 56 bits of the pointer.
+        // A slot to hold the StringBuilder across the appends, so it can be a GC
+        // ROOT rather than an SSA temporary.
+        //
+        // This is BUGS #63's shape, and it bit here specifically because this
+        // function allocates on every field: __sb_append can grow the buffer, and
+        // a nested-enum field calls another to_string that allocates a whole
+        // subtree of StringBuilders. The accumulator `sb` lived only in an LLVM
+        // register across all of that, so a collection triggered mid-format
+        // reclaimed the very buffer being appended to. The symptom was not a crash
+        // but a plausible-looking short string: `Pair(Pair(Leaf(1)...` came back as
+        // `1)))))`, because the buffer was freed and partly rewritten while the
+        // remaining appends carried on into it. Depth 1-3 were correct and depth 4+
+        // corrupt purely because that is where allocation crossed the 64KB
+        // threshold — which is why this looked like a nesting-depth limit.
+        //
+        // Classes never showed it: a user-written `to_string()` keeps its
+        // intermediates in real locals, and output_body.sf already allocas and
+        // pushes those as roots. Only this GENERATED formatter held its
+        // accumulator in a register, which is the asymmetry that located the bug.
+        //
+        // identity_mode is excluded because it has no GC at all (its __gc_alloc is
+        // a plain malloc), and max_fields == 0 because a fieldless enum's arms
+        // return a string constant without building anything.
+        // `%self` needs a root slot of its own, for the same reason and one level
+        // out. The payload array being formatted is reachable only through this
+        // parameter: an i64 argument is not an alloca, so output_body.sf's
+        // param-rooting loop (which pushes the ADDRESS of a param's slot) has
+        // nothing to push here. A collection triggered by any append therefore
+        // reclaims the array whose fields are still being read, and the next
+        // `load i64, i64* %self`-derived slot reads 0 — which is exactly the
+        // EXC_BAD_ACCESS at `L__to_string + 16` (`ldr x8, [x0]` with x0 = 0) that a
+        // nested enum produced at depth 4.
+        //
+        // This was invisible before payload enums had GC headers: an __sf_malloc
+        // array is never reclaimed, so an unrooted pointer to one is harmless. It is
+        // not a new bug so much as one that only becomes reachable once the value
+        // is collectable at all, which is the cost side of the #154 fix and belongs
+        // to it.
+        var self_slot: String = ""
+        if (max_fields > 0 and !this.identity_mode) {
+            self_slot = this.fresh_local()
+            this.emit_indent(self_slot + " = alloca i64")
+            this.emit_indent("store i64 %self, i64* " + self_slot)
+            var self_root: String = this.typed_ptr_to_val(self_slot, "i64*")
+            this.emit_indent("call void @__gc_push_root(i64 " + self_root + ")")
+            this.called_functions.push("__gc_push_root")
+        }
+
+        var sb_slot: String = ""
+        if (max_fields > 0 and !this.identity_mode) {
+            sb_slot = this.fresh_local()
+            this.emit_indent(sb_slot + " = alloca i64")
+            this.emit_indent("store i64 0, i64* " + sb_slot)
+        }
+
         var tag_val: String = ""
         if (max_fields == 0) {
             tag_val = this.fresh_local()
@@ -8289,6 +8524,14 @@ class Codegen {
                 var gep: String = this.fresh_local()
                 this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var as_i64: String = this.ptr_to_val(gep)
+                // A fieldless VARIANT of an enum that has payload variants still
+                // took the self root above (the gate is max_fields, per enum), so
+                // this exit has to balance it. Only self is pushed on this path —
+                // the StringBuilder is never created here.
+                if (self_slot.length() > 0) {
+                    this.emit_indent("call void @__gc_pop_roots(i64 1)")
+                    this.called_functions.push("__gc_pop_roots")
+                }
                 this.emit_terminator("ret i64 " + as_i64)
             } else {
                 // Has fields: build "VariantName(field0, field1, ...)"
@@ -8304,9 +8547,20 @@ class Codegen {
                 this.emit_indent(prefix_gep + " = getelementptr [" + prefix_len.to_string() + " x i8], [" + prefix_len.to_string() + " x i8]* " + prefix_const + ", i64 0, i64 0")
                 var prefix_i64: String = this.ptr_to_val(prefix_gep)
 
-                // Create a StringBuilder, append prefix
+                // Create a StringBuilder, append prefix.
+                //
+                // The push has to happen BEFORE the first append, not after the
+                // loop: __sb_append itself allocates, so a window of even one
+                // append is enough to lose the builder. Rooting is the address of
+                // the slot, so the collector re-reads it each cycle.
                 var sb: String = this.fresh_local()
                 this.emit_indent(sb + " = call i64 @StringBuilder()")
+                if (sb_slot.length() > 0) {
+                    this.emit_indent("store i64 " + sb + ", i64* " + sb_slot)
+                    var sb_root: String = this.typed_ptr_to_val(sb_slot, "i64*")
+                    this.emit_indent("call void @__gc_push_root(i64 " + sb_root + ")")
+                    this.called_functions.push("__gc_push_root")
+                }
                 this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + prefix_i64 + ")")
 
                 // For each field, extract, convert to string, append
@@ -8446,9 +8700,18 @@ class Codegen {
                 var close_i64: String = this.ptr_to_val(close_gep)
                 this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + close_i64 + ")")
 
-                // Finalize
+                // Finalize. __sb_to_string reads the buffer out, so the builder has
+                // to stay rooted through it; the pop goes between that read and the
+                // return. Leaking a root would be worse than the bug being fixed —
+                // the shadow stack is a stack, so an unbalanced push corrupts every
+                // frame above it.
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = call i64 @__sb_to_string(i64 " + sb + ")")
+                // Two roots on this path: self, then the builder. Pop both.
+                if (sb_slot.length() > 0) {
+                    this.emit_indent("call void @__gc_pop_roots(i64 2)")
+                    this.called_functions.push("__gc_pop_roots")
+                }
                 this.emit_terminator("ret i64 " + result)
             }
 
@@ -8462,6 +8725,13 @@ class Codegen {
         var empty_gep: String = this.fresh_local()
         this.emit_indent(empty_gep + " = getelementptr [" + empty_len.to_string() + " x i8], [" + empty_len.to_string() + " x i8]* " + empty_const + ", i64 0, i64 0")
         var empty_i64: String = this.ptr_to_val(empty_gep)
+        // The switch's default. Reachable only from a corrupt tag, but it is a real
+        // `ret`, and an unbalanced shadow stack corrupts every frame above it — a
+        // far worse failure than the "Unknown" it returns. So it balances too.
+        if (self_slot.length() > 0) {
+            this.emit_indent("call void @__gc_pop_roots(i64 1)")
+            this.called_functions.push("__gc_pop_roots")
+        }
         this.emit_terminator("ret i64 " + empty_i64)
 
         this.emit("}")
@@ -8470,7 +8740,10 @@ class Codegen {
         this.func_ret_types.set(func_name, this.str_to_type("String"))
     }
 
-    fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
+    // `enum_name` is only used to look up the payload GC tag, but it has to be
+    // passed rather than derived: this is keyed by VARIANT name, and a variant
+    // name alone does not identify its enum.
+    fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float, enum_name: String) {
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,vname)) { return }
         this.defined_funcs.push(vname)
@@ -8511,13 +8784,10 @@ class Codegen {
             this.emit_indent(r + " = or i64 " + t + ", %f0")
             this.emit_terminator("ret i64 " + r)
         } else {
-            // Array encoding: malloc [tag, f0, f1, ...]
+            // Array encoding: [tag, f0, f1, ...] — see emit_enum_payload_alloc
+            // for why this is __gc_alloc outside identity mode.
             var num_slots: Float = num_fields + 1
-            var arr_bytes: Float = num_slots * 8
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
-            var arr: String = this.fresh_local()
-            this.emit_indent(arr + " = bitcast i8* " + raw + " to [" + num_slots.floor().to_string() + " x i64]*")
+            var arr: String = this.emit_enum_payload_alloc(enum_name, num_slots)
             // Store tag
             var ts: String = this.fresh_local()
             this.emit_indent(ts + " = getelementptr [" + num_slots.floor().to_string() + " x i64], [" + num_slots.floor().to_string() + " x i64]* " + arr + ", i64 0, i64 0")
@@ -8590,6 +8860,7 @@ class Codegen {
             j = j + 1
         }
         this.enum_defs.set(name, variant_names)
+        this.register_enum_tag(name)
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
@@ -9251,6 +9522,9 @@ class Codegen {
         var vts_names: List<String> = this.class_type_ids.keys()
         var vts_tags: List<String> = []
         var vts_syms: List<String> = []
+        // 1 for an enum arm, 0 for a class arm. The two disagree about whether
+        // the callee's result is tagged — see the untag site below.
+        var vts_raw: List<String> = []
         var vi: Float = 0
         while (vi < vts_names.length()) {
             var vc: String = vts_names[vi]
@@ -9261,8 +9535,23 @@ class Codegen {
                 var vtag: Float = this.class_type_ids.get(vc)
                 vts_tags.push(vtag.floor().to_string())
                 vts_syms.push(this.resolve_method_symbol(vbare, "to_string"))
+                vts_raw.push("0")
             }
             vi = vi + 1
+        }
+        // One arm per payload enum (BUGS #154). Unconditional, unlike the class
+        // loop's effective_method_owner test: emit_enum_to_string generates
+        // <Enum>__to_string for every enum it lowers, so the symbol always
+        // exists — there is no user-declared-or-not question to ask.
+        var vts_enums: List<String> = this.enum_type_ids.keys()
+        var vei: Float = 0
+        while (vei < vts_enums.length()) {
+            var ve: String = vts_enums[vei]
+            var vetag: Float = this.enum_type_ids.get(ve)
+            vts_tags.push(vetag.floor().to_string())
+            vts_syms.push(ve + "__to_string")
+            vts_raw.push("1")
+            vei = vei + 1
         }
         this.emit("")
         this.emit("define i64 @__val_to_string(i64 %val) {")
@@ -9305,10 +9594,24 @@ class Codegen {
             // with no untag), and __val_class_tag already accepted both the
             // tagged and the bare-pointer spelling, so no normalisation belongs
             // between the tag read and the call.
-            var sptr: String = this.fresh_local()
-            this.emit_indent(sptr + " = call i8* @__val_untag_ptr(i64 " + sres + ")")
-            var sraw: String = this.ptr_to_val(sptr)
-            this.emit_terminator("ret i64 " + sraw)
+            //
+            // An enum arm skips it, because the two to_strings disagree on their
+            // return representation: a class <C>__to_string ends at
+            // __val_tag_ptr and hands back a TAGGED string, while
+            // emit_enum_to_string ends at __sb_to_string — a bare
+            // `load64(sb + 16)` — and hands back a RAW char*. The evidence is at
+            // the enum call sites in methods_body.sf, which wrap the result in
+            // __rt_tag_ptr while class calls do not. Untagging an already-raw
+            // pointer is the #102 mistake mirrored, and it corrupts the address
+            // rather than failing loudly.
+            if (vts_raw[vi.floor()] == "1") {
+                this.emit_terminator("ret i64 " + sres)
+            } else {
+                var sptr: String = this.fresh_local()
+                this.emit_indent(sptr + " = call i8* @__val_untag_ptr(i64 " + sres + ")")
+                var sraw: String = this.ptr_to_val(sptr)
+                this.emit_terminator("ret i64 " + sraw)
+            }
             vi = vi + 1
         }
         this.start_block(vts_none)
@@ -11018,8 +11321,15 @@ class Codegen {
                 // Already decided — by an annotation, or by the first pass's
                 // literal inference. Never overwrite either.
                 if (name.length() > 0 and !this.global_var_types.has(prefix + name) and !this.global_var_types.has(name)) {
-                    var vtype: String = this.get_var_type(stmts[si])
-                    if (vtype.length() == 0 or vtype == "Any") {
+                    // Unannotated only. The has() guard above is not enough to
+                    // protect an explicit `: Any`: the first pass declines to
+                    // record a global it reads as Any, so an `: Any` global is
+                    // absent from global_var_types and reaches this line — and
+                    // then took its type from the initializer's call, which is
+                    // BUGS #160 arriving by the one pre-scan that was otherwise
+                    // safe. Asking `is_unknown_type` asks only whether the author
+                    // wrote an annotation, which is the question this branch means.
+                    if (this.is_unknown_type(this.get_var_type(stmts[si]))) {
                         // Only a call's type is new information here; the literal
                         // shapes were already resolved by the first pass, and
                         // re-deriving them would just duplicate its allowlist.
@@ -11992,6 +12302,7 @@ class Codegen {
                         pr_vi = pr_vi + 1
                     }
                     this.enum_defs.set(pr_ename, pr_vnames)
+                    this.register_enum_tag(pr_ename)
                 }
                 VarDecl(n, t, init, d, v_vis, __ns, __fs) => {}
                 ExprStmt(e) => {}
@@ -16725,7 +17036,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
                         // Pre-register global variable type so functions compiled
                         // before the module init can resolve list/map/string dispatch
-                        var vtype2: String = gen.get_var_type(stmts[si2])
+                        var vann2: AST.Type = gen.get_var_type(stmts[si2])
+                        var vtype2: String = ""
+                        if (!gen.is_unknown_type(vann2)) {
+                            vtype2 = gen.type_to_string(vann2)
+                        }
                         // Infer from the initializer when unannotated (BUGS #36).
                         // `var _items = []` otherwise stays untyped and every
                         // `_items.push(...)` falls through to a return "0" that emits
@@ -16733,13 +17048,33 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         // before function return types register, so only literal
                         // shapes (list/map/string) resolve reliably here; that is
                         // exactly the case that bites.
-                        if (vtype2.length() == 0 or vtype2 == "Any") {
+                        //
+                        // Unannotated ONLY — `is_unknown_type`, not the old
+                        // `length() == 0 or == "Any"`. That disjunction asked two
+                        // questions with one test, and the second one was wrong here:
+                        // an explicit `: Any` is an annotation, so overwriting it with
+                        // the initializer's type is exactly the widening #147 fixed in
+                        // the checker and left unfixed in all five copies of this
+                        // pre-scan. That gap is BUGS #160 — `var g: Any = []` typed g
+                        // as a List, and a later `g = "s"` stored a string into a slot
+                        // every reader dispatched on as a list.
+                        if (gen.is_unknown_type(vann2)) {
                             var vinit2: String = gen.get_expr_type(gen.get_var_init(stmts[si2]))
                             if (vinit2.starts_with("List") or vinit2.starts_with("Map") or vinit2 == "String") {
                                 vtype2 = vinit2
                             }
                         }
-                        if (vtype2.length() > 0 and vtype2 != "Any") {
+                        // Record whatever is known, INCLUDING "Any". The old
+                        // `!= "Any"` was the write-side half of #160 and the half
+                        // that actually produced the wrong value: refusing to record
+                        // an explicit `: Any` leaves the global absent from
+                        // global_var_types, so get_var_type_str answers "" (unknown)
+                        // rather than "Any" (dispatch on the runtime tag), and every
+                        // read of `var g: Any = "s"` took the Int path and printed
+                        // the string's address. A local with the same annotation is
+                        // fine because typed_vars stores "Any" for it — the two
+                        // tables disagreed about what an Any annotation means.
+                        if (vtype2.length() > 0) {
                             gen.global_var_types.set(vname, vtype2)
                             gen.global_var_types.set(prefix + vname, vtype2)
                         }
@@ -17012,6 +17347,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }
@@ -17296,16 +17632,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
                         // Pre-register global variable type so functions compiled
                         // before the module init can resolve list/map/string dispatch
-                        var vtype3: String = gen.get_var_type(all_stmts[si])
+                        var vann3: AST.Type = gen.get_var_type(all_stmts[si])
+                        var vtype3: String = ""
+                        if (!gen.is_unknown_type(vann3)) {
+                            vtype3 = gen.type_to_string(vann3)
+                        }
                         // Infer from the initializer when unannotated (BUGS #36) —
-                        // see the note at the first module-global pre-scan.
-                        if (vtype3.length() == 0 or vtype3 == "Any") {
+                        // see the note at the first module-global pre-scan, including
+                        // why this asks only whether an annotation exists (#160).
+                        if (gen.is_unknown_type(vann3)) {
                             var vinit3: String = gen.get_expr_type(gen.get_var_init(all_stmts[si]))
                             if (vinit3.starts_with("List") or vinit3.starts_with("Map") or vinit3 == "String") {
                                 vtype3 = vinit3
                             }
                         }
-                        if (vtype3.length() > 0 and vtype3 != "Any") {
+                        // Including "Any" — see the note at the first pre-scan.
+                        if (vtype3.length() > 0) {
                             gen.global_var_types.set(vname, vtype3)
                             gen.global_var_types.set(prefix + vname, vtype3)
                         }
@@ -17433,18 +17775,23 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 }
                 gen.module_globals.set(gvname, true)
                 // Pre-register global variable type for method dispatch
-                var gvtype: String = gen.get_var_type(program[gvi])
+                var gvann: AST.Type = gen.get_var_type(program[gvi])
+                var gvtype: String = ""
+                if (!gen.is_unknown_type(gvann)) {
+                    gvtype = gen.type_to_string(gvann)
+                }
                 // Infer from the initializer when unannotated, exactly as the
                 // module-level pre-scan does (BUGS #36). This copy only ever read
                 // the annotation, so `var _order = "abc"` in the main program
                 // stayed untyped and every method on it misdispatched (#37).
-                if (gvtype.length() == 0 or gvtype == "Any") {
+                if (gen.is_unknown_type(gvann)) {
                     var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
                     if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
                         gvtype = gvinit
                     }
                 }
-                if (gvtype.length() > 0 and gvtype != "Any") {
+                // Including "Any" — see the note at the first pre-scan.
+                if (gvtype.length() > 0) {
                     gen.global_var_types.set(gvname, gvtype)
                 }
             }
@@ -17632,6 +17979,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     pr_vi = pr_vi + 1
                 }
                 gen.enum_defs.set(pr_ename, pr_vnames)
+                gen.register_enum_tag(pr_ename)
             }
             pr_si = pr_si + 1
         }
@@ -17699,6 +18047,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }
@@ -18012,16 +18361,22 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                         gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
                         // Pre-register global variable type so functions compiled
                         // before the module init can resolve list/map/string dispatch
-                        var vtype3: String = gen.get_var_type(all_stmts[si])
+                        var vann3: AST.Type = gen.get_var_type(all_stmts[si])
+                        var vtype3: String = ""
+                        if (!gen.is_unknown_type(vann3)) {
+                            vtype3 = gen.type_to_string(vann3)
+                        }
                         // Infer from the initializer when unannotated (BUGS #36) —
-                        // see the note at the first module-global pre-scan.
-                        if (vtype3.length() == 0 or vtype3 == "Any") {
+                        // see the note at the first module-global pre-scan, including
+                        // why this asks only whether an annotation exists (#160).
+                        if (gen.is_unknown_type(vann3)) {
                             var vinit3: String = gen.get_expr_type(gen.get_var_init(all_stmts[si]))
                             if (vinit3.starts_with("List") or vinit3.starts_with("Map") or vinit3 == "String") {
                                 vtype3 = vinit3
                             }
                         }
-                        if (vtype3.length() > 0 and vtype3 != "Any") {
+                        // Including "Any" — see the note at the first pre-scan.
+                        if (vtype3.length() > 0) {
                             gen.global_var_types.set(vname, vtype3)
                             gen.global_var_types.set(prefix + vname, vtype3)
                         }
@@ -18159,18 +18514,23 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 }
                 gen.module_globals.set(gvname, true)
                 // Pre-register global variable type for method dispatch
-                var gvtype: String = gen.get_var_type(program[gvi])
+                var gvann: AST.Type = gen.get_var_type(program[gvi])
+                var gvtype: String = ""
+                if (!gen.is_unknown_type(gvann)) {
+                    gvtype = gen.type_to_string(gvann)
+                }
                 // Infer from the initializer when unannotated, exactly as the
                 // module-level pre-scan does (BUGS #36). This copy only ever read
                 // the annotation, so `var _order = "abc"` in the main program
                 // stayed untyped and every method on it misdispatched (#37).
-                if (gvtype.length() == 0 or gvtype == "Any") {
+                if (gen.is_unknown_type(gvann)) {
                     var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
                     if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
                         gvtype = gvinit
                     }
                 }
-                if (gvtype.length() > 0 and gvtype != "Any") {
+                // Including "Any" — see the note at the first pre-scan.
+                if (gvtype.length() > 0) {
                     gen.global_var_types.set(gvname, gvtype)
                 }
             }
@@ -18442,6 +18802,7 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
                 pr_vi2 = pr_vi2 + 1
             }
             gen.enum_defs.set(pr_ename2, pr_vnames2)
+            gen.register_enum_tag(pr_ename2)
         }
         pr_pi = pr_pi + 1
     }

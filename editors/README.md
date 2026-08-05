@@ -217,6 +217,37 @@ Homebrew, `/usr/local/bin`, then `PATH`, and for the server at
 For quick iteration, `cd editors/intellij && ./gradlew runIde` launches a
 sandbox IDE with the plugin loaded.
 
+## Working on a project outside this repo
+
+Both plugins find the server and the compiler by looking **inside the open
+project** first. Open this repo and everything resolves; open a Saffron project
+anywhere else and, by default, nothing does — the IntelliJ plugin reports the
+server as missing, and even once it starts there is no `saffronc` for it to run,
+which surfaces as **no diagnostics at all** rather than as an error.
+
+Install once to fix both:
+
+```bash
+editors/build.sh --install     # writes only under ~/.saffron
+```
+
+That places three things, and all three are required:
+
+| Path | Why |
+|---|---|
+| `~/.saffron/lsp/server.js` + `node_modules/` | The plugin's fallback server location. The `.js` files alone are not enough — the server `require`s `vscode-languageserver` at runtime, so without `node_modules` beside it node exits with `Cannot find module`, which the IDE reports as the server crashing. |
+| `~/.saffron/bin/saffronc` | `findCompiler`'s fallback, after walking up from the server for a `build/saffronc`. |
+| `~/.saffron/src/lib/` | `@`-prefixed imports (`import "@test"`) resolve relative to the **executable**, so a compiler installed without the stdlib next to it rejects every one of them with `cannot resolve import`. |
+
+`--install` verifies the result by starting the installed server from outside the
+repo, because a partial install is invisible in the editor: it looks exactly like
+a file with no problems. Override the location with `SAFFRON_PREFIX=/some/path`.
+Nothing outside that prefix is touched — not `PATH`, not shell profiles, not any
+editor configuration.
+
+Re-run it after a bootstrap; the installed compiler is a copy, not a link, so it
+does not track `build/saffronc`.
+
 ## Regenerating `builtins.ts`
 
 `src/builtins.ts` holds signatures for the modules a program can call without an

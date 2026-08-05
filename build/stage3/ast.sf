@@ -268,7 +268,13 @@ enum Stmt {
     // destructuring `let` expands to. That is not a gap to fill in later — a
     // synthetic node has no source region, and inventing one would make an editor
     // jump to a construct the user never wrote. `span_is_real` is the guard.
-    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String, visibility: String, name_span: Span, full_span: Span),
+    // `type_ann` is a `Type` node, not a String — invariant I3. The omitted
+    // annotation is `UnknownType`, which is a DIFFERENT value from an explicit
+    // `: Any` (`AnyType`); the String encoding spelled the first "" and the two
+    // were routinely tested with one `length() == 0 or == "Any"` disjunction that
+    // asked both questions at once. See the migration note in
+    // docs/design/compiler-rewrite.md.
+    VarDecl(name: String, type_ann: Type, initializer: Expr, docstring: String, visibility: String, name_span: Span, full_span: Span),
     // `ret_type` is a `Type`, not a `String`, and an *omitted* return type is
     // `UnknownType` rather than the old in-band `"Nil"`. The two are different
     // facts: `fun f(): Nil` says the author declared no result, while an omitted

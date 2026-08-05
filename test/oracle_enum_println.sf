@@ -38,6 +38,28 @@
 //
 // Expected output is in the sibling .expected file and records CORRECT behaviour,
 // so this test fails until the println path is fixed.
+//
+// STATUS 2026-08-04. The PAYLOAD half is fixed and the FIELDLESS half is not, so
+// this test is down to exactly one failing line — line 22, `[Color.Red,
+// Color.Blue]`, which prints `[0, 4.77831e-299]`. It stays in
+// test/FAILURE_BASELINE.txt for that line.
+//
+// The split is not arbitrary, and it is not a partial job left half done: the two
+// halves have different representations and only one of them can be identified at
+// runtime. A payload variant is a heap allocation, so it can carry a GC header;
+// gen_enum_construct now allocates it with __gc_alloc under a per-enum type tag
+// and emit_val_to_string's switch has an arm per payload enum, which is what
+// makes every formatter path — __io_println, the list element formatter, a Map
+// value, an `Any` parameter — reach the enum's own to_string. A FIELDLESS variant
+// is the bare immediate `tag << 56`. There is no allocation, so there is no header
+// and nothing to hang an identity on, and recovering "this is a Color" from the
+// bit pattern alone would mean guessing that some doubles are enums. That guess
+// was deliberately declined for BUGS #115 and is declined here for the same
+// reason: silently misprinting a real double is worse than one visibly wrong line.
+//
+// Line 22 therefore documents the remaining half of #154 rather than a
+// regression, and closing it needs a representation change for fieldless enums
+// (an immediate that is distinguishable from a double), not another formatter arm.
 
 enum Color { Red, Green, Blue }
 

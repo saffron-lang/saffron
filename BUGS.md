@@ -3,16 +3,54 @@
 ## Open
 
 **13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #161. Next free number is **#167**. Two numbers are claimed but not written
-here: **#162**, the saffron_154 line's SSA-temp GC bug, and **#164**, which is
-`main`'s fatal-`IndexError`-on-incomplete-source fix — already resolved there, so
-it will land under Resolved with that merge rather than joining the open list.
-#158 and #160 were in this category one revision ago and are present now; this is
-the merge that brought them. The rule that made the placeholders necessary still
-holds: a number can be taken without its text being in this file yet, so the
-next-free number is one past the highest *claimed*, not one past the highest
-written. (The open count counts what is *written here*, so #162 and #164 are
-excluded on purpose and the `awk` self-check over this file agrees with the number.)
+#161, #162. Next free number is **#167**.
+
+For the first time in a while, the claimed set and the written set agree exactly —
+nothing is taken-but-absent. #160, #163 and #164 are taken and not in the list
+above because all three are already fixed and live under Resolved: an `: Any`
+global that could not widen, three malformed-`import` defects, and a fatal
+`IndexError` on any incomplete source. #161 and #162 were the two placeholders one
+revision ago and are both present now; this merge brought #160's closure and #164,
+and #161 is this line's own. The rule that made the placeholders necessary still
+holds and is worth keeping written down even on a day it is not needed: a number
+can be taken without its text being in this file yet, so the next-free number is
+one past the highest *claimed*, not one past the highest open or even the highest
+written.
+
+Worth recording how #162 and #163 avoided contesting each other, because it is
+the first time the scheme resolved a three-way overlap with no renumber at all:
+#163 was claimed *after* #161 and #162, saw both, and stepped over them to 163
+rather than treating an unpushed claim as free. The "unpushed side moves" rule
+would have let it take 162; it did not need to, and not exercising a tie-break
+you are entitled to is cheaper than winning it.
+
+**#162 is the sixth collision, and it was caught twice by the same grep.** It was
+filed as #156, which `main` had already taken for the `var x = nil` fix; the
+pre-merge re-read then found #161 claimed by `sfx`, so it landed on #162. Two
+renumbers in one pass is a first, and it is the strongest case yet for the rule at
+the end of the note below: had the grep been skipped, the number would have been
+wrong in a commit message, a `KNOWN_FAIL` entry and a test file's header comment,
+all of which are more annoying to fix than a header line. The tie-break was
+unchanged — committed and cited keeps the number, uncommitted moves.
+
+#162 was found by #154's own regression test rather than by looking for it, and it
+is filed separately on purpose: it is an argument-temp rooting hole in codegen,
+reproducible with plain classes, and #63 — which reads like the same bug — is
+closed and was about the *moving* nursery. Retiring that nursery removed the move
+without supplying the missing root, so the non-moving collector now frees the temp
+instead of relocating it. Same lesson as #161 one entry up: the non-regression half
+of a fix is where the next bug is found.
+
+#154 stays open with its payload half fixed. An enum with at least one field
+anywhere now carries a GC header and names itself on the no-static-type paths; a
+fieldless variant is the immediate `tag << 56` with nothing to hang a header on, so
+it needs an enum-bearing NaN-box tag rather than another formatter arm.
+
+(The count and next-free number live at the top of this section, not here. This
+spot used to carry a second copy of them, restated after each narrative note, and
+this merge is the argument against that: both copies conflicted, and a reader who
+found only the lower one would have read a stale count as current. One source of
+truth per fact — invariant I10 — applies to this file too.)
 
 **This line's duplicate-declaration fix was renumbered three times: #160 → #164 →
 #166.** Written as #160, with the cross-module dispatch bug as #161. By the time
@@ -55,12 +93,14 @@ consecutive collision narratives make the scheme look worse than it is. (The
 sixth, above, landed on the very next pair of numbers — so the quiet case is
 still the exception, not the new normal.)
 
-#160 is also the second half of #147, which is the more useful thing about it: the
+#160 was also the second half of #147, which is the more useful thing about it: the
 checker stopped conflating `: Any` with silence, and codegen never did. A fix
 recorded as landed had reached one of two consumers, and nothing in the tree said
 so. That is the argument for invariant I10 (one source of truth per fact) stated as
 a measurement rather than a principle — the inference in question exists in five
-pasted copies.
+pasted copies, and closing #160 on 2026-08-04 meant editing all five by hand. The
+argument survives the fix: what made the hand-edit safe was not deduplication but
+the type migration splitting the overloaded guard into two askable questions.
 
 **The fifth collision, and the first one the pre-commit re-read actually caught.**
 The rule at the end of the note below — re-read the next-free number from `main`
@@ -620,64 +660,94 @@ a one-line edit.
 
 ---
 
-### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
+### 162. OPEN — a live object held only in an LLVM SSA temp is *freed* by the non-moving collector; `f(Box(7), allocating())` reads a dead object
 
-**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
-and only when the initializer is a list, map or string literal.
+**Severity: high.** Silent data corruption with no crash and no diagnostic, on the
+ordinary form `f(alloc_expr, allocating_expr)`.
 
-`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
-prints a bit pattern or segfaults. The identical *local* is correct — that is the
-half #147 fixed:
+This is **not** #63, and the distinction is the reason it needs its own number.
+#63 was the *moving* minor collector invalidating an SSA temp — it closed by
+retiring the nursery, so there is no move left to invalidate anything. The
+observation #63 left behind in its resolution notes ("values in SSA temps are not
+roots, so no moving collector can be correct against this codegen") turns out to
+understate the problem: with the nursery gone, the mark-sweep major collector
+does not move the object, it **frees** it, because the shadow stack never learned
+about it either. Retiring the nursery narrowed #63's window; it did not close
+this one.
 
-```saffron
-var g: Any = "abc"
-fun r() { g = 42
-    IO.println("g=${g}") }
-r()                             // segfault
-
-fun s() { var l: Any = "abc"
-    l = 42
-    IO.println("l=${l}") }
-s()                             // l=42   — correct
-```
-
-#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
-moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
-apart. It did — but **codegen's global pre-scans still collapse the two**, in five
-copies, all of the same shape:
+**Reproduction** — deterministic, 51 corrupted reads out of 200:
 
 ```saffron
-if (gvtype.length() == 0 or gvtype == "Any") {
-    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
-    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
-        gvtype = gvinit
-    }
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
 }
+
+fun churn(n: Int): Int {
+    var s: String = ""
+    var i: Int = 0
+    while (i < n) { s = "x" + i.to_string(); i = i + 1 }
+    return s.length()
+}
+
+fun take(b: Box, ignored: Int): Int { return b.v }
+
+var bad: Int = 0
+var t: Int = 0
+while (t < 200) {
+    var got: Int = take(Box(7), churn(300))   // Box(7) live only in a register
+    if (got != 7) { bad = bad + 1 }
+    t = t + 1
+}
+IO.println("mismatches=${bad}")   // mismatches=51
 ```
 
-`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
-`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
-fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
-initializer and `global_var_types` says `String`; the store writes a tagged Int and
-the load untags a pointer.
+**Cause.** Argument 0 is evaluated to an SSA temp, then argument 1 runs and
+allocates. `output_body.sf:489` roots a *parameter* by pushing the address of its
+alloca, and locals get root slots the same way — but an argument value that is
+still mid-call-setup has no alloca and no slot, so `__gc_collect` cannot see it
+and sweeps it. `take`'s `b.v` then reads freed memory.
 
-The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
-`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
-three collapsed shapes break, which is the kind of partial correctness that reads as
-"works" until it doesn't.
+**Two controls, both clean, which is what pins it:**
 
-**Why the five copies exist, and why that is the actual entry.** Each one has a
-comment citing the bug that motivated it (#36, #37, #80) — they were added
-independently, and the inference was pasted rather than shared. One source of truth
-(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
-them is a real change with real risk, and the pre-scans differ in which corpus and
-prefix they walk, so this is filed rather than fixed in passing.
+| control | mismatches |
+|---|---|
+| default | 51 / 200 |
+| `__gc_disable()` | **0** |
+| hoist both arguments into locals first (`var b = Box(7)` / `var c = churn(300)`) | **0** |
 
-Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
-behaviour and documents in a comment that the `: Any` global is excluded for this
-reason.
+The second row rules out an arithmetic or dispatch bug. The third is the shape of
+the fix and also the workaround available today: a local gets a root slot, an
+argument temp does not.
+
+**It is not enum-specific, and that matters for #154.** Found while writing
+`test/pass/enum_payload_any.sf`, where making payload enums GC-collectable exposed
+it — but the identical shape built out of **classes**, which have carried GC headers
+since long before #154, corrupts the same way. At depth 9 a recursive
+`assert_eq(grow(d).to_string(), want(d), "depth ${d}")` over classes returns a
+string whose tail reads `Node(Node(Leaf(1), 0)), 0)` — live subtrees replaced by
+`0`. The emitted IR shows the window plainly:
+
+```llvm
+%t15 = call i64 @__rt_tag_ptr(i64 %t14)   ; argument 0, live only in a register
+%t16 = load i64, i64* @__g_d
+%t17 = call i64 @want(i64 %t16)            ; allocates thousands of strings
+```
+
+Enums merely fail one depth earlier than classes because their allocation per node
+is larger. `test/pass/enum_payload_any.sf` therefore hoists both operands into
+locals rather than asserting on the raw call — a test that failed here would be
+reporting this entry while claiming to be about #154.
+
+**Fix.** Give argument temps root slots for the duration of call setup: spill each
+evaluated argument to an alloca and `__gc_push_root` it before evaluating the next,
+popping after the call. The blocker noted while fixing #154 is real and needs
+solving first — there is no entry-block alloca facility in this codegen, so an
+alloca emitted in a loop body grows the stack every iteration. Either add one, or
+reuse a fixed-size per-frame argument spill area.
 
 ---
+
 
 ### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
 
@@ -851,14 +921,21 @@ the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
 
 ---
 
-### 154. An enum inside a printed collection still prints a bit pattern
+### 154. An enum inside a printed collection still prints a bit pattern — PAYLOAD HALF FIXED, fieldless half open
 
-**Severity: medium.** Silent wrong answer, but narrower than it looks: only
-*inside* a collection. This is the residual of #105 and #115 — both entries
-describe it, but it lived in a paragraph of a *resolved* entry, which is a place
-nothing looks. Hence a number.
+**Severity: medium as filed; now low.** Silent wrong answer, but narrower than it
+looks: only *inside* a collection. This is the residual of #105 and #115 — both
+entries describe it, but it lived in a paragraph of a *resolved* entry, which is a
+place nothing looks. Hence a number.
 
-Verified at HEAD, not inherited from those notes:
+**Status 2026-08-04: the payload half is fixed** exactly as the plan below
+prescribed, and the fieldless half is open and will stay open until the value
+representation changes. The entry keeps its number rather than splitting, because
+the two halves share one repro and one mechanism; what differs is only whether the
+value is allocated. The fix is described after the original analysis, so the
+reasoning that predicted it stays readable next to what it predicted.
+
+Verified when filed (the payload lines are now correct — see the Fix section):
 
 ```saffron
 enum Color { Red, Green }
@@ -912,6 +989,86 @@ wrong.
 `test/oracle_enum_println.sf` records the current output and is the regression
 test; it has shown these subnormals unchanged across both the #105 and #115 fixes,
 which is how the residual stayed measured rather than assumed.
+
+**The fix (payload half, 2026-08-04).** Three edits, in the order that matters:
+
+1. `codegen.sf` gains `enum_type_ids: Map<String, Float>` beside `class_type_ids`,
+   drawing from the **same** `next_class_type_id` counter. Sharing the counter is
+   the point, not an economy: `__val_class_tag` answers with one number space, so
+   an enum tag that duplicated a class tag would make `__val_to_string` call the
+   wrong `to_string` — a silent wrong answer strictly worse than the bit pattern
+   it replaced.
+2. `emit_enum_payload_alloc` (`stmts_body.sf`) centralises the allocation choice
+   that used to be three independent `__sf_malloc` call sites — two in
+   `gen_enum_construct`, one in `emit_enum_constructor`. It emits `__gc_alloc`
+   with the enum's tag when there is one, and falls back to the old `__sf_malloc`
+   under `identity_mode` or for an unregistered enum. One helper rather than three
+   edits, so the header decision cannot drift between construction paths.
+3. `emit_val_to_string`'s switch gains an arm per registered enum, and
+   `register_enum_tag` is called from the **prescan** (`output_body.sf`'s
+   `EnumDecl` arm) as well as from `gen_enum_decl` and `register_enum_variants`.
+   The prescan call is the one that is easy to omit and fatal to omit: without it
+   a construction site lowered before its `enum` declaration gets no tag, which is
+   the #33/#36/#37 ordering hazard.
+
+Two asymmetries had to be respected, and each would have produced a plausible
+wrong fix:
+
+- **An enum `to_string` returns a RAW `char*`; a class `to_string` returns a
+  NaN-TAGGED pointer.** The evidence is at the existing call sites — the two enum
+  ones wrap the result in `__rt_tag_ptr` (`methods_body.sf:1787`, `:3653`) and the
+  class ones do not. So the enum arms in `__val_to_string` must *not* apply
+  `__val_untag_ptr`, which every class arm does. Applying it uniformly is the #102
+  mistake mirrored.
+- **The payload pointer must stay BARE.** `ensure_enum_eq` bails to "unequal"
+  unless both operands' `lshr 48` is zero, so NaN-tagging the allocation would
+  make every payload enum unequal to itself while printing perfectly.
+  `__val_class_tag` accepts a bare pointer (`upper == 0`) precisely so a
+  GC-headered value need not be tagged to be identified.
+
+The tag is **8 bits** — `__gc_pack_info` stores `tag << 8` and `__gc_info_tag`
+reads it back with `and 255` — so `register_enum_tag` refuses past 255 rather than
+wrapping. Refusing degrades to the old bit-pattern print; wrapping would collide
+with class tag 10 and call a wrong `to_string`. GC tracing needed no work:
+`__gc_mark_drain` routes any `tag >= 10` to `trace_instance`, and slot 0 (the
+small variant tag) is rejected by `__gc_is_heap_ptr`'s alignment and 4 GB floor,
+so scanning `size/8` slots as values is already safe.
+
+**wasm64 is excluded, not overlooked.** `wasm_base.ll`'s `__gc_alloc` discards its
+`%type_tag` and its `__val_class_tag` returns 0 unconditionally. Native
+(`base_nanbox.ll`, 24-byte header) and wasm32 (`wasm_base_32.ll`, 16-byte header)
+both have real headers and both were verified end to end.
+
+Verified: native and wasm32 both go from `[5.21502e-310, ...]` / `[0, 0, 0]` to
+`[Circle(1), Rect(2, 3), Nothing]`; `==` and `match` unchanged; `./bootstrap.sh`
+green through stage 2 gen4 including the zero-`Int`-fallback assertion; the suite's
+failure *set* byte-identical to `test/FAILURE_BASELINE.txt`. `identity_mode` is
+excluded exactly as `emit_reflect_helpers` is, so **the bootstrap never exercises
+this path** — it was tested with gen3-compiled user programs, which is the only way
+it could be.
+
+`test/pass/enum_payload_any.sf` is the regression test. It asserts on the three
+paths that have no static type — a list element, a map value, an `Any` parameter —
+because those are the ones that converge on `__any_to_string`; asserting on
+`"${Shape.Circle(1)}"` would have passed before the fix and proved nothing. Five of
+its first sixteen assertions failed before the change and all sixteen pass after.
+
+It has 23 assertions now, and the extra seven are the ones that earned their keep:
+a 400-iteration GC stress loop and a recursive `Tree` formatted byte-exactly against
+an independently built expected string. Those found the two rooting bugs listed
+above, which the sixteen never reached — an enum whose to_string does not itself
+allocate past the threshold never triggers a collection mid-format. They also found
+#162, which is *not* fixed here: the recursive assertions hoist both operands into
+locals, because passing them directly leaves argument 0 unrooted across argument 1's
+allocation. That is an argument-temp rooting hole in codegen, reproducible with
+classes, and it is filed separately rather than papered over silently.
+
+**What remains open** is the fieldless half, unchanged from the analysis above, and
+`test/oracle_enum_println.sf` still fails on exactly one line for it (line 22,
+`[Color.Red, Color.Blue]` → `[0, 4.77831e-299]`). That test stays in the baseline
+for that line, so the movement here is *inside* one name — two failing lines to one
+— which an unchanged failure set does not show. Closing it needs an enum-bearing
+NaN-box tag, not another formatter arm.
 
 ---
 
@@ -1180,6 +1337,167 @@ neutralising the pass to an early `return` placed *after* the Map allocation sti
 segfaults, moving the same early return *before* it passes, and `GC.disable()`
 makes the test pass 4/4. #165 does not fix it, which is the useful part — if the
 runtime constructors had been the only bug, this test would have gone green here.
+
+### 160. FIXED — an explicit `: Any` on a module-level global could not widen it, and read back wrong even unreassigned; #147 was fixed in the checker only
+
+**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
+and only when the initializer is a list, map or string literal.
+
+`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
+prints a bit pattern or segfaults. The identical *local* is correct — that is the
+half #147 fixed:
+
+```saffron
+var g: Any = "abc"
+fun r() { g = 42
+    IO.println("g=${g}") }
+r()                             // segfault
+
+fun s() { var l: Any = "abc"
+    l = 42
+    IO.println("l=${l}") }
+s()                             // l=42   — correct
+```
+
+#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
+moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
+apart. It did — but **codegen's global pre-scans still collapse the two**, in five
+copies, all of the same shape:
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") {
+    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+        gvtype = gvinit
+    }
+}
+```
+
+`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
+`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
+fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
+initializer and `global_var_types` says `String`; the store writes a tagged Int and
+the load untags a pointer.
+
+The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
+`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
+three collapsed shapes break, which is the kind of partial correctness that reads as
+"works" until it doesn't.
+
+**Why the five copies exist, and why that is the actual entry.** Each one has a
+comment citing the bug that motivated it (#36, #37, #80) — they were added
+independently, and the inference was pasted rather than shared. One source of truth
+(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
+them is a real change with real risk, and the pre-scans differ in which corpus and
+prefix they walk, so this is filed rather than fixed in passing.
+
+Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
+behaviour and documents in a comment that the `: Any` global is excluded for this
+reason.
+
+**Fixed 2026-08-04, as a consequence of migrating `VarDecl.type_ann` to
+`AST.Type`.** Regression test `test/pass/any_global_widens.sf`.
+
+The entry above had the mechanism half right, and the missing half was the bigger
+one. There were **two** defects sharing the guard, on opposite sides of it:
+
+- The *read* side is what is described above — `length() == 0 or == "Any"` retypes
+  an annotated `Any` global from its initializer.
+- The *write* side, three lines later, is `if (gvtype.length() > 0 and gvtype !=
+  "Any")`. Refusing to **record** an `Any` annotation leaves the global absent from
+  `global_var_types` entirely, and `get_var_type_str` then answers `""` — unknown,
+  not `Any` — so every read of it takes the Int path.
+
+The write side is the one that produced a wrong value with **no reassignment at
+all**, which the entry above asserted was fine:
+
+```saffron
+var a_str: Any = "s"
+var a_bool: Any = true
+fun p() { IO.println("${a_bool}/${a_str}") }
+p()                             // before: true/4307428950
+                                // after:  true/s
+```
+
+`a_bool` printing correctly is what made this look like a widening bug: an unboxed
+bool survives the Int path, a string pointer does not. So the repro in the original
+entry needed the reassignment only to reach a *tag* the Int path mangles — not
+because reassignment was the defect.
+
+The local was correct throughout for a reason worth keeping: `typed_vars` stores
+`"Any"` for a local, and `global_var_types` refused to. **The two tables disagreed
+about what an `Any` annotation means, and only one of them was asked about globals.**
+
+The fix is not the deduplication this entry called for, and the argument for I10
+stands unchanged — five copies still exist, and all five had to be edited by hand.
+What made the edit *safe* rather than a guess is that the migration split the
+overloaded guard into two predicates that answer separately:
+`is_unknown_type` ("was an annotation written") and `is_any_type` ("does it say
+Any"). Every one of the five needed only the first question; that they were asking
+both is what the String encoding could not express.
+
+The read side of `prescan_global_call_types` (`utils_body.sf`) needed the same fix
+and had been assessed as safe here. Its `has()` guard does not protect an `: Any`
+global, precisely because the first pass declines to record one — so the global is
+absent, reaches the second pass, and gets typed from its initializer's call. Two
+passes, and the first one's bug is what let the second one's fire.
+
+---
+
+### 164. FIXED — any incomplete source killed the compiler with a fatal IndexError instead of reporting a parse error
+
+```
+$ printf 'var x = \n' > partial.sf
+$ saffronc partial.sf out.ll
+Runtime Error: IndexError: index 4 out of bounds (length 4)
+```
+
+Every one of these did it — `var x =`, `var x: Int =`, `fun f(`, `if (`,
+`var a = 1 +`. Not exotic input: that is a file *being typed*.
+
+`parse_error` (`parser.sf:342`) reports and returns **without consuming a token**,
+deliberately, so each caller decides how to resynchronize. But a parser that has
+run out of input keeps calling `advance()`, and `current()` read
+`this.tokens[this.pos]` with no bound. Past the end that is an `IndexError`, which
+in Saffron is a **fatal runtime error, not a diagnostic** — it routes to
+`__runtime_error_fatal` and calls `rt_exit(1)`, so the process died before writing
+anything. Under `--json` that means empty stdout, and the LSP correctly read
+"unparseable payload" and published nothing: an editor showing a clean file for
+source that cannot parse.
+
+Note which stage failed. This was never a checker or codegen problem; the token
+cursor simply had no terminal condition.
+
+**Why the suite never saw it.** Every input in `test/` is a complete file —
+`test/fail/*.sf` are *deliberately* malformed, but they are malformed and
+*finished*, e.g. a type error or a bad import, never a truncated one. Nothing in
+`src/`, `test/` or `tools/` is a partial file, so bootstrap and the full suite are
+green with this live. It only reproduces where every intermediate state of the
+text gets compiled, which is to say an editor — the same
+identity-mode/complete-input blind spot as #163, in a different dimension: not
+"our source isn't adversarial about its syntax" but "our source is never
+half-written".
+
+**Fix.** `current()` clamps `pos` to the last token. The lexer always terminates
+the stream with `TkEof` (`lexer.sf:767`), so past-the-end now yields EOF forever
+and the existing `match_kind_check("eof")` guards do their job.
+
+**The over-correction to watch for, and the audit.** Returning EOF forever turns a
+crash into a *hang* for any loop that scans for a closing token without an EOF
+guard — strictly worse in an editor, where a spin is an unkillable beachball
+rather than a message. So every token loop in `parser.sf` was checked: of 39
+`while` loops on `match_kind_check`/`peek_is`, 13 have no `eof` in the condition,
+and all 13 are *positive* tests (`while (this.match_kind_check("."))` and
+similar), which stop at EOF on their own because EOF is not the token they seek.
+Exactly one negative loop lacked the guard — `while (!this.match_kind_check(")"))`
+in enum-variant fields (`parser.sf:2711`) — and it is guarded here too. The
+`while (true)` at :878 already breaks on `eof` explicitly. The regression test
+asserts each incomplete case *returns* within a timeout, so a future spin fails
+the test rather than quietly passing it.
+
+Test: `editors/shared/test/compiler_discovery.test.mjs`, "incomplete buffers
+produce diagnostics, not a crash or a hang", which drives all six shapes through
+the real LSP round trip.
 
 ### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
 
@@ -6840,6 +7158,11 @@ the full explanation of why it is off. Two notes for whoever revives it:
   SSA temps are not roots, so no moving collector can be correct against this
   codegen. Sink the receiver load below all allocating argument code first
   (`methods_body.sf` / `expr_body.sf`), or make the young generation non-moving.
+  **That blocker is now its own open entry, #162** — and retiring the nursery did
+  not close it. With no move left, the non-moving major collector *frees* the
+  unrooted temp instead of relocating it, so `f(Box(7), allocating())` still reads
+  a dead object 51 times in 200. Fixing #162 is a precondition for reviving the
+  nursery, not a separate cleanup.
 - The forwarding pass has its own tag bug on top of that — see #101 and the
   comment in `__gc_minor_visit_slot`.
 

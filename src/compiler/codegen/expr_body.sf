@@ -3309,10 +3309,7 @@
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
         if (args.length() == 0) {
             // No-field variant in a multi-field enum: heap-allocate to outlive function
-            var arr_raw: String = this.fresh_local()
-            this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 8)")
-            var arr_ptr: String = this.fresh_local()
-            this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [1 x i64]*")
+            var arr_ptr: String = this.emit_enum_payload_alloc(enum_name, 1)
             var tag_slot: String = this.fresh_local()
             this.emit_indent(tag_slot + " = getelementptr [1 x i64], [1 x i64]* " + arr_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
@@ -3323,19 +3320,40 @@
         // Multi-field: heap-allocate array [tag, field0, field1, ...]
         // Must be heap (not stack) since enum values may outlive the creating function
         var num_slots: Float = args.length() + 1
-        var arr_bytes: Float = num_slots * 8
-        var arr_raw: String = this.fresh_local()
-        this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
-        var arr_ptr: String = this.fresh_local()
-        this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [" + num_slots.to_string() + " x i64]*")
-        // Store tag at index 0
-        var tag_slot: String = this.fresh_local()
-        this.emit_indent(tag_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 0")
-        this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
-        // Store fields at indices 1, 2, ...
-        var i: Float = 0
-        while (i < args.length()) {
-            var val: String = this.gen_arg_value(args[i])
+
+        // Evaluate the arguments FIRST, then allocate, then store.
+        //
+        // This order is load-bearing now that the payload carries a GC header. The
+        // old order was alloc-then-evaluate, which was safe only because
+        // __sf_malloc memory is never reclaimed: the array was invisible to the
+        // collector, and nothing collected it either. Under __gc_alloc the same
+        // shape is a dangling pointer — `arr_ptr` sits in an LLVM register while
+        // gen_arg_value emits a nested allocating call (for
+        // `Pair(build(d-1), build(d-1))`, an entire subtree), so a collection
+        // inside an argument reclaims the array being filled. The stores then land
+        // in freed memory and the value reads back truncated, or faults, at
+        // whatever depth allocation first crosses the 64KB threshold — which is
+        // why it presented as a nesting-depth limit rather than as a GC bug.
+        //
+        // What this does NOT close: __gc_alloc can itself collect (it calls
+        // __gc_minor_collect, and __gc_collect on threshold), so an argument value
+        // held only in a register is still exposed across that one call. That is
+        // BUGS #63 exactly, it is not specific to enums, and class construction has
+        // the identical window — `CPair(build(d-1), build(d-1))` evaluates its
+        // arguments and then calls a constructor that allocates. Fixing it here
+        // would mean rooting the array and storing each argument as it is produced,
+        // which needs an alloca; an alloca emitted in a loop body grows the stack
+        // every iteration, and there is no entry-block alloca facility in this
+        // codegen to put it in instead. So this fix deliberately brings enums up to
+        // the exposure classes already have and no further, rather than inventing a
+        // rooting convention for one node type.
+        //
+        // The Int->Float widening stays inline with each argument because it reads
+        // `this.last_type`, which the next gen_arg_value would overwrite.
+        var arg_vals: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var av: String = this.gen_arg_value(args[ai])
             // Int -> Float widening at the payload store, the same fix as BUGS #28
             // applied to enum construction instead of variable declaration.
             //
@@ -3355,16 +3373,29 @@
             // Gated on !identity_mode for the reason given at the declaration site:
             // identity mode has no tags and Float *is* Int there.
             if (!this.identity_mode) {
-                var decl_type: String = this.get_variant_field_type(enum_name, variant, i)
+                var decl_type: String = this.get_variant_field_type(enum_name, variant, ai)
                 if (decl_type == "Float" and this.type_to_string(this.last_type) == "Int") {
-                    var widened: String = this.emit_untag_float(val)
-                    val = this.emit_tag_float(widened)
+                    var widened: String = this.emit_untag_float(av)
+                    av = this.emit_tag_float(widened)
                 }
             }
+            arg_vals.push(av)
+            ai = ai + 1
+        }
+
+        var arr_ptr: String = this.emit_enum_payload_alloc(enum_name, num_slots)
+        // Store tag at index 0
+        var tag_slot: String = this.fresh_local()
+        this.emit_indent(tag_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 0")
+        this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
+        // Store fields at indices 1, 2, ... — no allocation between the alloc above
+        // and the last of these, which is the property the comment relies on.
+        var i: Float = 0
+        while (i < args.length()) {
             var field_idx: Float = i + 1
             var field_slot: String = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())
-            this.emit_indent("store i64 " + val + ", i64* " + field_slot)
+            this.emit_indent("store i64 " + arg_vals[i] + ", i64* " + field_slot)
             i = i + 1
         }
         // Cast pointer to i64 for storage
