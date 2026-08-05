@@ -376,6 +376,8 @@ declare i64 @__gc_alloc_zeroed(i64, i64)
 declare i64 @__gc_realloc(i64, i64, i64)
 declare void @__gc_push_root(i64)
 declare void @__gc_pop_roots(i64)
+declare void @__gc_push_temp(i64)
+declare void @__gc_pop_temps(i64)
 declare i64 @__gc_shadow_stack_depth()
 declare i64 @__gc_list_new()
 declare void @__gc_list_push(i64, i64)
@@ -1228,35 +1230,35 @@ endif86:
   %t17 = inttoptr i64 %t16 to %Lexer*
   %t18 = getelementptr %Lexer, %Lexer* %t17, i32 0, i32 4
   %t19 = load volatile i64, i64* %t18
-  %t20 = call i8* @__sf_malloc(i64 48)
-  %t21 = bitcast i8* %t20 to [6 x i64]*
-  %t22 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 0
-  store i64 0, i64* %t22
-  %t23 = load i64, i64* %kind
-  %t24 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 1
-  store i64 %t23, i64* %t24
+  %t20 = load i64, i64* %kind
+  %t21 = load i64, i64* %self
+  %t22 = inttoptr i64 %t21 to %Lexer*
+  %t23 = getelementptr %Lexer, %Lexer* %t22, i32 0, i32 6
+  %t24 = load volatile i64, i64* %t23
   %t25 = load i64, i64* %self
   %t26 = inttoptr i64 %t25 to %Lexer*
-  %t27 = getelementptr %Lexer, %Lexer* %t26, i32 0, i32 6
+  %t27 = getelementptr %Lexer, %Lexer* %t26, i32 0, i32 7
   %t28 = load volatile i64, i64* %t27
-  %t29 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 2
-  store i64 %t28, i64* %t29
-  %t30 = load i64, i64* %self
-  %t31 = inttoptr i64 %t30 to %Lexer*
-  %t32 = getelementptr %Lexer, %Lexer* %t31, i32 0, i32 7
-  %t33 = load volatile i64, i64* %t32
-  %t34 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 3
-  store i64 %t33, i64* %t34
-  %t35 = load i64, i64* %self
-  %t36 = inttoptr i64 %t35 to %Lexer*
-  %t37 = getelementptr %Lexer, %Lexer* %t36, i32 0, i32 5
-  %t38 = load volatile i64, i64* %t37
-  %t39 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 4
-  store i64 %t38, i64* %t39
-  %t40 = load i64, i64* %len
-  %t41 = getelementptr [6 x i64], [6 x i64]* %t21, i64 0, i64 5
-  store i64 %t40, i64* %t41
-  %t42 = ptrtoint [6 x i64]* %t21 to i64
+  %t29 = load i64, i64* %self
+  %t30 = inttoptr i64 %t29 to %Lexer*
+  %t31 = getelementptr %Lexer, %Lexer* %t30, i32 0, i32 5
+  %t32 = load volatile i64, i64* %t31
+  %t33 = load i64, i64* %len
+  %t34 = call i8* @__sf_malloc(i64 48)
+  %t35 = bitcast i8* %t34 to [6 x i64]*
+  %t36 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 0
+  store i64 0, i64* %t36
+  %t37 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 1
+  store i64 %t20, i64* %t37
+  %t38 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 2
+  store i64 %t24, i64* %t38
+  %t39 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 3
+  store i64 %t28, i64* %t39
+  %t40 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 4
+  store i64 %t32, i64* %t40
+  %t41 = getelementptr [6 x i64], [6 x i64]* %t35, i64 0, i64 5
+  store i64 %t33, i64* %t41
+  %t42 = ptrtoint [6 x i64]* %t35 to i64
   %t43 = call i64 @__list_push(i64 %t19, i64 %t42)
   ret i64 0
 }
@@ -1277,26 +1279,26 @@ entry:
   %t2 = inttoptr i64 %t1 to %Lexer*
   %t3 = getelementptr %Lexer, %Lexer* %t2, i32 0, i32 4
   %t4 = load volatile i64, i64* %t3
-  %t5 = call i8* @__sf_malloc(i64 48)
-  %t6 = bitcast i8* %t5 to [6 x i64]*
-  %t7 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 0
-  store i64 0, i64* %t7
-  %t8 = load i64, i64* %kind
-  %t9 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 1
-  store i64 %t8, i64* %t9
-  %t10 = load i64, i64* %line
-  %t11 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 2
-  store i64 %t10, i64* %t11
-  %t12 = load i64, i64* %col
-  %t13 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 3
-  store i64 %t12, i64* %t13
-  %t14 = load i64, i64* %offset
-  %t15 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 4
-  store i64 %t14, i64* %t15
-  %t16 = add i64 0, 0
-  %t17 = getelementptr [6 x i64], [6 x i64]* %t6, i64 0, i64 5
-  store i64 %t16, i64* %t17
-  %t18 = ptrtoint [6 x i64]* %t6 to i64
+  %t5 = load i64, i64* %kind
+  %t6 = load i64, i64* %line
+  %t7 = load i64, i64* %col
+  %t8 = load i64, i64* %offset
+  %t9 = add i64 0, 0
+  %t10 = call i8* @__sf_malloc(i64 48)
+  %t11 = bitcast i8* %t10 to [6 x i64]*
+  %t12 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 0
+  store i64 0, i64* %t12
+  %t13 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 1
+  store i64 %t5, i64* %t13
+  %t14 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 2
+  store i64 %t6, i64* %t14
+  %t15 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 3
+  store i64 %t7, i64* %t15
+  %t16 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 4
+  store i64 %t8, i64* %t16
+  %t17 = getelementptr [6 x i64], [6 x i64]* %t11, i64 0, i64 5
+  store i64 %t9, i64* %t17
+  %t18 = ptrtoint [6 x i64]* %t11 to i64
   %t19 = call i64 @__list_push(i64 %t4, i64 %t18)
   ret i64 0
 }
@@ -2003,14 +2005,14 @@ while.body184:
   br label %while.cond183
 while.end185:
   %t109 = load i64, i64* %self
-  %t110 = call i8* @__sf_malloc(i64 16)
-  %t111 = bitcast i8* %t110 to [2 x i64]*
-  %t112 = getelementptr [2 x i64], [2 x i64]* %t111, i64 0, i64 0
-  store i64 0, i64* %t112
-  %t113 = load i64, i64* %value
-  %t114 = getelementptr [2 x i64], [2 x i64]* %t111, i64 0, i64 1
-  store i64 %t113, i64* %t114
-  %t115 = ptrtoint [2 x i64]* %t111 to i64
+  %t110 = load i64, i64* %value
+  %t111 = call i8* @__sf_malloc(i64 16)
+  %t112 = bitcast i8* %t111 to [2 x i64]*
+  %t113 = getelementptr [2 x i64], [2 x i64]* %t112, i64 0, i64 0
+  store i64 0, i64* %t113
+  %t114 = getelementptr [2 x i64], [2 x i64]* %t112, i64 0, i64 1
+  store i64 %t110, i64* %t114
+  %t115 = ptrtoint [2 x i64]* %t112 to i64
   %t116 = call i64 @Lexer__emit(i64 %t109, i64 %t115)
   ret i64 0
 else175:
@@ -2391,14 +2393,14 @@ else243:
   br label %endif241
 endif241:
   %t349 = load i64, i64* %self
-  %t350 = call i8* @__sf_malloc(i64 16)
-  %t351 = bitcast i8* %t350 to [2 x i64]*
-  %t352 = getelementptr [2 x i64], [2 x i64]* %t351, i64 0, i64 0
-  store i64 1, i64* %t352
-  %t353 = load i64, i64* %text
-  %t354 = getelementptr [2 x i64], [2 x i64]* %t351, i64 0, i64 1
-  store i64 %t353, i64* %t354
-  %t355 = ptrtoint [2 x i64]* %t351 to i64
+  %t350 = load i64, i64* %text
+  %t351 = call i8* @__sf_malloc(i64 16)
+  %t352 = bitcast i8* %t351 to [2 x i64]*
+  %t353 = getelementptr [2 x i64], [2 x i64]* %t352, i64 0, i64 0
+  store i64 1, i64* %t353
+  %t354 = getelementptr [2 x i64], [2 x i64]* %t352, i64 0, i64 1
+  store i64 %t350, i64* %t354
+  %t355 = ptrtoint [2 x i64]* %t352 to i64
   %t356 = call i64 @Lexer__emit(i64 %t349, i64 %t355)
   br label %endif238
 else240:
@@ -2407,14 +2409,14 @@ else240:
   br i1 %t358, label %then244, label %else245
 then244:
   %t359 = load i64, i64* %self
-  %t360 = call i8* @__sf_malloc(i64 16)
-  %t361 = bitcast i8* %t360 to [2 x i64]*
-  %t362 = getelementptr [2 x i64], [2 x i64]* %t361, i64 0, i64 0
-  store i64 1, i64* %t362
-  %t363 = load i64, i64* %text
-  %t364 = getelementptr [2 x i64], [2 x i64]* %t361, i64 0, i64 1
-  store i64 %t363, i64* %t364
-  %t365 = ptrtoint [2 x i64]* %t361 to i64
+  %t360 = load i64, i64* %text
+  %t361 = call i8* @__sf_malloc(i64 16)
+  %t362 = bitcast i8* %t361 to [2 x i64]*
+  %t363 = getelementptr [2 x i64], [2 x i64]* %t362, i64 0, i64 0
+  store i64 1, i64* %t363
+  %t364 = getelementptr [2 x i64], [2 x i64]* %t362, i64 0, i64 1
+  store i64 %t360, i64* %t364
+  %t365 = ptrtoint [2 x i64]* %t362 to i64
   %t366 = call i64 @Lexer__emit(i64 %t359, i64 %t365)
   br label %endif238
 else245:
@@ -2423,14 +2425,14 @@ else245:
   %t369 = call i64 @atol(i8* %t368)
   store i64 %t369, i64* %ivalue
   %t370 = load i64, i64* %self
-  %t371 = call i8* @__sf_malloc(i64 16)
-  %t372 = bitcast i8* %t371 to [2 x i64]*
-  %t373 = getelementptr [2 x i64], [2 x i64]* %t372, i64 0, i64 0
-  store i64 0, i64* %t373
-  %t374 = load i64, i64* %ivalue
-  %t375 = getelementptr [2 x i64], [2 x i64]* %t372, i64 0, i64 1
-  store i64 %t374, i64* %t375
-  %t376 = ptrtoint [2 x i64]* %t372 to i64
+  %t371 = load i64, i64* %ivalue
+  %t372 = call i8* @__sf_malloc(i64 16)
+  %t373 = bitcast i8* %t372 to [2 x i64]*
+  %t374 = getelementptr [2 x i64], [2 x i64]* %t373, i64 0, i64 0
+  store i64 0, i64* %t374
+  %t375 = getelementptr [2 x i64], [2 x i64]* %t373, i64 0, i64 1
+  store i64 %t371, i64* %t375
+  %t376 = ptrtoint [2 x i64]* %t373 to i64
   %t377 = call i64 @Lexer__emit(i64 %t370, i64 %t376)
   br label %endif238
 endif238:
@@ -2912,16 +2914,16 @@ else309:
   br label %endif307
 endif307:
   %t190 = load i64, i64* %self
-  %t191 = call i8* @__sf_malloc(i64 16)
-  %t192 = bitcast i8* %t191 to [2 x i64]*
-  %t193 = getelementptr [2 x i64], [2 x i64]* %t192, i64 0, i64 0
-  store i64 2, i64* %t193
-  %t194 = load i64, i64* %result
-  %t195 = call i64 @__sb_to_string(i64 %t194)
-  %t196 = call i64 @__rt_tag_ptr(i64 %t195)
-  %t197 = getelementptr [2 x i64], [2 x i64]* %t192, i64 0, i64 1
-  store i64 %t196, i64* %t197
-  %t198 = ptrtoint [2 x i64]* %t192 to i64
+  %t191 = load i64, i64* %result
+  %t192 = call i64 @__sb_to_string(i64 %t191)
+  %t193 = call i64 @__rt_tag_ptr(i64 %t192)
+  %t194 = call i8* @__sf_malloc(i64 16)
+  %t195 = bitcast i8* %t194 to [2 x i64]*
+  %t196 = getelementptr [2 x i64], [2 x i64]* %t195, i64 0, i64 0
+  store i64 2, i64* %t196
+  %t197 = getelementptr [2 x i64], [2 x i64]* %t195, i64 0, i64 1
+  store i64 %t193, i64* %t197
+  %t198 = ptrtoint [2 x i64]* %t195 to i64
   %t199 = load i64, i64* %lit_line
   %t200 = load i64, i64* %lit_col
   %t201 = load i64, i64* %lit_off
@@ -2969,15 +2971,15 @@ endif307:
   %t239 = load i64, i64* %lit_off
   %t240 = call i64 @Lexer__emit_at(i64 %t232, i64 %t236, i64 %t237, i64 %t238, i64 %t239)
   %t241 = load i64, i64* %self
-  %t242 = call i8* @__sf_malloc(i64 16)
-  %t243 = bitcast i8* %t242 to [2 x i64]*
-  %t244 = getelementptr [2 x i64], [2 x i64]* %t243, i64 0, i64 0
-  store i64 6, i64* %t244
-  %t245 = getelementptr [10 x i8], [10 x i8]* @.str.143, i64 0, i64 0
-  %t246 = ptrtoint i8* %t245 to i64
-  %t247 = getelementptr [2 x i64], [2 x i64]* %t243, i64 0, i64 1
-  store i64 %t246, i64* %t247
-  %t248 = ptrtoint [2 x i64]* %t243 to i64
+  %t242 = getelementptr [10 x i8], [10 x i8]* @.str.143, i64 0, i64 0
+  %t243 = ptrtoint i8* %t242 to i64
+  %t244 = call i8* @__sf_malloc(i64 16)
+  %t245 = bitcast i8* %t244 to [2 x i64]*
+  %t246 = getelementptr [2 x i64], [2 x i64]* %t245, i64 0, i64 0
+  store i64 6, i64* %t246
+  %t247 = getelementptr [2 x i64], [2 x i64]* %t245, i64 0, i64 1
+  store i64 %t243, i64* %t247
+  %t248 = ptrtoint [2 x i64]* %t245 to i64
   %t249 = load i64, i64* %lit_line
   %t250 = load i64, i64* %lit_col
   %t251 = load i64, i64* %lit_off
@@ -3052,16 +3054,16 @@ while.end270:
   br i1 %t300, label %then311, label %else312
 then311:
   %t301 = load i64, i64* %self
-  %t302 = call i8* @__sf_malloc(i64 16)
-  %t303 = bitcast i8* %t302 to [2 x i64]*
-  %t304 = getelementptr [2 x i64], [2 x i64]* %t303, i64 0, i64 0
-  store i64 2, i64* %t304
-  %t305 = load i64, i64* %result
-  %t306 = call i64 @__sb_to_string(i64 %t305)
-  %t307 = call i64 @__rt_tag_ptr(i64 %t306)
-  %t308 = getelementptr [2 x i64], [2 x i64]* %t303, i64 0, i64 1
-  store i64 %t307, i64* %t308
-  %t309 = ptrtoint [2 x i64]* %t303 to i64
+  %t302 = load i64, i64* %result
+  %t303 = call i64 @__sb_to_string(i64 %t302)
+  %t304 = call i64 @__rt_tag_ptr(i64 %t303)
+  %t305 = call i8* @__sf_malloc(i64 16)
+  %t306 = bitcast i8* %t305 to [2 x i64]*
+  %t307 = getelementptr [2 x i64], [2 x i64]* %t306, i64 0, i64 0
+  store i64 2, i64* %t307
+  %t308 = getelementptr [2 x i64], [2 x i64]* %t306, i64 0, i64 1
+  store i64 %t304, i64* %t308
+  %t309 = ptrtoint [2 x i64]* %t306 to i64
   %t310 = load i64, i64* %lit_line
   %t311 = load i64, i64* %lit_col
   %t312 = load i64, i64* %lit_off
@@ -3079,16 +3081,16 @@ then311:
   br label %endif310
 else312:
   %t323 = load i64, i64* %self
-  %t324 = call i8* @__sf_malloc(i64 16)
-  %t325 = bitcast i8* %t324 to [2 x i64]*
-  %t326 = getelementptr [2 x i64], [2 x i64]* %t325, i64 0, i64 0
-  store i64 2, i64* %t326
-  %t327 = load i64, i64* %result
-  %t328 = call i64 @__sb_to_string(i64 %t327)
-  %t329 = call i64 @__rt_tag_ptr(i64 %t328)
-  %t330 = getelementptr [2 x i64], [2 x i64]* %t325, i64 0, i64 1
-  store i64 %t329, i64* %t330
-  %t331 = ptrtoint [2 x i64]* %t325 to i64
+  %t324 = load i64, i64* %result
+  %t325 = call i64 @__sb_to_string(i64 %t324)
+  %t326 = call i64 @__rt_tag_ptr(i64 %t325)
+  %t327 = call i8* @__sf_malloc(i64 16)
+  %t328 = bitcast i8* %t327 to [2 x i64]*
+  %t329 = getelementptr [2 x i64], [2 x i64]* %t328, i64 0, i64 0
+  store i64 2, i64* %t329
+  %t330 = getelementptr [2 x i64], [2 x i64]* %t328, i64 0, i64 1
+  store i64 %t326, i64* %t330
+  %t331 = ptrtoint [2 x i64]* %t328 to i64
   %t332 = call i64 @Lexer__emit(i64 %t323, i64 %t331)
   br label %endif310
 endif310:
@@ -3719,15 +3721,15 @@ else396:
   br i1 %t315, label %then397, label %else398
 then397:
   %t316 = load i64, i64* %self
-  %t317 = call i8* @__sf_malloc(i64 16)
-  %t318 = bitcast i8* %t317 to [2 x i64]*
-  %t319 = getelementptr [2 x i64], [2 x i64]* %t318, i64 0, i64 0
-  store i64 6, i64* %t319
-  %t320 = getelementptr [2 x i8], [2 x i8]* @.str.174, i64 0, i64 0
-  %t321 = ptrtoint i8* %t320 to i64
-  %t322 = getelementptr [2 x i64], [2 x i64]* %t318, i64 0, i64 1
-  store i64 %t321, i64* %t322
-  %t323 = ptrtoint [2 x i64]* %t318 to i64
+  %t317 = getelementptr [2 x i8], [2 x i8]* @.str.174, i64 0, i64 0
+  %t318 = ptrtoint i8* %t317 to i64
+  %t319 = call i8* @__sf_malloc(i64 16)
+  %t320 = bitcast i8* %t319 to [2 x i64]*
+  %t321 = getelementptr [2 x i64], [2 x i64]* %t320, i64 0, i64 0
+  store i64 6, i64* %t321
+  %t322 = getelementptr [2 x i64], [2 x i64]* %t320, i64 0, i64 1
+  store i64 %t318, i64* %t322
+  %t323 = ptrtoint [2 x i64]* %t320 to i64
   %t324 = call i64 @Lexer__emit(i64 %t316, i64 %t323)
   br label %endif339
 else398:
@@ -4466,14 +4468,14 @@ then487:
   br label %endif436
 else488:
   %t287 = load i64, i64* %self
-  %t288 = call i8* @__sf_malloc(i64 16)
-  %t289 = bitcast i8* %t288 to [2 x i64]*
-  %t290 = getelementptr [2 x i64], [2 x i64]* %t289, i64 0, i64 0
-  store i64 6, i64* %t290
-  %t291 = load i64, i64* %text
-  %t292 = getelementptr [2 x i64], [2 x i64]* %t289, i64 0, i64 1
-  store i64 %t291, i64* %t292
-  %t293 = ptrtoint [2 x i64]* %t289 to i64
+  %t288 = load i64, i64* %text
+  %t289 = call i8* @__sf_malloc(i64 16)
+  %t290 = bitcast i8* %t289 to [2 x i64]*
+  %t291 = getelementptr [2 x i64], [2 x i64]* %t290, i64 0, i64 0
+  store i64 6, i64* %t291
+  %t292 = getelementptr [2 x i64], [2 x i64]* %t290, i64 0, i64 1
+  store i64 %t288, i64* %t292
+  %t293 = ptrtoint [2 x i64]* %t290 to i64
   %t294 = call i64 @Lexer__emit(i64 %t287, i64 %t293)
   br label %endif436
 endif436:
@@ -4712,14 +4714,14 @@ then520:
   %t89 = call i64 @Lexer__read_doc_comment(i64 %t88)
   store i64 %t89, i64* %text
   %t90 = load i64, i64* %self
-  %t91 = call i8* @__sf_malloc(i64 16)
-  %t92 = bitcast i8* %t91 to [2 x i64]*
-  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
-  store i64 69, i64* %t93
-  %t94 = load i64, i64* %text
-  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
-  store i64 %t94, i64* %t95
-  %t96 = ptrtoint [2 x i64]* %t92 to i64
+  %t91 = load i64, i64* %text
+  %t92 = call i8* @__sf_malloc(i64 16)
+  %t93 = bitcast i8* %t92 to [2 x i64]*
+  %t94 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 0
+  store i64 69, i64* %t94
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 1
+  store i64 %t91, i64* %t95
+  %t96 = ptrtoint [2 x i64]* %t93 to i64
   %t97 = call i64 @Lexer__emit(i64 %t90, i64 %t96)
   br label %while.cond503
 else521:
@@ -4740,14 +4742,14 @@ then522:
   %t110 = call i64 @Lexer__read_doc_comment(i64 %t109)
   store i64 %t110, i64* %text
   %t111 = load i64, i64* %self
-  %t112 = call i8* @__sf_malloc(i64 16)
-  %t113 = bitcast i8* %t112 to [2 x i64]*
-  %t114 = getelementptr [2 x i64], [2 x i64]* %t113, i64 0, i64 0
-  store i64 70, i64* %t114
-  %t115 = load i64, i64* %text
-  %t116 = getelementptr [2 x i64], [2 x i64]* %t113, i64 0, i64 1
-  store i64 %t115, i64* %t116
-  %t117 = ptrtoint [2 x i64]* %t113 to i64
+  %t112 = load i64, i64* %text
+  %t113 = call i8* @__sf_malloc(i64 16)
+  %t114 = bitcast i8* %t113 to [2 x i64]*
+  %t115 = getelementptr [2 x i64], [2 x i64]* %t114, i64 0, i64 0
+  store i64 70, i64* %t115
+  %t116 = getelementptr [2 x i64], [2 x i64]* %t114, i64 0, i64 1
+  store i64 %t112, i64* %t116
+  %t117 = ptrtoint [2 x i64]* %t114 to i64
   %t118 = call i64 @Lexer__emit(i64 %t111, i64 %t117)
   br label %while.cond503
 else523:
