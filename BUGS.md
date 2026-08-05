@@ -2,12 +2,14 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #162. Next free number is **#165**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#162. Next free number is **#165**.
 
-#163 and #164 are taken and are *not* in the list above because both are already
-fixed — three malformed-`import` defects, and a fatal `IndexError` on any
-incomplete source — filed and resolved on sight, so they live under Resolved.
+#160, #163 and #164 are taken and are *not* in the list above because all three
+are already fixed — an `: Any` global that could not widen, three
+malformed-`import` defects, and a fatal `IndexError` on any incomplete source.
+#160 was open here and closed on 2026-08-04; the other two were filed and
+resolved on sight. All three live under Resolved.
 #161 is taken and not present here at all: it is the `sfx` worktree's
 committed entry (a method call binding to a same-named class in another module)
 and will arrive with that merge. Both are the ordinary case the rule below
@@ -44,7 +46,8 @@ fieldless variant is the immediate `tag << 56` with nothing to hang a header on,
 it needs an enum-bearing NaN-box tag rather than another formatter arm.
 
 **12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160. Next free number is **#165**.
+#162. Next free number is **#165**. (#160 was open when the note below was
+written and closed on 2026-08-04; #162 arrived from the saffron_154 line.)
 
 #161 and #162 are claimed but not present here: #161 is the sfx line's
 cross-module method-binding bug and #162 is the saffron_154 line's SSA-temp GC
@@ -59,12 +62,14 @@ found #160 free, which is the whole procedure working as intended rather than
 detecting a clash. Worth recording that the quiet case happens too; five
 consecutive collision narratives make the scheme look worse than it is.
 
-#160 is also the second half of #147, which is the more useful thing about it: the
+#160 was also the second half of #147, which is the more useful thing about it: the
 checker stopped conflating `: Any` with silence, and codegen never did. A fix
 recorded as landed had reached one of two consumers, and nothing in the tree said
 so. That is the argument for invariant I10 (one source of truth per fact) stated as
 a measurement rather than a principle — the inference in question exists in five
-pasted copies.
+pasted copies, and closing #160 on 2026-08-04 meant editing all five by hand. The
+argument survives the fix: what made the hand-edit safe was not deduplication but
+the type migration splitting the overloaded guard into two askable questions.
 
 #158 is the entry the previous revision of this header described as "claimed but
 not present" — the lsp worktree's `match`-above-its-enum bug. This is that merge,
@@ -719,64 +724,6 @@ reuse a fixed-size per-frame argument spill area.
 
 ---
 
-### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
-
-**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
-and only when the initializer is a list, map or string literal.
-
-`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
-prints a bit pattern or segfaults. The identical *local* is correct — that is the
-half #147 fixed:
-
-```saffron
-var g: Any = "abc"
-fun r() { g = 42
-    IO.println("g=${g}") }
-r()                             // segfault
-
-fun s() { var l: Any = "abc"
-    l = 42
-    IO.println("l=${l}") }
-s()                             // l=42   — correct
-```
-
-#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
-moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
-apart. It did — but **codegen's global pre-scans still collapse the two**, in five
-copies, all of the same shape:
-
-```saffron
-if (gvtype.length() == 0 or gvtype == "Any") {
-    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
-    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
-        gvtype = gvinit
-    }
-}
-```
-
-`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
-`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
-fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
-initializer and `global_var_types` says `String`; the store writes a tagged Int and
-the load untags a pointer.
-
-The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
-`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
-three collapsed shapes break, which is the kind of partial correctness that reads as
-"works" until it doesn't.
-
-**Why the five copies exist, and why that is the actual entry.** Each one has a
-comment citing the bug that motivated it (#36, #37, #80) — they were added
-independently, and the inference was pasted rather than shared. One source of truth
-(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
-them is a real change with real risk, and the pre-scans differ in which corpus and
-prefix they walk, so this is filed rather than fixed in passing.
-
-Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
-behaviour and documents in a comment that the `: Any` global is excluded for this
-reason.
-
----
 
 ### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
 
@@ -1144,6 +1091,112 @@ semicolon alone.
 ---
 
 ## Resolved
+
+### 160. FIXED — an explicit `: Any` on a module-level global could not widen it, and read back wrong even unreassigned; #147 was fixed in the checker only
+
+**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
+and only when the initializer is a list, map or string literal.
+
+`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
+prints a bit pattern or segfaults. The identical *local* is correct — that is the
+half #147 fixed:
+
+```saffron
+var g: Any = "abc"
+fun r() { g = 42
+    IO.println("g=${g}") }
+r()                             // segfault
+
+fun s() { var l: Any = "abc"
+    l = 42
+    IO.println("l=${l}") }
+s()                             // l=42   — correct
+```
+
+#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
+moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
+apart. It did — but **codegen's global pre-scans still collapse the two**, in five
+copies, all of the same shape:
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") {
+    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+        gvtype = gvinit
+    }
+}
+```
+
+`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
+`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
+fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
+initializer and `global_var_types` says `String`; the store writes a tagged Int and
+the load untags a pointer.
+
+The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
+`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
+three collapsed shapes break, which is the kind of partial correctness that reads as
+"works" until it doesn't.
+
+**Why the five copies exist, and why that is the actual entry.** Each one has a
+comment citing the bug that motivated it (#36, #37, #80) — they were added
+independently, and the inference was pasted rather than shared. One source of truth
+(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
+them is a real change with real risk, and the pre-scans differ in which corpus and
+prefix they walk, so this is filed rather than fixed in passing.
+
+Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
+behaviour and documents in a comment that the `: Any` global is excluded for this
+reason.
+
+**Fixed 2026-08-04, as a consequence of migrating `VarDecl.type_ann` to
+`AST.Type`.** Regression test `test/pass/any_global_widens.sf`.
+
+The entry above had the mechanism half right, and the missing half was the bigger
+one. There were **two** defects sharing the guard, on opposite sides of it:
+
+- The *read* side is what is described above — `length() == 0 or == "Any"` retypes
+  an annotated `Any` global from its initializer.
+- The *write* side, three lines later, is `if (gvtype.length() > 0 and gvtype !=
+  "Any")`. Refusing to **record** an `Any` annotation leaves the global absent from
+  `global_var_types` entirely, and `get_var_type_str` then answers `""` — unknown,
+  not `Any` — so every read of it takes the Int path.
+
+The write side is the one that produced a wrong value with **no reassignment at
+all**, which the entry above asserted was fine:
+
+```saffron
+var a_str: Any = "s"
+var a_bool: Any = true
+fun p() { IO.println("${a_bool}/${a_str}") }
+p()                             // before: true/4307428950
+                                // after:  true/s
+```
+
+`a_bool` printing correctly is what made this look like a widening bug: an unboxed
+bool survives the Int path, a string pointer does not. So the repro in the original
+entry needed the reassignment only to reach a *tag* the Int path mangles — not
+because reassignment was the defect.
+
+The local was correct throughout for a reason worth keeping: `typed_vars` stores
+`"Any"` for a local, and `global_var_types` refused to. **The two tables disagreed
+about what an `Any` annotation means, and only one of them was asked about globals.**
+
+The fix is not the deduplication this entry called for, and the argument for I10
+stands unchanged — five copies still exist, and all five had to be edited by hand.
+What made the edit *safe* rather than a guess is that the migration split the
+overloaded guard into two predicates that answer separately:
+`is_unknown_type` ("was an annotation written") and `is_any_type` ("does it say
+Any"). Every one of the five needed only the first question; that they were asking
+both is what the String encoding could not express.
+
+The read side of `prescan_global_call_types` (`utils_body.sf`) needed the same fix
+and had been assessed as safe here. Its `has()` guard does not protect an `: Any`
+global, precisely because the first pass declines to record one — so the global is
+absent, reaches the second pass, and gets typed from its initializer's call. Two
+passes, and the first one's bug is what let the second one's fire.
+
+---
 
 ### 164. FIXED — any incomplete source killed the compiler with a fatal IndexError instead of reporting a parse error
 

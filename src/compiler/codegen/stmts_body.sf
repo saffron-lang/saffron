@@ -139,9 +139,16 @@
         }
     }
 
-    fun get_var_type(stmt: AST.Stmt): String {
+    /// The declared type of a `var`, as a node.
+    ///
+    /// The non-VarDecl fallback is `UnknownType`, which is also what a VarDecl with
+    /// no annotation carries — the same collision `fun_ret_type` documents in
+    /// src/lib/ast.sf. Every caller here pre-checks `classify_stmt(...) == "var"`,
+    /// so neither of them reaches the fallback; a caller that could should ask
+    /// first rather than reading the answer.
+    fun get_var_type(stmt: AST.Stmt): AST.Type {
         return match (stmt) { VarDecl(n, t, i, d, v_vis, __ns, __fs) => t
-            _ => ""
+            _ => AST.Type.UnknownType
         }
     }
 
@@ -173,12 +180,29 @@
         this.gen_var_decl_with_name(name, this.get_var_type(stmt), this.get_var_init(stmt))
     }
 
-    fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
-        // "" is the parser's "no annotation" sentinel and the only spelling that
+    fun gen_var_decl_with_name(name: String, type_ann: AST.Type, init: AST.Expr) {
+        // `UnknownType` is the parser's "no annotation" node and the only value that
         // means infer. An explicit `: Any` is a real annotation and must NOT be
         // overwritten by the initializer's type — that conflation was BUGS #147.
-        var vtype: String = type_ann
-        var vt_infer: Bool = type_ann.length() == 0
+        //
+        // `type_to_string`, not `type_to_source`: everything downstream of `vtype`
+        // in this function is written against the diagnostic spellings — the
+        // `vtype.contains("<")` generic-argument resolution below, `== "Nil"`,
+        // `starts_with("List")` at the callers. Rendering the faithful form here
+        // would hand those a string they were not written for, which is precisely
+        // the reason type_to_source was added as a second function rather than as a
+        // fix to the first (see the note on it in ast.sf).
+        //
+        // The infer path starts from "" rather than from the rendered node, because
+        // `type_to_string(UnknownType)` is the literal word "Unknown" and I2 forbids
+        // that reaching codegen. Every line below either overwrites `vtype` or tests
+        // it against a real type name, so "" is what the old String encoding put
+        // here and what those lines are written to see when nothing is known.
+        var vt_infer: Bool = this.is_unknown_type(type_ann)
+        var vtype: String = ""
+        if (!vt_infer) {
+            vtype = this.type_to_string(type_ann)
+        }
         if (vt_infer) {
             vtype = this.get_expr_type(init)
         }
