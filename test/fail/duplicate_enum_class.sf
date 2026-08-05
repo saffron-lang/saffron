@@ -1,4 +1,4 @@
-// BUGS #166: the collision is across KINDS, not just within one.
+// BUGS #168: the collision is across KINDS, not just within one.
 //
 // `class` and `enum` register in different maps (env.class_fields vs
 // env.enum_variants) but share one name space at every use site — `Shape` as a

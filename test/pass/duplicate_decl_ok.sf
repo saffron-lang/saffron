@@ -1,4 +1,4 @@
-// BUGS #166's non-regression half: what the duplicate-declaration check must
+// BUGS #168's non-regression half: what the duplicate-declaration check must
 // NOT reject.
 //
 // The check exists because two type declarations in ONE file leave the checker
@@ -23,7 +23,7 @@ Test.assert_eq(TargetB.label, "target-b-global", "the other module's is distinct
 
 // Both modules' `Marker` is constructible. The two constructors resolve to
 // distinct symbols (@fixtures_alias_scope_target_a_Marker and ..._b_Marker in
-// the IR), which is the part #166 must not break.
+// the IR), which is the part #168 must not break.
 //
 // Their METHODS are deliberately not asserted here: `ma.describe()` binds to
 // target_b's describe for both receivers, even with an explicit

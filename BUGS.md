@@ -2,20 +2,17 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#161, #162. Next free number is **#167**.
+**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#161, #162, #165. Next free number is **#169**.
 
-For the first time in a while, the claimed set and the written set agree exactly —
-nothing is taken-but-absent. #160, #163 and #164 are taken and not in the list
-above because all three are already fixed and live under Resolved: an `: Any`
-global that could not widen, three malformed-`import` defects, and a fatal
-`IndexError` on any incomplete source. #161 and #162 were the two placeholders one
-revision ago and are both present now; this merge brought #160's closure and #164,
-and #161 is this line's own. The rule that made the placeholders necessary still
-holds and is worth keeping written down even on a day it is not needed: a number
-can be taken without its text being in this file yet, so the next-free number is
-one past the highest *claimed*, not one past the highest open or even the highest
-written.
+#160, #163, #164, #167 and #168 are taken and not in the list above because all
+five are fixed and live under Resolved: an `: Any` global that could not widen,
+three malformed-`import` defects, a fatal `IndexError` on any incomplete source,
+the GC constructor rule, and two type declarations binding one name. #165 arrives
+open from `main` (a class-typed parameter accepting a String). The rule that made
+the old placeholders necessary still holds: a number can be taken without its text
+being in this file yet, so the next-free number is one past the highest *claimed*,
+not one past the highest open or even the highest written.
 
 Worth recording how #162 and #163 avoided contesting each other, because it is
 the first time the scheme resolved a three-way overlap with no renumber at all:
@@ -53,21 +50,24 @@ found only the lower one would have read a stale count as current. One source of
 truth per fact — invariant I10 — applies to this file too.)
 
 **This line's duplicate-declaration fix was renumbered three times: #160 → #164 →
-#166.** Written as #160, with the cross-module dispatch bug as #161. By the time
-the GC work below was finished, `main` had claimed **#160** for the `: Any`
+#166 → #168.** Written as #160, with the cross-module dispatch bug as #161. By the
+time the GC work below was finished, `main` had claimed **#160** for the `: Any`
 widening entry and **#162** for the saffron_154 line's SSA-temp bug, so it became
 **#164** and the GC fix took **#165**. Then, during the bootstrap and suite run
-that verified the merge, `main` landed its own **#164** (a fatal `IndexError` on
-incomplete source). Mine was unpushed, so per the rule below mine moved again, to
-**#166**. #165 was never contested — `main`'s own header still reads "next free is
-#165", so the GC entry keeps it.
+that verified the first merge, `main` landed its own **#164** (a fatal `IndexError`
+on incomplete source), so mine moved to **#166**. Then, during the bootstrap and
+suite run that verified the *second* merge, `main` landed its own **#165** (a
+class-typed parameter accepting a String), so the GC fix moved to **#167** and the
+duplicate-declaration fix to **#168**. Both times mine was the unpushed side, and
+both times the collision was found by the same grep in the same window — after the
+verification, before the push.
 
-Two lessons, and the second is the one that is new:
+Three lessons, and the third is the one this second collision adds:
 
 - A reservation note in `main` is worth writing even for a number you have not
   pushed yet. #161 survived all of this *only* because `main` had reserved it by
-  name for this line. The two entries that had no reservation both moved; the one
-  that had one did not.
+  name for this line. Every entry that had no reservation moved at least once; the
+  one that had one never moved.
 - **The re-read has to happen after the last long-running verification, not before
   it.** The rule as written says "immediately before committing", and that is what
   was done — the pre-commit grep found #164 free and it was. What it did not
@@ -76,8 +76,20 @@ Two lessons, and the second is the one that is new:
   operative moment is the push, not the commit. This cost a renumber across four
   files and one `### ` heading; catching it required re-fetching after the suite
   finished, which was luck rather than procedure.
+- **Fixing the timing of the re-read does not reduce the number of collisions; it
+  only moves where you find them.** The second collision happened *after* the
+  lesson above was written down and followed. The pre-push grep did its job — it
+  is why the renumber was a five-file `sed` and not a wrong number in `main` — but
+  the underlying race is structural: verification takes longer than the interval
+  between `main`'s commits, so any number claimed before a bootstrap is a number
+  held across a window where it can be taken. The procedural fix caps the *cost*
+  of a collision at one mechanical rename. The only thing that would cap the
+  *count* is claiming the number in `main` first (a one-line reservation commit,
+  pushed before the work starts) — which is exactly what #161 did, and #161 is the
+  only entry on this line that never moved. Two collisions in one session is the
+  argument for making that reservation the default rather than the exception.
 
-**#161 was found by writing #166's test, not by looking for it.** The
+**#161 was found by writing #168's test, not by looking for it.** The
 duplicate-declaration check had to prove it did *not* reject two modules declaring
 one name, and the fixture that exercises that — two `Marker` classes — turned out
 to dispatch both receivers' methods to the second module. The general lesson is
@@ -680,7 +692,7 @@ corrupted reads out of 200 when this was filed; on the tree that merged #160's
 closure, #164 and the `VarDecl.type_ann` migration it is **200 out of 200**. The
 rate is a property of one binary's allocation layout, not of the defect, so do not
 read a change in it as progress in either direction — and do not conclude the bug
-is fixed because some *other* test stopped failing. See the note under #165, where
+is fixed because some *other* test stopped failing. See the note under #167, where
 a bystander (`pass/check_module_imports`) went from always-red to always-green
 while this got strictly worse.
 
@@ -1147,21 +1159,21 @@ receiver's static type is available and never consulted; the guard the cluster
 keeps asking for is the same one here.
 
 **Not a duplicate-declaration problem.** Two modules declaring one name is legal —
-#166 deliberately does not reject it, and `register_class_identity`'s prefix keying
+#168 deliberately does not reject it, and `register_class_identity`'s prefix keying
 is what keeps the two classes distinguishable in the checker. The bug is that
 codegen's method dispatch does not use that distinction. `test/pass/duplicate_decl_ok.sf`
 asserts the constructors and explicitly documents why it stops short of the
 methods.
 
-**It predates the #166 work.** gen2 and gen3 emit byte-identical wrong calls, so
-this was found while writing #166's non-regression test rather than caused by it.
+**It predates the #168 work.** gen2 and gen3 emit byte-identical wrong calls, so
+this was found while writing #168's non-regression test rather than caused by it.
 The `alias_scope_target_a/b.sf` fixtures reproduce it as-is.
 
 ---
 
 ## Resolved
 
-### 166. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
+### 168. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
 
 ```saffron
 class Foo {
@@ -1227,11 +1239,11 @@ distinct names).
 
 Writing that pass test is what turned up **#161**: `ma.describe()` binds to the
 other module's method even with an explicit annotation. The test asserts the
-constructors, which #166 must not break, and says in a comment why it stops short
+constructors, which #168 must not break, and says in a comment why it stops short
 of the methods — a test that pins a second bug fails for the wrong reason and
 teaches the next reader nothing about the first.
 
-### 165. FIXED — every container constructor allocated its child buffers while the parent was invisible to the collector, so a well-timed GC freed the object being built
+### 167. FIXED — every container constructor allocated its child buffers while the parent was invisible to the collector, so a well-timed GC freed the object being built
 
 **Severity: high.** Silent heap corruption. Six sites, one shape, one rule.
 
@@ -1332,18 +1344,18 @@ what it leaves in registers.
 
 Measured after this fix, so the two are not confused: #162's own repro still
 yields **51 corrupted reads out of 200**, byte-identical to the number
-saffron_154 recorded before #165 existed. Fixing six constructors moved it not at
+saffron_154 recorded before #167 existed. Fixing six constructors moved it not at
 all, which is the cleanest available evidence that they are separate bugs rather
 than two descriptions of one.
 
 **#162 is why `pass/check_module_imports` briefly entered the failure baseline with
-#166, and why it left again two merges later without anything being fixed.** That
-test runs the checker in-process, so #166's new pass executes, and its single
+#168, and why it left again two merges later without anything being fixed.** That
+test runs the checker in-process, so #168's new pass executes, and its single
 `var seen: Map<String, String> = {}` per module is enough extra allocation to move
 a collection onto #162's window. Established by A/B rather than inferred:
 neutralising the pass to an early `return` placed *after* the Map allocation still
 segfaulted, moving the same early return *before* it passed, and `GC.disable()`
-made the test pass 4/4. #165 did not fix it, which was the useful part — if the
+made the test pass 4/4. #167 did not fix it, which was the useful part — if the
 runtime constructors had been the only bug, this test would have gone green there.
 
 Then it went green anyway. After merging origin's #160 closure, #164 and the
