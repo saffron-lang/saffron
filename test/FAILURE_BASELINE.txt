@@ -362,6 +362,40 @@
 # cwd`). The lock did its job. A bootstrap that appears hung with a one-line log is
 # usually this, not a failure -- check for the [LOCK] line before diagnosing.
 
+# Confirmed 2026-08-05 after rebasing the compiler-rewrite I3 line onto this tree
+# (the infer_binary node migration, plus BUGS #169 — a generic return type losing
+# its type arguments): 317 passed, 8 failed, 14 skipped, 1 known-fail. The SET
+# below is UNCHANGED, comm-diffed both directions after stripping comments per the
+# recipe above, empty each way. The +1 over 316 is this line's own
+# test/pass/generic_return_infers.sf, confirmed PASS by name in the log.
+#
+# Why this run mattered rather than being a formality: #169's fix changes what
+# `TypeEnv.get_func_ret` RETURNS — every function and method return type in the
+# language now arrives at its six consumers spelled with its type arguments
+# (`List<String>`) instead of collapsed to a bare base (`List`). So the risk was
+# never that the fix fails to fire; it was that some consumer downstream was
+# written against the collapsed spelling and silently changes answer. Two of the
+# six compare the result against a string, and one feeds it to `is_type_param`,
+# which is precisely where the richer spelling could be misread — a function type
+# spells as "Fun(Int):Int" and would have passed every test that predicate makes.
+# A name entering this list is how that would have shown up. None did, and the
+# same widened predicate ran over the compiler's own source in the stage 2 gen4
+# fixed point.
+#
+# The interesting negative result: TWO of the tests this line added earlier are
+# still passing here (pass/call_arg_class_legal, and pass/any_global_widens from
+# further back), and pass/arg_temp_rooted still XFAILs with "expected 10, actual
+# 49" — so #162 is untouched by any of this, as expected, and the merge did not
+# quietly move the allocation timing that the note two entries up warns about.
+#
+# One process note worth more than the result, because it is the failure this
+# file's rule does not cover: the bootstrap and suite reported here are the SECOND
+# pair. The first pair was green too — and measured against a parent 11 commits
+# behind. Those numbers were already written into a commit message before the
+# push was rejected. A green measurement on the wrong parent is not a weaker
+# result than no measurement; it is worse, because it reads exactly like the right
+# one. Fetch before you measure, not just before you push.
+
 async
 docstrings
 json
