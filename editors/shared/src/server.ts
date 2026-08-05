@@ -713,6 +713,64 @@ function findSymbol(symbols: SaffronSymbol[], name: string, qualifier: string | 
   return null;
 }
 
+const CONTAINER_KINDS = new Set(["class", "enum", "interface", "actor"]);
+
+/**
+ * The name of the innermost class/actor/enum/interface whose extent covers
+ * `line`, or null when the position is at top level.
+ *
+ * This is how `this.x` is resolved: the receiver type is not in the payload
+ * (per-expression types are out of scope, plan Stage 3/4), but `this` can only
+ * mean the lexically enclosing container, and the container declarations carry a
+ * full extent. Innermost wins so a nested declaration resolves against the
+ * closest enclosing type.
+ */
+function enclosingContainer(
+  doc: TextDocument,
+  symbols: SaffronSymbol[],
+  line: number,
+): string | null {
+  let best: SaffronSymbol | null = null;
+  let bestSpan = Infinity;
+  for (const s of symbols) {
+    if (s.container !== "" || !CONTAINER_KINDS.has(s.kind)) continue;
+    if (s.start_offset === undefined || s.end_offset === undefined) continue;
+    const startLine = positionAtByteOffset(doc, s.start_offset).line;
+    const endLine = positionAtByteOffset(doc, s.end_offset).line;
+    if (line < startLine || line > endLine) continue;
+    const span = endLine - startLine;
+    if (span < bestSpan) {
+      best = s;
+      bestSpan = span;
+    }
+  }
+  return best?.name ?? null;
+}
+
+/**
+ * A member (field/method/variant) named `name`, resolved by name because the
+ * receiver's type is not known — the same name-based basis as find-references
+ * (see README, "What is name-based"). `containerHint`, when supplied (the
+ * enclosing class for a `this.` access), disambiguates between two same-named
+ * members; without it the last declaration wins, which for a single file is the
+ * usual and only reasonable guess. Returns null when no member carries the name,
+ * so a value-qualified access falls through rather than jumping to an unrelated
+ * top-level declaration of the same name.
+ */
+function findMemberSymbol(
+  symbols: SaffronSymbol[],
+  name: string,
+  containerHint: string | null,
+): SaffronSymbol | null {
+  const members = symbols.filter((s) => s.name === name && s.container !== "");
+  if (members.length === 0) return null;
+  if (containerHint) {
+    const inHint = members.find((m) => m.container === containerHint);
+    if (inHint) return inHint;
+  }
+  return members[members.length - 1];
+}
+
 function findDefinitionInFile(filePath: string, name: string): { start: { line: number; character: number }; end: { line: number; character: number } } | null {
   let content: string;
   try {
@@ -781,7 +839,19 @@ connection.onHover(async (params: HoverParams): Promise<Hover | null> => {
   if (!cached) cached = await runCheck(params.textDocument.uri) ?? undefined;
   if (!cached) return null;
 
-  const sym = findSymbol(cached.symbols, ctx.word, ctx.qualifier);
+  // For a value-qualified access (`this.count`, `obj.method`) prefer the member
+  // resolved through its container, matching go-to-definition, so hover text and
+  // the jump target agree. A module qualifier and the unqualified case keep the
+  // plain name lookup.
+  let sym: SaffronSymbol | null = null;
+  if (ctx.qualifier && !isBuiltinModule(ctx.qualifier) && !resolveImports(doc).has(ctx.qualifier)) {
+    const containerHint =
+      ctx.qualifier === "this"
+        ? enclosingContainer(doc, cached.symbols, params.position.line)
+        : null;
+    sym = findMemberSymbol(cached.symbols, ctx.word, containerHint);
+  }
+  if (!sym) sym = findSymbol(cached.symbols, ctx.word, ctx.qualifier);
   if (!sym) return null;
 
   // The declaration first, in a code fence, then the doc comment as prose below
@@ -873,6 +943,25 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
         return { uri: targetUri, range: loc };
       }
     }
+    // Not a module qualifier, so this is a value-qualified access: `this.count`,
+    // `c.increment()`, `obj.field`. The receiver's static type is not in the
+    // payload, so the member is resolved by name — disambiguated by the enclosing
+    // class when the receiver is `this`. This is what makes go-to-definition work
+    // on instance fields and methods; without it every `this.`/`obj.` access
+    // resolved nothing, and IntelliJ correspondingly refused to underline them on
+    // Cmd-hover (it only decorates identifiers it can navigate to).
+    const containerHint =
+      ctx.qualifier === "this"
+        ? enclosingContainer(doc, cached.symbols, params.position.line)
+        : null;
+    const member = findMemberSymbol(cached.symbols, ctx.word, containerHint);
+    if (member) {
+      return {
+        uri: params.textDocument.uri,
+        range: symbolRange(member, doc),
+      };
+    }
+
     // Fall through: navigate to the module/enum declaration itself
     const sym = findSymbol(cached.symbols, ctx.qualifier, null);
     if (sym) {
