@@ -785,27 +785,11 @@ class NullChecker {
         return false
     }
 
-    fun strip_nil(typ: String): String {
-        if (typ == "Nil") return "Nil"
-        // Shorthand: "String?" → "String"
-        if (typ.ends_with("?")) {
-            return typ.slice(0, typ.length() - 1)
-        }
-        if (!typ.contains("|")) return typ
-        var parts: List<String> = typ.split("|")
-        var filtered: List<String> = []
-        var i: Float = 0
-        while (i < parts.length()) {
-            if (parts[i] != "Nil") {
-                filtered.push(parts[i])
-            }
-            i = i + 1
-        }
-        if (filtered.length() == 0) return "Nil"
-        if (filtered.length() == 1) return filtered[0]
-        return filtered.join("|")
-    }
-
+    // `strip_nil(typ: String)` used to sit here, doing the same job by splitting on
+    // "|" and slicing a trailing "?". It had no callers left once
+    // `strip_nil_from_node` existed, and a dead string twin of a live node function
+    // is worse than no twin: the next person to need nil-stripping had two
+    // implementations to choose between, only one of which is exercised by anything.
     fun strip_nil_from_node(t: AST.Type): AST.Type {
         return match (t) {
             UnionType(types) => {
@@ -3151,25 +3135,16 @@ class NullChecker {
         return this.extract_var_from_nil_check(right, left)
     }
 
-    fun get_eq_nil_var_name(expr: AST.Expr): String {
-        // For Binary(left, "==", right), extract variable name if one side is NilLit
-        var ek: String = this.classify_cond(expr)
-        if (ek != "binary") return ""
-        var left_expr: AST.Expr = this.get_binary_left(expr)
-        var right_expr: AST.Expr = this.get_binary_right(expr)
-        var left_name: String = this.extract_var_from_nil_check(left_expr, right_expr)
-        if (left_name.length() > 0) return left_name
-        return this.extract_var_from_nil_check(right_expr, left_expr)
-    }
-
-    fun extract_is_check_var(cond: AST.Expr): String {
-        // Get the value expression from IsCheck, then get its variable name
-        var val_expr: AST.Expr = match (cond) {
-            IsCheck(val, typ) => val
-            _ => AST.Expr.NilLit
-        }
-        return this.get_variable_name_from_expr(val_expr)
-    }
+    // Three dead functions used to sit here: `get_eq_nil_var_name`,
+    // `get_expr_var_name` and `extract_is_check_var`. The first two had *identical*
+    // bodies, and their comments disagreed about which operator they were for —
+    // one said `==`, the other `!=`, and neither body looked at the operator at all.
+    // Both were the same code as `nil_check_var_from_binary` above, reached through
+    // `classify_cond` instead of a match. Nothing called any of the three.
+    //
+    // Worth noting for the next reader: a comment on dead code cannot be wrong in a
+    // way anything detects, so two copies drifted into claiming opposite things
+    // while doing the same thing. `nil_check_var_from_binary` is the live one.
 
     fun get_variable_name_from_expr(expr: AST.Expr): String {
         return match (expr) {
@@ -3177,17 +3152,6 @@ class NullChecker {
             Ref(rk, rn, rs, __rs) => rn
             _ => ""
         }
-    }
-
-    fun get_expr_var_name(expr: AST.Expr): String {
-        // For Binary(left, "!=", right), extract variable name if one side is NilLit
-        var ek: String = this.classify_cond(expr)
-        if (ek != "binary") return ""
-        var left_expr: AST.Expr = this.get_binary_left(expr)
-        var right_expr: AST.Expr = this.get_binary_right(expr)
-        var left_name: String = this.extract_var_from_nil_check(left_expr, right_expr)
-        if (left_name.length() > 0) return left_name
-        return this.extract_var_from_nil_check(right_expr, left_expr)
     }
 
     fun classify_cond(expr: AST.Expr): String {
@@ -3815,10 +3779,13 @@ class NullChecker {
         return "Int"
     }
 
-    fun infer_unary(op: String, right: AST.Expr): String {
-        if (op == "!") return "Bool"
-        return this.infer_expr(right)
-    }
+    // `infer_unary(op, right)` used to sit here and was dead. Its live replacement
+    // is `infer_type`'s `Unary` arm, which does strictly more: on `!` it calls
+    // `check_condition(right, "`!`")` before answering BoolType, so the operand is
+    // both type-checked and walked. This version answered "Bool" without looking at
+    // the operand — the same un-walked-subtree shape as BUGS #133/#121/#126, except
+    // that nothing reached it, so it never cost a false "unused variable".
+    // A dead copy of a checking function is a checking hole waiting for a caller.
 
     // Check if a type string is a type parameter (e.g., "T", "U", "V", "Element")
     // Type parameters are: single uppercase letters, or names that aren't known
