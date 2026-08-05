@@ -176,11 +176,11 @@
 # contains no malformed import, so all three defects were invisible to the gen4
 # fixed point while fully present.
 #
-# Updated 2026-08-04 at the #166/#165 work: 302 passed, 9 failed, 14 skipped.
+# Updated 2026-08-04 at the #168/#167 work: 302 passed, 9 failed, 14 skipped.
 # ONE NAME ADDED, pass/check_module_imports, and it is added under protest — the
 # test is right, the compiler is wrong, and the bug is BUGS #162 (an object held
 # only in an LLVM SSA temp is never rooted, so a collection frees it) rather than
-# anything in #166's duplicate-declaration pass.
+# anything in #168's duplicate-declaration pass.
 #
 # The evidence, because "my change is innocent" is exactly the claim that needs
 # it. check_module_imports runs the checker IN-PROCESS, so it executes the new
@@ -191,18 +191,18 @@
 # 4/4. So the pass's logic is not reachable by the crash — only its allocation is,
 # and what it perturbs is allocation timing.
 #
-# #165 fixed the runtime half of that family (six container constructors that
+# #167 fixed the runtime half of that family (six container constructors that
 # allocated child buffers while the parent was unrooted) and this test is not
 # fixed by it, which is the useful negative result: two independent layers, and
 # only one is closed. #162's own repro still yields 51 corrupted reads out of 200
-# after #165, unchanged. It is owned by the saffron_154 line, so it is recorded
+# after #167, unchanged. It is owned by the saffron_154 line, so it is recorded
 # here rather than fixed here.
 #
 # Removing this name again is the acceptance test for #162. If someone lands an
 # SSA-temp rooting fix in codegen, this is the test that should start passing
 # without being touched.
 #
-# Confirmed 2026-08-04 on the MERGED tree (#166/#165 above, merged with origin's
+# Confirmed 2026-08-04 on the MERGED tree (#168/#167 above, merged with origin's
 # #155-scalar, #158, #160, #163, and the FunDecl/Lambda ret_type + assignment type
 # checks): 311 passed, 9 failed, 14 skipped. The SET is exactly the 9 names below —
 # comm-diffed both directions against this file, empty each way — and md5 of
@@ -217,7 +217,7 @@
 #
 # This was the run the merge actually needed, not a formality. origin migrated
 # FunDecl/Lambda `ret_type` from String to AST.Type in the same checker.sf that
-# #166 adds a pass to, and added an assignment type check there too. A clean
+# #168 adds a pass to, and added an assignment type check there too. A clean
 # auto-merge of that pair says nothing — the presence of check_duplicate_decls in
 # the merged file was verified by grep at merge time, but only the STAGE 2 gen4
 # fixed point (0 unresolved inference fallbacks, gen3 compiles itself) proves the
@@ -301,7 +301,7 @@
 # build/stage3/codegen.ll. Waiting for it, then re-merging, is what turned #163 from
 # something this branch would have silently reverted into something it composes with.
 
-# Updated 2026-08-05 on the twice-merged tree (this line's #165/#166 plus origin's
+# Updated 2026-08-05 on the twice-merged tree (this line's #167/#168 plus origin's
 # #160 closure, #164, and the VarDecl.type_ann -> AST.Type migration): 315 passed,
 # 8 failed, 14 skipped, 1 known-fail. Bootstrap green through STAGE 2 (0 unresolved
 # inference fallbacks; gen3 compiles itself, gen4 links and compiles).
