@@ -3,16 +3,27 @@
 ## Open
 
 **14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#161, #162, #165. Next free number is **#169**.
+#161, #162, #165. Next free number is **#170**.
 
-#160, #163, #164, #167 and #168 are taken and not in the list above because all
-five are fixed and live under Resolved: an `: Any` global that could not widen,
+#160, #163, #164, #167, #168 and #169 are taken and not in the list above because
+all six are fixed and live under Resolved: an `: Any` global that could not widen,
 three malformed-`import` defects, a fatal `IndexError` on any incomplete source,
-the GC constructor rule, and two type declarations binding one name. #165 arrives
-open from `main` (a class-typed parameter accepting a String). The rule that made
-the old placeholders necessary still holds: a number can be taken without its text
-being in this file yet, so the next-free number is one past the highest *claimed*,
-not one past the highest open or even the highest written.
+the GC constructor rule, two type declarations binding one name, and a generic
+return type losing its type arguments. #165 arrives open from `main` (a
+class-typed parameter accepting a String). The rule that made the old
+placeholders necessary still holds: a number can be taken without its text being
+in this file yet, so the next-free number is one past the highest *claimed*, not
+one past the highest open or even the highest written.
+
+#169 is the fourth entry in this file to be renumbered on landing, and the
+cheapest one so far, which is worth one line on why. It was written as #166
+against a tree whose header said "next free is #166" — true when read, stale by
+the time it was pushed, because #166 had meanwhile been claimed upstream (and was
+itself a renumber, of #164). Nothing detects that: the number is correct locally
+and wrong globally, and the only thing that settles it is fetching before
+claiming. The reason this one cost a single `sed` rather than an argument is that
+the entry was self-contained — no other entry cross-referenced it yet — so there
+was nothing to keep in step with the rename.
 
 Worth recording how #162 and #163 avoided contesting each other, because it is
 the first time the scheme resolved a three-way overlap with no renumber at all:
@@ -1453,6 +1464,95 @@ Also worth keeping: the "51 out of 200" figure recorded above was correct when
 written and is not a constant. A corruption rate is a property of one binary's
 allocation layout, not of the defect, so quoting one as if it were stable invites
 exactly the misreading this paragraph exists to prevent.
+
+### 169. FIXED — a generic return type lost its type arguments on the way out of the function table, and the two branches that existed to handle them could never run
+
+**Severity: medium.** Not a wrong answer — a *lost* answer: a spurious "cannot
+infer type" warning plus a type widened to `Any`, in the one shape where the
+source states the type outright. Narrow in surface, but it hit every
+generic-returning function and method in the language.
+
+```saffron
+fun names(): List<String> { return ["a", "b"] }
+var n = names()
+var first = n[0]
+IO.println(first.to_upper())   // [checker] Warning: first: cannot infer type
+```
+
+The identical read through an *annotated* variable was fine:
+
+```saffron
+var names: List<String> = ["a", "b"]
+var first = names[0]           // no warning; String
+```
+
+That asymmetry is the whole diagnosis. Variables are stored as `AST.Type` nodes
+and read back as nodes. Function return types are stored as nodes too — but
+`TypeEnv.get_func_ret` rendered them through `AST.type_to_string`, which is
+*deliberately* lossy for diagnostics: `GenericType(base, args)` collapses to the
+bare `base`. So `List<String>` arrived at every one of its six consumers as the
+four-character string `"List"`, and `Map<String,Int>` as `"Map"`.
+
+The part worth recording is what that did to the code written to handle it.
+`infer_call` and `infer_method_call` each guard a branch on
+`ret.contains("<")` — "generic return type like `List<T>` — resolve type params
+within" — and **neither branch could ever be entered**, because the single
+renderer feeding them had already deleted the `<`. `resolve_generic_return`, a
+32-line function with two call sites, had never once run. A dead branch that
+*reads* as live is worse than a missing one: the missing case announces itself as
+missing, while this one looked like coverage, complete with a comment describing
+behaviour that did not exist.
+
+A second, independent misreading rode along on the same renderer. A union return
+type rendered as the literal word `"Union"`, and `is_type_param("Union")` answers
+**true** — uppercase first letter, not a declared class or enum. So a
+union-returning function's return type was being handed to `resolve_type_params`
+as though `"Union"` were a type parameter to resolve from the argument list. It
+happened not to produce a visible wrong answer, because `resolve_type_params`
+returns its input unchanged when it fails to match, but the checker was asking a
+nonsensical question and relying on the answer being ignored.
+
+**Fixed** by rendering through `AST.type_to_source` instead — the renderer whose
+output `parse_type_ast` reads back, so it keeps the type arguments and spells a
+union with its members. All six consumers treat the result as a type to compare,
+substitute into, or return as an inferred type; none prints it to a user, so none
+wanted the lossy spelling.
+
+That richer string needed one guard widened in turn: `type_to_source` spells a
+function type `"Fun(Int):Int"`, and while the bare `"Fun"` was excluded by an
+equality test, `"Fun(Int):Int"` passes every test `is_type_param` makes — no
+`<`, no `|`, uppercase first letter, not a declared class — and would have become
+a "type parameter" named `Fun(Int):Int`. `is_type_param` now rejects anything
+containing `(`, keyed on the punctuation rather than a `Fun` prefix so a user
+class named `Function` is unaffected.
+
+Regression test: `test/pass/generic_return_infers.sf`, 11 assertions. It pins the
+element type by *using* it — `.to_upper()` on a `String` element, arithmetic on an
+`Int` one — rather than by asserting a rendered type name, because the defect
+widened the type rather than misspelling it, and a widened type still renders
+plausibly. Both call forms are asserted separately: `infer_method_call` carries
+its own copy of the lookup and the same unreachable branch, so the free-function
+fix covering it was an assumption worth not making.
+
+One thing the test deliberately does **not** assert, and it is filed here rather
+than silently omitted: `ident("q").to_upper()` on `fun ident<T>(x: T): T` still
+fails with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
+type 'T'`. It fails identically on the unmodified gen2, so it is preexisting and
+unrelated — and the mechanism is a different layer. The *checker* resolves `T` to
+`String` correctly via `resolve_type_params`; codegen carries its own
+receiver-type inference (`codegen/methods_body.sf:3733`) that does not, so a
+method call on the result is dropped while a plain read of it is fine. The `Int`
+side works only because arithmetic never goes through method dispatch. That is
+worth its own entry if anyone hits it.
+
+The operational lesson is the fourth slice's, arriving from a new direction: this
+was found while *classifying* the five remaining `parse_type_node(this.infer_*())`
+round trips for a mechanical migration, not while looking for a bug. Four of the
+five turned out not to be round trips at all — and reading `infer_call` closely
+enough to establish that is what surfaced a renderer two layers below it
+answering the wrong question. The migration checklist was wrong about those four
+arms; being wrong about them in a way that required reading the code was worth
+more than being right without.
 
 ### 160. FIXED — an explicit `: Any` on a module-level global could not widen it, and read back wrong even unreassigned; #147 was fixed in the checker only
 
