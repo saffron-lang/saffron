@@ -301,15 +301,31 @@ class NullChecker {
     // AnyType, field-offset resolution fell through, and every field read answered
     // 0 or "" with no diagnostic (BUGS #86).
     //
-    // The value encodes three distinct states, which is the whole point:
-    //   absent      → the callee's parameter is not a function type at all (or the
-    //                 callee is unknown). Nothing to say; leave the lambda alone.
-    //   "?"         → declared a function type that carries NO parameter types
-    //                 (bare `Fun`). The source does not contain the type, so an
-    //                 untyped lambda parameter here is an error, not a guess.
-    //   "" / "A,B"  → the declared parameter types (empty = declared zero params).
-    //                 These get written into the lambda's own Param nodes.
-    var fun_param_sigs: Map<String, String>
+    // The value is the callee parameter's declared callback parameter types, as
+    // nodes. Presence in the map is the "is a function type at all" gate; the two
+    // remaining states collapse into the list itself:
+    //   absent      → the callee's parameter is not a function type (or the callee
+    //                 is unknown). Nothing to say; leave the lambda alone.
+    //   [] present  → a function type that declares no parameters — either bare
+    //                 `Fun`, which says nothing, or `() => R` / `Fun<R>`, which
+    //                 says "zero". Both mean an untyped lambda parameter here has
+    //                 no source to draw from, so it is an error, not a guess — and
+    //                 the consumer treats the two identically, which is why one
+    //                 empty list serves for both.
+    //   [A, B]      → the declared parameter types, written into the lambda's own
+    //                 Param nodes.
+    //
+    // This was a `Map<String, String>` carrying a tri-state (`"!"` / `"?"` /
+    // comma-joined) — the in-band-sentinel shape I3 exists to remove. The value is
+    // produced from a node (fun_param_nodes_of) and consumed as a node
+    // (apply_fun_param_sig); rendering it to a string in between was a round trip,
+    // and an unfaithful one: `type_to_str` collapses every FuncType to the bare
+    // word "Fun", so a nested function-typed parameter (`((Int) => Int) => R`) came
+    // back out of the string as `ClassType("Fun")` rather than the FuncType it
+    // started as. No current test reaches that — a block is never passed at a
+    // nested-function position in the corpus — but it is the same latent misread
+    // as BUGS #169, fixed here by never leaving the node form.
+    var fun_param_sigs: Map<String, List<AST.Type>>
     var actor_classes: Map<String, Bool>
     // Names declared with the `interface` soft keyword. `class`, `interface` and
     // `actor` all parse to ClassDecl and register identically in class_fields, so
@@ -3300,8 +3316,8 @@ class NullChecker {
             //                      K/V extractors all keyed off rendered forms.
             //
             // So these four are blocked on the string-surgery helpers below them
-            // (`generic_base` with 23 callers, `fun_param_types_of` with 13, and
-            // ten more), not on the arm. Migrating an arm whose body cannot yet
+            // (`generic_base` with 23 callers, and a dozen more), not on the arm.
+            // Migrating an arm whose body cannot yet
             // answer in nodes would mean building the node from a string one line
             // lower down — the same round trip, moved, and harder to find.
             //
@@ -3443,7 +3459,8 @@ class NullChecker {
                 AST.Type.AnyType
             }
             IndexGet(obj, index) => {
-                var list_type: String = this.infer_expr(obj)
+                var list_node: AST.Type = this.infer_type(obj)
+                var list_type: String = this.type_to_str(list_node)
                 this.infer_expr(index)
                 // Subscript overloading: on a user class declaring `getItem`,
                 // `obj[k]` has getItem's declared return type. That type may
@@ -3463,9 +3480,16 @@ class NullChecker {
                 var idx_base: String = this.generic_base(list_type)
                 if (this.env.class_fields.has(idx_base)
                     and this.get_receiver_methods(idx_base).contains("getItem")) {
+                    // Still a round trip: class_method_ret_type does string surgery
+                    // (the class-type-parameter substitution documented above), so
+                    // its answer is a string and there is nothing to read as a node
+                    // yet. Blocked on that helper, not on this arm.
                     this.parse_type_node(this.class_method_ret_type(list_type, "getItem"))
                 } else {
-                    this.parse_type_node(this.extract_list_element_type(list_type))
+                    // The real-List / positional-generic case: read the element off
+                    // the node. Was parse_type_node(extract_list_element_type(...)),
+                    // a render-and-reparse whose only input is list_node itself.
+                    this.index_element_node(list_node)
                 }
             }
             IndexSet(obj, index, value) => this.infer_type(value)
@@ -3745,6 +3769,28 @@ class NullChecker {
         // "List<String>" → "String"
         if (!typ.contains("<")) return "Any"
         return this.extract_nth_generic_arg(typ, 0)
+    }
+
+    // The node form of `parse_type_node(extract_list_element_type(type_to_str(n)))`
+    // for the IndexGet arm: the element type of an indexed generic, read straight
+    // off the node instead of rendered to a string and parsed back. Matches the
+    // string helper's positional read exactly — the FIRST type argument of any
+    // generic (a real `List<E>` gives E; a `Map<K,V>` gives K, which is what the
+    // string path also did, faithful bug and all), and Any for a non-generic.
+    //
+    // Better than the round trip in one case, the same as it in every other: a
+    // `List<Fun(Int):Int>` element came back out of the string as ClassType("Fun"),
+    // because type_to_str collapses every FuncType to the bare "Fun" — the #169
+    // shape. Reading the node returns the FuncType. No test indexes a list of
+    // functions, so nothing observable moves; the point is that it CAN'T misread.
+    fun index_element_node(node: AST.Type): AST.Type {
+        var zero: Float = 0
+        return match (node) {
+            GenericType(base, args) => {
+                if (args.length() >= 1) { args[zero] } else { AST.Type.AnyType }
+            }
+            _ => AST.Type.AnyType
+        }
     }
 
     // --- Class-level generic substitution (BUGS #95) ---
@@ -4766,106 +4812,71 @@ class NullChecker {
 
     // --- Function-typed parameter signatures (BUGS #86) ---
 
-    // Read the parameter-type list out of a declared function type. Returns "?" when
-    // the spelling names a function but says nothing about its parameters, so callers
-    // can tell "declared zero parameters" (`""`) apart from "declared nothing"
-    // (`"?"`) — collapsing those two is exactly how a guess gets laundered into a
-    // type. Returns "!" for a parameter that is not a function type at all.
-    //
-    // The input must come from type_to_str, NOT type_node_to_string: the latter is
-    // ast.sf's renderer, which prints every GenericType as its bare base name, so
-    // `Fun<Box, String>` would arrive here as "Fun" with the two type arguments
-    // already gone. type_to_str renders the arguments.
-    //
-    // Which spellings actually carry information, as of today:
-    //   "Fun"            bare `Fun`              → "?"  (no information)
-    //   "Fun<A,B,R>"     `Fun<A, B, R>`          → "A,B" (trailing arg is the return)
-    //
-    // The arrow spelling `(A) => R` does NOT come through this function at all —
-    // see fun_param_sig_of below, which reads the FuncType node directly. It cannot
-    // come through here, because the node's information is destroyed by the very
-    // rendering step that produces this function's input: type_to_str renders every
-    // FuncType as the bare string "Fun". Note that a bare `Fun` also reaches here as
-    // "Fun", but by a different route — it parses to ClassType("Fun"), never to a
-    // FuncType — so the two are still distinguishable at the node level even though
-    // they are not distinguishable in this string.
-    fun fun_param_types_of(type_str: String): String {
-        if (type_str == "Fun") return "?"
-        if (type_str.starts_with("Fun<")) {
-            // `Fun<A, B, R>` is (A, B) => R: the trailing argument is the return
-            // type, so `Fun<R>` declares no parameters at all.
-            var inner: String = type_str.slice(4, type_str.length() - 1)
-            var parts: List<String> = this.split_type_args(inner)
-            if (parts.length() <= 1) return ""
-            var kept: List<String> = []
-            var pi: Float = 0
-            while (pi < parts.length() - 1) {
-                kept.push(parts[pi])
-                pi = pi + 1
-            }
-            return kept.join(",")
+    // Given `Fun<A, B, R>` already destructured into its argument nodes, return the
+    // declared PARAMETER nodes: the trailing argument is the return type, so
+    // `Fun<R>` (one arg) declares no parameters and `Fun<>` (none) likewise. Kept
+    // separate from fun_param_nodes_of only because the generic case has this "drop
+    // the last one" rule that the arrow spelling handles structurally.
+    fun fun_generic_param_nodes(args: List<AST.Type>): List<AST.Type> {
+        if (args.length() <= 1) return []
+        var kept: List<AST.Type> = []
+        var pi: Float = 0
+        while (pi < args.length() - 1) {
+            kept.push(args[pi])
+            pi = pi + 1
         }
-        // Not a function type — the caller must not treat this parameter as one.
-        return "!"
+        return kept
     }
 
-    // What one parameter declares about its own parameters, in the same three
-    // states fun_param_types_of returns: "!" not a function type, "?" a function
-    // type that says nothing, otherwise the comma-joined declared types.
+    // What one parameter declares about its own parameters, as nodes. Two callers
+    // downstream — register_fun_param_sigs stores the result and apply_fun_param_sig
+    // reads it — and both want nodes, so this never renders to a string. That is the
+    // I3 point: the value was a tri-state String (`"!"` not a function type, `"?"` a
+    // bare Fun, otherwise comma-joined) round-tripped through type_to_str and
+    // split_type_args; here it stays in node form the whole way.
     //
-    // This dispatches on the NODE rather than on a rendered string, because the two
-    // spellings survive rendering differently:
+    // The two source spellings differ only in how they parse, not in what they mean:
     //
-    //   `f: Fun<A, B, R>`  parses to GenericType("Fun", [A, B, R]). type_to_str
-    //                      renders its arguments, so the string still carries them
-    //                      and fun_param_types_of can read them back out.
-    //   `f: (A, B) => R`   parses to FuncType([A, B], R) — since parser.sf's
-    //                      parse_fun_type_ast stopped discarding them. But
-    //                      type_to_str renders EVERY FuncType as the bare "Fun",
-    //                      so rendering first destroys exactly the information
-    //                      needed and lands the arrow spelling in the "?" state:
-    //                      an error rather than the declared types.
+    //   `f: (A, B) => R`   parses to FuncType([A, B], R) — the parameter nodes are
+    //                      right there, structurally, and the return type is the
+    //                      separate `r` field. This is the spelling that a rendered
+    //                      string could not preserve: type_to_str collapses every
+    //                      FuncType to the bare "Fun", which is why the old code
+    //                      landed the arrow spelling in the "?" (says-nothing) state
+    //                      and #86's arrow half stayed broken until parser.sf kept
+    //                      the arguments AND this stopped rendering them away.
+    //   `f: Fun<A, B, R>`  parses to GenericType("Fun", [A, B, R]) — the return type
+    //                      is the trailing argument, so fun_generic_param_nodes drops
+    //                      it. (`is_type_param`/`is_subtype_node` still test the
+    //                      rendered "Fun" by string equality; leaving type_to_str's
+    //                      collapse alone keeps them working. The rich reading lives
+    //                      here, at the one site that needs it — unchanged from
+    //                      before, only now it is the node that is rich, not a
+    //                      re-parse of the string.)
     //
-    // Reading the node fixes that without touching type_to_str, which is the point.
-    // type_to_str has other consumers that depend on its collapsed "Fun": infer_expr
-    // renders a Lambda's inferred FuncType through it, and both `is_type_param` and
-    // fun_param_types_of test `typ == "Fun"` by exact equality. Rendering FuncType
-    // richly there would make is_type_param("Fun():Any") answer TRUE — a lambda
-    // silently reclassified as a generic type parameter — and would make
-    // is_subtype_node's string comparison stop equating two function types. So the
-    // rich reading lives here, at the one site that needs it.
-    //
-    // A FuncType with no parameters is genuinely "declared zero parameters" (""),
-    // not "declared nothing" ("?"): `() => Int` says its callback takes nothing, and
-    // conflating that with a bare `Fun` is the collapse #86 exists to prevent. The
-    // "?" state stays reachable only through ClassType("Fun"), which is what a bare
-    // `Fun` annotation actually parses to.
-    fun fun_param_sig_of(pt: AST.Type): String {
+    // Absent from the return: the "!" / "not a function type" state. The caller
+    // signals that by NOT storing anything (see register_fun_param_sigs), so this
+    // returns a real list only when `pt` is a function type. A non-function `pt`
+    // returns [], but the caller must gate on is_fun_type first, not on emptiness —
+    // an empty list from a `() => R` means "zero declared parameters", which is a
+    // genuine, distinct answer.
+    fun is_fun_type_node(pt: AST.Type): Bool {
         return match (pt) {
-            FuncType(p, r) => {
-                var rendered: List<String> = []
-                var fi: Float = 0
-                while (fi < p.length()) {
-                    rendered.push(this.type_to_str(p[fi]))
-                    fi = fi + 1
-                }
-                rendered.join(",")
-            }
-            // Every other spelling still goes through the string reader, which
-            // handles `Fun<A, B, R>` and answers "!" for a non-function type.
-            IntType => this.fun_param_types_of(this.type_to_str(pt))
-            FloatType => this.fun_param_types_of(this.type_to_str(pt))
-            BoolType => this.fun_param_types_of(this.type_to_str(pt))
-            StringType => this.fun_param_types_of(this.type_to_str(pt))
-            NilType => this.fun_param_types_of(this.type_to_str(pt))
-            AnyType => this.fun_param_types_of(this.type_to_str(pt))
-            ClassType(n) => this.fun_param_types_of(this.type_to_str(pt))
-            EnumType(n) => this.fun_param_types_of(this.type_to_str(pt))
-            GenericType(b, a) => this.fun_param_types_of(this.type_to_str(pt))
-            UnionType(ts) => this.fun_param_types_of(this.type_to_str(pt))
-            NullableType(inner) => this.fun_param_types_of(this.type_to_str(pt))
-            UnknownType => this.fun_param_types_of(this.type_to_str(pt))
-            NeverType => this.fun_param_types_of(this.type_to_str(pt))
+            FuncType(p, r) => true
+            ClassType(n) => n == "Fun"
+            GenericType(b, a) => b == "Fun"
+            _ => false
+        }
+    }
+
+    fun fun_param_nodes_of(pt: AST.Type): List<AST.Type> {
+        return match (pt) {
+            FuncType(p, r) => p
+            GenericType(b, a) => this.fun_generic_param_nodes(a)
+            // Bare `Fun` (ClassType("Fun")) and every non-function type: no declared
+            // parameters. Only reached for a function type once the caller has gated
+            // on is_fun_type_node, so this stands in for the old "?" state.
+            _ => []
         }
     }
 
@@ -4877,9 +4888,11 @@ class NullChecker {
         while (i < params.length()) {
             var p: AST.Param = params[i]
             var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
-            var sig: String = this.fun_param_sig_of(pt)
-            if (sig != "!") {
-                this.fun_param_sigs.set(name + ":" + i.floor().to_string(), sig)
+            // Store only for a function-typed parameter; a stored [] then
+            // unambiguously means "declared zero parameters", never "not a function
+            // type" — that state is the map key's absence. (Was `sig != "!"`.)
+            if (this.is_fun_type_node(pt)) {
+                this.fun_param_sigs.set(name + ":" + i.floor().to_string(), this.fun_param_nodes_of(pt))
             }
             i = i + 1
         }
@@ -4893,18 +4906,20 @@ class NullChecker {
     // Only AnyType parameters are touched: an explicitly annotated lambda states
     // its own types and must keep them, so that a genuine mismatch stays visible
     // rather than being overwritten to agree.
-    fun apply_fun_param_sig(args: List<AST.Expr>, arg_idx: Float, sig: String, callee: String) {
+    fun apply_fun_param_sig(args: List<AST.Expr>, arg_idx: Float, declared: List<AST.Type>, callee: String) {
         var lambda: AST.Expr = args[arg_idx]
         var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p    _ => [] }
         var ret_type: AST.Type = match (lambda) { Lambda(p, r, b) => r    _ => AST.Type.AnyType }
         var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b    _ => [] }
         if (params.length() == 0) return nil
 
-        // How many parameters were declared, and what are they?
-        var declared: List<String> = []
-        if (sig != "?" and sig.length() > 0) {
-            declared = this.split_type_args(sig)
-        }
+        // `declared` is the callee parameter's declared callback parameter types,
+        // already as nodes — the map only holds an entry for a function-typed
+        // parameter, so reaching here means it was one. An empty `declared` is the
+        // old "?"/"" collapse: the callee said nothing (bare `Fun`) or declared zero
+        // parameters, both of which leave a block parameter with no source and land
+        // it in the second error branch below. That the two are indistinguishable
+        // here is why the producer no longer bothers to tell them apart.
 
         var new_params: List<AST.Param> = []
         var changed: Bool = false
@@ -4919,9 +4934,14 @@ class NullChecker {
             var pvis: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => p_vis }
             if (this.is_any_type(pt) and pname != "self") {
                 if (i < declared.length()) {
-                    var declared_str: String = declared[i].trim()
-                    if (declared_str.length() > 0 and declared_str != "Any") {
-                        pt = this.parse_type_node(declared_str)
+                    var declared_node: AST.Type = declared[i]
+                    // The old string form gated on `length() > 0 and != "Any"`. An
+                    // empty declared string was `parse_type_node("")`'s UnknownType
+                    // sentinel (#147); "Any" was the explicit top type. Both mean the
+                    // callee named no usable type for this parameter, so they keep
+                    // routing to the same first error branch — now asked of the node.
+                    if (!this.is_unknown_type(declared_node) and !this.is_any_type(declared_node)) {
+                        pt = declared_node
                         changed = true
                     } else {
                         this.error("parameter '" + pname + "' of the function passed to '" + callee
