@@ -43,11 +43,12 @@ anywhere now carries a GC header and names itself on the no-static-type paths; a
 fieldless variant is the immediate `tag << 56` with nothing to hang a header on, so
 it needs an enum-bearing NaN-box tag rather than another formatter arm.
 
-(The count and next-free number live at the top of this section, not here. This
-spot used to carry a second copy of them, restated after each narrative note, and
-this merge is the argument against that: both copies conflicted, and a reader who
-found only the lower one would have read a stale count as current. One source of
-truth per fact — invariant I10 — applies to this file too.)
+The count and the open set live in **one** place: the header at the top of this
+file. A second copy used to sit here, and it went stale exactly as I10 predicts —
+it still said 12 open with #160 listed after #160 was closed, because closing an
+entry moves it under `## Resolved` and nothing makes a duplicated tally follow.
+(#160 was open when the note below was written and closed on 2026-08-04; #162
+arrived from the saffron_154 line.)
 
 **This line's duplicate-declaration fix was renumbered three times: #160 → #164 →
 #166 → #168.** Written as #160, with the cross-module dispatch bug as #161. By the
@@ -96,6 +97,21 @@ to dispatch both receivers' methods to the second module. The general lesson is
 about where the non-regression half of a rejection fix points: a check that
 tightens what compiles needs a test for the shapes it must still accept, and that
 test walks straight into whatever else is wrong with those shapes.
+
+#161 and #162 are claimed but not present in that header: #161 is the sfx line's
+cross-module method-binding bug and #162 is the saffron_154 line's SSA-temp GC
+bug, both committed there and unpushed when this entry was written. Per the
+rule below, whoever is unpushed moves — but both were claimed *before* #163,
+so #163 stepped over them rather than contesting either. #163 is resolved on
+sight and is filed under Resolved.
+
+(That paragraph is `main`'s, and this line is the reason half of it is now
+stale: #161 *is* in the header list above, because this line pushed it. Left in
+place rather than rewritten, because what it records is a state — two numbers
+claimed in worktrees and invisible from `main` — that was true when written and
+is the exact condition the next-free rule exists for. A narrative that describes
+a moment does not need updating every time the moment passes; a *count* does,
+which is the whole distinction I10 is drawing.)
 
 #160 took its number without a collision — the first entry in a while to do so.
 The pre-commit re-read (see the note below) was run against `origin/main` and
@@ -937,6 +953,65 @@ declared anything." Three things that fell out of doing it, all worth keeping:
 What remains under this number is the class-typed segfault above, still gated on
 the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
 `Ptr<T>`.
+
+See **#165** for the same hole on the *argument* side of a call, which this entry
+does not cover and which segfaults identically.
+
+---
+
+### 165. OPEN — passing a String where a class-typed parameter is declared compiles clean and segfaults; #155's hole, one site over
+
+**Severity: high.** Found while classifying `checker.sf`'s `: String`-returning
+functions for rewrite stage 3.
+
+`check_call_args` (`checker.sf:1058`) closed #145 by comparing arguments to
+parameters, and reuses `scalar_mismatch`, so it fires only on two *different
+concrete scalars*. A class-typed parameter is therefore never checked against
+anything, and all three call forms accept a `String`:
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n }
+  fun eat(b: Box): Int { return b.get() } }
+
+fun free_fn(b: Box): Int { return b.get() }
+
+var s: String = "nope"
+free_fn(s)          // compiles; segfault
+Box(1).eat(s)       // compiles; segfault
+Holder(s)           // compiles; segfault  (constructor, `var b: Box` field)
+```
+
+Measured: each of the three compiles to a `.ll` with no diagnostic, and running
+the first is `Segmentation fault: 11`. The mechanism is #155's exactly — the
+checker trusts the declaration, codegen emits a direct `Box__get` with a field
+load, and the receiver is a String pointer — but at the *call* boundary rather
+than the `return` boundary. #155's narrative is entirely about `return` and its
+"still open" paragraph names only that site, so nothing tracked this one.
+
+**Why this is a separate number rather than a note under #155.** They share a
+cause and will likely share a fix, but they are different code: #155 is
+`check_stmt`'s `Return` arm, this is `check_call_args`, wired at three keys
+(`name`, `Class__method`, `Class__init`). #145 landed only the free-function key
+first and both the method and constructor negatives printed `NOT CAUGHT`, so
+"fixed at the return site" would not have implied fixed here even if the arm were
+shared.
+
+**What is NOT the bug.** `scalar_mismatch` letting this through is deliberate and
+documented at the site: the checker type-checks the compiler's own source, so a
+false positive is a broken bootstrap, and #155 already reverted an obvious
+declared-class/passed-scalar arm after it produced three distinct false-positive
+families. I re-probed all three at the *argument* site and they are live here too
+— a `String` into `String|Nil`, an `Int` into a type parameter `T`, and
+`Math.e` into `: Float` all compile clean and must keep doing so. So the fix is
+not "add the arm"; it is the same membership test against a real class/enum
+registry, or `is_subtype_node`, that #155 is gated on, which wants I4 to answer
+reliably for module-qualified names.
+
+Filed rather than fixed for that reason. What this entry adds is that closing
+#155 will not close the argument side unless the fix is written at both sites,
+and that a probe of *one* call form is not evidence about the others.
 
 ---
 
