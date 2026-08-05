@@ -3275,8 +3275,42 @@ class NullChecker {
                 }
                 _ => this.infer_type(right)
             }
+            // The four remaining `parse_type_node(this.infer_*())` arms —
+            // this one, `MemberAccess`, `Match` and `MethodCall` — look like the
+            // same round trip that `infer_binary` and `check_assign` were, and
+            // they are NOT. Recording that here because the migration checklist
+            // in docs/design/compiler-rewrite.md listed all six together, and
+            // acting on that list without reading the bodies would have been a
+            // mechanical rewrite of four functions that do genuine string work:
+            //
+            //   infer_call         builds its answer from `env.get_func_ret`,
+            //                      `resolve_type_params` and `resolve_generic_return`
+            //                      — string surgery on comma-joined param lists.
+            //   infer_member_access  ends `return field`, the FIELD NAME, as the
+            //                      type when no class resolves. A bare name is
+            //                      indistinguishable from a class type in this
+            //                      encoding, which is exactly what I3 exists to
+            //                      remove — but removing it changes what the
+            //                      fallback MEANS, not just how it is spelled.
+            //   infer_match        unifies arm types by string concatenation
+            //                      (`result_type + "|" + arm_type`) and consults
+            //                      `get_enum_binding_type`, also strings.
+            //   infer_method_call  the largest of the four, with
+            //                      `substitute_class_type_params` and the Map
+            //                      K/V extractors all keyed off rendered forms.
+            //
+            // So these four are blocked on the string-surgery helpers below them
+            // (`generic_base` with 23 callers, `fun_param_types_of` with 13, and
+            // ten more), not on the arm. Migrating an arm whose body cannot yet
+            // answer in nodes would mean building the node from a string one line
+            // lower down — the same round trip, moved, and harder to find.
+            //
+            // What reading them for this DID find is BUGS #169: `get_func_ret`
+            // rendered through the lossy `type_to_string`, so two branches guarded
+            // on `ret.contains("<")` could never run. That is the argument for
+            // classifying before migrating.
             Call(callee, args, __cs) => this.parse_type_node(this.infer_call(callee, args))
-            Assign(name, value, __as) => this.parse_type_node(this.check_assign(name, value, __as))
+            Assign(name, value, __as) => this.check_assign_node(name, value, __as)
             // Both operands are code, so walk them. Returning BoolType without
             // visiting `left` and `right` meant a variable used ONLY inside an
             // `and`/`or` operand was never marked used and drew a false "unused
@@ -4091,8 +4125,30 @@ class NullChecker {
     // The declared type is the one that constrains the store, so this asks
     // `get_declared_var_type` rather than `get_var`; see the note there for the
     // narrowing case it would otherwise reject.
-    fun check_assign(name: String, value: AST.Expr, name_span: AST.Span): String {
-        var val_type: String = this.infer_expr(value)
+    // Type-check `name = value` and answer the assignment's own type, as a node.
+    //
+    // This replaced `check_assign(...): String`, whose result `infer_type` fed
+    // straight back into `parse_type_node`. That was a genuine round trip and not
+    // merely a string-typed signature: the value returned IS `infer_type(value)`,
+    // so a node was rendered and re-parsed with nothing in between reading the
+    // string form. Worth naming because the round trip is not faithful — an
+    // assignment whose value is a lambda came back as `ClassType("Fun")` rather
+    // than the `FuncType` it started as, since `type_to_str` collapses every
+    // function type to the bare word "Fun" and `parse_type_node` has no arm that
+    // reads it back. Nothing observable depended on that, because assignment is a
+    // statement here and its value is almost never consumed — but "almost never
+    // consumed" is the wrong reason for a type to be wrong.
+    //
+    // The two checks below are unchanged, deliberately, including which form each
+    // one asks. The nullability guard keeps asking the NODE (`decl_node`), and
+    // `scalar_mismatch` keeps receiving `AST.type_to_string`'s lossy rendering,
+    // because that predicate's whole proof set is written against the lossy
+    // spellings — "Union" as a word, a generic collapsed to its base — and
+    // handing it the faithful form would widen what it fires on. That is the
+    // #155 false-positive surface, and it is not this change's to move.
+    fun check_assign_node(name: String, value: AST.Expr, name_span: AST.Span): AST.Type {
+        var val_node: AST.Type = this.infer_type(value)
+        var val_type: String = this.type_to_str(val_node)
         var decl_node: AST.Type = this.env.get_declared_var_type(name)
         var var_type: String = this.env.get_var(name)
         // Ask the NODE whether the binding is nullable, not the rendered string.
@@ -4114,7 +4170,7 @@ class NullChecker {
         if (this.scalar_mismatch(decl_type, val_type)) {
             this.error_at(name_span, name + ": cannot assign " + val_type + " to " + decl_type + " variable")
         }
-        return val_type
+        return val_node
     }
 
     // --- Method call inference (the key null-safety check) ---
