@@ -227,10 +227,34 @@ class TypeEnv {
         return AST.Type.AnyType
     }
 
-    // String wrapper for backward compat
+    // The declared return type as a string, rendered the way the type PARSER
+    // spells it rather than the way a diagnostic does.
+    //
+    // This used to render through `AST.type_to_string`, which is deliberately
+    // lossy: `GenericType(base, args)` collapses to the bare `base`, so a
+    // function declared `List<String>` came back as the string "List", and a
+    // union came back as the literal word "Union". Both losses were live:
+    //
+    //   - `infer_call` and `infer_method_call` each guard a branch on
+    //     `ret.contains("<")`, and neither could ever be entered, because the
+    //     one renderer feeding them had already removed the "<". Every
+    //     generic-returning function inferred as bare `List`, which is why
+    //     `var n = names()` then `n[0]` warned "cannot infer type" while the
+    //     identical read through an annotated variable did not — variables are
+    //     stored as nodes and never went through this function.
+    //   - `is_type_param("Union")` answers TRUE (uppercase first letter, not a
+    //     known class), so a union-returning function's return type was being
+    //     fed to `resolve_type_params` as though "Union" were a type parameter
+    //     to resolve from the argument list.
+    //
+    // `type_to_source` is the renderer whose output `parse_type_ast` reads back,
+    // so it keeps the type arguments and spells a union with its members. That
+    // is what every caller here actually wanted: all six of them treat the
+    // result as a type to compare, substitute into, or hand back as an inferred
+    // type, and none of them is printing it to a user.
     fun get_func_ret(name: String): String {
         var t: AST.Type = this.get_func_ret_type(name)
-        return AST.type_to_string(t)
+        return AST.type_to_source(t)
     }
 }
 
@@ -3823,6 +3847,17 @@ class NullChecker {
         if (typ == "StringBuilder") return false
         if (typ.contains("<")) return false
         if (typ.contains("|")) return false
+        // A function type spelled the way `AST.type_to_source` spells it:
+        // "Fun(Int):Int", or bare "Fun" caught by the equality above. The bare
+        // form was the only one that could arrive here while `get_func_ret`
+        // rendered through the lossy `type_to_string`; now that it renders
+        // through `type_to_source`, the parameter list and return type come with
+        // it, and "Fun(Int):Int" would otherwise pass every test below — no "<",
+        // no "|", uppercase first letter, not a declared class — and be handed to
+        // `resolve_type_params` as though it were a type parameter named
+        // "Fun(Int):Int". Keyed on the punctuation rather than the "Fun" prefix
+        // so a user class actually named `Function` is unaffected.
+        if (typ.contains("(")) return false
         // Single uppercase letter: definitely a type param
         if (typ.length() == 1) {
             var ch: String = typ.char_at(0)
