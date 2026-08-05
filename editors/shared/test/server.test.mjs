@@ -229,6 +229,36 @@ test("hover shows the signature, the doc comment, and non-default visibility", {
   assert.doesNotMatch(pub.contents.value, /public/, "the default visibility is noise, not signal");
 });
 
+test("go-to-definition resolves a this-qualified field and method to their declarations", { skip: SKIP }, async () => {
+  // The receiver's static type is not in the payload, so a member is resolved by
+  // name and — for `this.` — disambiguated by the enclosing class. Before this
+  // worked, the definition handler only understood MODULE qualifiers, so every
+  // `this.x`/`obj.x` resolved nothing: no jump, and IntelliJ correspondingly
+  // refused to underline the identifier on Cmd-hover.
+  const fieldDecl = at("var radius").line; // the declaration line of Circle.radius
+
+  // `this.radius` inside area() is the 2nd `radius` after the field decl and its
+  // two init uses; target the one in the multiplication.
+  const useInArea = at("this.radius", 2); // 0: init assign, 1/2: area()'s two uses
+  const toField = await request("textDocument/definition", {
+    textDocument: { uri },
+    position: { line: useInArea.line, character: useInArea.character + "this.".length + 1 },
+  });
+  assert.ok(toField, "this.radius must resolve");
+  assert.equal(toField.range.start.line, fieldDecl, "…to the field declaration");
+
+  // `this.count` inside Counter.init resolves to Counter.count, not to any other
+  // `count` — the container disambiguation.
+  const countDecl = at("var count").line;
+  const countUse = at("this.count", 0);
+  const toCount = await request("textDocument/definition", {
+    textDocument: { uri },
+    position: { line: countUse.line, character: countUse.character + "this.".length + 1 },
+  });
+  assert.ok(toCount, "this.count must resolve");
+  assert.equal(toCount.range.start.line, countDecl, "…to the actor's own field");
+});
+
 test("references include interpolated uses and exclude comment text", { skip: SKIP }, async () => {
   const refs = await request("textDocument/references", {
     textDocument: { uri },
