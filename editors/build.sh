@@ -102,6 +102,16 @@ fi
 # 2. VS Code extension.
 build_ts "$EDITORS_DIR/vscode"
 
+# 2b. The client's server-discovery tests. They load the COMPILED out/extension.js
+# with `vscode` stubbed, so they must run after the tsc step, not beside the shared
+# suite. What they guard is the one client failure that is invisible in the editor:
+# a LanguageClient pointed at a server module that does not exist starts, reports
+# nothing, and leaves every file looking clean.
+if [[ "$RUN_TESTS" == "1" ]]; then
+  log "node --test (vscode)"
+  (cd "$EDITORS_DIR/vscode" && node --test "test/*.test.mjs")
+fi
+
 # 3. IntelliJ plugin (Gradle). Skipped without a JDK or on --skip-intellij.
 if [[ "$SKIP_INTELLIJ" == "1" ]]; then
   log "skipping IntelliJ plugin (--skip-intellij)"
