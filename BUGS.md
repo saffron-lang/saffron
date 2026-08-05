@@ -2,8 +2,13 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #162. Next free number is **#164**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#160. Next free number is **#164**.
+
+#162 was in this list and is now fixed — argument temps are GC-rooted by value
+across call setup, on every call form — so it moved to Resolved. The count above
+went 13 → 12 for that reason and no other; the numbers are otherwise identical to
+the previous line, which is the check.
 
 #163 is taken and is *not* in the list above because it is already fixed — three
 malformed-`import` defects, filed and resolved on sight, so it lives under
@@ -33,9 +38,11 @@ unchanged — committed and cited keeps the number, uncommitted moves.
 is filed separately on purpose: it is an argument-temp rooting hole in codegen,
 reproducible with plain classes, and #63 — which reads like the same bug — is
 closed and was about the *moving* nursery. Retiring that nursery removed the move
-without supplying the missing root, so the non-moving collector now frees the temp
+without supplying the missing root, so the non-moving collector freed the temp
 instead of relocating it. Same lesson as #161 one entry up: the non-regression half
-of a fix is where the next bug is found.
+of a fix is where the next bug is found. (Now fixed and under Resolved; the
+separate filing is what let the fix be scoped to argument loops rather than
+reopened against #63's nursery narrative.)
 
 #154 stays open with its payload half fixed. An enum with at least one field
 anywhere now carries a GC header and names itself on the no-static-type paths; a
@@ -630,94 +637,6 @@ a one-line edit.
 
 ---
 
-### 162. OPEN — a live object held only in an LLVM SSA temp is *freed* by the non-moving collector; `f(Box(7), allocating())` reads a dead object
-
-**Severity: high.** Silent data corruption with no crash and no diagnostic, on the
-ordinary form `f(alloc_expr, allocating_expr)`.
-
-This is **not** #63, and the distinction is the reason it needs its own number.
-#63 was the *moving* minor collector invalidating an SSA temp — it closed by
-retiring the nursery, so there is no move left to invalidate anything. The
-observation #63 left behind in its resolution notes ("values in SSA temps are not
-roots, so no moving collector can be correct against this codegen") turns out to
-understate the problem: with the nursery gone, the mark-sweep major collector
-does not move the object, it **frees** it, because the shadow stack never learned
-about it either. Retiring the nursery narrowed #63's window; it did not close
-this one.
-
-**Reproduction** — deterministic, 51 corrupted reads out of 200:
-
-```saffron
-class Box {
-    var v: Int
-    fun init(v: Int) { this.v = v }
-}
-
-fun churn(n: Int): Int {
-    var s: String = ""
-    var i: Int = 0
-    while (i < n) { s = "x" + i.to_string(); i = i + 1 }
-    return s.length()
-}
-
-fun take(b: Box, ignored: Int): Int { return b.v }
-
-var bad: Int = 0
-var t: Int = 0
-while (t < 200) {
-    var got: Int = take(Box(7), churn(300))   // Box(7) live only in a register
-    if (got != 7) { bad = bad + 1 }
-    t = t + 1
-}
-IO.println("mismatches=${bad}")   // mismatches=51
-```
-
-**Cause.** Argument 0 is evaluated to an SSA temp, then argument 1 runs and
-allocates. `output_body.sf:489` roots a *parameter* by pushing the address of its
-alloca, and locals get root slots the same way — but an argument value that is
-still mid-call-setup has no alloca and no slot, so `__gc_collect` cannot see it
-and sweeps it. `take`'s `b.v` then reads freed memory.
-
-**Two controls, both clean, which is what pins it:**
-
-| control | mismatches |
-|---|---|
-| default | 51 / 200 |
-| `__gc_disable()` | **0** |
-| hoist both arguments into locals first (`var b = Box(7)` / `var c = churn(300)`) | **0** |
-
-The second row rules out an arithmetic or dispatch bug. The third is the shape of
-the fix and also the workaround available today: a local gets a root slot, an
-argument temp does not.
-
-**It is not enum-specific, and that matters for #154.** Found while writing
-`test/pass/enum_payload_any.sf`, where making payload enums GC-collectable exposed
-it — but the identical shape built out of **classes**, which have carried GC headers
-since long before #154, corrupts the same way. At depth 9 a recursive
-`assert_eq(grow(d).to_string(), want(d), "depth ${d}")` over classes returns a
-string whose tail reads `Node(Node(Leaf(1), 0)), 0)` — live subtrees replaced by
-`0`. The emitted IR shows the window plainly:
-
-```llvm
-%t15 = call i64 @__rt_tag_ptr(i64 %t14)   ; argument 0, live only in a register
-%t16 = load i64, i64* @__g_d
-%t17 = call i64 @want(i64 %t16)            ; allocates thousands of strings
-```
-
-Enums merely fail one depth earlier than classes because their allocation per node
-is larger. `test/pass/enum_payload_any.sf` therefore hoists both operands into
-locals rather than asserting on the raw call — a test that failed here would be
-reporting this entry while claiming to be about #154.
-
-**Fix.** Give argument temps root slots for the duration of call setup: spill each
-evaluated argument to an alloca and `__gc_push_root` it before evaluating the next,
-popping after the call. The blocker noted while fixing #154 is real and needs
-solving first — there is no entry-block alloca facility in this codegen, so an
-alloca emitted in a loop body grows the stack every iteration. Either add one, or
-reuse a fixed-size per-frame argument spill area.
-
----
-
 ### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
 
 **Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
@@ -1086,10 +1005,12 @@ a 400-iteration GC stress loop and a recursive `Tree` formatted byte-exactly aga
 an independently built expected string. Those found the two rooting bugs listed
 above, which the sixteen never reached — an enum whose to_string does not itself
 allocate past the threshold never triggers a collection mid-format. They also found
-#162, which is *not* fixed here: the recursive assertions hoist both operands into
-locals, because passing them directly leaves argument 0 unrooted across argument 1's
+#162, which was *not* fixed here: the recursive assertions hoist both operands into
+locals, because passing them directly left argument 0 unrooted across argument 1's
 allocation. That is an argument-temp rooting hole in codegen, reproducible with
-classes, and it is filed separately rather than papered over silently.
+classes, and it is filed separately rather than papered over silently. #162 has
+since been fixed, so the hoisting in this test is no longer load-bearing — it is
+left in place because a test for #154 should not depend on #162's fix holding.
 
 **What remains open** is the fieldless half, unchanged from the analysis above, and
 `test/oracle_enum_println.sf` still fails on exactly one line for it (line 22,
@@ -1143,6 +1064,168 @@ semicolon alone.
 ---
 
 ## Resolved
+
+### 162. FIXED — a live object held only in an LLVM SSA temp was *freed* by the non-moving collector; `f(Box(7), allocating())` read a dead object
+
+**Severity: high.** Silent data corruption with no crash and no diagnostic, on the
+ordinary form `f(alloc_expr, allocating_expr)`.
+
+This is **not** #63, and the distinction is the reason it needs its own number.
+#63 was the *moving* minor collector invalidating an SSA temp — it closed by
+retiring the nursery, so there is no move left to invalidate anything. The
+observation #63 left behind in its resolution notes ("values in SSA temps are not
+roots, so no moving collector can be correct against this codegen") turns out to
+understate the problem: with the nursery gone, the mark-sweep major collector
+does not move the object, it **frees** it, because the shadow stack never learned
+about it either. Retiring the nursery narrowed #63's window; it did not close
+this one.
+
+**Reproduction** — deterministic, 51 corrupted reads out of 200:
+
+```saffron
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun churn(n: Int): Int {
+    var s: String = ""
+    var i: Int = 0
+    while (i < n) { s = "x" + i.to_string(); i = i + 1 }
+    return s.length()
+}
+
+fun take(b: Box, ignored: Int): Int { return b.v }
+
+var bad: Int = 0
+var t: Int = 0
+while (t < 200) {
+    var got: Int = take(Box(7), churn(300))   // Box(7) live only in a register
+    if (got != 7) { bad = bad + 1 }
+    t = t + 1
+}
+IO.println("mismatches=${bad}")   // mismatches=51
+```
+
+**Cause.** Argument 0 is evaluated to an SSA temp, then argument 1 runs and
+allocates. `output_body.sf:489` roots a *parameter* by pushing the address of its
+alloca, and locals get root slots the same way — but an argument value that is
+still mid-call-setup has no alloca and no slot, so `__gc_collect` cannot see it
+and sweeps it. `take`'s `b.v` then reads freed memory.
+
+**Two controls, both clean, which is what pins it:**
+
+| control | mismatches |
+|---|---|
+| default | 51 / 200 |
+| `__gc_disable()` | **0** |
+| hoist both arguments into locals first (`var b = Box(7)` / `var c = churn(300)`) | **0** |
+
+The second row rules out an arithmetic or dispatch bug. The third is the shape of
+the fix and also the workaround available today: a local gets a root slot, an
+argument temp does not.
+
+**It is not enum-specific, and that matters for #154.** Found while writing
+`test/pass/enum_payload_any.sf`, where making payload enums GC-collectable exposed
+it — but the identical shape built out of **classes**, which have carried GC headers
+since long before #154, corrupts the same way. At depth 9 a recursive
+`assert_eq(grow(d).to_string(), want(d), "depth ${d}")` over classes returns a
+string whose tail reads `Node(Node(Leaf(1), 0)), 0)` — live subtrees replaced by
+`0`. The emitted IR shows the window plainly:
+
+```llvm
+%t15 = call i64 @__rt_tag_ptr(i64 %t14)   ; argument 0, live only in a register
+%t16 = load i64, i64* @__g_d
+%t17 = call i64 @want(i64 %t16)            ; allocates thousands of strings
+```
+
+Enums merely fail one depth earlier than classes because their allocation per node
+is larger. `test/pass/enum_payload_any.sf` therefore hoists both operands into
+locals rather than asserting on the raw call — a test that failed here would be
+reporting this entry while claiming to be about #154.
+
+**Scope is narrower than it first looks: exactly one argument is safe.**
+`take_one(Box(7))` where `take_one`'s *body* allocates heavily before reading the
+field gives 0 mismatches in 200, because the callee's prologue stores the param
+into an alloca and roots it (`output_body.sf:426` allocates, `:494` stores, the
+loop at `:516` roots). So the exposed window is only *between* argument
+evaluations — from the moment argument *i* becomes a register to the moment the
+`call` transfers it to the callee's prologue. A one-argument call has no such
+interval. That rules out the ~151 `gen_arg_value` call sites as the unit of repair
+and points at the argument *loops* instead.
+
+**Fix.** Root each evaluated argument by VALUE for the rest of call setup. The
+collector is non-moving (`__gc_sweep_impl` frees or clears the mark; it never
+relocates), so a root only has to keep the object marked — it does not have to be
+an address the collector can write back through. That removes the need for a slot
+per argument entirely: push the values onto a side stack before evaluating the
+next argument, pop them after the `call`.
+
+A second root discipline, deliberately separate from `__gc_push_root`:
+
+- `__gc_push_temp(i64 val)` / `__gc_pop_temps(i64 n)` in `src/runtime/gc.ll`
+  hold **values**, and `__gc_mark`'s temp scan calls `__gc_mark_object` on each
+  one **directly**. `__gc_push_root`/`__gc_pop_roots` take slot *addresses* and
+  dereference them during mark; feeding a value to those would mark whatever the
+  value's bit pattern happens to address. The two cannot share a stack, so they
+  do not.
+- Stubs in all four IR bases (`base.ll`, `base_nanbox.ll`, `wasm_base.ll`,
+  `wasm_base_32.ll`), because codegen emits the calls unconditionally.
+- Pushing a non-pointer is free: `__gc_mark_object` runs `__gc_strip_tag` then
+  `__gc_is_heap_ptr` (alignment, range, and the `0x5AFFC0DEDEADBEEF` magic at
+  header+16), so an Int or nil costs one rejected check. Values may be pushed
+  raw, tagged, or untagged.
+
+**The discipline is count-based (`pop_temps(n)`), not depth-based, and that is a
+correctness constraint rather than a style choice.** A saved depth would live in
+an SSA register that must dominate its use — and an argument containing a
+short-circuit `and`, a ternary, or a `try` expression *splits the basic block*, so
+the pop would sit in a block the push does not dominate and the module would fail
+the LLVM verifier. A constant count has no live value to dominate. The first draft
+of this fix used `__gc_temp_depth()` + `__gc_truncate_temps(depth)` and was
+replaced before it could be measured.
+
+**Coverage came from a probe, not from reasoning about the call sites.** Rooting
+only the direct-call loop still left `method=50 ctor=44 indirect=52 list=28`
+mismatches out of 200 on the four other call forms. Instrumented, each in its
+argument loop: both direct-call copies and the indirect closure call in
+`expr_body.sf`, the constructor's `__init` loop (`expr_body.sf:2653` — `instance`
+is rooted too, since it is live across every argument), `gen_list_lit`
+(`methods_body.sf:483` — the list is rooted once *before* the element loop, not
+per element), and `gen_namespace_call` (`methods_body.sf:1279`, which covers
+instance methods, actor dispatch and virtual dispatch; the receiver is rooted
+there because the caller evaluated it and it stays live across the arguments).
+All four counters then read 0.
+
+**Where the pop lands is not uniform, on purpose.** In `gen_namespace_call` the
+coroutine arms pop *immediately after the `call`* and before the await loop, not
+after it: the loop suspends, the temp count is a global, and a task resuming
+inside that window would pop entries belonging to another frame. The virtual-dispatch
+arm pops in `vd_end`, which post-dominates every arm.
+
+**Verified**: `test/pass/arg_temp_rooted.sf` passes 2/2 (was 1/2, 49 mismatches);
+the four-form probe reads 0 everywhere; bootstrap is green through STAGE 2 with 0
+inference fallbacks; the suite's failure set is unchanged against
+`test/FAILURE_BASELINE.txt`; and wasm32 links with both symbols present
+(`llvm-nm` shows `__gc_push_temp`/`__gc_pop_temps`).
+
+**Not covered, and it is a distinct preexisting bug.** `m.set("k" + churn(120).to_string(), churn(120))`
+in a loop segfaults — but it segfaults identically on the compiler at `HEAD`, i.e.
+before this fix, so it is not a regression from the temp-root work and is not this
+entry. It also does not reproduce when the key is hoisted, nor with an allocating
+key alone, nor with a fresh map per iteration; the reduction is not finished. Left
+unfiled rather than filed on a guess.
+
+An earlier draft of this entry said the blocker was that "there is no entry-block
+alloca facility in this codegen". **That is false** — `output_body.sf:420` is
+literally commented `// Emit all allocas in entry block (params + locals)` and
+loops over `param_list` and `collect_vars`'s output emitting one `alloca` each. The
+same wrong claim is worth reading twice, because it was reasoned from rather than
+checked, and it argued for the harder of the two designs: an alloca facility does
+exist, and with a non-moving collector it is not needed anyway. `src/compiler/codegen/expr_body.sf`
+carried the same sentence at the `gen_enum_construct` fix and has been corrected too.
+
+---
 
 ### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
 
@@ -6803,11 +6886,21 @@ the full explanation of why it is off. Two notes for whoever revives it:
   SSA temps are not roots, so no moving collector can be correct against this
   codegen. Sink the receiver load below all allocating argument code first
   (`methods_body.sf` / `expr_body.sf`), or make the young generation non-moving.
-  **That blocker is now its own open entry, #162** — and retiring the nursery did
-  not close it. With no move left, the non-moving major collector *frees* the
-  unrooted temp instead of relocating it, so `f(Box(7), allocating())` still reads
-  a dead object 51 times in 200. Fixing #162 is a precondition for reviving the
-  nursery, not a separate cleanup.
+  **That blocker became its own entry, #162** — and retiring the nursery did
+  not close it. With no move left, the non-moving major collector *freed* the
+  unrooted temp instead of relocating it, so `f(Box(7), allocating())` read a dead
+  object 51 times in 200.
+
+  **#162 is now fixed, and that does NOT unblock a moving nursery.** Read the fix
+  before assuming it did: argument temps are rooted by *value*
+  (`__gc_push_temp(i64 val)`), which is sound only because the collector never
+  relocates — the mark phase reads the value, and nothing can write a new address
+  back through it. A moving young generation would forward the object and leave
+  every temp root pointing at the old copy, which is #63's failure again with an
+  extra data structure in the way. Reviving the nursery still needs one of the two
+  original options: sink the loads below allocating argument code, or make the
+  young generation non-moving. What #162 did remove is the *sweep* half of the
+  hazard, so a non-moving young generation is now the cheaper of the two.
 - The forwarding pass has its own tag bug on top of that — see #101 and the
   comment in `__gc_minor_visit_slot`.
 

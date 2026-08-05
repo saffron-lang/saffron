@@ -92,8 +92,9 @@ NOT_A_TEST="goals hello_wasm gc_generational_test"
 # suite prints: a bare name for test/*.sf, "pass/<name>" for test/pass/*.sf.
 # An entry must land in the same commit as the test it names, or the staleness
 # check below will (correctly) flag it.
+# Empty again: #162 was fixed, so pass/arg_temp_rooted moved out of this table
+# and into the ordinary pass suite in the same change.
 KNOWN_FAIL="
-pass/arg_temp_rooted 162
 "
 
 known_fail_bug() {   # label -> echoes the BUGS number, or nothing

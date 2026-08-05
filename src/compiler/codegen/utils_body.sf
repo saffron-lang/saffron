@@ -44,6 +44,10 @@
         rt.append("declare i64 @__gc_realloc(i64, i64, i64)\n")
         rt.append("declare void @__gc_push_root(i64)\n")
         rt.append("declare void @__gc_pop_roots(i64)\n")
+        // Temp VALUE roots for argument temps (BUGS #162). Distinct from
+        // push_root/pop_roots, which take slot addresses.
+        rt.append("declare void @__gc_push_temp(i64)\n")
+        rt.append("declare void @__gc_pop_temps(i64)\n")
         rt.append("declare i64 @__gc_shadow_stack_depth()\n")
         rt.append("declare i64 @__gc_list_new()\n")
         rt.append("declare void @__gc_list_push(i64, i64)\n")
