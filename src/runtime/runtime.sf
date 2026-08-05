@@ -63,12 +63,32 @@
 // =============================================================================
 // List: { count@0, capacity@8, data*@16 } — 24 bytes
 // =============================================================================
+//
+// THE CONSTRUCTOR RULE: a container's child buffers are allocated with
+// __gc_alloc_safe, never __gc_alloc.
+//
+// The parent header is allocated first and is not reachable from anything the
+// collector can see — runtime.sf is compiled --identity-mode (bootstrap.sh),
+// which emits no __gc_push_root, so `raw` is a plain untracked local. A second
+// __gc_alloc in that window can cross the threshold, run a full mark-and-sweep,
+// find the parent unmarked, and free it. The child is then stored into memory
+// that has already been handed back to malloc.
+//
+// __gc_alloc_safe allocates through __sf_malloc_nogc (gc.ll:426), so it cannot
+// collect, while still linking the object into gc_head with a correct header —
+// the child stays swept and traced normally once the parent is reachable. The
+// parent's own allocation stays on __gc_alloc, so the threshold is still
+// checked and collection still happens; it just cannot happen inside the
+// window where the parent is invisible.
+//
+// __str_split established this pattern (__split_push, below). It is a general
+// rule about every multi-allocation constructor, not a quirk of splitting.
 
 fun __list_new(): Int {
     var raw: Int = __gc_alloc(24, 2)
     store64(raw, 0)                              // count = 0
     store64(raw + 8, 8)                  // capacity = 8
-    store64(raw + 16, __gc_alloc(64, 7))  // data ptr
+    store64(raw + 16, __gc_alloc_safe(64, 7))  // data ptr — see the constructor rule
     return raw
 }
 
@@ -79,8 +99,17 @@ fun __list_push(list: Int, value: Int) {
     if (count >= cap) {
         var new_cap: Int = cap * 2
         var old_data: Int = load64(list + 16)
-        var new_data: Int = __gc_realloc(old_data, new_cap * 8, 7)
+        // __gc_alloc_safe + explicit copy rather than __gc_realloc, which
+        // allocates via __gc_alloc and can therefore collect. `list` is a bare
+        // parameter here: runtime.sf is --identity-mode, so it is not a
+        // shadow-stack root, and the caller often holds the list only in an
+        // LLVM SSA temp (a list literal of more than 8 elements is exactly
+        // this — the 9th push grows). A collection in that window frees the
+        // list being pushed to. Same constructor rule as __list_new; this is
+        // the grow half of it, and __split_push already did it this way.
+        var new_data: Int = __gc_alloc_safe(new_cap * 8, 7)
         if (new_data != 0) {
+            rt_memcpy(new_data, old_data, cap * 8)
             store64(list + 8, new_cap)
             store64(list + 16, new_data)
         }
@@ -197,7 +226,10 @@ fun StringBuilder(): Int {
     var raw: Int = __gc_alloc(24, 6)
     store64(raw, 0)
     store64(raw + 8, 1024)
-    var buf: Int = __gc_alloc(1024, 0)
+    // __gc_alloc_safe: see the constructor rule at __list_new. 1024 bytes is
+    // the largest of the three child buffers, so this is the site most likely
+    // to be the allocation that crosses the threshold.
+    var buf: Int = __gc_alloc_safe(1024, 0)
     store8(buf, 0)
     store64(raw + 16, buf)
     return raw
@@ -212,8 +244,12 @@ fun __sb_append(sb: Int, str: Int) {
     var needed: Int = len + slen + 1
     if (needed >= cap) {
         var new_cap: Int = needed * 2
-        var new_buf: Int = __gc_realloc(buf, new_cap, 0)
+        // __gc_alloc_safe, not __gc_realloc: the grow half of the constructor
+        // rule at __list_new. `sb` and the `str` being appended are both
+        // unrooted parameters, so a collecting grow can free either.
+        var new_buf: Int = __gc_alloc_safe(new_cap, 0)
         if (new_buf != 0) {
+            rt_memcpy(new_buf, buf, len)
             buf = new_buf
             store64(sb + 8, new_cap)
             store64(sb + 16, buf)
@@ -505,8 +541,12 @@ fun __map_new(): Int {
     var raw: Int = __gc_alloc(32, 3)
     store64(raw, 0)
     store64(raw + 8, 16)
-    store64(raw + 16, __gc_alloc(128, 8))
-    store64(raw + 24, __gc_alloc(128, 8))
+    // Both child arrays via __gc_alloc_safe: see the constructor rule at
+    // __list_new. A Map is the worse case of the two — the keys array is
+    // itself unrooted while the values array is allocated, so a collection in
+    // that window can free the parent AND the keys.
+    store64(raw + 16, __gc_alloc_safe(128, 8))
+    store64(raw + 24, __gc_alloc_safe(128, 8))
     return raw
 }
 
@@ -528,9 +568,16 @@ fun __map_set(map: Int, key: Int, value: Int) {
     if (count >= cap) {
         var new_cap: Int = cap * 2
         var new_bytes: Int = new_cap * 8
-        var new_keys: Int = __gc_realloc(keys, new_bytes, 8)
-        var new_vals: Int = __gc_realloc(vals, new_bytes, 8)
+        // __gc_alloc_safe, not __gc_realloc — the grow half of the constructor
+        // rule at __list_new. Two reasons here rather than one: `map` is an
+        // unrooted parameter, and the freshly allocated `new_keys` is itself
+        // unrooted across the `new_vals` allocation, so a collecting realloc
+        // could free the keys array it just produced.
+        var new_keys: Int = __gc_alloc_safe(new_bytes, 8)
+        var new_vals: Int = __gc_alloc_safe(new_bytes, 8)
         if (new_keys != 0 and new_vals != 0) {
+            rt_memcpy(new_keys, keys, cap * 8)
+            rt_memcpy(new_vals, vals, cap * 8)
             store64(map + 8, new_cap)
             store64(map + 16, new_keys)
             store64(map + 24, new_vals)

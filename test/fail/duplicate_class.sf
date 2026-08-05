@@ -1,0 +1,19 @@
+// BUGS #164: two top-level type declarations binding one name.
+//
+// The MUST-REJECT here is not pedantry about redeclaration. Before the fix this
+// file compiled clean and printed 1: the checker type checked `f.b` against the
+// SECOND Foo (which has a String field `b`), while codegen emitted a read of the
+// FIRST Foo's slot 0 (an Int field `a`). The two halves of the compiler disagreed
+// about which Foo the name meant, and the disagreement was silent.
+class Foo {
+    var a: Int
+    fun init() { this.a = 1 }
+}
+
+class Foo {
+    var b: String
+    fun init() { this.b = "x" }
+}
+
+var f = Foo()
+IO.println(f.b)

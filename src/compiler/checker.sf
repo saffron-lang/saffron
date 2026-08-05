@@ -1160,6 +1160,11 @@ class NullChecker {
         // ordinary, so neither earlier walk has the information when it passes the
         // declaration. Signatures only; it never descends into a body.
         this.check_leaks(stmts)
+        // Fifth pass: two type declarations in this file binding one name. Its
+        // own pass over `stmts` for the same reason check_leaks is one — it must
+        // see only the module under check, not the imported declarations that
+        // registration also walked.
+        this.check_duplicate_decls(stmts)
     }
 
     fun check_conformance() {
@@ -1843,6 +1848,82 @@ class NullChecker {
         var leaked: String = this.private_type_in(spelling)
         if (leaked.length() == 0) { return nil }
         this.report_leak(subject, position, leaked, spelling)
+    }
+
+    /// The name a duplicate-declaration diagnostic should use for a statement's
+    /// introducing keyword. `class`, `interface` and `actor` all parse into one
+    /// ClassDecl, so the keyword is read from `introducer` rather than guessed —
+    /// the same reason check_condition reads it (BUGS #159).
+    fun decl_kind_of(stmt: AST.Stmt): String {
+        return match (stmt) {
+            ClassDecl(n, tp, ps, fs, ms, d, v, __ns, __fs, intro) => intro
+            EnumDecl(n, vs, d, v, __ns, __fs) => "enum"
+            _ => ""
+        }
+    }
+
+    /// The name a type declaration binds, or "" if the statement is not one.
+    fun decl_type_name_of(stmt: AST.Stmt): String {
+        return match (stmt) {
+            ClassDecl(n, tp, ps, fs, ms, d, v, __ns, __fs, intro) => n
+            EnumDecl(n, vs, d, v, __ns, __fs) => n
+            _ => ""
+        }
+    }
+
+    /// Reject two top-level type declarations that bind the same name.
+    ///
+    /// A fifth pass over the module's own statements, and deliberately scoped to
+    /// those: registration is fed imported declarations too, and two MODULES
+    /// declaring the same class is legal and already handled by
+    /// register_class_identity's prefix keying (the `Response` collision). The
+    /// error here is two declarations in ONE file, where there is no prefix to
+    /// tell them apart and the second silently overwrites the first's entry in
+    /// class_fields.
+    ///
+    /// Silently is the whole harm. `class Foo { var a: Int }` followed by
+    /// `class Foo { var b: String }` type checked against the SECOND Foo's fields
+    /// while codegen emitted a read of the FIRST one's slot 0 — `f.b` compiled
+    /// clean and printed the other class's `a`. That is BUGS #148's shape
+    /// (a nonexistent member reading field 0) reached by a different route, and
+    /// the reason this is a checker error rather than a warning.
+    ///
+    /// Types only — `class`, `interface`, `actor`, `enum`. Duplicate `fun` and
+    /// duplicate `var` are also silent (the last declaration wins) and are NOT
+    /// covered here: a function is genuinely redeclarable in the stdlib's
+    /// prelude-ish files today, and folding both in would turn one bug into a
+    /// broad source-compatibility change. Those stay open; this closes the case
+    /// where the winner and the layout disagree.
+    fun check_duplicate_decls(stmts: List<AST.Stmt>) {
+        var seen: Map<String, String> = {}
+        var i: Float = 0
+        while (i < stmts.length()) {
+            var dname: String = this.decl_type_name_of(stmts[i])
+            if (dname.length() > 0) {
+                if (seen.has(dname)) {
+                    var first_kind: String = seen.get(dname)
+                    var this_kind: String = this.decl_kind_of(stmts[i])
+                    // The tail names the consequence rather than restating the
+                    // rule, but only claims the layout disagreement where it
+                    // actually applies. Two classes DO diverge that way — the
+                    // checker takes the second's fields, codegen the first's
+                    // slots. An enum on either side is a plainer overwrite: the
+                    // later declaration wins the name everywhere, so saying
+                    // "field access reads the first one's layout" would be a
+                    // wrong explanation attached to a right error.
+                    var tail: String = " silently replaces the first"
+                    if (first_kind != "enum" and this_kind != "enum") {
+                        tail = " silently replaces the first for type checking, while field access still reads the first one's layout"
+                    }
+                    this.error("duplicate declaration of '" + dname + "': already declared as "
+                        + first_kind + " '" + dname + "' in this file; the second "
+                        + this_kind + tail)
+                } else {
+                    seen.set(dname, this.decl_kind_of(stmts[i]))
+                }
+            }
+            i = i + 1
+        }
     }
 
     /// The leak pass: a public declaration must not expose a private type in its

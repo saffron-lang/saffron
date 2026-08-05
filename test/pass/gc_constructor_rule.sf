@@ -1,0 +1,125 @@
+// A container's child buffers must be allocated with __gc_alloc_safe, never
+// __gc_alloc. See the constructor rule at src/runtime/runtime.sf:__list_new.
+//
+// The bug this pins: __list_new allocated the 24-byte list header with
+// __gc_alloc, then allocated the 64-byte data array with __gc_alloc too. The
+// header is not reachable from anything the collector can see in that window —
+// runtime.sf is compiled --identity-mode, so it emits no __gc_push_root and
+// `raw` is an untracked local. If the second allocation crossed the threshold
+// it ran a full mark-and-sweep, found the header unmarked, and freed it. The
+// data pointer was then stored into memory already returned to malloc.
+//
+// __map_new (two child arrays, and the keys array unrooted across the values
+// allocation), StringBuilder (a 1024-byte buffer), and the three grow paths
+// __list_push / __map_set / __sb_append all had the same shape. The grow paths
+// reached it through __gc_realloc, which allocates via __gc_alloc.
+//
+// GC.set_threshold(1) is what makes this a test rather than a coin flip: it
+// collects on every allocation, so the hazardous window is entered every time.
+// At the default 64KB threshold the same code corrupted only occasionally,
+// which is how this survived so long — it presented as an unrelated
+// intermittent segfault far from the allocation that caused it.
+import "@gc" as GC
+import "@test" as Test
+
+class Node {
+    var tag: String
+    fun init(tag: String) { this.tag = tag }
+    fun describe(): String { return "n:" + this.tag }
+}
+
+GC.set_threshold(1)
+
+// __list_new: header then data array.
+var small: List<String> = ["a", "b", "c"]
+Test.assert_eq(small.length(), 3, "a list literal keeps its length")
+Test.assert_eq(small[0], "a", "and its first element")
+Test.assert_eq(small[2], "c", "and its last")
+
+// __list_push's grow path: capacity starts at 8, so the 9th push grows.
+var grown: List<String> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+Test.assert_eq(grown.length(), 10, "a list survives growing past capacity 8")
+Test.assert_eq(grown[0], "a", "the elements copied before the grow survive it")
+Test.assert_eq(grown[9], "j", "and the ones written after")
+
+// __map_new: header, keys array, values array.
+var m: Map<String, String> = {}
+m.set("k", "v")
+m.set("k2", "v2")
+Test.assert_eq(m.length(), 2, "a map keeps its entries")
+var got: String = "MISSING"
+var raw = m.get("k")
+if (raw != nil) { got = "${raw}" }
+Test.assert_eq(got, "v", "and its values")
+
+// __map_set's grow path: capacity starts at 16.
+var big: Map<String, String> = {}
+var i: Int = 0
+while (i < 40) {
+    big.set("key${i}", "val${i}")
+    i = i + 1
+}
+Test.assert_eq(big.length(), 40, "a map survives growing past capacity 16")
+var first = big.get("key0")
+var last = big.get("key39")
+Test.assert(first != nil, "the entry written before the grow survives it")
+Test.assert(last != nil, "and the one written after")
+
+// StringBuilder, reached through interpolation and concatenation, including
+// __sb_append's grow path past the initial 1024 bytes.
+var acc: String = ""
+var j: Int = 0
+while (j < 200) {
+    acc = acc + "${j}-"
+    j = j + 1
+}
+Test.assert(acc.starts_with("0-1-2-"), "a built string keeps its head")
+Test.assert(acc.ends_with("199-"), "and its tail")
+
+// Class instances and their fields.
+var n = Node("t")
+Test.assert_eq(n.describe(), "n:t", "an instance keeps its fields")
+
+// __str_split, which already used the safe pattern — a non-regression check.
+var parts = "one two three".split(" ")
+Test.assert_eq(parts.length(), 3, "split keeps its parts")
+Test.assert_eq(parts[2], "three", "and their contents")
+
+// The whole thing again in a loop, so a collection lands at many different
+// points in each constructor rather than only where a single pass happens to
+// put it.
+var fails: Int = 0
+var k: Int = 0
+while (k < 60) {
+    var xs: List<String> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+    if (xs[0] != "a" or xs[9] != "j" or xs.length() != 10) { fails = fails + 1 }
+    var mm: Map<String, String> = {}
+    mm.set("a", xs[0])
+    if (mm.get("a") == nil) { fails = fails + 1 }
+    var node = Node("t${k}")
+    if (node.describe() != "n:t" + k.to_string()) { fails = fails + 1 }
+    var joined: String = xs[0] + "-" + xs[1] + "-${k}"
+    if (!joined.starts_with("a-b-")) { fails = fails + 1 }
+    k = k + 1
+}
+Test.assert_eq(fails, 0, "60 rounds of every constructor under collect-on-every-alloc")
+
+// The fix must not have turned collection off. __gc_alloc_safe skips the
+// threshold CHECK but still links the object into gc_head and still updates
+// __gc_total_bytes, so these objects are swept normally and the heap stays
+// bounded. Asserted because the lazy version of this fix — allocate children
+// with plain malloc, outside the GC's knowledge — would pass every assertion
+// above while leaking every child buffer in the program.
+GC.set_threshold(65536)
+var before: Int = GC.total_bytes()
+var t: Int = 0
+while (t < 20000) {
+    var tmp: List<String> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+    var tm: Map<String, String> = {}
+    tm.set("k", tmp[0])
+    t = t + 1
+}
+var after: Int = GC.total_bytes()
+Test.assert(after < before + 1000000, "20000 rounds of garbage stay bounded (${before} -> ${after})")
+
+Test.summary()

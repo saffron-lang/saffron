@@ -2,12 +2,36 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157.
-Next free number is **#160**. #158 is claimed but not present here: it is the lsp
-worktree's committed entry (the `match` above its enum declaration) and will arrive
-with that merge. A number can be taken without its text being in this file yet, so
-the next-free number is one past the highest *claimed*, not one past the highest
-written.
+**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #161.
+Next free number is **#166**. #158, #160, #162 and #163 are claimed but not present
+here: #158 is the lsp worktree's committed entry (the `match` above its enum
+declaration), #160 is `main`'s open `: Any` widening entry, #162 is the saffron_154
+line's SSA-temp GC bug, and #163 is already FIXED on `main` (malformed `import`
+lines). They arrive with their merges. A number can be taken
+without its text being in this file yet, so the next-free number is one past the
+highest *claimed*, not one past the highest written. (The open count above counts
+what is *written here*, so those three are excluded on purpose and the `awk`
+self-check over this file agrees with the number.)
+
+**The sixth collision, and the first one to cost a renumber after the work was
+done.** This line's duplicate-declaration fix was written as #160 and its
+cross-module dispatch bug as #161. By the time the GC work below was finished,
+`main` had claimed **#160** for something else entirely (the `: Any` widening
+entry) and **#162** for the saffron_154 line's SSA-temp bug. #161 survived because
+`main` had *reserved* it by name for this line — the reservation note is what saved
+it. So the duplicate-declaration fix became **#164** and the GC fix took **#165**.
+The lesson is not "re-read the number" — that rule was already in force and is what
+caught this. It is that a reservation note in `main` is worth writing even for a
+number you have not pushed yet: the one entry that had one kept its number, and the
+one that did not, moved.
+
+**#161 was found by writing #164's test, not by looking for it.** The
+duplicate-declaration check had to prove it did *not* reject two modules declaring
+one name, and the fixture that exercises that — two `Marker` classes — turned out
+to dispatch both receivers' methods to the second module. The general lesson is
+about where the non-regression half of a rejection fix points: a check that
+tightens what compiles needs a test for the shapes it must still accept, and that
+test walks straight into whatever else is wrong with those shapes.
 
 **The fifth collision, and the first one the pre-commit re-read actually caught.**
 The rule at the end of the note below — re-read the next-free number from `main`
@@ -729,9 +753,231 @@ at the first character that cannot appear in an identifier. That covers the whol
 class — semicolon, comment, trailing brace, stray punctuation — rather than the
 semicolon alone.
 
+### 161. A method call on a receiver from one module binds to a same-named class in another module
+
+```saffron
+// two modules, each declaring `class Marker { fun describe(): String }`
+import "./target_a.sf" as TargetA
+import "./target_b.sf" as TargetB
+
+var ma: TargetA.Marker = TargetA.Marker("x")
+IO.println(ma.describe())    // prints "target-b:x"
+```
+
+**The constructors resolve correctly and the methods do not.** The emitted IR
+holds both `@fixtures_alias_scope_target_a_Marker` and `..._b_Marker`, and the two
+`var` initialisers call the right one each. But both `describe()` calls lower to
+`@fixtures_alias_scope_target_b_Marker__describe`, so a correctly-constructed
+target-a instance is handed to target-b's method. An explicit
+`ma: TargetA.Marker` annotation does not help, which is what makes this worse than
+an inference gap — the static type is written down in the source and ignored.
+
+**Same root as the #134/#135/#37/#38/#91 cluster.** `find_class_for_method`
+(`methods_body.sf:1`) is handed a bare method name and scans `class_methods`
+globally, returning the first class that has a method by that name and non-empty
+fields. Two modules declaring `Marker` put two entries in that map, and whichever
+the module walk registered first wins for every receiver in the program. The
+receiver's static type is available and never consulted; the guard the cluster
+keeps asking for is the same one here.
+
+**Not a duplicate-declaration problem.** Two modules declaring one name is legal —
+#164 deliberately does not reject it, and `register_class_identity`'s prefix keying
+is what keeps the two classes distinguishable in the checker. The bug is that
+codegen's method dispatch does not use that distinction. `test/pass/duplicate_decl_ok.sf`
+asserts the constructors and explicitly documents why it stops short of the
+methods.
+
+**It predates the #164 work.** gen2 and gen3 emit byte-identical wrong calls, so
+this was found while writing #164's non-regression test rather than caused by it.
+The `alias_scope_target_a/b.sf` fixtures reproduce it as-is.
+
 ---
 
 ## Resolved
+
+### 165. FIXED — every container constructor allocated its child buffers while the parent was invisible to the collector, so a well-timed GC freed the object being built
+
+**Severity: high.** Silent heap corruption. Six sites, one shape, one rule.
+
+`__list_new` allocated the 24-byte list header, then allocated the 64-byte data
+array — both with `__gc_alloc`:
+
+```saffron
+fun __list_new(): Int {
+    var raw: Int = __gc_alloc(24, 2)
+    store64(raw, 0)
+    store64(raw + 8, 8)
+    store64(raw + 16, __gc_alloc(64, 7))   // <-- can collect; `raw` is unrooted
+    return raw
+}
+```
+
+The header is not reachable from anything the collector can see in that window.
+`runtime.sf` is compiled `--identity-mode` (`bootstrap.sh:225`), which emits no
+`__gc_push_root`, so `raw` is an untracked local — not a shadow-stack root, not a
+global, not a field of anything live. If the second `__gc_alloc` crossed the
+threshold it ran a full mark-and-sweep, found the header unmarked, and freed it.
+The data pointer was then stored into memory already returned to `malloc`.
+
+**Reproduction** — three lines, and the second `IO.println` is the whole bug:
+
+```saffron
+import "@gc" as GC
+GC.set_threshold(1)
+var xs: List<String> = ["a","b","c"]
+IO.println(xs.length())   // 3   — the spine survives
+IO.println(xs[0])         // 0   — the data array does not
+```
+
+`set_threshold(1)` collects on every allocation, so the window is entered every
+time. That is a stress knob, not the bug: at the default 64KB threshold the same
+code corrupted intermittently, which is how this survived so long. It presented
+as an unrelated segfault far from the allocation that caused it — a class method
+holding a `Map` local, called in a loop, aborting at iteration ~140 with no
+diagnostic on stderr at all. The `Map`'s key string had been allocated into the
+memory the freed list occupied, so `names[0]` read back `"k"`.
+
+**Six sites, three constructors and three grow paths:**
+
+| Site | Shape |
+|---|---|
+| `__list_new` | header, then data array |
+| `__map_new` | header, then keys array, then values array — and the keys array is *itself* unrooted across the values allocation |
+| `StringBuilder` | header, then a 1024-byte buffer (the largest child, so the likeliest to cross the threshold) |
+| `__list_push` | grow via `__gc_realloc` while `list` is an unrooted parameter |
+| `__map_set` | grow via two `__gc_realloc`s; `new_keys` unrooted across the second |
+| `__sb_append` | grow via `__gc_realloc` while `sb` and `str` are both unrooted |
+
+The grow paths reach it through `__gc_realloc`, which allocates via `__gc_alloc`
+(`gc.ll:498`). `__gc_realloc` itself is fine — the *old* buffer stays reachable
+through its parent — but the parent may not be reachable at all.
+
+**Fix: the constructor rule.** A container's child buffers are allocated with
+`__gc_alloc_safe`, never `__gc_alloc`. `__gc_alloc_safe` allocates through
+`__sf_malloc_nogc` (`gc.ll:426`) so it cannot collect, while still linking the
+object into `gc_head` with a correct header — the child is swept and traced
+normally once the parent is reachable. The parent's own allocation stays on
+`__gc_alloc`, so the threshold is still checked and collection still happens; it
+just cannot happen inside the window where the parent is invisible.
+
+This was **already the established pattern** and nobody had generalised it.
+`__str_split` used `__gc_alloc_safe` with a hand-written `__split_push`, and its
+comment says why — "used by `__str_split` to avoid nursery invalidation". That
+read as a splitting-specific workaround for a nursery that is now retired. It is
+in fact the general rule for every multi-allocation constructor, and it outlives
+the nursery: with the nursery gone the collector does not *move* the parent, it
+*frees* it. Retiring the nursery narrowed this window; it did not close it.
+
+**Not a leak, and that was checked rather than assumed.** The lazy version of
+this fix — allocate children with plain `malloc`, outside the GC's knowledge —
+would pass every correctness assertion while leaking every child buffer in the
+program. 20,000 rounds allocating a 10-element list and a `Map` each settle at
+606 live objects and 65,360 bytes with the threshold unmoved at its 65,536
+default, so collection still reclaims them.
+
+**`__gc_realloc` now has zero callers.** It is left defined rather than deleted:
+it is correct code, and the comment above it records a real bug it was written to
+fix (a grown capacity stored next to an un-grown buffer). Deleting it would take
+that narrative with it.
+
+**Regression test:** `test/pass/gc_constructor_rule.sf`, 18 assertions covering
+all six sites under `set_threshold(1)`, plus the boundedness assertion above.
+Verified to fail against the pre-fix runtime (`expected: a, actual: 0`) and pass
+against the fixed one — the distinction that separates a regression test from a
+test that merely happens to pass.
+
+**Related but distinct: #162.** That is the same corruption one layer up — a live
+object held only in an LLVM SSA temp at a *call site* is never rooted either, so
+`f(Box(7), allocating())` reads a dead object. A nested list literal
+(`[["p","q"],["r"]]`) is exactly that shape: the outer list lives in `%t5` across
+the inner `__list_new()`. This entry does not fix it and the test does not assert
+it. Two layers, two fixes: the runtime owns its own constructors, codegen owns
+what it leaves in registers.
+
+Measured after this fix, so the two are not confused: #162's own repro still
+yields **51 corrupted reads out of 200**, byte-identical to the number
+saffron_154 recorded before #165 existed. Fixing six constructors moved it not at
+all, which is the cleanest available evidence that they are separate bugs rather
+than two descriptions of one.
+
+**#162 is why `pass/check_module_imports` enters the failure baseline with #164.**
+That test runs the checker in-process, so #164's new pass executes, and its single
+`var seen: Map<String, String> = {}` per module is enough extra allocation to move
+a collection onto #162's window. Established by A/B rather than inferred:
+neutralising the pass to an early `return` placed *after* the Map allocation still
+segfaults, moving the same early return *before* it passes, and `GC.disable()`
+makes the test pass 4/4. #165 does not fix it, which is the useful part — if the
+runtime constructors had been the only bug, this test would have gone green here.
+
+### 164. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
+
+```saffron
+class Foo {
+    var a: Int
+    fun init() { this.a = 1 }
+}
+class Foo {
+    var b: String
+    fun init() { this.b = "x" }
+}
+var f = Foo()
+IO.println(f.b)     // prints 1 — an Int, from the other class's field
+```
+
+**The two halves of the compiler picked different classes, silently.** The checker
+type checked `f.b` against the *second* `Foo`, where `b: String` exists, so no
+error. Codegen emitted a read of the *first* `Foo`'s slot 0, where `a: Int` lives.
+The program compiled with exit 0 and printed `1` — an integer, from a field that
+was never named, through a member access that the checker had just approved
+against a different declaration.
+
+That is BUGS #148's shape (a nonexistent member reading field 0 and emitting
+invalid IR) arrived at by a different route, and it is the argument for making this
+an error rather than a warning: the failure mode is not "the later declaration
+wins", which would at least be predictable, but "the checker and codegen each pick
+a winner and they are not the same one".
+
+Every kind was affected. `enum E` twice, `class Foo` then `enum Foo`, and the
+`interface`/`actor` spellings all registered the same way, and none of them
+reported anything.
+
+**Fix**: a fifth pass in `check_program`, `check_duplicate_decls`, over the
+module's own statement list. Scoping it to *that list* is the load-bearing detail
+and the reason it is a separate pass rather than a check inside `register_decl`:
+registration is also fed every imported declaration, so a check that lived there
+would reject two *modules* declaring one name — legal, common, and already handled
+by `register_class_identity`'s prefix keying (the `Response` collision). Same
+structural reason `check_leaks` is its own pass over `stmts`.
+
+**Types only — `class`, `interface`, `actor`, `enum`.** Duplicate `fun` and
+duplicate `var` are silent too (last declaration wins; `fun f` twice returns the
+first, `var x` twice reads the second — both probed), and are deliberately left
+open. A function name is genuinely redeclarable across the stdlib's files today,
+and folding those in would turn one bug into a broad source-compatibility change
+that wants its own decision. What this closes is the case where the winner and
+the memory layout disagree.
+
+The diagnostic names the consequence, but only claims the layout disagreement
+where it actually holds: two classes do diverge that way, while an enum on either
+side is a plain overwrite. Attaching the class explanation to the enum case would
+have been a wrong reason on a right error.
+
+**Verified**: bootstrap green through stage 2 (`gen3 compiles itself`, 0 unresolved
+inference fallbacks), so the compiler's own ~40 source files contain no duplicate
+type declaration — checked independently with a `grep`/`uniq -d` sweep over
+`src/compiler`, `src/lib` and all three test directories, which found none. Three
+tests: `test/fail/duplicate_class.sf` (the wrong-layout case above),
+`test/fail/duplicate_enum_class.sf` (the cross-kind case), and
+`test/pass/duplicate_decl_ok.sf` (9 assertions on the let-through set — two
+modules sharing a class name, a function name and a global name; a local class
+shadowing an imported one; and `class`/`enum`/`interface`/`actor` coexisting with
+distinct names).
+
+Writing that pass test is what turned up **#161**: `ma.describe()` binds to the
+other module's method even with an explicit annotation. The test asserts the
+constructors, which #164 must not break, and says in a comment why it stops short
+of the methods — a test that pins a second bug fails for the wrong reason and
+teaches the next reader nothing about the first.
 
 ### 159. FIXED — a class or enum used as a condition was deterministically always false
 

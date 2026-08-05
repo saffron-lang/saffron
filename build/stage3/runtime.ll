@@ -167,7 +167,7 @@ entry:
   %t16 = add i64 %t14, %t15
   %t17 = add i64 0, 64
   %t18 = add i64 0, 7
-  %t19 = call i64 @__gc_alloc(i64 %t17, i64 %t18)
+  %t19 = call i64 @__gc_alloc_safe(i64 %t17, i64 %t18)
   %t20 = inttoptr i64 %t16 to i8*
   %t21 = bitcast i8* %t20 to i64*
   store i64 %t19, i64* %t21
@@ -229,34 +229,42 @@ then5:
   %t29 = bitcast i8* %t28 to i64*
   %t30 = load i64, i64* %t29
   store i64 %t30, i64* %old_data
-  %t31 = load i64, i64* %old_data
-  %t32 = load i64, i64* %new_cap
-  %t33 = add i64 0, 8
-  %t34 = mul i64 %t32, %t33
-  %t35 = add i64 0, 7
-  %t36 = call i64 @__gc_realloc(i64 %t31, i64 %t34, i64 %t35)
-  store i64 %t36, i64* %new_data
-  %t37 = load i64, i64* %new_data
-  %t38 = add i64 0, 0
-  %t39 = icmp ne i64 %t37, %t38
-  %t40 = zext i1 %t39 to i64
-  %t41 = trunc i64 %t40 to i1
-  br i1 %t41, label %then8, label %else9
+  %t31 = load i64, i64* %new_cap
+  %t32 = add i64 0, 8
+  %t33 = mul i64 %t31, %t32
+  %t34 = add i64 0, 7
+  %t35 = call i64 @__gc_alloc_safe(i64 %t33, i64 %t34)
+  store i64 %t35, i64* %new_data
+  %t36 = load i64, i64* %new_data
+  %t37 = add i64 0, 0
+  %t38 = icmp ne i64 %t36, %t37
+  %t39 = zext i1 %t38 to i64
+  %t40 = trunc i64 %t39 to i1
+  br i1 %t40, label %then8, label %else9
 then8:
-  %t42 = load i64, i64* %list
-  %t43 = add i64 0, 8
-  %t44 = add i64 %t42, %t43
-  %t45 = load i64, i64* %new_cap
-  %t46 = inttoptr i64 %t44 to i8*
-  %t47 = bitcast i8* %t46 to i64*
-  store i64 %t45, i64* %t47
-  %t48 = load i64, i64* %list
-  %t49 = add i64 0, 16
-  %t50 = add i64 %t48, %t49
-  %t51 = load i64, i64* %new_data
-  %t52 = inttoptr i64 %t50 to i8*
-  %t53 = bitcast i8* %t52 to i64*
-  store i64 %t51, i64* %t53
+  %t41 = load i64, i64* %new_data
+  %t42 = inttoptr i64 %t41 to i8*
+  %t43 = load i64, i64* %old_data
+  %t44 = inttoptr i64 %t43 to i8*
+  %t45 = load i64, i64* %cap
+  %t46 = add i64 0, 8
+  %t47 = mul i64 %t45, %t46
+  %t48 = call i8* @memcpy(i8* %t42, i8* %t44, i64 %t47)
+  %t49 = ptrtoint i8* %t48 to i64
+  %t50 = load i64, i64* %list
+  %t51 = add i64 0, 8
+  %t52 = add i64 %t50, %t51
+  %t53 = load i64, i64* %new_cap
+  %t54 = inttoptr i64 %t52 to i8*
+  %t55 = bitcast i8* %t54 to i64*
+  store i64 %t53, i64* %t55
+  %t56 = load i64, i64* %list
+  %t57 = add i64 0, 16
+  %t58 = add i64 %t56, %t57
+  %t59 = load i64, i64* %new_data
+  %t60 = inttoptr i64 %t58 to i8*
+  %t61 = bitcast i8* %t60 to i64*
+  store i64 %t59, i64* %t61
   br label %endif7
 else9:
   br label %endif7
@@ -265,29 +273,29 @@ endif7:
 else6:
   br label %endif4
 endif4:
-  %t54 = load i64, i64* %list
-  %t55 = add i64 0, 16
-  %t56 = add i64 %t54, %t55
-  %t57 = inttoptr i64 %t56 to i8*
-  %t58 = bitcast i8* %t57 to i64*
-  %t59 = load i64, i64* %t58
-  store i64 %t59, i64* %data
-  %t60 = load i64, i64* %data
-  %t61 = load i64, i64* %count
-  %t62 = add i64 0, 8
-  %t63 = mul i64 %t61, %t62
-  %t64 = add i64 %t60, %t63
-  %t65 = load i64, i64* %value
-  %t66 = inttoptr i64 %t64 to i8*
-  %t67 = bitcast i8* %t66 to i64*
-  store i64 %t65, i64* %t67
-  %t68 = load i64, i64* %list
+  %t62 = load i64, i64* %list
+  %t63 = add i64 0, 16
+  %t64 = add i64 %t62, %t63
+  %t65 = inttoptr i64 %t64 to i8*
+  %t66 = bitcast i8* %t65 to i64*
+  %t67 = load i64, i64* %t66
+  store i64 %t67, i64* %data
+  %t68 = load i64, i64* %data
   %t69 = load i64, i64* %count
-  %t70 = add i64 0, 1
-  %t71 = add i64 %t69, %t70
-  %t72 = inttoptr i64 %t68 to i8*
-  %t73 = bitcast i8* %t72 to i64*
-  store i64 %t71, i64* %t73
+  %t70 = add i64 0, 8
+  %t71 = mul i64 %t69, %t70
+  %t72 = add i64 %t68, %t71
+  %t73 = load i64, i64* %value
+  %t74 = inttoptr i64 %t72 to i8*
+  %t75 = bitcast i8* %t74 to i64*
+  store i64 %t73, i64* %t75
+  %t76 = load i64, i64* %list
+  %t77 = load i64, i64* %count
+  %t78 = add i64 0, 1
+  %t79 = add i64 %t77, %t78
+  %t80 = inttoptr i64 %t76 to i8*
+  %t81 = bitcast i8* %t80 to i64*
+  store i64 %t79, i64* %t81
   ret i64 0
 }
 
@@ -905,7 +913,7 @@ entry:
   store i64 %t11, i64* %t13
   %t14 = add i64 0, 1024
   %t15 = add i64 0, 0
-  %t16 = call i64 @__gc_alloc(i64 %t14, i64 %t15)
+  %t16 = call i64 @__gc_alloc_safe(i64 %t14, i64 %t15)
   store i64 %t16, i64* %buf
   %t17 = load i64, i64* %buf
   %t18 = add i64 0, 0
@@ -988,34 +996,40 @@ then80:
   %t36 = add i64 0, 2
   %t37 = mul i64 %t35, %t36
   store i64 %t37, i64* %new_cap
-  %t38 = load i64, i64* %buf
-  %t39 = load i64, i64* %new_cap
-  %t40 = add i64 0, 0
-  %t41 = call i64 @__gc_realloc(i64 %t38, i64 %t39, i64 %t40)
-  store i64 %t41, i64* %new_buf
-  %t42 = load i64, i64* %new_buf
-  %t43 = add i64 0, 0
-  %t44 = icmp ne i64 %t42, %t43
-  %t45 = zext i1 %t44 to i64
-  %t46 = trunc i64 %t45 to i1
-  br i1 %t46, label %then83, label %else84
+  %t38 = load i64, i64* %new_cap
+  %t39 = add i64 0, 0
+  %t40 = call i64 @__gc_alloc_safe(i64 %t38, i64 %t39)
+  store i64 %t40, i64* %new_buf
+  %t41 = load i64, i64* %new_buf
+  %t42 = add i64 0, 0
+  %t43 = icmp ne i64 %t41, %t42
+  %t44 = zext i1 %t43 to i64
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then83, label %else84
 then83:
-  %t47 = load i64, i64* %new_buf
-  store i64 %t47, i64* %buf
-  %t48 = load i64, i64* %sb
-  %t49 = add i64 0, 8
-  %t50 = add i64 %t48, %t49
-  %t51 = load i64, i64* %new_cap
-  %t52 = inttoptr i64 %t50 to i8*
-  %t53 = bitcast i8* %t52 to i64*
-  store i64 %t51, i64* %t53
+  %t46 = load i64, i64* %new_buf
+  %t47 = inttoptr i64 %t46 to i8*
+  %t48 = load i64, i64* %buf
+  %t49 = inttoptr i64 %t48 to i8*
+  %t50 = load i64, i64* %len
+  %t51 = call i8* @memcpy(i8* %t47, i8* %t49, i64 %t50)
+  %t52 = ptrtoint i8* %t51 to i64
+  %t53 = load i64, i64* %new_buf
+  store i64 %t53, i64* %buf
   %t54 = load i64, i64* %sb
-  %t55 = add i64 0, 16
+  %t55 = add i64 0, 8
   %t56 = add i64 %t54, %t55
-  %t57 = load i64, i64* %buf
+  %t57 = load i64, i64* %new_cap
   %t58 = inttoptr i64 %t56 to i8*
   %t59 = bitcast i8* %t58 to i64*
   store i64 %t57, i64* %t59
+  %t60 = load i64, i64* %sb
+  %t61 = add i64 0, 16
+  %t62 = add i64 %t60, %t61
+  %t63 = load i64, i64* %buf
+  %t64 = inttoptr i64 %t62 to i8*
+  %t65 = bitcast i8* %t64 to i64*
+  store i64 %t63, i64* %t65
   br label %endif82
 else84:
   br label %endif82
@@ -1024,31 +1038,31 @@ endif82:
 else81:
   br label %endif79
 endif79:
-  %t60 = load i64, i64* %buf
-  %t61 = load i64, i64* %len
-  %t62 = add i64 %t60, %t61
-  %t63 = inttoptr i64 %t62 to i8*
-  %t64 = load i64, i64* %str
-  %t65 = inttoptr i64 %t64 to i8*
-  %t66 = load i64, i64* %slen
-  %t67 = call i8* @memcpy(i8* %t63, i8* %t65, i64 %t66)
-  %t68 = ptrtoint i8* %t67 to i64
-  %t69 = load i64, i64* %len
-  %t70 = load i64, i64* %slen
-  %t71 = add i64 %t69, %t70
-  store i64 %t71, i64* %new_len
-  %t72 = load i64, i64* %sb
-  %t73 = load i64, i64* %new_len
-  %t74 = inttoptr i64 %t72 to i8*
-  %t75 = bitcast i8* %t74 to i64*
-  store i64 %t73, i64* %t75
-  %t76 = load i64, i64* %buf
-  %t77 = load i64, i64* %new_len
-  %t78 = add i64 %t76, %t77
-  %t79 = add i64 0, 0
-  %t80 = trunc i64 %t79 to i8
-  %t81 = inttoptr i64 %t78 to i8*
-  store i8 %t80, i8* %t81
+  %t66 = load i64, i64* %buf
+  %t67 = load i64, i64* %len
+  %t68 = add i64 %t66, %t67
+  %t69 = inttoptr i64 %t68 to i8*
+  %t70 = load i64, i64* %str
+  %t71 = inttoptr i64 %t70 to i8*
+  %t72 = load i64, i64* %slen
+  %t73 = call i8* @memcpy(i8* %t69, i8* %t71, i64 %t72)
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = load i64, i64* %len
+  %t76 = load i64, i64* %slen
+  %t77 = add i64 %t75, %t76
+  store i64 %t77, i64* %new_len
+  %t78 = load i64, i64* %sb
+  %t79 = load i64, i64* %new_len
+  %t80 = inttoptr i64 %t78 to i8*
+  %t81 = bitcast i8* %t80 to i64*
+  store i64 %t79, i64* %t81
+  %t82 = load i64, i64* %buf
+  %t83 = load i64, i64* %new_len
+  %t84 = add i64 %t82, %t83
+  %t85 = add i64 0, 0
+  %t86 = trunc i64 %t85 to i8
+  %t87 = inttoptr i64 %t84 to i8*
+  store i8 %t86, i8* %t87
   ret i64 0
 }
 
@@ -1870,7 +1884,7 @@ entry:
   %t16 = add i64 %t14, %t15
   %t17 = add i64 0, 128
   %t18 = add i64 0, 8
-  %t19 = call i64 @__gc_alloc(i64 %t17, i64 %t18)
+  %t19 = call i64 @__gc_alloc_safe(i64 %t17, i64 %t18)
   %t20 = inttoptr i64 %t16 to i8*
   %t21 = bitcast i8* %t20 to i64*
   store i64 %t19, i64* %t21
@@ -1879,7 +1893,7 @@ entry:
   %t24 = add i64 %t22, %t23
   %t25 = add i64 0, 128
   %t26 = add i64 0, 8
-  %t27 = call i64 @__gc_alloc(i64 %t25, i64 %t26)
+  %t27 = call i64 @__gc_alloc_safe(i64 %t25, i64 %t26)
   %t28 = inttoptr i64 %t24 to i8*
   %t29 = bitcast i8* %t28 to i64*
   store i64 %t27, i64* %t29
@@ -2008,60 +2022,76 @@ then216:
   %t70 = add i64 0, 8
   %t71 = mul i64 %t69, %t70
   store i64 %t71, i64* %new_bytes
-  %t72 = load i64, i64* %keys
-  %t73 = load i64, i64* %new_bytes
-  %t74 = add i64 0, 8
-  %t75 = call i64 @__gc_realloc(i64 %t72, i64 %t73, i64 %t74)
-  store i64 %t75, i64* %new_keys
-  %t76 = load i64, i64* %vals
-  %t77 = load i64, i64* %new_bytes
-  %t78 = add i64 0, 8
-  %t79 = call i64 @__gc_realloc(i64 %t76, i64 %t77, i64 %t78)
-  store i64 %t79, i64* %new_vals
-  %t80 = load i64, i64* %new_keys
-  %t81 = add i64 0, 0
-  %t82 = icmp ne i64 %t80, %t81
-  %t83 = zext i1 %t82 to i64
-  %t84 = trunc i64 %t83 to i1
+  %t72 = load i64, i64* %new_bytes
+  %t73 = add i64 0, 8
+  %t74 = call i64 @__gc_alloc_safe(i64 %t72, i64 %t73)
+  store i64 %t74, i64* %new_keys
+  %t75 = load i64, i64* %new_bytes
+  %t76 = add i64 0, 8
+  %t77 = call i64 @__gc_alloc_safe(i64 %t75, i64 %t76)
+  store i64 %t77, i64* %new_vals
+  %t78 = load i64, i64* %new_keys
+  %t79 = add i64 0, 0
+  %t80 = icmp ne i64 %t78, %t79
+  %t81 = zext i1 %t80 to i64
+  %t82 = trunc i64 %t81 to i1
   br label %logic.entry219
 logic.entry219:
-  br i1 %t84, label %rhs220, label %end221
+  br i1 %t82, label %rhs220, label %end221
 rhs220:
-  %t85 = load i64, i64* %new_vals
-  %t86 = add i64 0, 0
-  %t87 = icmp ne i64 %t85, %t86
-  %t88 = zext i1 %t87 to i64
-  %t89 = trunc i64 %t88 to i1
+  %t83 = load i64, i64* %new_vals
+  %t84 = add i64 0, 0
+  %t85 = icmp ne i64 %t83, %t84
+  %t86 = zext i1 %t85 to i64
+  %t87 = trunc i64 %t86 to i1
   br label %rhs.exit222
 rhs.exit222:
   br label %end221
 end221:
-  %t90 = phi i1 [%t84, %logic.entry219], [%t89, %rhs.exit222]
-  %t91 = zext i1 %t90 to i64
-  %t92 = trunc i64 %t91 to i1
-  br i1 %t92, label %then223, label %else224
+  %t88 = phi i1 [%t82, %logic.entry219], [%t87, %rhs.exit222]
+  %t89 = zext i1 %t88 to i64
+  %t90 = trunc i64 %t89 to i1
+  br i1 %t90, label %then223, label %else224
 then223:
-  %t93 = load i64, i64* %map
-  %t94 = add i64 0, 8
-  %t95 = add i64 %t93, %t94
-  %t96 = load i64, i64* %new_cap
-  %t97 = inttoptr i64 %t95 to i8*
-  %t98 = bitcast i8* %t97 to i64*
-  store i64 %t96, i64* %t98
-  %t99 = load i64, i64* %map
-  %t100 = add i64 0, 16
-  %t101 = add i64 %t99, %t100
-  %t102 = load i64, i64* %new_keys
-  %t103 = inttoptr i64 %t101 to i8*
-  %t104 = bitcast i8* %t103 to i64*
-  store i64 %t102, i64* %t104
-  %t105 = load i64, i64* %map
-  %t106 = add i64 0, 24
-  %t107 = add i64 %t105, %t106
-  %t108 = load i64, i64* %new_vals
-  %t109 = inttoptr i64 %t107 to i8*
-  %t110 = bitcast i8* %t109 to i64*
-  store i64 %t108, i64* %t110
+  %t91 = load i64, i64* %new_keys
+  %t92 = inttoptr i64 %t91 to i8*
+  %t93 = load i64, i64* %keys
+  %t94 = inttoptr i64 %t93 to i8*
+  %t95 = load i64, i64* %cap
+  %t96 = add i64 0, 8
+  %t97 = mul i64 %t95, %t96
+  %t98 = call i8* @memcpy(i8* %t92, i8* %t94, i64 %t97)
+  %t99 = ptrtoint i8* %t98 to i64
+  %t100 = load i64, i64* %new_vals
+  %t101 = inttoptr i64 %t100 to i8*
+  %t102 = load i64, i64* %vals
+  %t103 = inttoptr i64 %t102 to i8*
+  %t104 = load i64, i64* %cap
+  %t105 = add i64 0, 8
+  %t106 = mul i64 %t104, %t105
+  %t107 = call i8* @memcpy(i8* %t101, i8* %t103, i64 %t106)
+  %t108 = ptrtoint i8* %t107 to i64
+  %t109 = load i64, i64* %map
+  %t110 = add i64 0, 8
+  %t111 = add i64 %t109, %t110
+  %t112 = load i64, i64* %new_cap
+  %t113 = inttoptr i64 %t111 to i8*
+  %t114 = bitcast i8* %t113 to i64*
+  store i64 %t112, i64* %t114
+  %t115 = load i64, i64* %map
+  %t116 = add i64 0, 16
+  %t117 = add i64 %t115, %t116
+  %t118 = load i64, i64* %new_keys
+  %t119 = inttoptr i64 %t117 to i8*
+  %t120 = bitcast i8* %t119 to i64*
+  store i64 %t118, i64* %t120
+  %t121 = load i64, i64* %map
+  %t122 = add i64 0, 24
+  %t123 = add i64 %t121, %t122
+  %t124 = load i64, i64* %new_vals
+  %t125 = inttoptr i64 %t123 to i8*
+  %t126 = bitcast i8* %t125 to i64*
+  store i64 %t124, i64* %t126
   br label %endif218
 else224:
   br label %endif218
@@ -2070,45 +2100,45 @@ endif218:
 else217:
   br label %endif215
 endif215:
-  %t111 = load i64, i64* %map
-  %t112 = add i64 0, 16
-  %t113 = add i64 %t111, %t112
-  %t114 = inttoptr i64 %t113 to i8*
-  %t115 = bitcast i8* %t114 to i64*
-  %t116 = load i64, i64* %t115
-  store i64 %t116, i64* %cur_keys
-  %t117 = load i64, i64* %map
-  %t118 = add i64 0, 24
-  %t119 = add i64 %t117, %t118
-  %t120 = inttoptr i64 %t119 to i8*
-  %t121 = bitcast i8* %t120 to i64*
-  %t122 = load i64, i64* %t121
-  store i64 %t122, i64* %cur_vals
-  %t123 = load i64, i64* %cur_keys
-  %t124 = load i64, i64* %count
-  %t125 = add i64 0, 8
-  %t126 = mul i64 %t124, %t125
-  %t127 = add i64 %t123, %t126
-  %t128 = load i64, i64* %key
-  %t129 = inttoptr i64 %t127 to i8*
-  %t130 = bitcast i8* %t129 to i64*
-  store i64 %t128, i64* %t130
-  %t131 = load i64, i64* %cur_vals
-  %t132 = load i64, i64* %count
-  %t133 = add i64 0, 8
-  %t134 = mul i64 %t132, %t133
-  %t135 = add i64 %t131, %t134
-  %t136 = load i64, i64* %value
-  %t137 = inttoptr i64 %t135 to i8*
-  %t138 = bitcast i8* %t137 to i64*
-  store i64 %t136, i64* %t138
-  %t139 = load i64, i64* %map
+  %t127 = load i64, i64* %map
+  %t128 = add i64 0, 16
+  %t129 = add i64 %t127, %t128
+  %t130 = inttoptr i64 %t129 to i8*
+  %t131 = bitcast i8* %t130 to i64*
+  %t132 = load i64, i64* %t131
+  store i64 %t132, i64* %cur_keys
+  %t133 = load i64, i64* %map
+  %t134 = add i64 0, 24
+  %t135 = add i64 %t133, %t134
+  %t136 = inttoptr i64 %t135 to i8*
+  %t137 = bitcast i8* %t136 to i64*
+  %t138 = load i64, i64* %t137
+  store i64 %t138, i64* %cur_vals
+  %t139 = load i64, i64* %cur_keys
   %t140 = load i64, i64* %count
-  %t141 = add i64 0, 1
-  %t142 = add i64 %t140, %t141
-  %t143 = inttoptr i64 %t139 to i8*
-  %t144 = bitcast i8* %t143 to i64*
-  store i64 %t142, i64* %t144
+  %t141 = add i64 0, 8
+  %t142 = mul i64 %t140, %t141
+  %t143 = add i64 %t139, %t142
+  %t144 = load i64, i64* %key
+  %t145 = inttoptr i64 %t143 to i8*
+  %t146 = bitcast i8* %t145 to i64*
+  store i64 %t144, i64* %t146
+  %t147 = load i64, i64* %cur_vals
+  %t148 = load i64, i64* %count
+  %t149 = add i64 0, 8
+  %t150 = mul i64 %t148, %t149
+  %t151 = add i64 %t147, %t150
+  %t152 = load i64, i64* %value
+  %t153 = inttoptr i64 %t151 to i8*
+  %t154 = bitcast i8* %t153 to i64*
+  store i64 %t152, i64* %t154
+  %t155 = load i64, i64* %map
+  %t156 = load i64, i64* %count
+  %t157 = add i64 0, 1
+  %t158 = add i64 %t156, %t157
+  %t159 = inttoptr i64 %t155 to i8*
+  %t160 = bitcast i8* %t159 to i64*
+  store i64 %t158, i64* %t160
   ret i64 0
 }
 
