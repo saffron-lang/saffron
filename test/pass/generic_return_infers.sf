@@ -1,0 +1,108 @@
+// A generic return type has to survive the trip out of the function table.
+//
+// `env.get_func_ret` used to render the stored `AST.Type` through
+// `AST.type_to_string`, which is deliberately lossy: `GenericType(base, args)`
+// collapses to the bare `base`. So a function declared `List<String>` came back
+// as the string "List", the element type was gone, and reading an element off the
+// result inferred nothing -- "cannot infer type, add explicit annotation" -- while
+// the *identical* read through an annotated variable was fine, because variables
+// are stored as nodes and never went through that renderer.
+//
+// Two branches guarded on `ret.contains("<")` were therefore unreachable: the one
+// renderer feeding them had already removed the "<". A dead branch that looks
+// live is worse than a missing one, because it reads as coverage.
+//
+// Everything below would compile either way -- the defect was a *warning* plus a
+// widened type, not an error -- so the assertions pin the types by USING them in
+// ways only the narrow type supports: `.to_upper()` on a String element,
+// arithmetic on an Int element. If the element type widens back to Any, dispatch
+// on those falls through.
+
+import "@test" as Test
+
+// --- Free function, one type argument. ------------------------------------
+fun names(): List<String> { return ["beta", "alpha"] }
+
+var n = names()
+var first = n[0]
+Test.assert_eq(first.to_upper(), "BETA", "List<String> element keeps String through a call return")
+
+// Directly off the call, no intermediate binding.
+Test.assert_eq(names()[1].to_upper(), "ALPHA", "same, without an intermediate variable")
+
+// --- Two type arguments, so the loss would take both. ---------------------
+fun table(): Map<String, Int> { return {"a": 1, "b": 2} }
+
+var t = table()
+var got = t.get("a")
+Test.assert(got != nil, "Map<String,Int> get() is non-nil for a present key")
+if (got != nil) {
+    Test.assert_eq(got + 1, 2, "Map<String,Int> value keeps Int through a call return")
+}
+
+// --- The method-call twin. `infer_method_call` has its own copy of the same
+// lookup and the same unreachable branch, so it needs its own assertion rather
+// than an assumption that the free-function fix covers it.
+class Bag {
+    var items: List<String>
+    fun init() { this.items = ["x"] }
+    fun all(): List<String> { return this.items }
+}
+
+var bag = Bag()
+var xs = bag.all()
+var x0 = xs[0]
+Test.assert_eq(x0.to_upper(), "X", "List<String> element keeps String through a METHOD return")
+
+// --- Nested generic: the renderer recurses, so a List<List<Int>> must not
+// flatten to "List" at either level.
+fun grid(): List<List<Int>> { return [[1, 2], [3]] }
+
+var g = grid()
+var row = g[0]
+Test.assert_eq(row.length(), 2, "outer element of List<List<Int>> is still a List")
+
+// --- The shapes that must NOT be misread now that the string is richer. ----
+
+// A union return renders as its members, not the literal word "Union".
+// `is_type_param("Union")` answers TRUE -- uppercase first letter, not a declared
+// class -- so under the old renderer a union-returning function's return type was
+// being handed to `resolve_type_params` as a type parameter to resolve from the
+// argument list. This asserts the union is usable, which requires the narrowing
+// guard to see a real union.
+fun maybe(flag: Bool): String|Nil {
+    if (flag) { return "s" }
+    return nil
+}
+var m = maybe(true)
+Test.assert(m != nil, "a union return type is a union, not a type parameter")
+if (m != nil) {
+    Test.assert_eq(m.to_upper(), "S", "and its non-nil member is usable")
+}
+
+// A function return type is spelled "Fun(Int):Int" by the source renderer. That
+// form has an uppercase first letter, no "<" and no "|", so it would pass every
+// is_type_param test and be treated as a type parameter named "Fun(Int):Int" --
+// which is why is_type_param now excludes anything containing "(".
+fun mk(): Fun { return fun (a: Int): Int => a }
+var f = mk()
+Test.assert(f != nil, "a function return type is not a type parameter")
+
+// A real type parameter still resolves from the arguments. This is the branch
+// the union and Fun cases were wrongly entering, so it has to be shown working.
+fun ident<T>(x: T): T { return x }
+Test.assert_eq(ident(41) + 1, 42, "a genuine type parameter still resolves from the argument")
+Test.assert_eq(ident("q"), "q", "and resolves per call site")
+
+// NOT asserted here, deliberately: `ident("q").to_upper()`. It fails, with
+// "[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver type 'T'",
+// and it fails identically on the unmodified gen2 — so it is preexisting and
+// unrelated to this file's fix. The mechanism is a different one: the CHECKER
+// resolves T to String via resolve_type_params, but codegen carries its own
+// receiver-type inference (methods_body.sf:3733) that does not, so a *method
+// call* on the result is dropped while a plain read of it is fine. The Int side
+// (`ident(41) + 1`) works because arithmetic does not go through method
+// dispatch. Recording it here rather than asserting it: a test that fails for a
+// reason its own comment disclaims is a test nobody trusts.
+
+Test.summary()

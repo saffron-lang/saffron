@@ -2,21 +2,33 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160. Next free number is **#164**.
+**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#161, #165. Next free number is **#170**.
 
 #162 was in this list and is now fixed — argument temps are GC-rooted by value
 across call setup, on every call form — so it moved to Resolved. The count above
-went 13 → 12 for that reason and no other; the numbers are otherwise identical to
-the previous line, which is the check.
+went 14 → 13 for that reason and no other; the set is otherwise main's line
+verbatim, which is the check.
 
-#163 is taken and is *not* in the list above because it is already fixed — three
-malformed-`import` defects, filed and resolved on sight, so it lives under
-Resolved. #161 is taken and not present here at all: it is the `sfx` worktree's
-committed entry (a method call binding to a same-named class in another module)
-and will arrive with that merge. Both are the ordinary case the rule below
-describes — the next-free number is one past the highest *claimed*, not one past
-the highest open or even the highest written.
+#160, #163, #164, #167, #168 and #169 are taken and not in the list above because
+all six are fixed and live under Resolved: an `: Any` global that could not widen,
+three malformed-`import` defects, a fatal `IndexError` on any incomplete source,
+the GC constructor rule, two type declarations binding one name, and a generic
+return type losing its type arguments. #165 arrives open from `main` (a
+class-typed parameter accepting a String). The rule that made the old
+placeholders necessary still holds: a number can be taken without its text being
+in this file yet, so the next-free number is one past the highest *claimed*, not
+one past the highest open or even the highest written.
+
+#169 is the fourth entry in this file to be renumbered on landing, and the
+cheapest one so far, which is worth one line on why. It was written as #166
+against a tree whose header said "next free is #166" — true when read, stale by
+the time it was pushed, because #166 had meanwhile been claimed upstream (and was
+itself a renumber, of #164). Nothing detects that: the number is correct locally
+and wrong globally, and the only thing that settles it is fetching before
+claiming. The reason this one cost a single `sed` rather than an argument is that
+the entry was self-contained — no other entry cross-referenced it yet — so there
+was nothing to keep in step with the rename.
 
 Worth recording how #162 and #163 avoided contesting each other, because it is
 the first time the scheme resolved a three-way overlap with no renumber at all:
@@ -49,35 +61,92 @@ anywhere now carries a GC header and names itself on the no-static-type paths; a
 fieldless variant is the immediate `tag << 56` with nothing to hang a header on, so
 it needs an enum-bearing NaN-box tag rather than another formatter arm.
 
-**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160. Next free number is **#164**.
+The count and the open set live in **one** place: the header at the top of this
+file. A second copy used to sit here, and it went stale exactly as I10 predicts —
+it still said 12 open with #160 listed after #160 was closed, because closing an
+entry moves it under `## Resolved` and nothing makes a duplicated tally follow.
+(#160 was open when the note below was written and closed on 2026-08-04; #162
+arrived from the saffron_154 line.)
 
-#161 and #162 are claimed but not present here: #161 is the sfx line's
+**This line's duplicate-declaration fix was renumbered three times: #160 → #164 →
+#166 → #168.** Written as #160, with the cross-module dispatch bug as #161. By the
+time the GC work below was finished, `main` had claimed **#160** for the `: Any`
+widening entry and **#162** for the saffron_154 line's SSA-temp bug, so it became
+**#164** and the GC fix took **#165**. Then, during the bootstrap and suite run
+that verified the first merge, `main` landed its own **#164** (a fatal `IndexError`
+on incomplete source), so mine moved to **#166**. Then, during the bootstrap and
+suite run that verified the *second* merge, `main` landed its own **#165** (a
+class-typed parameter accepting a String), so the GC fix moved to **#167** and the
+duplicate-declaration fix to **#168**. Both times mine was the unpushed side, and
+both times the collision was found by the same grep in the same window — after the
+verification, before the push.
+
+Three lessons, and the third is the one this second collision adds:
+
+- A reservation note in `main` is worth writing even for a number you have not
+  pushed yet. #161 survived all of this *only* because `main` had reserved it by
+  name for this line. Every entry that had no reservation moved at least once; the
+  one that had one never moved.
+- **The re-read has to happen after the last long-running verification, not before
+  it.** The rule as written says "immediately before committing", and that is what
+  was done — the pre-commit grep found #164 free and it was. What it did not
+  survive was the ~15 minutes of bootstrap-plus-suite that came *after* the commit
+  and before the push, which is exactly long enough for `main` to move. The
+  operative moment is the push, not the commit. This cost a renumber across four
+  files and one `### ` heading; catching it required re-fetching after the suite
+  finished, which was luck rather than procedure.
+- **Fixing the timing of the re-read does not reduce the number of collisions; it
+  only moves where you find them.** The second collision happened *after* the
+  lesson above was written down and followed. The pre-push grep did its job — it
+  is why the renumber was a five-file `sed` and not a wrong number in `main` — but
+  the underlying race is structural: verification takes longer than the interval
+  between `main`'s commits, so any number claimed before a bootstrap is a number
+  held across a window where it can be taken. The procedural fix caps the *cost*
+  of a collision at one mechanical rename. The only thing that would cap the
+  *count* is claiming the number in `main` first (a one-line reservation commit,
+  pushed before the work starts) — which is exactly what #161 did, and #161 is the
+  only entry on this line that never moved. Two collisions in one session is the
+  argument for making that reservation the default rather than the exception.
+
+**#161 was found by writing #168's test, not by looking for it.** The
+duplicate-declaration check had to prove it did *not* reject two modules declaring
+one name, and the fixture that exercises that — two `Marker` classes — turned out
+to dispatch both receivers' methods to the second module. The general lesson is
+about where the non-regression half of a rejection fix points: a check that
+tightens what compiles needs a test for the shapes it must still accept, and that
+test walks straight into whatever else is wrong with those shapes.
+
+#161 and #162 are claimed but not present in that header: #161 is the sfx line's
 cross-module method-binding bug and #162 is the saffron_154 line's SSA-temp GC
 bug, both committed there and unpushed when this entry was written. Per the
 rule below, whoever is unpushed moves — but both were claimed *before* #163,
 so #163 stepped over them rather than contesting either. #163 is resolved on
 sight and is filed under Resolved.
 
+(That paragraph is `main`'s, and this line is the reason half of it is now
+stale: #161 *is* in the header list above, because this line pushed it. Left in
+place rather than rewritten, because what it records is a state — two numbers
+claimed in worktrees and invisible from `main` — that was true when written and
+is the exact condition the next-free rule exists for. A narrative that describes
+a moment does not need updating every time the moment passes; a *count* does,
+which is the whole distinction I10 is drawing.)
+
 #160 took its number without a collision — the first entry in a while to do so.
 The pre-commit re-read (see the note below) was run against `origin/main` and
 found #160 free, which is the whole procedure working as intended rather than
 detecting a clash. Worth recording that the quiet case happens too; five
-consecutive collision narratives make the scheme look worse than it is.
+consecutive collision narratives make the scheme look worse than it is. (The
+sixth, above, landed on the very next pair of numbers — so the quiet case is
+still the exception, not the new normal.)
 
-#160 is also the second half of #147, which is the more useful thing about it: the
+#160 was also the second half of #147, which is the more useful thing about it: the
 checker stopped conflating `: Any` with silence, and codegen never did. A fix
 recorded as landed had reached one of two consumers, and nothing in the tree said
 so. That is the argument for invariant I10 (one source of truth per fact) stated as
 a measurement rather than a principle — the inference in question exists in five
-pasted copies.
-
-#158 is the entry the previous revision of this header described as "claimed but
-not present" — the lsp worktree's `match`-above-its-enum bug. This is that merge,
-so it is now present and the claimed set and the written set agree again. The
-observation that made the placeholder necessary still holds and is worth keeping:
-a number can be taken without its text being in this file yet, so the next-free
-number is one past the highest *claimed*, not one past the highest written.
+pasted copies, and closing #160 on 2026-08-04 meant editing all five by hand. The
+argument survives the fix: what made the hand-edit safe was not deduplication but
+the type migration splitting the overloaded guard into two askable questions.
 
 **The fifth collision, and the first one the pre-commit re-read actually caught.**
 The rule at the end of the note below — re-read the next-free number from `main`
@@ -637,64 +706,6 @@ a one-line edit.
 
 ---
 
-### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
-
-**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
-and only when the initializer is a list, map or string literal.
-
-`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
-prints a bit pattern or segfaults. The identical *local* is correct — that is the
-half #147 fixed:
-
-```saffron
-var g: Any = "abc"
-fun r() { g = 42
-    IO.println("g=${g}") }
-r()                             // segfault
-
-fun s() { var l: Any = "abc"
-    l = 42
-    IO.println("l=${l}") }
-s()                             // l=42   — correct
-```
-
-#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
-moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
-apart. It did — but **codegen's global pre-scans still collapse the two**, in five
-copies, all of the same shape:
-
-```saffron
-if (gvtype.length() == 0 or gvtype == "Any") {
-    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
-    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
-        gvtype = gvinit
-    }
-}
-```
-
-`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
-`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
-fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
-initializer and `global_var_types` says `String`; the store writes a tagged Int and
-the load untags a pointer.
-
-The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
-`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
-three collapsed shapes break, which is the kind of partial correctness that reads as
-"works" until it doesn't.
-
-**Why the five copies exist, and why that is the actual entry.** Each one has a
-comment citing the bug that motivated it (#36, #37, #80) — they were added
-independently, and the inference was pasted rather than shared. One source of truth
-(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
-them is a real change with real risk, and the pre-scans differ in which corpus and
-prefix they walk, so this is filed rather than fixed in passing.
-
-Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
-behaviour and documents in a comment that the `: Any` global is excluded for this
-reason.
-
----
 
 ### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
 
@@ -865,6 +876,65 @@ declared anything." Three things that fell out of doing it, all worth keeping:
 What remains under this number is the class-typed segfault above, still gated on
 the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
 `Ptr<T>`.
+
+See **#165** for the same hole on the *argument* side of a call, which this entry
+does not cover and which segfaults identically.
+
+---
+
+### 165. OPEN — passing a String where a class-typed parameter is declared compiles clean and segfaults; #155's hole, one site over
+
+**Severity: high.** Found while classifying `checker.sf`'s `: String`-returning
+functions for rewrite stage 3.
+
+`check_call_args` (`checker.sf:1058`) closed #145 by comparing arguments to
+parameters, and reuses `scalar_mismatch`, so it fires only on two *different
+concrete scalars*. A class-typed parameter is therefore never checked against
+anything, and all three call forms accept a `String`:
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n }
+  fun eat(b: Box): Int { return b.get() } }
+
+fun free_fn(b: Box): Int { return b.get() }
+
+var s: String = "nope"
+free_fn(s)          // compiles; segfault
+Box(1).eat(s)       // compiles; segfault
+Holder(s)           // compiles; segfault  (constructor, `var b: Box` field)
+```
+
+Measured: each of the three compiles to a `.ll` with no diagnostic, and running
+the first is `Segmentation fault: 11`. The mechanism is #155's exactly — the
+checker trusts the declaration, codegen emits a direct `Box__get` with a field
+load, and the receiver is a String pointer — but at the *call* boundary rather
+than the `return` boundary. #155's narrative is entirely about `return` and its
+"still open" paragraph names only that site, so nothing tracked this one.
+
+**Why this is a separate number rather than a note under #155.** They share a
+cause and will likely share a fix, but they are different code: #155 is
+`check_stmt`'s `Return` arm, this is `check_call_args`, wired at three keys
+(`name`, `Class__method`, `Class__init`). #145 landed only the free-function key
+first and both the method and constructor negatives printed `NOT CAUGHT`, so
+"fixed at the return site" would not have implied fixed here even if the arm were
+shared.
+
+**What is NOT the bug.** `scalar_mismatch` letting this through is deliberate and
+documented at the site: the checker type-checks the compiler's own source, so a
+false positive is a broken bootstrap, and #155 already reverted an obvious
+declared-class/passed-scalar arm after it produced three distinct false-positive
+families. I re-probed all three at the *argument* site and they are live here too
+— a `String` into `String|Nil`, an `Int` into a type parameter `T`, and
+`Math.e` into `: Float` all compile clean and must keep doing so. So the fix is
+not "add the arm"; it is the same membership test against a real class/enum
+registry, or `is_subtype_node`, that #155 is gated on, which wants I4 to answer
+reliably for module-qualified names.
+
+Filed rather than fixed for that reason. What this entry adds is that closing
+#155 will not close the argument side unless the fix is written at both sites,
+and that a probe of *one* call form is not evidence about the others.
 
 ---
 
@@ -1061,6 +1131,44 @@ at the first character that cannot appear in an identifier. That covers the whol
 class — semicolon, comment, trailing brace, stray punctuation — rather than the
 semicolon alone.
 
+### 161. A method call on a receiver from one module binds to a same-named class in another module
+
+```saffron
+// two modules, each declaring `class Marker { fun describe(): String }`
+import "./target_a.sf" as TargetA
+import "./target_b.sf" as TargetB
+
+var ma: TargetA.Marker = TargetA.Marker("x")
+IO.println(ma.describe())    // prints "target-b:x"
+```
+
+**The constructors resolve correctly and the methods do not.** The emitted IR
+holds both `@fixtures_alias_scope_target_a_Marker` and `..._b_Marker`, and the two
+`var` initialisers call the right one each. But both `describe()` calls lower to
+`@fixtures_alias_scope_target_b_Marker__describe`, so a correctly-constructed
+target-a instance is handed to target-b's method. An explicit
+`ma: TargetA.Marker` annotation does not help, which is what makes this worse than
+an inference gap — the static type is written down in the source and ignored.
+
+**Same root as the #134/#135/#37/#38/#91 cluster.** `find_class_for_method`
+(`methods_body.sf:1`) is handed a bare method name and scans `class_methods`
+globally, returning the first class that has a method by that name and non-empty
+fields. Two modules declaring `Marker` put two entries in that map, and whichever
+the module walk registered first wins for every receiver in the program. The
+receiver's static type is available and never consulted; the guard the cluster
+keeps asking for is the same one here.
+
+**Not a duplicate-declaration problem.** Two modules declaring one name is legal —
+#168 deliberately does not reject it, and `register_class_identity`'s prefix keying
+is what keeps the two classes distinguishable in the checker. The bug is that
+codegen's method dispatch does not use that distinction. `test/pass/duplicate_decl_ok.sf`
+asserts the constructors and explicitly documents why it stops short of the
+methods.
+
+**It predates the #168 work.** gen2 and gen3 emit byte-identical wrong calls, so
+this was found while writing #168's non-regression test rather than caused by it.
+The `alias_scope_target_a/b.sf` fixtures reproduce it as-is.
+
 ---
 
 ## Resolved
@@ -1224,6 +1332,464 @@ same wrong claim is worth reading twice, because it was reasoned from rather tha
 checked, and it argued for the harder of the two designs: an alloca facility does
 exist, and with a non-moving collector it is not needed anyway. `src/compiler/codegen/expr_body.sf`
 carried the same sentence at the `gen_enum_construct` fix and has been corrected too.
+
+---
+
+### 168. FIXED — two type declarations binding one name compiled clean, with the checker and codegen disagreeing about which one
+
+```saffron
+class Foo {
+    var a: Int
+    fun init() { this.a = 1 }
+}
+class Foo {
+    var b: String
+    fun init() { this.b = "x" }
+}
+var f = Foo()
+IO.println(f.b)     // prints 1 — an Int, from the other class's field
+```
+
+**The two halves of the compiler picked different classes, silently.** The checker
+type checked `f.b` against the *second* `Foo`, where `b: String` exists, so no
+error. Codegen emitted a read of the *first* `Foo`'s slot 0, where `a: Int` lives.
+The program compiled with exit 0 and printed `1` — an integer, from a field that
+was never named, through a member access that the checker had just approved
+against a different declaration.
+
+That is BUGS #148's shape (a nonexistent member reading field 0 and emitting
+invalid IR) arrived at by a different route, and it is the argument for making this
+an error rather than a warning: the failure mode is not "the later declaration
+wins", which would at least be predictable, but "the checker and codegen each pick
+a winner and they are not the same one".
+
+Every kind was affected. `enum E` twice, `class Foo` then `enum Foo`, and the
+`interface`/`actor` spellings all registered the same way, and none of them
+reported anything.
+
+**Fix**: a fifth pass in `check_program`, `check_duplicate_decls`, over the
+module's own statement list. Scoping it to *that list* is the load-bearing detail
+and the reason it is a separate pass rather than a check inside `register_decl`:
+registration is also fed every imported declaration, so a check that lived there
+would reject two *modules* declaring one name — legal, common, and already handled
+by `register_class_identity`'s prefix keying (the `Response` collision). Same
+structural reason `check_leaks` is its own pass over `stmts`.
+
+**Types only — `class`, `interface`, `actor`, `enum`.** Duplicate `fun` and
+duplicate `var` are silent too (last declaration wins; `fun f` twice returns the
+first, `var x` twice reads the second — both probed), and are deliberately left
+open. A function name is genuinely redeclarable across the stdlib's files today,
+and folding those in would turn one bug into a broad source-compatibility change
+that wants its own decision. What this closes is the case where the winner and
+the memory layout disagree.
+
+The diagnostic names the consequence, but only claims the layout disagreement
+where it actually holds: two classes do diverge that way, while an enum on either
+side is a plain overwrite. Attaching the class explanation to the enum case would
+have been a wrong reason on a right error.
+
+**Verified**: bootstrap green through stage 2 (`gen3 compiles itself`, 0 unresolved
+inference fallbacks), so the compiler's own ~40 source files contain no duplicate
+type declaration — checked independently with a `grep`/`uniq -d` sweep over
+`src/compiler`, `src/lib` and all three test directories, which found none. Three
+tests: `test/fail/duplicate_class.sf` (the wrong-layout case above),
+`test/fail/duplicate_enum_class.sf` (the cross-kind case), and
+`test/pass/duplicate_decl_ok.sf` (9 assertions on the let-through set — two
+modules sharing a class name, a function name and a global name; a local class
+shadowing an imported one; and `class`/`enum`/`interface`/`actor` coexisting with
+distinct names).
+
+Writing that pass test is what turned up **#161**: `ma.describe()` binds to the
+other module's method even with an explicit annotation. The test asserts the
+constructors, which #168 must not break, and says in a comment why it stops short
+of the methods — a test that pins a second bug fails for the wrong reason and
+teaches the next reader nothing about the first.
+
+### 167. FIXED — every container constructor allocated its child buffers while the parent was invisible to the collector, so a well-timed GC freed the object being built
+
+**Severity: high.** Silent heap corruption. Six sites, one shape, one rule.
+
+`__list_new` allocated the 24-byte list header, then allocated the 64-byte data
+array — both with `__gc_alloc`:
+
+```saffron
+fun __list_new(): Int {
+    var raw: Int = __gc_alloc(24, 2)
+    store64(raw, 0)
+    store64(raw + 8, 8)
+    store64(raw + 16, __gc_alloc(64, 7))   // <-- can collect; `raw` is unrooted
+    return raw
+}
+```
+
+The header is not reachable from anything the collector can see in that window.
+`runtime.sf` is compiled `--identity-mode` (`bootstrap.sh:225`), which emits no
+`__gc_push_root`, so `raw` is an untracked local — not a shadow-stack root, not a
+global, not a field of anything live. If the second `__gc_alloc` crossed the
+threshold it ran a full mark-and-sweep, found the header unmarked, and freed it.
+The data pointer was then stored into memory already returned to `malloc`.
+
+**Reproduction** — three lines, and the second `IO.println` is the whole bug:
+
+```saffron
+import "@gc" as GC
+GC.set_threshold(1)
+var xs: List<String> = ["a","b","c"]
+IO.println(xs.length())   // 3   — the spine survives
+IO.println(xs[0])         // 0   — the data array does not
+```
+
+`set_threshold(1)` collects on every allocation, so the window is entered every
+time. That is a stress knob, not the bug: at the default 64KB threshold the same
+code corrupted intermittently, which is how this survived so long. It presented
+as an unrelated segfault far from the allocation that caused it — a class method
+holding a `Map` local, called in a loop, aborting at iteration ~140 with no
+diagnostic on stderr at all. The `Map`'s key string had been allocated into the
+memory the freed list occupied, so `names[0]` read back `"k"`.
+
+**Six sites, three constructors and three grow paths:**
+
+| Site | Shape |
+|---|---|
+| `__list_new` | header, then data array |
+| `__map_new` | header, then keys array, then values array — and the keys array is *itself* unrooted across the values allocation |
+| `StringBuilder` | header, then a 1024-byte buffer (the largest child, so the likeliest to cross the threshold) |
+| `__list_push` | grow via `__gc_realloc` while `list` is an unrooted parameter |
+| `__map_set` | grow via two `__gc_realloc`s; `new_keys` unrooted across the second |
+| `__sb_append` | grow via `__gc_realloc` while `sb` and `str` are both unrooted |
+
+The grow paths reach it through `__gc_realloc`, which allocates via `__gc_alloc`
+(`gc.ll:498`). `__gc_realloc` itself is fine — the *old* buffer stays reachable
+through its parent — but the parent may not be reachable at all.
+
+**Fix: the constructor rule.** A container's child buffers are allocated with
+`__gc_alloc_safe`, never `__gc_alloc`. `__gc_alloc_safe` allocates through
+`__sf_malloc_nogc` (`gc.ll:426`) so it cannot collect, while still linking the
+object into `gc_head` with a correct header — the child is swept and traced
+normally once the parent is reachable. The parent's own allocation stays on
+`__gc_alloc`, so the threshold is still checked and collection still happens; it
+just cannot happen inside the window where the parent is invisible.
+
+This was **already the established pattern** and nobody had generalised it.
+`__str_split` used `__gc_alloc_safe` with a hand-written `__split_push`, and its
+comment says why — "used by `__str_split` to avoid nursery invalidation". That
+read as a splitting-specific workaround for a nursery that is now retired. It is
+in fact the general rule for every multi-allocation constructor, and it outlives
+the nursery: with the nursery gone the collector does not *move* the parent, it
+*frees* it. Retiring the nursery narrowed this window; it did not close it.
+
+**Not a leak, and that was checked rather than assumed.** The lazy version of
+this fix — allocate children with plain `malloc`, outside the GC's knowledge —
+would pass every correctness assertion while leaking every child buffer in the
+program. 20,000 rounds allocating a 10-element list and a `Map` each settle at
+606 live objects and 65,360 bytes with the threshold unmoved at its 65,536
+default, so collection still reclaims them.
+
+**`__gc_realloc` now has zero callers.** It is left defined rather than deleted:
+it is correct code, and the comment above it records a real bug it was written to
+fix (a grown capacity stored next to an un-grown buffer). Deleting it would take
+that narrative with it.
+
+**Regression test:** `test/pass/gc_constructor_rule.sf`, 18 assertions covering
+all six sites under `set_threshold(1)`, plus the boundedness assertion above.
+Verified to fail against the pre-fix runtime (`expected: a, actual: 0`) and pass
+against the fixed one — the distinction that separates a regression test from a
+test that merely happens to pass.
+
+**Related but distinct: #162.** That is the same corruption one layer up — a live
+object held only in an LLVM SSA temp at a *call site* is never rooted either, so
+`f(Box(7), allocating())` reads a dead object. A nested list literal
+(`[["p","q"],["r"]]`) is exactly that shape: the outer list lives in `%t5` across
+the inner `__list_new()`. This entry does not fix it and the test does not assert
+it. Two layers, two fixes: the runtime owns its own constructors, codegen owns
+what it leaves in registers.
+
+Measured after this fix, so the two are not confused: #162's own repro still
+yields **51 corrupted reads out of 200**, byte-identical to the number
+saffron_154 recorded before #167 existed. Fixing six constructors moved it not at
+all, which is the cleanest available evidence that they are separate bugs rather
+than two descriptions of one.
+
+**#162 is why `pass/check_module_imports` briefly entered the failure baseline with
+#168, and why it left again two merges later without anything being fixed.** That
+test runs the checker in-process, so #168's new pass executes, and its single
+`var seen: Map<String, String> = {}` per module is enough extra allocation to move
+a collection onto #162's window. Established by A/B rather than inferred:
+neutralising the pass to an early `return` placed *after* the Map allocation still
+segfaulted, moving the same early return *before* it passed, and `GC.disable()`
+made the test pass 4/4. #167 did not fix it, which was the useful part — if the
+runtime constructors had been the only bug, this test would have gone green there.
+
+Then it went green anyway. After merging origin's #160 closure, #164 and the
+`VarDecl.type_ann` migration, `pass/check_module_imports` passes 12/12 while #162
+is *more* broken than before: the standalone repro under `GC.set_threshold(1)` went
+from `mismatches=51` to `mismatches=200` out of 200, and #162's own regression test
+`pass/arg_temp_rooted` still XFAILs with `expected 10, actual 49`. Allocation
+timing shifted underneath a bystander; nothing touched SSA-temp rooting.
+
+**The lesson is about which test carries a bug's signal.** A bystander that flips
+from always-red to always-green is indistinguishable from a repair when you read
+totals, and *deterministic in both directions* is worse than flaky, because
+re-running it does not reveal the problem. The replacement is `pass/arg_temp_rooted`
+— the bug's own repro, registered as a KNOWN_FAIL so that an actual fix reports as
+an `xpass` *failure* and forces its entry to be dropped on purpose. The general
+form: an open bug's acceptance test should be its own repro, and it should be wired
+so that fixing it breaks the build until someone acknowledges the fix.
+
+Also worth keeping: the "51 out of 200" figure recorded above was correct when
+written and is not a constant. A corruption rate is a property of one binary's
+allocation layout, not of the defect, so quoting one as if it were stable invites
+exactly the misreading this paragraph exists to prevent.
+
+### 169. FIXED — a generic return type lost its type arguments on the way out of the function table, and the two branches that existed to handle them could never run
+
+**Severity: medium.** Not a wrong answer — a *lost* answer: a spurious "cannot
+infer type" warning plus a type widened to `Any`, in the one shape where the
+source states the type outright. Narrow in surface, but it hit every
+generic-returning function and method in the language.
+
+```saffron
+fun names(): List<String> { return ["a", "b"] }
+var n = names()
+var first = n[0]
+IO.println(first.to_upper())   // [checker] Warning: first: cannot infer type
+```
+
+The identical read through an *annotated* variable was fine:
+
+```saffron
+var names: List<String> = ["a", "b"]
+var first = names[0]           // no warning; String
+```
+
+That asymmetry is the whole diagnosis. Variables are stored as `AST.Type` nodes
+and read back as nodes. Function return types are stored as nodes too — but
+`TypeEnv.get_func_ret` rendered them through `AST.type_to_string`, which is
+*deliberately* lossy for diagnostics: `GenericType(base, args)` collapses to the
+bare `base`. So `List<String>` arrived at every one of its six consumers as the
+four-character string `"List"`, and `Map<String,Int>` as `"Map"`.
+
+The part worth recording is what that did to the code written to handle it.
+`infer_call` and `infer_method_call` each guard a branch on
+`ret.contains("<")` — "generic return type like `List<T>` — resolve type params
+within" — and **neither branch could ever be entered**, because the single
+renderer feeding them had already deleted the `<`. `resolve_generic_return`, a
+32-line function with two call sites, had never once run. A dead branch that
+*reads* as live is worse than a missing one: the missing case announces itself as
+missing, while this one looked like coverage, complete with a comment describing
+behaviour that did not exist.
+
+A second, independent misreading rode along on the same renderer. A union return
+type rendered as the literal word `"Union"`, and `is_type_param("Union")` answers
+**true** — uppercase first letter, not a declared class or enum. So a
+union-returning function's return type was being handed to `resolve_type_params`
+as though `"Union"` were a type parameter to resolve from the argument list. It
+happened not to produce a visible wrong answer, because `resolve_type_params`
+returns its input unchanged when it fails to match, but the checker was asking a
+nonsensical question and relying on the answer being ignored.
+
+**Fixed** by rendering through `AST.type_to_source` instead — the renderer whose
+output `parse_type_ast` reads back, so it keeps the type arguments and spells a
+union with its members. All six consumers treat the result as a type to compare,
+substitute into, or return as an inferred type; none prints it to a user, so none
+wanted the lossy spelling.
+
+That richer string needed one guard widened in turn: `type_to_source` spells a
+function type `"Fun(Int):Int"`, and while the bare `"Fun"` was excluded by an
+equality test, `"Fun(Int):Int"` passes every test `is_type_param` makes — no
+`<`, no `|`, uppercase first letter, not a declared class — and would have become
+a "type parameter" named `Fun(Int):Int`. `is_type_param` now rejects anything
+containing `(`, keyed on the punctuation rather than a `Fun` prefix so a user
+class named `Function` is unaffected.
+
+Regression test: `test/pass/generic_return_infers.sf`, 11 assertions. It pins the
+element type by *using* it — `.to_upper()` on a `String` element, arithmetic on an
+`Int` one — rather than by asserting a rendered type name, because the defect
+widened the type rather than misspelling it, and a widened type still renders
+plausibly. Both call forms are asserted separately: `infer_method_call` carries
+its own copy of the lookup and the same unreachable branch, so the free-function
+fix covering it was an assumption worth not making.
+
+One thing the test deliberately does **not** assert, and it is filed here rather
+than silently omitted: `ident("q").to_upper()` on `fun ident<T>(x: T): T` still
+fails with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
+type 'T'`. It fails identically on the unmodified gen2, so it is preexisting and
+unrelated — and the mechanism is a different layer. The *checker* resolves `T` to
+`String` correctly via `resolve_type_params`; codegen carries its own
+receiver-type inference (`codegen/methods_body.sf:3733`) that does not, so a
+method call on the result is dropped while a plain read of it is fine. The `Int`
+side works only because arithmetic never goes through method dispatch. That is
+worth its own entry if anyone hits it.
+
+The operational lesson is the fourth slice's, arriving from a new direction: this
+was found while *classifying* the five remaining `parse_type_node(this.infer_*())`
+round trips for a mechanical migration, not while looking for a bug. Four of the
+five turned out not to be round trips at all — and reading `infer_call` closely
+enough to establish that is what surfaced a renderer two layers below it
+answering the wrong question. The migration checklist was wrong about those four
+arms; being wrong about them in a way that required reading the code was worth
+more than being right without.
+
+### 160. FIXED — an explicit `: Any` on a module-level global could not widen it, and read back wrong even unreassigned; #147 was fixed in the checker only
+
+**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
+and only when the initializer is a list, map or string literal.
+
+`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
+prints a bit pattern or segfaults. The identical *local* is correct — that is the
+half #147 fixed:
+
+```saffron
+var g: Any = "abc"
+fun r() { g = 42
+    IO.println("g=${g}") }
+r()                             // segfault
+
+fun s() { var l: Any = "abc"
+    l = 42
+    IO.println("l=${l}") }
+s()                             // l=42   — correct
+```
+
+#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
+moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
+apart. It did — but **codegen's global pre-scans still collapse the two**, in five
+copies, all of the same shape:
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") {
+    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+        gvtype = gvinit
+    }
+}
+```
+
+`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
+`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
+fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
+initializer and `global_var_types` says `String`; the store writes a tagged Int and
+the load untags a pointer.
+
+The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
+`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
+three collapsed shapes break, which is the kind of partial correctness that reads as
+"works" until it doesn't.
+
+**Why the five copies exist, and why that is the actual entry.** Each one has a
+comment citing the bug that motivated it (#36, #37, #80) — they were added
+independently, and the inference was pasted rather than shared. One source of truth
+(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
+them is a real change with real risk, and the pre-scans differ in which corpus and
+prefix they walk, so this is filed rather than fixed in passing.
+
+Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
+behaviour and documents in a comment that the `: Any` global is excluded for this
+reason.
+
+**Fixed 2026-08-04, as a consequence of migrating `VarDecl.type_ann` to
+`AST.Type`.** Regression test `test/pass/any_global_widens.sf`.
+
+The entry above had the mechanism half right, and the missing half was the bigger
+one. There were **two** defects sharing the guard, on opposite sides of it:
+
+- The *read* side is what is described above — `length() == 0 or == "Any"` retypes
+  an annotated `Any` global from its initializer.
+- The *write* side, three lines later, is `if (gvtype.length() > 0 and gvtype !=
+  "Any")`. Refusing to **record** an `Any` annotation leaves the global absent from
+  `global_var_types` entirely, and `get_var_type_str` then answers `""` — unknown,
+  not `Any` — so every read of it takes the Int path.
+
+The write side is the one that produced a wrong value with **no reassignment at
+all**, which the entry above asserted was fine:
+
+```saffron
+var a_str: Any = "s"
+var a_bool: Any = true
+fun p() { IO.println("${a_bool}/${a_str}") }
+p()                             // before: true/4307428950
+                                // after:  true/s
+```
+
+`a_bool` printing correctly is what made this look like a widening bug: an unboxed
+bool survives the Int path, a string pointer does not. So the repro in the original
+entry needed the reassignment only to reach a *tag* the Int path mangles — not
+because reassignment was the defect.
+
+The local was correct throughout for a reason worth keeping: `typed_vars` stores
+`"Any"` for a local, and `global_var_types` refused to. **The two tables disagreed
+about what an `Any` annotation means, and only one of them was asked about globals.**
+
+The fix is not the deduplication this entry called for, and the argument for I10
+stands unchanged — five copies still exist, and all five had to be edited by hand.
+What made the edit *safe* rather than a guess is that the migration split the
+overloaded guard into two predicates that answer separately:
+`is_unknown_type` ("was an annotation written") and `is_any_type` ("does it say
+Any"). Every one of the five needed only the first question; that they were asking
+both is what the String encoding could not express.
+
+The read side of `prescan_global_call_types` (`utils_body.sf`) needed the same fix
+and had been assessed as safe here. Its `has()` guard does not protect an `: Any`
+global, precisely because the first pass declines to record one — so the global is
+absent, reaches the second pass, and gets typed from its initializer's call. Two
+passes, and the first one's bug is what let the second one's fire.
+
+---
+
+### 164. FIXED — any incomplete source killed the compiler with a fatal IndexError instead of reporting a parse error
+
+```
+$ printf 'var x = \n' > partial.sf
+$ saffronc partial.sf out.ll
+Runtime Error: IndexError: index 4 out of bounds (length 4)
+```
+
+Every one of these did it — `var x =`, `var x: Int =`, `fun f(`, `if (`,
+`var a = 1 +`. Not exotic input: that is a file *being typed*.
+
+`parse_error` (`parser.sf:342`) reports and returns **without consuming a token**,
+deliberately, so each caller decides how to resynchronize. But a parser that has
+run out of input keeps calling `advance()`, and `current()` read
+`this.tokens[this.pos]` with no bound. Past the end that is an `IndexError`, which
+in Saffron is a **fatal runtime error, not a diagnostic** — it routes to
+`__runtime_error_fatal` and calls `rt_exit(1)`, so the process died before writing
+anything. Under `--json` that means empty stdout, and the LSP correctly read
+"unparseable payload" and published nothing: an editor showing a clean file for
+source that cannot parse.
+
+Note which stage failed. This was never a checker or codegen problem; the token
+cursor simply had no terminal condition.
+
+**Why the suite never saw it.** Every input in `test/` is a complete file —
+`test/fail/*.sf` are *deliberately* malformed, but they are malformed and
+*finished*, e.g. a type error or a bad import, never a truncated one. Nothing in
+`src/`, `test/` or `tools/` is a partial file, so bootstrap and the full suite are
+green with this live. It only reproduces where every intermediate state of the
+text gets compiled, which is to say an editor — the same
+identity-mode/complete-input blind spot as #163, in a different dimension: not
+"our source isn't adversarial about its syntax" but "our source is never
+half-written".
+
+**Fix.** `current()` clamps `pos` to the last token. The lexer always terminates
+the stream with `TkEof` (`lexer.sf:767`), so past-the-end now yields EOF forever
+and the existing `match_kind_check("eof")` guards do their job.
+
+**The over-correction to watch for, and the audit.** Returning EOF forever turns a
+crash into a *hang* for any loop that scans for a closing token without an EOF
+guard — strictly worse in an editor, where a spin is an unkillable beachball
+rather than a message. So every token loop in `parser.sf` was checked: of 39
+`while` loops on `match_kind_check`/`peek_is`, 13 have no `eof` in the condition,
+and all 13 are *positive* tests (`while (this.match_kind_check("."))` and
+similar), which stop at EOF on their own because EOF is not the token they seek.
+Exactly one negative loop lacked the guard — `while (!this.match_kind_check(")"))`
+in enum-variant fields (`parser.sf:2711`) — and it is guarded here too. The
+`while (true)` at :878 already breaks on `eof` explicitly. The regression test
+asserts each incomplete case *returns* within a timeout, so a future spin fails
+the test rather than quietly passing it.
+
+Test: `editors/shared/test/compiler_discovery.test.mjs`, "incomplete buffers
+produce diagnostics, not a crash or a hang", which drives all six shapes through
+the real LSP round trip.
 
 ---
 

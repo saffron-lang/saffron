@@ -1,0 +1,72 @@
+// The shapes `check_call_args` must keep ACCEPTING at a class-typed or otherwise
+// non-scalar parameter. This is the positive half of BUGS #165: the negative half
+// (passing a String where a class is declared) compiles clean and segfaults, and
+// is filed rather than fixed because the obvious arm is too eager.
+//
+// #155 reverted exactly that arm at the `return` site after it produced three
+// distinct false-positive families. I re-probed all three at the *argument* site
+// and they are live here too, so they are pinned below. Whoever widens
+// `scalar_mismatch`'s proof set to close #165 has to keep every assertion in this
+// file passing — and a false positive here is not a nuisance, it is a broken
+// bootstrap, because the checker type-checks the compiler's own source.
+
+import "@test" as Test
+import "math" as Math
+
+class Box {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun get(): Int { return this.n }
+    fun eat(other: Box): Int { return other.get() }
+}
+
+class Crate extends Box {
+    fun init(n: Int) { this.n = n }
+}
+
+// --- The legitimate class-typed cases, one per call form. --------------------
+// #145 landed only the free-function key first and both the method and
+// constructor negatives printed NOT CAUGHT, so each form is asserted separately
+// rather than assuming one covers calls in general.
+fun free_fn(b: Box): Int { return b.get() }
+
+class Holder {
+    var b: Box
+    fun init(b: Box) { this.b = b }
+    fun unwrap(): Int { return this.b.get() }
+}
+
+Test.assert_eq(free_fn(Box(1)), 1, "a Box into a Box parameter, free function")
+Test.assert_eq(Box(2).eat(Box(3)), 3, "a Box into a Box parameter, method")
+Test.assert_eq(Holder(Box(4)).unwrap(), 4, "a Box into a Box parameter, constructor")
+
+// A subclass into a base-typed parameter. This is the one a naive
+// "declared class, passed something else" arm gets wrong first.
+Test.assert_eq(free_fn(Crate(5)), 5, "a subclass into a base-typed parameter")
+
+// --- #155's three false-positive families, at the argument site. -------------
+
+// 1. A concrete type into a nullable one: String IS a subtype of String|Nil.
+fun takes_nullable(s: String|Nil): Int {
+    if (s == nil) { return 0 }
+    return 1
+}
+Test.assert_eq(takes_nullable("hi"), 1, "a String into a String|Nil parameter")
+Test.assert_eq(takes_nullable(nil), 0, "nil into a String|Nil parameter")
+
+// 2. A type parameter is resolved from the argument, not checked against it.
+fun ident<T>(x: T): T { return x }
+Test.assert_eq(ident(6), 6, "an Int into a type-parameter-typed parameter")
+Test.assert_eq(ident("s"), "s", "a String into the same type parameter")
+
+// 3. A module member whose inferred type comes back as the bare member name.
+// `Math.e` inferred as `e` -- an inference gap wearing the costume of a type
+// name. Letting it through is what keeps this from erroring.
+fun takes_float(f: Float): Float { return f }
+Test.assert(takes_float(Math.e) > 2.7, "a module member into a Float parameter")
+
+// Int into Float is a widening, not a mismatch -- the one pair scalar_mismatch
+// deliberately allows.
+Test.assert_eq(takes_float(7), 7, "an Int into a Float parameter widens")
+
+Test.summary()

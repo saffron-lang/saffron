@@ -175,6 +175,54 @@
 # also why bootstrap green proves little on its own -- the compiler's own source
 # contains no malformed import, so all three defects were invisible to the gen4
 # fixed point while fully present.
+#
+# Updated 2026-08-04 at the #168/#167 work: 302 passed, 9 failed, 14 skipped.
+# ONE NAME ADDED, pass/check_module_imports, and it is added under protest — the
+# test is right, the compiler is wrong, and the bug is BUGS #162 (an object held
+# only in an LLVM SSA temp is never rooted, so a collection frees it) rather than
+# anything in #168's duplicate-declaration pass.
+#
+# The evidence, because "my change is innocent" is exactly the claim that needs
+# it. check_module_imports runs the checker IN-PROCESS, so it executes the new
+# pass. Neutralising the pass to `if (stmts.length() >= 0) { return }` placed
+# AFTER its `var seen: Map<String, String> = {}` still segfaults; moving the same
+# early return BEFORE the Map allocation passes. One extra Map allocation per
+# module checked is the entire difference. `GC.disable()` also makes the test pass
+# 4/4. So the pass's logic is not reachable by the crash — only its allocation is,
+# and what it perturbs is allocation timing.
+#
+# #167 fixed the runtime half of that family (six container constructors that
+# allocated child buffers while the parent was unrooted) and this test is not
+# fixed by it, which is the useful negative result: two independent layers, and
+# only one is closed. #162's own repro still yields 51 corrupted reads out of 200
+# after #167, unchanged. It is owned by the saffron_154 line, so it is recorded
+# here rather than fixed here.
+#
+# Removing this name again is the acceptance test for #162. If someone lands an
+# SSA-temp rooting fix in codegen, this is the test that should start passing
+# without being touched.
+#
+# Confirmed 2026-08-04 on the MERGED tree (#168/#167 above, merged with origin's
+# #155-scalar, #158, #160, #163, and the FunDecl/Lambda ret_type + assignment type
+# checks): 311 passed, 9 failed, 14 skipped. The SET is exactly the 9 names below —
+# comm-diffed both directions against this file, empty each way — and md5 of
+# build/saffronc was 174ea698f90c791749ecd89d6dfff53d before and after the run.
+#
+# The count arithmetic closes exactly, which is the part worth writing down because
+# a merge is where it usually stops closing: origin's 308 passed / 8 failed, PLUS
+# this line's four new tests all passing (pass/gc_constructor_rule,
+# pass/duplicate_decl_ok, fail/duplicate_class, fail/duplicate_enum_class), MINUS
+# pass/check_module_imports moving into the failure column. 308 + 4 - 1 = 311, and
+# 8 + 1 = 9. No name is unaccounted for in either direction.
+#
+# This was the run the merge actually needed, not a formality. origin migrated
+# FunDecl/Lambda `ret_type` from String to AST.Type in the same checker.sf that
+# #168 adds a pass to, and added an assignment type check there too. A clean
+# auto-merge of that pair says nothing — the presence of check_duplicate_decls in
+# the merged file was verified by grep at merge time, but only the STAGE 2 gen4
+# fixed point (0 unresolved inference fallbacks, gen3 compiles itself) proves the
+# merged source still type checks against itself, and only this diff proves the
+# two sides' behaviour composes.
 
 # Confirmed 2026-08-04 with the payload half of BUGS #154 (payload enums get a GC
 # header and an emit_val_to_string arm): 295 passed, 8 failed, 14 skipped, 1
@@ -284,6 +332,101 @@
 # form. Compiled by the PRE-fix compiler the 6-assertion version segfaults rather
 # than counting mismatches (Pair holds a freed Box and `p.a.v` dereferences it),
 # which is a sharper negative control than the 49/200 the 2-assertion version gave.
+
+# Updated 2026-08-05 on the twice-merged tree (this line's #167/#168 plus origin's
+# #160 closure, #164, and the VarDecl.type_ann -> AST.Type migration): 315 passed,
+# 8 failed, 14 skipped, 1 known-fail. Bootstrap green through STAGE 2 (0 unresolved
+# inference fallbacks; gen3 compiles itself, gen4 links and compiles).
+#
+# ONE NAME REMOVED, pass/check_module_imports — and it is removed for the reason
+# this file's header calls out as suspect. It is NOT a fix. BUGS #162 is still
+# wide open, and three independent measurements at this exact HEAD say so:
+#
+#   - test/pass/arg_temp_rooted.sf, #162's own regression test (origin added it as
+#     a KNOWN_FAIL), still XFAILs: 1/2 assertions, expected 10, actual 49.
+#   - The standalone repro under GC.set_threshold(1) — take(Box(7), alloc()) over
+#     200 rounds — now reports mismatches=200. Not 51 as it did two merges ago:
+#     ALL 200.
+#   - Nothing in either merge touched SSA-temp rooting. origin's codegen commits
+#     were the type_ann migration and #154's payload half.
+#
+# So the name left this list because allocation timing shifted underneath it, not
+# because the defect it exposes was repaired. It is deterministic in both
+# directions, which is the trap: 12/12 passing runs at this HEAD, and it was
+# reliably segfaulting before. A test that flips from always-red to always-green
+# with no fix in between is indistinguishable from a repair if you only read the
+# totals — and the totals here look great (+4 passed, -1 failed).
+#
+# What replaces it as #162's acceptance test is pass/arg_temp_rooted, which is
+# strictly better: it is the bug's own repro rather than a bystander, and it is
+# registered as a KNOWN_FAIL so an actual fix reports as an `xpass` failure and
+# forces the entry to be dropped deliberately. That is the mechanism that was
+# missing when check_module_imports was carrying the signal.
+#
+# The count arithmetic, since a merge is where it stops closing: origin's 309
+# passed / 8 failed, PLUS this line's four new tests (pass/gc_constructor_rule,
+# pass/duplicate_decl_ok, fail/duplicate_class, fail/duplicate_enum_class), PLUS
+# pass/check_module_imports returning to the passing column, MINUS
+# pass/arg_temp_rooted leaving `passed` for the known-fail bucket. 309 + 4 + 1 + 1
+# = 315 with the xfail counted separately, and 8 failed unchanged by name.
+
+# Confirmed 2026-08-05 after merging origin's gen2 PROMOTION (VarDecl.type_ann as an
+# AST.Type node): 315 passed, 8 failed, 14 skipped, 1 known-fail. The SET below is
+# UNCHANGED, comm-diffed both directions, empty each way.
+#
+# The load-bearing detail is not the set, it is the hash: md5 of build/saffronc is
+# 0044ed810447dee0976339d13dfa963c, BYTE-IDENTICAL to the gen3 built from the
+# previous gen2 before the promotion. A promotion replaces the root of trust for the
+# whole chain, so it is the one merge that cannot be waved through on "only a binary
+# changed" — and the way to check it is that the new root reproduces the same gen3,
+# not that the suite is still green. Same source, same output, different compiler
+# compiling it.
+#
+# One visible difference in the log, and it is the expected one: STAGE 1 no longer
+# prints "gen2 outdated, bootstrapping via checked-in .ll artifacts...". That line
+# had been appearing on every bootstrap in this line's history, because the old gen2
+# could not compile the current source directly and fell back to the checked-in .ll
+# files. The promoted gen2 compiles it. Bootstrap dropped from ~6 minutes to ~2.
+#
+# Also recorded because it cost nothing and could have cost a false RED: this
+# bootstrap sat on bootstrap.sh's LOCK for several minutes waiting for
+# /tmp/saffron_154's run to finish (pid 80107, identified via `lsof -p ... | grep
+# cwd`). The lock did its job. A bootstrap that appears hung with a one-line log is
+# usually this, not a failure -- check for the [LOCK] line before diagnosing.
+
+# Confirmed 2026-08-05 after rebasing the compiler-rewrite I3 line onto this tree
+# (the infer_binary node migration, plus BUGS #169 — a generic return type losing
+# its type arguments): 317 passed, 8 failed, 14 skipped, 1 known-fail. The SET
+# below is UNCHANGED, comm-diffed both directions after stripping comments per the
+# recipe above, empty each way. The +1 over 316 is this line's own
+# test/pass/generic_return_infers.sf, confirmed PASS by name in the log.
+#
+# Why this run mattered rather than being a formality: #169's fix changes what
+# `TypeEnv.get_func_ret` RETURNS — every function and method return type in the
+# language now arrives at its six consumers spelled with its type arguments
+# (`List<String>`) instead of collapsed to a bare base (`List`). So the risk was
+# never that the fix fails to fire; it was that some consumer downstream was
+# written against the collapsed spelling and silently changes answer. Two of the
+# six compare the result against a string, and one feeds it to `is_type_param`,
+# which is precisely where the richer spelling could be misread — a function type
+# spells as "Fun(Int):Int" and would have passed every test that predicate makes.
+# A name entering this list is how that would have shown up. None did, and the
+# same widened predicate ran over the compiler's own source in the stage 2 gen4
+# fixed point.
+#
+# The interesting negative result: TWO of the tests this line added earlier are
+# still passing here (pass/call_arg_class_legal, and pass/any_global_widens from
+# further back), and pass/arg_temp_rooted still XFAILs with "expected 10, actual
+# 49" — so #162 is untouched by any of this, as expected, and the merge did not
+# quietly move the allocation timing that the note two entries up warns about.
+#
+# One process note worth more than the result, because it is the failure this
+# file's rule does not cover: the bootstrap and suite reported here are the SECOND
+# pair. The first pair was green too — and measured against a parent 11 commits
+# behind. Those numbers were already written into a commit message before the
+# push was rejected. A green measurement on the wrong parent is not a weaker
+# result than no measurement; it is worse, because it reads exactly like the right
+# one. Fetch before you measure, not just before you push.
 
 async
 docstrings

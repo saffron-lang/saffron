@@ -15,6 +15,19 @@
 #   editors/build.sh --skip-intellij # skip the Gradle build (no JDK needed)
 #   editors/build.sh --regen-builtins# regenerate builtins.ts from the stdlib first
 #   editors/build.sh --test          # also run the shared server's unit tests
+#   editors/build.sh --install       # also install to ~/.saffron (see below)
+#
+# --install is what makes the plugins work on a project OUTSIDE this repo, which
+# is the normal way anyone uses them. The IntelliJ plugin looks for the server at
+# $PROJECT/editors/shared/out/server.js and then at ~/.saffron/lsp/server.js, so
+# without the second location a non-Saffron-repo project has no server at all.
+# Getting it right needs three things that are each easy to miss:
+#   - node_modules alongside server.js. It requires vscode-languageserver at
+#     runtime, so copying the .js files alone fails with "Cannot find module".
+#   - the compiler at ~/.saffron/bin/saffronc (findCompiler's fallback).
+#   - src/lib at ~/.saffron/src/lib. `@`-prefixed imports resolve relative to the
+#     EXECUTABLE, so a compiler installed without the stdlib beside it rejects
+#     every `import "@test"` with "cannot resolve import".
 #
 # The TypeScript builds use each package's LOCAL typescript devDependency, never
 # a global `tsc` (there isn't one on a stock machine) — so `npm install` runs
@@ -26,13 +39,15 @@ EDITORS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKIP_INTELLIJ=0
 REGEN_BUILTINS=0
 RUN_TESTS=0
+DO_INSTALL=0
 for arg in "$@"; do
   case "$arg" in
     --skip-intellij) SKIP_INTELLIJ=1 ;;
     --regen-builtins) REGEN_BUILTINS=1 ;;
     --test) RUN_TESTS=1 ;;
+    --install) DO_INSTALL=1 ;;
     -h|--help)
-      sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,34p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     *) echo "build.sh: unknown argument: $arg" >&2; exit 2 ;;
   esac
@@ -87,6 +102,16 @@ fi
 # 2. VS Code extension.
 build_ts "$EDITORS_DIR/vscode"
 
+# 2b. The client's server-discovery tests. They load the COMPILED out/extension.js
+# with `vscode` stubbed, so they must run after the tsc step, not beside the shared
+# suite. What they guard is the one client failure that is invisible in the editor:
+# a LanguageClient pointed at a server module that does not exist starts, reports
+# nothing, and leaves every file looking clean.
+if [[ "$RUN_TESTS" == "1" ]]; then
+  log "node --test (vscode)"
+  (cd "$EDITORS_DIR/vscode" && node --test "test/*.test.mjs")
+fi
+
 # 3. IntelliJ plugin (Gradle). Skipped without a JDK or on --skip-intellij.
 if [[ "$SKIP_INTELLIJ" == "1" ]]; then
   log "skipping IntelliJ plugin (--skip-intellij)"
@@ -104,6 +129,56 @@ else
   if [[ "$RUN_TESTS" == "1" ]]; then
     log "gradle verifyPlugin (intellij)"
     (cd "$EDITORS_DIR/intellij" && ./gradlew --console=plain verifyPlugin)
+  fi
+fi
+
+# 4. Optionally install to ~/.saffron so the plugins work outside this repo.
+#
+# Writes only under ~/.saffron, and only paths this project owns. It does NOT
+# touch PATH, shell profiles, or any editor configuration.
+if [[ "$DO_INSTALL" == "1" ]]; then
+  ROOT="$(cd "$EDITORS_DIR/.." && pwd)"
+  PREFIX="${SAFFRON_PREFIX:-$HOME/.saffron}"
+  log "install to $PREFIX"
+
+  mkdir -p "$PREFIX/lsp" "$PREFIX/bin" "$PREFIX/src"
+  cp "$EDITORS_DIR/shared/out/"*.js "$PREFIX/lsp/"
+  cp "$EDITORS_DIR/shared/package.json" "$PREFIX/lsp/"
+  # -R over a fresh copy: node_modules is large, and rsync is not guaranteed.
+  rm -rf "$PREFIX/lsp/node_modules"
+  cp -R "$EDITORS_DIR/shared/node_modules" "$PREFIX/lsp/node_modules"
+  echo "  server:  $PREFIX/lsp/server.js"
+
+  # The compiler and the stdlib travel TOGETHER or the install is broken in a way
+  # that only shows up on files using `@` imports — see the header note.
+  if [[ -x "$ROOT/build/saffronc" ]]; then
+    cp "$ROOT/build/saffronc" "$PREFIX/bin/saffronc"
+    rm -rf "$PREFIX/src/lib"
+    cp -R "$ROOT/src/lib" "$PREFIX/src/lib"
+    echo "  compiler: $PREFIX/bin/saffronc (with stdlib at $PREFIX/src/lib)"
+  else
+    echo "  compiler: SKIPPED — no build/saffronc; run ./bootstrap.sh, then re-run with --install" >&2
+  fi
+
+  # Verify rather than assume: start the installed server from a directory with
+  # no relation to this repo and check it loads its dependencies. A silent bad
+  # install presents in the editor as "no diagnostics", which is indistinguishable
+  # from clean code — so it has to be checked here or not at all.
+  #
+  # A clean start produces NO output and exits 0 on EOF. The check is therefore on
+  # the output being empty, not on the status: `set -e` is in force, so the
+  # command runs under `if` to keep a nonzero exit from aborting the script.
+  if [[ -x "$PREFIX/bin/saffronc" ]]; then
+    startup_out=""
+    if ! startup_out=$(cd / && node "$PREFIX/lsp/server.js" --stdio </dev/null 2>&1); then
+      : # nonzero exit is reported through the output check below
+    fi
+    if [[ -n "$startup_out" ]]; then
+      echo "  WARNING: the installed server printed on startup — it is not usable:" >&2
+      echo "$startup_out" | head -5 >&2
+    else
+      echo "  verified: the installed server starts cleanly outside the repo"
+    fi
   fi
 fi
 

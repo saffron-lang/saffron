@@ -1,0 +1,19 @@
+// BUGS #168: the collision is across KINDS, not just within one.
+//
+// `class` and `enum` register in different maps (env.class_fields vs
+// env.enum_variants) but share one name space at every use site — `Shape` as a
+// type annotation, as a constructor call, as an `is` target. Two declarations
+// binding it leave which map answers first as the tiebreak, so this is rejected
+// on the same grounds as two classes. `interface` and `actor` also arrive as
+// ClassDecl and are covered by the same pass.
+enum Shape {
+    Circle(r: Int),
+    Square
+}
+
+class Shape {
+    var sides: Int
+    fun init() { this.sides = 4 }
+}
+
+IO.println("unreachable")

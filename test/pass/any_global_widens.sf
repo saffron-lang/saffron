@@ -1,0 +1,71 @@
+// An explicit `: Any` on a module-level global must behave like one on a local.
+// This is BUGS #160, and it was two defects sharing one guard.
+//
+// Both halves lived in codegen's five pasted global pre-scans, which each tested
+// the declared type with `vtype.length() == 0 or vtype == "Any"` on the way in and
+// `vtype.length() > 0 and vtype != "Any"` on the way out:
+//
+//   The READ half asked "was an annotation written?" and "does it say Any?" with a
+//   single disjunction, so an explicit `: Any` took the infer-from-initializer
+//   branch and was retyped from its initializer — the same conflation BUGS #147
+//   fixed in the checker and left standing in codegen.
+//
+//   The WRITE half is the one that produced a wrong value even with no
+//   reassignment at all. Refusing to *record* an Any annotation leaves the global
+//   absent from `global_var_types`, and `get_var_type_str` then answers "" —
+//   unknown, not Any — so every read took the Int path. `var g: Any = "s"` printed
+//   the string's address. A local with the identical annotation was fine because
+//   `typed_vars` does store "Any" for it: the two tables disagreed about what an
+//   Any annotation means, and only the global one was wrong.
+//
+// Neither half was findable from the field itself while `type_ann` was a String,
+// because "" and "Any" are both just strings and the guard reads as one thought.
+// `UnknownType` vs `AnyType` makes them two questions with two answers.
+
+import "@test" as Test
+
+// --- Read: an Any global holds what it was given, of any tag. ----------------
+// Bool and Int passed even before the fix (their unboxed representation survives
+// the Int path); String and List did not, which is why all four are here.
+var a_bool: Any = true
+var a_int: Any = 7
+var a_str: Any = "a string"
+var a_list: Any = [1, 2, 3]
+
+fun reads(): String {
+    return "${a_bool}/${a_int}/${a_str}/${a_list.length()}"
+}
+
+// --- Write: the annotation widens, so reassigning across tags is legal. ------
+var g_any: Any = [1, 2, 3]
+
+fun widens(): String {
+    g_any = "now a string"
+    return "${g_any}"
+}
+
+// --- The local is the control. It always worked; it must keep working. -------
+fun local_control(): String {
+    var loc: Any = [1, 2, 3]
+    loc = "widened local"
+    return "${loc}"
+}
+
+// --- An unannotated global still infers from its initializer. ---------------
+// The read-half fix must not cost this: BUGS #36/#37 are the reverse defect, where
+// `var _items = []` stayed untyped and every `_items.push(...)` compiled to a call
+// that was never emitted. `is_unknown_type` is what keeps both true at once.
+var inferred_list = []
+
+fun inference_still_works(): Float {
+    inferred_list.push("x")
+    inferred_list.push("y")
+    return inferred_list.length()
+}
+
+Test.assert_eq(reads(), "true/7/a string/3", "an Any global reads back what it holds")
+Test.assert_eq(widens(), "now a string", "an Any global widens on reassignment")
+Test.assert_eq(local_control(), "widened local", "an Any local still widens")
+Test.assert_eq(inference_still_works(), 2, "an unannotated global still infers from its initializer")
+
+Test.summary()

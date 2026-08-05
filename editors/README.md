@@ -17,6 +17,8 @@ editors/
 │   ├── test/server.test.mjs    end-to-end LSP tests (needs build/saffronc)
 │   └── tools/gen-builtins.mjs   regenerates builtins.ts from src/lib/*.sf
 ├── vscode/     VS Code extension (thin client that starts the shared server)
+│   ├── src/extension.ts        activation: locate node + the server, start client
+│   └── test/discovery.test.mjs asserts WHICH server path activation picks
 ├── intellij/   IntelliJ plugin (LSP client + TextMate grammar bundle)
 └── build.sh    builds all of the above
 ```
@@ -69,11 +71,11 @@ must rewrite it.
 ### Tests
 
 ```bash
-editors/build.sh --test          # build, then run both suites
-cd editors/shared && npm test    # same, without the vscode build
+editors/build.sh --test          # build, then run every suite below
+cd editors/shared && npm test    # the two server suites only
 ```
 
-Two layers, because they fail differently:
+Three layers, because they fail differently:
 
 - **`test/scan.test.mjs`** — the scanner and the two pure helpers, with no
   compiler and no LSP connection. Each case is one of the things a regex gets
@@ -94,6 +96,17 @@ Two layers, because they fail differently:
   missing or predates `--json`. Note that `node:test` treats any `skip` value
   other than `false`/`undefined` as a skip — returning `null` for "nothing is
   wrong" silently skipped the whole suite while reporting 14 passes.
+- **`editors/vscode/test/discovery.test.mjs`** — which server path the VS Code
+  client picks, loaded from the **compiled** `out/extension.js` with `vscode`
+  stubbed. This exists because it is the one client failure with no symptom: a
+  `LanguageClient` constructed against a module that does not exist starts,
+  reports nothing, and leaves every `.sf` file looking clean — no dialog, no
+  Problems entry, no output channel. The client was broken exactly that way, and
+  only along the path a *user* takes: `asAbsolutePath("../shared/out/server.js")`
+  resolves against the extension's own directory, so an installed extension sent
+  the `..` into `~/.vscode/extensions/` and found nothing. F5 from source worked,
+  so the `.vsix` route documented below shipped a dead extension. Three of these
+  five tests fail against the pre-fix build — checked, not assumed.
 
 ## How it works
 
@@ -191,16 +204,25 @@ Outputs (`out/`, `build/`, `node_modules/`) are gitignored.
 
 ### VS Code
 
-The extension launches `../shared/out/server.js`, so build both first
-(`build.sh` does). Then either:
-
 - **Run from source:** open `editors/vscode/` in VS Code and press <kbd>F5</kbd>
-  ("Run Extension") to launch an Extension Development Host with it loaded; or
-- **Package a `.vsix`:** `cd editors/vscode && npx vsce package`, then
-  `code --install-extension saffron-lang-*.vsix`.
+  ("Run Extension") to launch an Extension Development Host with it loaded. This
+  finds the server at `../shared/out/server.js`, so run `build.sh` first.
+- **Package a `.vsix`:**
+  ```bash
+  cd editors/vscode && npx @vscode/vsce package --allow-missing-repository --skip-license
+  code --install-extension saffron-lang-0.1.0.vsix
+  ```
+  An installed extension has no sibling `../shared/`, so **also run
+  `editors/build.sh --install`** — see [Working on a project outside this
+  repo](#working-on-a-project-outside-this-repo). Without it the extension has no
+  server, and says so on activation rather than starting silently against a
+  missing path.
 
-Set `saffron.compilerPath` in settings if your `saffronc` is not at
-`<project>/build/saffronc` or on `PATH`.
+The server is not bundled into the `.vsix` on purpose: one server serves both
+editors, and a copy inside the extension would go stale against the compiler it
+shells out to. `saffron.serverPath` overrides the search;
+`saffron.compilerPath` overrides the compiler (left unset, the server looks for
+`<project>/build/saffronc`, then `~/.saffron/bin/saffronc`, then `PATH`).
 
 ### IntelliJ (Ultimate)
 
@@ -216,6 +238,37 @@ Homebrew, `/usr/local/bin`, then `PATH`, and for the server at
 
 For quick iteration, `cd editors/intellij && ./gradlew runIde` launches a
 sandbox IDE with the plugin loaded.
+
+## Working on a project outside this repo
+
+Both plugins find the server and the compiler by looking **inside the open
+project** first. Open this repo and everything resolves; open a Saffron project
+anywhere else and, by default, nothing does — the IntelliJ plugin reports the
+server as missing, and even once it starts there is no `saffronc` for it to run,
+which surfaces as **no diagnostics at all** rather than as an error.
+
+Install once to fix both:
+
+```bash
+editors/build.sh --install     # writes only under ~/.saffron
+```
+
+That places three things, and all three are required:
+
+| Path | Why |
+|---|---|
+| `~/.saffron/lsp/server.js` + `node_modules/` | The plugin's fallback server location. The `.js` files alone are not enough — the server `require`s `vscode-languageserver` at runtime, so without `node_modules` beside it node exits with `Cannot find module`, which the IDE reports as the server crashing. |
+| `~/.saffron/bin/saffronc` | `findCompiler`'s fallback, after walking up from the server for a `build/saffronc`. |
+| `~/.saffron/src/lib/` | `@`-prefixed imports (`import "@test"`) resolve relative to the **executable**, so a compiler installed without the stdlib next to it rejects every one of them with `cannot resolve import`. |
+
+`--install` verifies the result by starting the installed server from outside the
+repo, because a partial install is invisible in the editor: it looks exactly like
+a file with no problems. Override the location with `SAFFRON_PREFIX=/some/path`.
+Nothing outside that prefix is touched — not `PATH`, not shell profiles, not any
+editor configuration.
+
+Re-run it after a bootstrap; the installed compiler is a copy, not a link, so it
+does not track `build/saffronc`.
 
 ## Regenerating `builtins.ts`
 

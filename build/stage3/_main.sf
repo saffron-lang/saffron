@@ -531,6 +531,20 @@ fun render_signature(params: List<AST.Param>, ret_type: AST.Type): String {
     return out
 }
 
+// A `var`'s declared type as hover detail, or "" when none was written.
+//
+// The `: Any` case is the one worth stating: unlike a param, where the parser
+// substitutes AnyType for an omitted annotation and printing ": Any" would invent
+// one, a `var` records the omission as UnknownType. So an author who actually wrote
+// `var x: Any` gets to see it, and only a genuinely unannotated `var` renders bare.
+// `type_to_source`, not `type_to_string`, because hover shows the author their own
+// spelling — collapsing `Map<String,Int>` to "Map" in a tooltip is a wrong answer
+// where in a diagnostic it is merely a terse one.
+fun render_var_detail(t: AST.Type): String {
+    if (is_unknown_type(t)) { return "" }
+    return ": " + AST.type_to_source(t)
+}
+
 // True for the type the parser substitutes when a param carries no annotation.
 // Distinguishing "unannotated" from "annotated as Any" is why this is a predicate
 // on the node rather than a string compare on the rendering.
@@ -592,7 +606,7 @@ fun collect_symbols_json(program: List<AST.Stmt>): String {
         var stmt: AST.Stmt = program[i]
         if (!is_import_stmt(stmt)) {
             acc = match (stmt) {
-                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns, v_vis, "", t, d, fs)
+                VarDecl(n, t, init, d, v_vis, ns, fs) => push_symbol(acc, n, "variable", ns, v_vis, "", render_var_detail(t), d, fs)
                 FunDecl(n, p, r, b, d, f_vis, ns, fs) => push_symbol(acc, n, "function", ns, f_vis, "", render_signature(p, r), d, fs)
                 EnumDecl(n, variants, d, e_vis, ns, fs) => {
                     var a2: String = push_symbol(acc, n, "enum", ns, e_vis, "", "", d, fs)
