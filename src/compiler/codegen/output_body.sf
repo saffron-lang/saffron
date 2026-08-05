@@ -774,6 +774,8 @@
         this.known_functions.push("__gc_realloc")
         this.known_functions.push("__gc_push_root")
         this.known_functions.push("__gc_pop_roots")
+        this.known_functions.push("__gc_push_temp")
+        this.known_functions.push("__gc_pop_temps")
         this.known_functions.push("__gc_shadow_stack_depth")
         this.known_functions.push("__gc_list_new")
         this.known_functions.push("__gc_list_push")

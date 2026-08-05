@@ -270,6 +270,129 @@ zero:
 }
 
 ; =============================================================================
+; Temp Root Stack (BUGS #162)
+; =============================================================================
+;
+; The shadow stack above holds root ADDRESSES: each entry is dereferenced during
+; mark, so every root needs a slot the value lives in (an alloca or a heap cell).
+; That works for locals and params, and does not work for a value that exists only
+; as an LLVM SSA register — which is exactly what an evaluated argument is between
+; its own evaluation and the `call` that hands it to the callee's prologue. #162:
+; `f(Box(7), allocating())` freed argument 0 while argument 1 was allocating.
+;
+; This stack holds VALUES instead of addresses. That is sound here for one specific
+; reason: the collector does not move. __gc_sweep_impl either frees an object or
+; clears its mark, so a root only has to keep the object reachable during mark; it
+; never has to be a location the collector can write a new address back through.
+; (If the nursery is ever revived, minor GC MOVES objects — this stack would then
+; need forwarding as well, and the note at the top of this file about the nursery
+; is the place that records it.)
+;
+; Values are pushed raw, tagged or untagged: __gc_mark_object strips the NaN tag
+; and __gc_is_heap_ptr validates conservatively, so pushing an Int or a nil costs a
+; rejected check and nothing else.
+;
+; Discipline is push-N / pop-N, matching __gc_push_root / __gc_pop_roots, and the
+; count is a compile-time constant: an argument loop pushes once per argument and
+; pops that many after the `call`. Nesting is automatic — an inner call's temps sit
+; above the outer's and are popped first — which a fixed per-frame spill area would
+; NOT give, since a nested call's setup would overwrite the outer frame's slots.
+;
+; Deliberately NOT depth-based (read a depth register, truncate back to it). The
+; depth would be an SSA register that has to stay live across the arguments, and an
+; argument containing a short-circuit `and`, a ternary or a `try` expression splits
+; the basic block — so the register would no longer dominate its use and the module
+; would fail the LLVM verifier. A constant count has no live value to dominate.
+;
+; Unbalanced on a non-local exit: a `throw` inside an argument longjmps past the
+; pop, leaving roots on the stack. That retains garbage; it cannot free a live
+; object, and it is the same trade __gc_pop_roots already makes for frame roots.
+
+@__gc_temp_roots = global i64 0        ; pointer to i64 array of live temp values
+@__gc_temp_count = global i64 0
+@__gc_temp_cap = global i64 0
+
+; Push a VALUE as a temporary root. Returns nothing; use the depth API to unwind.
+define void @__gc_push_temp(i64 %val) {
+entry:
+  %cap = load i64, i64* @__gc_temp_cap
+  %need_init = icmp eq i64 %cap, 0
+  br i1 %need_init, label %do_init, label %check_grow
+
+do_init:
+  %init_bytes = mul i64 256, 8
+  %init_raw = call i8* @__sf_malloc_nogc(i64 %init_bytes)
+  %init_ptr = ptrtoint i8* %init_raw to i64
+  %init_failed = icmp eq i64 %init_ptr, 0
+  br i1 %init_failed, label %done, label %init_ok
+
+init_ok:
+  store i64 %init_ptr, i64* @__gc_temp_roots
+  store i64 256, i64* @__gc_temp_cap
+  store i64 0, i64* @__gc_temp_count
+  br label %check_grow
+
+check_grow:
+  %cap2 = load i64, i64* @__gc_temp_cap
+  %count = load i64, i64* @__gc_temp_count
+  %full = icmp uge i64 %count, %cap2
+  br i1 %full, label %grow, label %push
+
+grow:
+  %new_cap = shl i64 %cap2, 1
+  %new_bytes = shl i64 %new_cap, 3
+  %old = load i64, i64* @__gc_temp_roots
+  %old_raw = inttoptr i64 %old to i8*
+  %new_raw = call i8* @__sf_realloc_nogc(i8* %old_raw, i64 %new_bytes)
+  %new_ptr = ptrtoint i8* %new_raw to i64
+  %grow_failed = icmp eq i64 %new_ptr, 0
+  ; On realloc failure, drop the push rather than overrun the old buffer. The
+  ; value stays unrooted (i.e. #162's original behaviour) instead of corrupting
+  ; the stack itself.
+  br i1 %grow_failed, label %done, label %grow_ok
+
+grow_ok:
+  store i64 %new_ptr, i64* @__gc_temp_roots
+  store i64 %new_cap, i64* @__gc_temp_cap
+  br label %push
+
+push:
+  %data = load i64, i64* @__gc_temp_roots
+  %n = load i64, i64* @__gc_temp_count
+  %off = shl i64 %n, 3
+  %slot = add i64 %data, %off
+  %slot_ptr = inttoptr i64 %slot to i64*
+  store i64 %val, i64* %slot_ptr
+  %n_next = add i64 %n, 1
+  store i64 %n_next, i64* @__gc_temp_count
+  br label %done
+
+done:
+  ret void
+}
+
+; Current temp-root depth. Diagnostic only — the pop discipline is count-based, for
+; the dominance reason given above. Kept because an imbalance is otherwise silent.
+define i64 @__gc_temp_depth() {
+entry:
+  %n = load i64, i64* @__gc_temp_count
+  ret i64 %n
+}
+
+; Pop N temp roots. Clamped at 0: an over-pop drops to empty rather than wrapping
+; to a huge unsigned count, which would make the mark phase read off the end of the
+; array. Under-popping only retains garbage.
+define void @__gc_pop_temps(i64 %n) {
+entry:
+  %count = load i64, i64* @__gc_temp_count
+  %new_count = sub i64 %count, %n
+  %is_neg = icmp slt i64 %new_count, 0
+  %final = select i1 %is_neg, i64 0, i64 %new_count
+  store i64 %final, i64* @__gc_temp_count
+  ret void
+}
+
+; =============================================================================
 ; GC Allocation
 ; =============================================================================
 
@@ -955,6 +1078,29 @@ next:
   br label %loop
 
 drain:
+  ; Temp roots (BUGS #162): these entries are VALUES, not addresses, so they are
+  ; marked directly rather than dereferenced. Scanned before the drain so their
+  ; children are traced by the same worklist pass.
+  %t_count = load i64, i64* @__gc_temp_count
+  %t_data = load i64, i64* @__gc_temp_roots
+  %t_empty = icmp eq i64 %t_count, 0
+  br i1 %t_empty, label %do_drain, label %t_loop
+
+t_loop:
+  %ti = phi i64 [0, %drain], [%ti_next, %t_body]
+  %t_done = icmp uge i64 %ti, %t_count
+  br i1 %t_done, label %do_drain, label %t_body
+
+t_body:
+  %t_off = shl i64 %ti, 3
+  %t_addr = add i64 %t_data, %t_off
+  %t_ptr = inttoptr i64 %t_addr to i64*
+  %t_val = load i64, i64* %t_ptr
+  call void @__gc_mark_object(i64 %t_val)
+  %ti_next = add i64 %ti, 1
+  br label %t_loop
+
+do_drain:
   ; After all roots are pushed, iteratively process the worklist
   call void @__gc_mark_drain()
   br label %done

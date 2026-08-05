@@ -800,6 +800,22 @@ entry:
   ret i64 0
 }
 
+; Temp value roots (BUGS #162): no-ops without GC.
+define weak void @__gc_push_temp(i64 %val) {
+entry:
+  ret void
+}
+
+define weak i64 @__gc_temp_depth() {
+entry:
+  ret i64 0
+}
+
+define weak void @__gc_pop_temps(i64 %n) {
+entry:
+  ret void
+}
+
 ; Statistics: all return 0 without GC.
 define weak i64 @__gc_stat_alloc_count() {
 entry:

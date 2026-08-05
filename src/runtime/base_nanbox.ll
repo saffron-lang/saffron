@@ -1079,6 +1079,24 @@ entry:
   ret i64 0
 }
 
+; Temp value roots (BUGS #162): no-ops without GC. Nothing is ever collected on
+; this path, so an unrooted argument temp cannot be freed — which is exactly why
+; #162 was invisible to the bootstrap, whose identity mode links this file.
+define weak void @__gc_push_temp(i64 %val) {
+entry:
+  ret void
+}
+
+define weak i64 @__gc_temp_depth() {
+entry:
+  ret i64 0
+}
+
+define weak void @__gc_pop_temps(i64 %n) {
+entry:
+  ret void
+}
+
 ; Statistics: all return 0 without GC.
 define weak i64 @__gc_stat_alloc_count() {
 entry:

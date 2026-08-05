@@ -1,7 +1,8 @@
 // arg_temp_rooted.sf — an object constructed as argument 0 must survive argument 1
-// allocating. BUGS #162, and this test is expected to FAIL until it is fixed
-// (run_tests.sh lists it under KNOWN_FAIL, so its failure is an `xfail` and its
-// eventual success is an `xpass` that tells you to close the entry).
+// allocating. BUGS #162, now FIXED; this is its regression test and it is an
+// ordinary member of the pass suite. It spent one commit in run_tests.sh's
+// KNOWN_FAIL table, where its failure read as `xfail`; the fix turned that into an
+// `xpass`, which reddens the suite, and the entry was dropped in the same change.
 //
 // The shape is the ordinary one — `f(Box(7), something_that_allocates())` — not a
 // contrived stress. Argument 0 is evaluated into an LLVM SSA temp, then argument 1
@@ -17,7 +18,23 @@
 // Two controls, both clean, are recorded in the #162 entry and pin the cause:
 // __gc_disable() gives 0 mismatches, and hoisting both arguments into locals gives
 // 0 mismatches. The second is the shape of the fix — a local gets a root slot, an
-// argument temp does not — and is the workaround available today.
+// argument temp does not — and was the workaround before the fix landed.
+//
+// FIVE call forms, not one, and that is the point of the second half of this file.
+// The fix's first version instrumented only the direct-call argument loop and
+// left the other four broken at 44-52 mismatches out of 200 apiece; the
+// direct-call assertion below passed the whole time. A regression test that
+// covered one form would have certified a 20%-complete fix as done. Each form has
+// its own argument loop in codegen (expr_body.sf for direct/constructor/indirect,
+// methods_body.sf for instance methods and list literals), so each needs its own
+// assertion — they do not share the code that was fixed.
+//
+// Negative control, run before landing: compiled by the pre-fix compiler this file
+// SEGFAULTS rather than reporting mismatches, because Pair holds a freed Box and
+// `p.a.v` dereferences it. The two-assertion version only ever counted wrong
+// values. Worth knowing so a future segfault here is not read as a new bug in the
+// test — the failure mode of an unrooted temp is corruption first, crash second,
+// depending on what got reused.
 //
 // Classes, deliberately, not enums. This was found while making payload enums
 // GC-collectable for #154, but it is not enum-specific and a test written with
@@ -29,6 +46,17 @@ import "@test" as Test
 class Box {
     var v: Int
     fun init(v: Int) { this.v = v }
+    // For the instance-method form: the receiver is evaluated before the arguments
+    // and stays live across them, so it needs rooting too, not just the arguments.
+    fun take_m(b: Box, ignored: Int): Int { return b.v }
+}
+
+// For the constructor form. `instance` comes back from @Pair() before any argument
+// runs, so it is exposed for the full width of the argument list.
+class Pair {
+    var a: Box
+    var b: Int
+    fun init(a: Box, b: Int) { this.a = a; this.b = b }
 }
 
 // Allocates enough strings to cross the collection threshold. The return value is
@@ -75,5 +103,42 @@ while (u < 200) {
 }
 
 Test.assert_eq(hoisted_mismatches, 0, "control: rooted locals are unaffected")
+
+// The other four call forms. Same window in each: hold a fresh object in the first
+// position while a later position allocates. Counted separately so a partial
+// regression names the form it broke.
+var recv: Box = Box(1)
+var indirect_fn = fun (b: Box, ignored: Int): Int => b.v
+
+var bad_method: Int = 0
+var bad_ctor: Int = 0
+var bad_indirect: Int = 0
+var bad_list: Int = 0
+
+var v: Int = 0
+while (v < 200) {
+    // instance method — gen_namespace_call, which also carries actor and virtual
+    // dispatch, so this arm covers three receivers' worth of arms below it
+    if (recv.take_m(Box(7), churn(300)) != 7) { bad_method = bad_method + 1 }
+
+    // constructor — the @Pair() instance plus each argument
+    var p: Pair = Pair(Box(7), churn(300))
+    if (p.a.v != 7) { bad_ctor = bad_ctor + 1 }
+
+    // indirect call through a closure value — the env pointer is loaded out of the
+    // closure pair before the arguments run, so it is exposed just as long
+    if (indirect_fn(Box(7), churn(300)) != 7) { bad_indirect = bad_indirect + 1 }
+
+    // list literal — elements are evaluated one after another into the same list
+    var l: List<Box> = [Box(7), Box(churn(300))]
+    if (l[0].v != 7) { bad_list = bad_list + 1 }
+
+    v = v + 1
+}
+
+Test.assert_eq(bad_method, 0, "instance-method argument temps are rooted")
+Test.assert_eq(bad_ctor, 0, "constructor argument temps and the instance are rooted")
+Test.assert_eq(bad_indirect, 0, "indirect-call argument temps are rooted")
+Test.assert_eq(bad_list, 0, "list-literal element temps are rooted")
 
 Test.summary()
