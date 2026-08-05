@@ -1,0 +1,22 @@
+// The let-through set for the two import-form checks next door.
+//
+// Both new parse errors are one-sided: they fire only on a *malformed* import
+// line, and every well-formed shape in the tree must still parse. A survey of
+// src/, test/ and tools/ found exactly two shapes in use — `import "path"` (411
+// sites) and `import { names } from "path"` (7) — so both are exercised here,
+// including the named form's trailing-comma and multi-name variants.
+import "@iter" as Iter
+import { map } from "@iter"
+import { filter, reduce } from "@iter"
+import "@test" as T
+
+var doubled: List<Number> = map([1, 2, 3], fun (x: Number): Number => x * 2)
+T.assert_eq(doubled[2], 6, "named import resolves through `from`")
+
+var evens: List<Number> = filter([1, 2, 3, 4], fun (x: Number): Bool => x % 2 == 0)
+T.assert_eq(evens.length(), 2, "a second name from the same module resolves")
+
+var aliased: List<Number> = Iter.map([5], fun (x: Number): Number => x + 1)
+T.assert_eq(aliased[0], 6, "`import \"path\" as Alias` still resolves")
+
+T.summary()

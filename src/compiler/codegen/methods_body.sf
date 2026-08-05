@@ -844,26 +844,24 @@
                         var xmethods: List<String> = this.class_methods.get(xcls)
                         if (!this.str_in_list(xmethods, xname)) { xmethods.push(xname) }
                     }
-                    var xret: String = this.get_fun_ret(stmts[xi])
-                    if (xret.length() > 0) {
-                        this.func_ret_types.set(xprefixed, this.str_to_type(xret))
-                        this.func_ret_types.set(xfull, this.str_to_type(xret))
-                    }
+                    var xret: AST.Type = this.ret_type_for_registration(this.get_fun_ret(stmts[xi]))
+                    this.func_ret_types.set(xprefixed, xret)
+                    this.func_ret_types.set(xfull, xret)
                 }
             }
             xi = xi + 1
         }
     }
 
-    fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
+    fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: AST.Type, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
     // Use target class's prefix (not source file's prefix)
     var class_prefix: String = this.extend_class_prefix(ext_class, this.current_prefix)
     var prefixed: String = class_prefix + full_name
     this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
-    this.func_ret_types.set(prefixed, this.str_to_type(ret_type))
-    this.func_ret_types.set(full_name, this.str_to_type(ret_type))
+    this.func_ret_types.set(prefixed, this.ret_type_for_registration(ret_type))
+    this.func_ret_types.set(full_name, this.ret_type_for_registration(ret_type))
     this.func_prefix_map.set(full_name, prefixed)
     if (this.class_methods.has(ext_class)) {
         var methods: List = this.class_methods.get(ext_class)
@@ -2239,9 +2237,14 @@
         var task_result_type: String = "Int"
         var spawn_expr_kind: String = this.classify_expr(args[0])
         if (spawn_expr_kind == "lambda") {
-            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
-            if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
-                task_result_type = lambda_ret
+            // Was `!= "Int"`, which meant "the parser did not fill in its
+            // unannotated-lambda sentinel". UnknownType says that outright, so a
+            // lambda genuinely declared `: Int` no longer falls into the
+            // body-inference branch below by sharing a spelling with absence.
+            var lambda_ret: AST.Type = match (args[0]) { Lambda(p, r, b) => r   _ => AST.Type.UnknownType }
+            var lambda_ret_str: String = this.type_to_string(lambda_ret)
+            if (!this.is_unknown_type(lambda_ret) and lambda_ret_str != "Any") {
+                task_result_type = lambda_ret_str
             } else {
                 // Infer from body: if body is [Return(Call(f, ...))] use f's return type
                 var lambda_body: List<AST.Stmt> = match (args[0]) { Lambda(p, r, b) => b   _ => [] }

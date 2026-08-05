@@ -1,0 +1,31 @@
+// BUGS #155: the Return arm must reject a value whose type is incompatible
+// with the declared return type. Before the fix, all of these compiled clean.
+//
+// This test covers SCALAR-VS-SCALAR mismatches only. The class-vs-scalar case
+// (the segfault: `fun make(): Box { return "not a box" }`) is deferred — it
+// needs the full resolve pass (I4) to avoid false positives on nullable unions,
+// type parameters, and inference gaps.
+//
+// Int→String is DELIBERATELY ALLOWED (NaN-box identity: an Int holding a heap
+// address IS a valid String). It will become an error when I5 introduces Ptr<T>.
+
+// String returned where Int expected
+fun int_from_string(): Int {
+    return "hello"
+}
+
+// Int returned where Bool expected
+fun bool_from_int(): Bool {
+    return 42
+}
+
+// Bool returned where String expected
+fun string_from_bool(): String {
+    return true
+}
+
+fun main() {
+    IO.println(int_from_string())
+}
+
+main()

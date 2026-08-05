@@ -2,16 +2,16 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #161.
-Next free number is **#166**. #158, #160, #162 and #163 are claimed but not present
-here: #158 is the lsp worktree's committed entry (the `match` above its enum
-declaration), #160 is `main`'s open `: Any` widening entry, #162 is the saffron_154
-line's SSA-temp GC bug, and #163 is already FIXED on `main` (malformed `import`
-lines). They arrive with their merges. A number can be taken
+**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#160, #161. Next free number is **#166**. Only **#162** is claimed but not written
+here — the saffron_154 line's SSA-temp GC bug, which arrives with that merge. #158
+and #160 were in that category one revision ago and are present now; this is the
+merge that brought them, so the claimed set and the written set almost agree again.
+The rule that made the placeholders necessary still holds: a number can be taken
 without its text being in this file yet, so the next-free number is one past the
-highest *claimed*, not one past the highest written. (The open count above counts
-what is *written here*, so those three are excluded on purpose and the `awk`
-self-check over this file agrees with the number.)
+highest *claimed*, not one past the highest written. (The open count counts what is
+*written here*, so #162 is excluded on purpose and the `awk` self-check over this
+file agrees with the number.)
 
 **The sixth collision, and the first one to cost a renumber after the work was
 done.** This line's duplicate-declaration fix was written as #160 and its
@@ -32,6 +32,21 @@ to dispatch both receivers' methods to the second module. The general lesson is
 about where the non-regression half of a rejection fix points: a check that
 tightens what compiles needs a test for the shapes it must still accept, and that
 test walks straight into whatever else is wrong with those shapes.
+
+#160 took its number without a collision — the first entry in a while to do so.
+The pre-commit re-read (see the note below) was run against `origin/main` and
+found #160 free, which is the whole procedure working as intended rather than
+detecting a clash. Worth recording that the quiet case happens too; five
+consecutive collision narratives make the scheme look worse than it is. (The
+sixth, above, landed on the very next pair of numbers — so the quiet case is
+still the exception, not the new normal.)
+
+#160 is also the second half of #147, which is the more useful thing about it: the
+checker stopped conflating `: Any` with silence, and codegen never did. A fix
+recorded as landed had reached one of two consumers, and nothing in the tree said
+so. That is the argument for invariant I10 (one source of truth per fact) stated as
+a measurement rather than a principle — the inference in question exists in five
+pasted copies.
 
 **The fifth collision, and the first one the pre-commit re-read actually caught.**
 The rule at the end of the note below — re-read the next-free number from `main`
@@ -591,15 +606,127 @@ a one-line edit.
 
 ---
 
-### 155. OPEN — no `return` is checked against its function's declared return type, so `fun make(): Box { return "s" }` compiles and segfaults
+### 160. OPEN — an explicit `: Any` on a module-level global still cannot widen it; #147 was fixed in the checker only
 
-**Severity: high.** Silent wrong type across a declared boundary, and the crash
-lands in the caller. Found while surveying `FunDecl.ret_type` for rewrite stage 3.
+**Severity: medium.** Silent wrong answer, then a segfault. Narrow: globals only,
+and only when the initializer is a list, map or string literal.
 
-The `Return` arm of `check_stmt` (`checker.sf:2574`) infers the value's type and
-then asks exactly one question: is a *nullable* value being returned from a
-non-nullable slot. It never compares two concrete types. So every one of these
-compiles with zero diagnostics:
+`var g: Any = "abc"` at module level, reassigned to an `Int` inside a function,
+prints a bit pattern or segfaults. The identical *local* is correct — that is the
+half #147 fixed:
+
+```saffron
+var g: Any = "abc"
+fun r() { g = 42
+    IO.println("g=${g}") }
+r()                             // segfault
+
+fun s() { var l: Any = "abc"
+    l = 42
+    IO.println("l=${l}") }
+s()                             // l=42   — correct
+```
+
+#147 was "an explicit `: Any` is indistinguishable from no annotation", and the fix
+moved the parser's sentinel from `"Any"` to `""` so the checker could tell them
+apart. It did — but **codegen's global pre-scans still collapse the two**, in five
+copies, all of the same shape:
+
+```saffron
+if (gvtype.length() == 0 or gvtype == "Any") {
+    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+        gvtype = gvinit
+    }
+}
+```
+
+`codegen.sf` lines ~787, ~1353, ~1492, ~2069, ~2218, plus the same disjunction in
+`codegen/utils_body.sf:1511` (`prescan_global_call_types`, which is safe — it only
+fills globals nothing has typed yet). So an annotated-`Any` global is typed from its
+initializer and `global_var_types` says `String`; the store writes a tagged Int and
+the load untags a pointer.
+
+The allowlist is why the defect is jagged rather than uniform: `var g: Any = 1` and
+`var g: Any = nil` widen correctly, because `Int` and `Nil` are not in it. Only the
+three collapsed shapes break, which is the kind of partial correctness that reads as
+"works" until it doesn't.
+
+**Why the five copies exist, and why that is the actual entry.** Each one has a
+comment citing the bug that motivated it (#36, #37, #80) — they were added
+independently, and the inference was pasted rather than shared. One source of truth
+(invariant I10) would have made #147's fix reach all of them at once. Deduplicating
+them is a real change with real risk, and the pre-scans differ in which corpus and
+prefix they walk, so this is filed rather than fixed in passing.
+
+Found from `test/pass/assign_type_valid.sf`, which asserts the checker-side
+behaviour and documents in a comment that the `: Any` global is excluded for this
+reason.
+
+---
+
+### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
+
+`enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the
+declaration (`codegen/stmts_body.sf:843` via `register_variant`), so the table is
+only correct for matches that appear after the enum in the file. A match above it
+asks `find_enum_for_variant` (`codegen/utils_body.sf:124`) for a variant that is
+not registered yet, gets `"Unknown"`, and falls into the unknown-enum branch at
+`codegen/match_body.sf:92`, which is documented as "just generate the first arm's
+body as default" — it GEPs the first arm's bindings out of the subject
+unconditionally and drops every other arm.
+
+The result is not a diagnostic and not a wrong branch. It is *no branch*: the
+emitted function has zero `icmp`/`br`/`switch` instructions and treats every
+input as the first arm's variant. If that arm has more fields than the value
+actually passed, the GEP reads past the allocation and the program segfaults on
+a load of whatever followed.
+
+Measured on `AST.expr_span` while adding it to `src/compiler/ast.sf` above
+`enum Expr`:
+
+```
+expr_span      : branches = 0     <- silently miscompiled
+type_to_string : branches = 15    <- same file, matches Type (declared above it)
+span_merge     : branches = 10    <- same file, matches Span (declared above it)
+```
+
+Calling it on a `Variable` (2 fields) through the first arm `Call` (3 fields)
+segfaulted; moving the function below `enum Expr` produced 10 branches and
+correct results for `Variable`, `Call` and a `Binary` falling through to `_`.
+
+Two things make this nastier than it looks:
+
+- **Declaration order is the only thing that matters, not scope.** Saffron
+  otherwise lets a function call another declared later in the file, so nothing
+  else in the language teaches you to expect this. Reordering two top-level
+  items — a mechanical, apparently meaningless edit — is the whole fix, and the
+  whole cause.
+- **Zero existing occurrences in the tree.** A scan of every `.sf` in `src/` and
+  `tools/` for a match arm naming a variant of an enum declared later in the same
+  file finds none, which is exactly why this has never been hit. It is a trap for
+  new code, not a live defect, so nothing regresses today and nothing will warn
+  the next person.
+
+The real fix is a prepass that registers every enum in the module before any body
+is generated. `register_external_enums` (`codegen/stmts_body.sf:1215`) is that
+prepass and **has no callers** — it is dead code. Either wire it up, or make
+`find_enum_for_variant` returning `"Unknown"` for a name that is a known variant
+somewhere a hard error instead of a silent fallthrough. The unknown-enum branch
+is legitimately needed for class patterns (`is Dog(d)`), so it cannot simply be
+deleted.
+
+---
+
+### 155. OPEN (narrowed) — a `return` is checked against its declared return type only for scalar-vs-scalar; the class-typed segfault is still live
+
+**Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for
+rewrite stage 3.
+
+The `Return` arm of `check_stmt` (`checker.sf:2574`) inferred the value's type and
+then asked exactly one question: is a *nullable* value being returned from a
+non-nullable slot. It never compared two concrete types, so every one of these
+compiled with zero diagnostics:
 
 ```saffron
 fun f(): String { return 42 }
@@ -608,7 +735,37 @@ fun f(): Bool   { return 42 }
 fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
 ```
 
-The class-typed case is the one that crashes:
+**Landed 2026-08-04 (second): the declared-`Nil` half**, the fourth case above.
+`fun f(): Nil { return 42 }` is now `return: cannot return Int from function
+declared ': Nil'`. It became expressible only after `FunDecl.ret_type` and
+`Lambda.ret_type` became `AST.Type` nodes with an explicit `UnknownType` — see
+"And the sentinel *was* in-band" below for what that unblocked and what it cost.
+`test/fail/return_nil_declared.sf` is the regression test; the legitimate shapes
+(`return nil`, bare `return`, falling off the end, and every unannotated function)
+are pinned in `test/pass/return_type_valid.sf`.
+
+**Landed 2026-08-04: the scalar-vs-scalar half.** The `Return` arm now calls
+`scalar_mismatch` (`checker.sf:890`), inheriting the same one-sided discipline
+`check_call_args` uses — it fires only on two *different concrete scalars*, and
+lets `Any`, `Nil`, unions, generics, class and enum types through. The first three
+cases above are now errors; `test/fail/return_type_mismatch.sf` is the regression
+test and `test/pass/return_type_valid.sf` pins the legitimate patterns
+(same-type, `Int`→`Float` widening, nil-from-nullable, concrete-into-nullable,
+`Any` in either position, unannotated).
+
+Two exclusions are deliberate and both are documented at the site:
+
+- **`Int`→`String` is allowed.** In the NaN-boxed runtime an `Int` holding a heap
+  address *is* a String — a pointer to a NUL-terminated buffer.
+  `lexer.sf:byte_to_char` (line 431) returns a `__lex_malloc` result from a
+  `: String` function, and it is correct. This is the identity-mode analog of
+  `Int`→`Float` widening and disappears when I5 introduces `Ptr<T>`. The check
+  found this on its first bootstrap: `STAGE 1` rejected `lexer.sf` with
+  `cannot return Int from function expecting String`.
+- ~~**The declared-`Nil` case is still unchecked**, because the sentinel problem
+  below is unsolved.~~ Solved 2026-08-04; see above.
+
+**Still open: the class-typed case, which is the one that crashes.**
 
 ```saffron
 class Box { var n: Int
@@ -623,29 +780,60 @@ IO.println("n=${b.get()}")         // segfault
 The checker binds `b` to `Box` on the declaration's authority, codegen emits a
 direct `Box__get` call with a field load, and the receiver is a `String` pointer.
 
-**The material for the fix already exists.** `scalar_mismatch(annotated, actual)`
-(`checker.sf:890`) answers precisely this question for `VarDecl` — two distinct
-concrete scalars, with `Int`→`Float` widening and anything touching `Any`/`Nil`
-allowed — and `is_subtype_node` (`checker.sf:1005`) handles the class/interface
-case. Neither is called from the `Return` arm.
+A first attempt added the obvious two arms — declared-class/returned-scalar and
+declared-scalar/returned-class — and they were **reverted**: they are too eager,
+because "not a scalar name" is not the same as "a class." The suite named three
+distinct false-positive families in one run (5 tests):
 
-**Why it survived this long, and the trap in fixing it.** The parser defaults an
-omitted return type to a *real type name*: `"Nil"` for `FunDecl`
-(`parser.sf:2561`), `"Int"` for `Lambda` (`parser.sf:1646`). Both spellings are
-indistinguishable from an annotation the author wrote, so turning on a strict
-return check would immediately reject every unannotated `fun f() { return 42 }` —
-`"Nil"` vs `Int` — and every unannotated lambda returning anything but an integer.
-BUGS #147's write-up under `## Resolved` is the same defect one node over, and the
-`## Resolved` entry for the use-recording walk already notes it clears
-`current_func_ret` for exactly this reason: "a walk that exists to record uses must
-not start enforcing a return type nobody wrote."
+| Test | Spurious error | Why it is legal |
+|---|---|---|
+| `nullable_narrowing`, `pass/nullable_recv_dispatch` | `cannot return String from function expecting String\|Nil` | `String` **is** a subtype of `String\|Nil` |
+| `pass/nullable_shorthand` | `cannot return Int from function expecting Int\|Nil` | same |
+| `test_generics` | `cannot return Int from function expecting T` | `T` is a type *parameter*, resolved from the call site |
+| `pass/module_member_write_valid` | `cannot return e from function expecting Float` | `return Math.e` — the type came back as the raw member name `e`; an inference gap, not a type |
 
-So the honest ordering is the one stage 1 used: **make the sentinel
-distinguishable first, then turn on the check.** `ret_type` becomes an `AST.Type`
-with an explicit `Unknown` (invariant I2) — rewrite stage 3's remaining work —
-and only then can the `Return` arm tell "the author declared `Nil`" from "nobody
-declared anything." Enforcing before that would be a large, noisy, and partly
-wrong diagnostic sweep.
+The last row is the useful one: an unresolved type currently *spells itself as a
+plausible type name*, which is mechanism M2 again — "I don't know" wearing the
+costume of an answer. A membership test against a real class/enum registry, or
+`is_subtype_node`, is what this needs, and both want the resolve pass (I4) to
+answer reliably for module-qualified names. `parse_type_node("AST.Type")` falls
+through to `ClassType("AST.Type")` while the value side infers `EnumType("Type")`
+— two spellings of one type, and `inherits_from` knows neither.
+
+**And the sentinel *was* in-band — fixed 2026-08-04.** The parser used to default
+an omitted return type to a *real type name*: `"Nil"` for `FunDecl`, `"Int"` for
+`Lambda`. Both were indistinguishable from an annotation the author wrote, so the
+declared-`Nil` case could not be enforced without rejecting every unannotated
+`fun f() { return 42 }` — several hundred of them in the compiler's own source,
+which the checker type-checks, so the false positive broke the bootstrap outright.
+#147 under `## Resolved` is the same defect one AST node over, and
+`check_lambda_body` already set `current_func_ret = AnyType` for exactly this
+reason — a walk that exists to record uses "must not start enforcing a return type
+nobody wrote."
+
+Both `ret_type` fields are now `AST.Type` with an explicit `UnknownType`
+(invariant I2), so the arm can tell "the author declared `Nil`" from "nobody
+declared anything." Three things that fell out of doing it, all worth keeping:
+
+- **The two sentinels meant opposite things.** Measured on the pre-migration
+  binary: `FunDecl`'s `"Nil"` *suppressed* implicit return, `Lambda`'s `"Int"`
+  *enabled* it. So `UnknownType` alone could not replace both — `gen_function`
+  recovers the distinction from the construct (`__lambda` in the emit name).
+  Collapsing them would have made every block-form lambda return 0 silently, with
+  no test naming it.
+- **The guard removed to enable the `: Nil` case had been shielding a second,
+  unrelated check.** The nullable-return test in the same arm was excluded from
+  unannotated functions only as a side effect of excluding real `: Nil` ones, so
+  dropping the outer guard produced `cannot return nullable Nil from function
+  expecting Unknown` — `Unknown` named as if the author had written it. This is
+  the inverse of #147's lesson: a sentinel blocks the checks that inspect it, and
+  sometimes the checks merely standing next to it.
+- **An LSP bug, incidentally.** `render_signature`'s `length() > 0` guard was
+  never false, so every unannotated function's hover claimed `: Nil`.
+
+What remains under this number is the class-typed segfault above, still gated on
+the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
+`Ptr<T>`.
 
 ---
 
@@ -978,6 +1166,80 @@ other module's method even with an explicit annotation. The test asserts the
 constructors, which #164 must not break, and says in a comment why it stops short
 of the methods — a test that pins a second bug fails for the wrong reason and
 teaches the next reader nothing about the first.
+### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
+
+```saffron
+import { map } bananas "@iter"       // no `from` — accepted, exit 0
+import bananas as B                  // unquoted path — accepted, exit 0
+
+import { map } from "@iter"          // and this pair, both well-formed:
+import { filter } from "@iter"       // the second line ERASED `map`
+```
+
+Three separate defects with one shape: a malformed or unusual import line was
+accepted by the parser, produced no diagnostic, exited 0, and then failed
+downstream in a message that named a symbol the user never wrote.
+
+**The `from` slot was skipped without being read.** `parse_import`
+(`parser.sf:3044`) did `this.consume("}")` and then a bare `this.advance()` over
+whatever stood where `from` belongs. `from` is a soft keyword — the lexer has no
+token for it, so it arrives as `TkIdent("from")` and must be compared by text —
+which is why an unconditional advance looked plausible.
+
+Accepting it is worse than it sounds, because the *live* import resolution is not
+the parser. It is the text scanner `extract_named_imports` (`main.sf:777`), which
+keys on the literal `from `. So the two disagreed: the parser said fine, the
+scanner matched nothing and registered no names, `map` reached codegen as an
+undefined function — a **warning**, exit 0 — and the build died in the linker
+with `ld: symbol(s) not found for architecture arm64` for `_map`.
+
+**The path was defaulted rather than required.** Both forms read the path through
+`match (kind) { TkString(s) => s   _ => "" }` and carried on with `""`. So
+`import bananas as B` compiled clean, `extract_imports` (`main.sf:734`) keyed on
+`import "` and matched nothing, and every use of `B` became an undefined-variable
+error blaming the use site for a malformed import line three screens up.
+
+**Two named-import lines from the same module: the second erased the first.**
+`extract_named_imports` accumulates into a map keyed by module **path** and did
+`result.set(imp_path, trimmed_names)`. A second `import { ... } from "@iter"`
+replaced the first line's names outright. This one is the worst of the three,
+because the program is *valid*:
+
+```
+saffron: the compiler emitted invalid LLVM IR for prog.sf
+saffron: this is a compiler bug, not an error in your program.
+  error: use of undefined value '@map'
+```
+
+The compiler was right that it was a compiler bug, and wrong about everything a
+user could do with that.
+
+**Why none of this showed up.** A survey of every import in `src/`, `test/` and
+`tools/` finds exactly two shapes: `import "path"` (411 sites) and
+`import { names } from "path"` (7). Every one is well-formed, and no module is
+named-imported on two lines. The compiler's own source cannot reach any of the
+three paths, so bootstrap — including the gen4 fixed point — is fully green with
+all three present. This is the identity-mode blind spot in a new place: the
+source that exercises the compiler is not adversarial about its own syntax.
+
+**Fix.** `parse_import` requires `from` by text and reports through
+`parse_error_at` with the offending token's span; both forms require a non-empty
+string-literal path the same way; `extract_named_imports` merges into the
+existing list for a path instead of replacing it, de-duplicating names so a name
+repeated across two lines is not registered twice.
+
+The two new diagnostics are one-sided by construction — they fire only on a line
+that is already malformed — which is what makes them safe against 411 existing
+call sites.
+
+Tests: `test/fail/import_missing_from.sf` and `test/fail/import_unquoted_path.sf`
+(both rejected, exit 1), and `test/pass/import_forms_ok.sf`, which pins the
+let-through set: the alias form, the single-name form, the multi-name form, and
+two lines from one module all still resolve.
+
+Verified: bootstrap green including 0 unresolved inference fallbacks and the
+STAGE 2 gen4 fixed point; suite 308 passed, 8 failed, failure set identical by
+name to the 8-name baseline, comm-diffed both directions.
 
 ### 159. FIXED — a class or enum used as a condition was deterministically always false
 

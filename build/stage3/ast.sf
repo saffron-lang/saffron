@@ -152,7 +152,7 @@ enum Expr {
     MemberAccess(object: Expr, field: String, field_span: Span),
     Match(subject: Expr, arms: List<MatchArm>),
     EnumConstruct(enum_name: String, variant: String, args: List<Expr>),
-    Lambda(params: List<Param>, ret_type: String, body: List<Stmt>),
+    Lambda(params: List<Param>, ret_type: Type, body: List<Stmt>),
     GetField(object: Expr, field: String, field_span: Span),
     SetField(object: Expr, field: String, value: Expr, field_span: Span),
     This,
@@ -178,6 +178,49 @@ enum Expr {
     // post-resolve consumer — which is all of codegen — sees an unlocatable name,
     // and the resolve pass is exactly where "which definition is this?" is known.
     Ref(kind: String, name: String, slot: String, name_span: Span)
+}
+
+/// Where to point a diagnostic that is about `expr`.
+///
+/// MUST stay below `enum Expr`. Codegen registers variant tags as it generates
+/// the enum declaration, so a match textually above it finds no tags, silently
+/// takes the unknown-enum path, and compiles to an unconditional destructure of
+/// the first arm with no tag check at all — reading past the allocation and
+/// segfaulting on any variant with fewer fields. Moving this function up is a
+/// mechanical-looking edit that miscompiles it. See BUGS #158.
+///
+/// Every expression that carries a span answers with it; anything else answers
+/// `span_none()`, which `error_at` renders exactly as `error` did. So a caller
+/// can hand this any expression and the result is never worse than no span.
+///
+/// `Call` answers with its full extent (callee through the closing paren) rather
+/// than its callee's name, because a call's *shape* is what a wrong-arity or
+/// wrong-argument-type message is about. A `Call` wrapping a named callee is the
+/// one node where both would be defensible; the extent is chosen because it is
+/// what the reader needs to see to judge the message.
+///
+/// Deliberately not recursive: `Binary`/`Unary`/`Index` have no span of their
+/// own, and descending into a child would point at a sub-expression the message
+/// is not about — a plausible-looking location is worse than an honest absent
+/// one, because the reader trusts it. Callers with a better idea of which child
+/// is at fault should ask about that child directly, which is what
+/// `check_call_args` does with `args[i]`.
+///
+/// This lives here, not in `src/lib/ast.sf`'s wrapper of the same name, because
+/// the checker imports this file and cannot import the stdlib (see the
+/// no-stdlib-deps rule at the top of `diag.sf`).
+fun expr_span(expr: Expr): Span {
+    return match (expr) {
+        Call(__callee, __args, __cs) => __cs
+        Variable(__n, __vs) => __vs
+        Ref(__k, __rn, __slot, __rs) => __rs
+        Assign(__an, __av, __as) => __as
+        MemberAccess(__mo, __mf, __ms) => __ms
+        GetField(__go, __gf, __gs) => __gs
+        SetField(__so, __sf, __sv, __ss) => __ss
+        MethodCall(__ko, __km, __ka, __ks) => __ks
+        _ => span_none()
+    }
 }
 
 enum MatchArm {
@@ -226,7 +269,18 @@ enum Stmt {
     // synthetic node has no source region, and inventing one would make an editor
     // jump to a construct the user never wrote. `span_is_real` is the guard.
     VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String, visibility: String, name_span: Span, full_span: Span),
-    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String, visibility: String, name_span: Span, full_span: Span),
+    // `ret_type` is a `Type`, not a `String`, and an *omitted* return type is
+    // `UnknownType` rather than the old in-band `"Nil"`. The two are different
+    // facts: `fun f(): Nil` says the author declared no result, while an omitted
+    // annotation says nobody declared anything, and a `String` field had no way
+    // to spell the second without stealing a spelling from the first. That
+    // collision is why the `Return` check could not reject `fun f(): Nil {
+    // return 42 }` — enforcing it would have rejected every unannotated function
+    // too (BUGS #155, and #147 one node over for `VarDecl.type_ann`).
+    //
+    // Consumers that need a string call `type_to_string`; the ones that need to
+    // know whether an annotation exists at all test `UnknownType` explicitly.
+    FunDecl(name: String, params: List<Param>, ret_type: Type, body: List<Stmt>, docstring: String, visibility: String, name_span: Span, full_span: Span),
     EnumDecl(name: String, variants: List<Variant>, docstring: String, visibility: String, name_span: Span, full_span: Span),
     // `type_params` holds the declared generic parameter names of `class Box<T>`
     // — ["T"], or [] for a non-generic class. The parser used to consume and
@@ -308,6 +362,72 @@ fun type_to_string(t: Type): String {
         // Deliberately NOT "Int" and NOT "Any". These strings are what a
         // diagnostic prints, and both must be recognisable on sight: an
         // "Unknown" in compiler output is a bug report, not a type.
+        UnknownType => "Unknown"
+        NeverType => "Never"
+    }
+}
+
+/// Render a type the way the *parser* spells it, so that
+/// `parse_type_ast(type_to_source(t))` round-trips.
+///
+/// `type_to_string` above is a diagnostic renderer and is deliberately lossy:
+/// it collapses `Map<String,Int>` to "Map" and any union to the literal word
+/// "Union". That is fine for a message a human reads and wrong for a string fed
+/// back into a type parser, which is what the `ret_type` migration needs — a
+/// consumer that still wants a string (`gen_function`'s signature, the LSP
+/// symbol payload) must not silently widen `List<Pt>` to `List` on the way.
+///
+/// Kept as a second function rather than a fix to the first because
+/// `type_to_string` has 20-odd callers whose downstream comparisons are written
+/// against the lossy spellings — `left_type == "Any"`, `starts_with("Map<")` —
+/// and changing what they receive is its own measured change.
+fun type_to_source(t: Type): String {
+    return match (t) {
+        IntType => "Int"
+        FloatType => "Float"
+        BoolType => "Bool"
+        StringType => "String"
+        NilType => "Nil"
+        AnyType => "Any"
+        ClassType(name) => name
+        EnumType(name) => name
+        GenericType(base, args) => {
+            var out: String = base + "<"
+            var gi: Float = 0
+            while (gi < args.length()) {
+                if (gi > 0) { out = out + "," }
+                out = out + type_to_source(args[gi])
+                gi = gi + 1
+            }
+            out + ">"
+        }
+        UnionType(types) => {
+            var u: String = ""
+            var ui: Float = 0
+            while (ui < types.length()) {
+                if (ui > 0) { u = u + "|" }
+                u = u + type_to_source(types[ui])
+                ui = ui + 1
+            }
+            u
+        }
+        // "Fun(A,B):R" is the encoding parse_type_ast reads back, via
+        // parse_fun_type_ast — see the comment there on why it is recognised
+        // before the union and generic branches.
+        FuncType(params, ret) => {
+            var f: String = "Fun("
+            var fi: Float = 0
+            while (fi < params.length()) {
+                if (fi > 0) { f = f + "," }
+                f = f + type_to_source(params[fi])
+                fi = fi + 1
+            }
+            f + "):" + type_to_source(ret)
+        }
+        NullableType(inner) => type_to_source(inner) + "|Nil"
+        // Neither has surface syntax, so neither round-trips — but both arms must
+        // exist, because a missing arm yields an indeterminate value rather than
+        // failing to compile (BUGS #76).
         UnknownType => "Unknown"
         NeverType => "Never"
     }
