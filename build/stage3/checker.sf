@@ -3239,7 +3239,7 @@ class NullChecker {
                 }
                 this.env.get_var_type(rname)
             }
-            Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
+            Binary(left, op, right) => this.infer_binary_node(left, op, right)
             // `!` is a condition site too (BUGS #143) and its RESULT is Bool,
             // not the operand's type — returning the operand type made `!42`
             // infer as Int, which then passed as a condition and as an Int
@@ -3764,19 +3764,43 @@ class NullChecker {
         return this.substitute_class_type_params(ret, recv_type)
     }
 
-    fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
-        var lt: String = this.infer_expr(left)
-        var rt: String = this.infer_expr(right)
+    // The type of a binary expression, as a node.
+    //
+    // This replaced `infer_binary(...): String`, whose result `infer_type` fed
+    // straight back into `parse_type_node` — a node → string → node round trip
+    // inside one function, for no reason but that the middle step was how the
+    // function had always been written.
+    //
+    // The decision logic is unchanged, deliberately: same operator sets, same
+    // order, same `Any`-absorbs-the-other rule, same `Int` fallback. What changes
+    // is only that the answer is not rendered and re-parsed on the way out, so the
+    // `lt == rt` path — the one that returns an *operand's* type rather than a
+    // literal spelling — no longer loses whatever `parse_type_node` cannot rebuild.
+    // It cannot rebuild a `FuncType` (`type_to_str` renders every one as the bare
+    // "Fun", which comes back as `ClassType("Fun")`) and it never produces an
+    // `EnumType` at all (every unrecognised name becomes a `ClassType`).
+    //
+    // Operand comparison stays on the rendered form via `type_to_str`. That is not
+    // an oversight: there is no node equality function, and `is_subtype_node`
+    // itself compares two rendered strings. Writing one here would be a second,
+    // separate change with its own false-positive surface — the comparisons below
+    // decide the *result type*, and a stricter equality would silently reroute
+    // pairs that currently take `lt == rt` into the `Int` fallback.
+    fun infer_binary_node(left: AST.Expr, op: String, right: AST.Expr): AST.Type {
+        var ln: AST.Type = this.infer_type(left)
+        var rn: AST.Type = this.infer_type(right)
         if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
-            return "Bool"
+            return AST.Type.BoolType
         }
+        var lt: String = this.type_to_str(ln)
+        var rt: String = this.type_to_str(rn)
         if (op == "+") {
-            if (lt == "String" or rt == "String") return "String"
+            if (lt == "String" or rt == "String") return AST.Type.StringType
         }
-        if (lt == rt) return lt
-        if (lt == "Any") return rt
-        if (rt == "Any") return lt
-        return "Int"
+        if (lt == rt) return ln
+        if (lt == "Any") return rn
+        if (rt == "Any") return ln
+        return AST.Type.IntType
     }
 
     // `infer_unary(op, right)` used to sit here and was dead. Its live replacement
