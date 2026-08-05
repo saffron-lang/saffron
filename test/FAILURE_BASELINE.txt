@@ -428,6 +428,27 @@
 # result than no measurement; it is worse, because it reads exactly like the right
 # one. Fetch before you measure, not just before you push.
 
+#
+# Confirmed 2026-08-05 after MERGING origin/main (ff40464) into the #162 fix line:
+# 318 passed, 8 failed, 14 skipped, 0 known-fail. SET unchanged, comm-diffed empty
+# both directions against the 8 names below. Bootstrap green through STAGE 2 (0
+# unresolved inference fallbacks; gen3 compiles itself, gen4 links and compiles) on
+# origin's PROMOTED gen2 -- which is the check that matters, since the #162 fix
+# touched codegen's argument loops and this merge brought the VarDecl.type_ann and
+# get_func_ret AST.Type migrations that rewrote adjacent code. The +8 over 310 is
+# entirely origin's own new tests (its #160/#164/#167/#168/#169 suite), all already
+# passing on main; eligible files 332 -> 340.
+#
+# SUPERSEDES the "#162 still XFAILs" lines in the two notes just above (the twice-
+# merged and rebased runs): those were written on origin's line BEFORE this fix
+# landed and describe a KNOWN_FAIL table that no longer has an entry. #162 is FIXED
+# and lives under Resolved; pass/arg_temp_rooted is an ordinary passing test with 6
+# assertions. The stale sentences are left in place rather than edited because they
+# were true when written and this file records history -- this note is the correction,
+# in the position chronology puts it. The ordering hazard is real and worth naming:
+# my #162 note sits ABOVE origin's later notes because my branch forked before they
+# were written, so read the dates, not the position.
+
 async
 docstrings
 json
