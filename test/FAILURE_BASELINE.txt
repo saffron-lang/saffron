@@ -201,6 +201,28 @@
 # Removing this name again is the acceptance test for #162. If someone lands an
 # SSA-temp rooting fix in codegen, this is the test that should start passing
 # without being touched.
+#
+# Confirmed 2026-08-04 on the MERGED tree (#164/#165 above, merged with origin's
+# #155-scalar, #158, #160, #163, and the FunDecl/Lambda ret_type + assignment type
+# checks): 311 passed, 9 failed, 14 skipped. The SET is exactly the 9 names below —
+# comm-diffed both directions against this file, empty each way — and md5 of
+# build/saffronc was 174ea698f90c791749ecd89d6dfff53d before and after the run.
+#
+# The count arithmetic closes exactly, which is the part worth writing down because
+# a merge is where it usually stops closing: origin's 308 passed / 8 failed, PLUS
+# this line's four new tests all passing (pass/gc_constructor_rule,
+# pass/duplicate_decl_ok, fail/duplicate_class, fail/duplicate_enum_class), MINUS
+# pass/check_module_imports moving into the failure column. 308 + 4 - 1 = 311, and
+# 8 + 1 = 9. No name is unaccounted for in either direction.
+#
+# This was the run the merge actually needed, not a formality. origin migrated
+# FunDecl/Lambda `ret_type` from String to AST.Type in the same checker.sf that
+# #164 adds a pass to, and added an assignment type check there too. A clean
+# auto-merge of that pair says nothing — the presence of check_duplicate_decls in
+# the merged file was verified by grep at merge time, but only the STAGE 2 gen4
+# fixed point (0 unresolved inference fallbacks, gen3 compiles itself) proves the
+# merged source still type checks against itself, and only this diff proves the
+# two sides' behaviour composes.
 
 async
 docstrings
