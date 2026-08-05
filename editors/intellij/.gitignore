@@ -3,3 +3,7 @@ build/
 .idea/
 out/
 *.iml
+
+# IntelliJ Platform Gradle plugin rewrites this on every IDE launch with the
+# current date, so it dirtied every worktree sharing this repo. Untracked.
+.intellijPlatform/self-update.lock
