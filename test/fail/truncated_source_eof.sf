@@ -1,0 +1,34 @@
+// A truncated source must be REJECTED with a parse error — not kill the compiler.
+//
+// This file ends mid-expression, which is the normal state of a file being typed.
+// Before BUGS #164 it did not produce a diagnostic at all: `parse_error` reports
+// without consuming a token (deliberately — each caller decides how to
+// resynchronize), so a parser out of input kept calling `advance()`, and
+// `current()` read `this.tokens[this.pos]` with no bound. Past the end that is
+// `IndexError: index 4 out of bounds (length 4)`, and in Saffron an IndexError is
+// a *fatal runtime error*, not a diagnostic: it routes to
+// `__runtime_error_fatal` and exits before anything is written. Under `--json`
+// that meant empty stdout, which the LSP correctly read as an unparseable payload
+// and published nothing — an editor showing a clean file for source that cannot
+// parse.
+//
+// The suite could not catch this before because every other input here is a
+// complete file. `test/fail/*.sf` are deliberately malformed, but malformed and
+// *finished*; none is truncated. This one is, and that is the whole point of it.
+//
+// KNOW WHAT THIS FILE DOES AND DOES NOT PIN. The fail suite records any nonzero
+// exit as a pass (`tools/run_tests.sh:394`), and the pre-fix crash also exited 1
+// — so on its own this file does NOT distinguish "rejected with a diagnostic"
+// from "died with a fatal IndexError". It pins the weaker property, that the
+// compiler must not accept truncated source.
+//
+// The discriminating test is editors/shared/test/compiler_discovery.test.mjs
+// ("incomplete buffers produce diagnostics, not a crash or a hang"): it drives
+// six truncated shapes through the real LSP round trip and asserts a *diagnostic
+// arrives*, which an empty-stdout crash cannot satisfy. It also bounds the wait,
+// so the over-correction — clamping the cursor to EOF turning the crash into a
+// hang — fails it rather than passing quietly.
+//
+// This file's job is to keep the case in the compiler's own suite, where someone
+// editing parser.sf will actually run it.
+var x =

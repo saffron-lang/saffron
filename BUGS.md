@@ -3,11 +3,12 @@
 ## Open
 
 **13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160, #162. Next free number is **#164**.
+#160, #162. Next free number is **#165**.
 
-#163 is taken and is *not* in the list above because it is already fixed — three
-malformed-`import` defects, filed and resolved on sight, so it lives under
-Resolved. #161 is taken and not present here at all: it is the `sfx` worktree's
+#163 and #164 are taken and are *not* in the list above because both are already
+fixed — three malformed-`import` defects, and a fatal `IndexError` on any
+incomplete source — filed and resolved on sight, so they live under Resolved.
+#161 is taken and not present here at all: it is the `sfx` worktree's
 committed entry (a method call binding to a same-named class in another module)
 and will arrive with that merge. Both are the ordinary case the rule below
 describes — the next-free number is one past the highest *claimed*, not one past
@@ -43,7 +44,7 @@ fieldless variant is the immediate `tag << 56` with nothing to hang a header on,
 it needs an enum-bearing NaN-box tag rather than another formatter arm.
 
 **12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#160. Next free number is **#164**.
+#160. Next free number is **#165**.
 
 #161 and #162 are claimed but not present here: #161 is the sfx line's
 cross-module method-binding bug and #162 is the saffron_154 line's SSA-temp GC
@@ -1143,6 +1144,61 @@ semicolon alone.
 ---
 
 ## Resolved
+
+### 164. FIXED — any incomplete source killed the compiler with a fatal IndexError instead of reporting a parse error
+
+```
+$ printf 'var x = \n' > partial.sf
+$ saffronc partial.sf out.ll
+Runtime Error: IndexError: index 4 out of bounds (length 4)
+```
+
+Every one of these did it — `var x =`, `var x: Int =`, `fun f(`, `if (`,
+`var a = 1 +`. Not exotic input: that is a file *being typed*.
+
+`parse_error` (`parser.sf:342`) reports and returns **without consuming a token**,
+deliberately, so each caller decides how to resynchronize. But a parser that has
+run out of input keeps calling `advance()`, and `current()` read
+`this.tokens[this.pos]` with no bound. Past the end that is an `IndexError`, which
+in Saffron is a **fatal runtime error, not a diagnostic** — it routes to
+`__runtime_error_fatal` and calls `rt_exit(1)`, so the process died before writing
+anything. Under `--json` that means empty stdout, and the LSP correctly read
+"unparseable payload" and published nothing: an editor showing a clean file for
+source that cannot parse.
+
+Note which stage failed. This was never a checker or codegen problem; the token
+cursor simply had no terminal condition.
+
+**Why the suite never saw it.** Every input in `test/` is a complete file —
+`test/fail/*.sf` are *deliberately* malformed, but they are malformed and
+*finished*, e.g. a type error or a bad import, never a truncated one. Nothing in
+`src/`, `test/` or `tools/` is a partial file, so bootstrap and the full suite are
+green with this live. It only reproduces where every intermediate state of the
+text gets compiled, which is to say an editor — the same
+identity-mode/complete-input blind spot as #163, in a different dimension: not
+"our source isn't adversarial about its syntax" but "our source is never
+half-written".
+
+**Fix.** `current()` clamps `pos` to the last token. The lexer always terminates
+the stream with `TkEof` (`lexer.sf:767`), so past-the-end now yields EOF forever
+and the existing `match_kind_check("eof")` guards do their job.
+
+**The over-correction to watch for, and the audit.** Returning EOF forever turns a
+crash into a *hang* for any loop that scans for a closing token without an EOF
+guard — strictly worse in an editor, where a spin is an unkillable beachball
+rather than a message. So every token loop in `parser.sf` was checked: of 39
+`while` loops on `match_kind_check`/`peek_is`, 13 have no `eof` in the condition,
+and all 13 are *positive* tests (`while (this.match_kind_check("."))` and
+similar), which stop at EOF on their own because EOF is not the token they seek.
+Exactly one negative loop lacked the guard — `while (!this.match_kind_check(")"))`
+in enum-variant fields (`parser.sf:2711`) — and it is guarded here too. The
+`while (true)` at :878 already breaks on `eof` explicitly. The regression test
+asserts each incomplete case *returns* within a timeout, so a future spin fails
+the test rather than quietly passing it.
+
+Test: `editors/shared/test/compiler_discovery.test.mjs`, "incomplete buffers
+produce diagnostics, not a crash or a hang", which drives all six shapes through
+the real LSP round trip.
 
 ### 163. FIXED — three ways a malformed or repeated `import` line compiled clean and failed at link time
 

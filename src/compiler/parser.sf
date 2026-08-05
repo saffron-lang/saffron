@@ -46,7 +46,29 @@ class Parser {
         return "_" + this.map_counter.to_string()
     }
 
+    /// The token at the cursor, clamped to the terminating EOF token.
+    ///
+    /// The clamp is what makes error recovery survivable. `parse_error` reports
+    /// and returns *without consuming* — deliberately, so the caller decides how
+    /// to resynchronize — so a parser that has run out of tokens keeps calling
+    /// `advance()` past the end. Unclamped, `this.tokens[this.pos]` then raised
+    /// `IndexError: index 6 out of bounds (length 6)`, which is a **fatal**
+    /// runtime error, not a diagnostic: it routes to `__runtime_error_fatal` and
+    /// exits, so the compiler died with no diagnostic and no JSON on stdout.
+    ///
+    /// Every incomplete-but-ordinary source produced it — `var x =`, `fun f(`,
+    /// `if (`, `1 +`. Which is to say: an editor buffer mid-keystroke. That made
+    /// it invisible to bootstrap and the suite (whose inputs are all complete
+    /// files, well-formed or deliberately malformed) and unavoidable in an LSP.
+    ///
+    /// The lexer always terminates the stream with `TkEof` (`lexer.sf:767`), so
+    /// clamping yields EOF forever rather than an out-of-range read. Loops that
+    /// scan for a closing token therefore need an explicit `eof` guard or they
+    /// spin — a hang being strictly worse than a crash in an editor. All such
+    /// loops in this file were audited when this clamp landed.
     fun current(): Lexer.Token {
+        var last: Float = this.tokens.length() - 1
+        if (this.pos > last) { return this.tokens[last] }
         return this.tokens[this.pos]
     }
 
@@ -2704,7 +2726,15 @@ class Parser {
             if (this.match_kind("(")) {
                 var fields_sb: StringBuilder = StringBuilder()
                 var first: Bool = true
-                while (!this.match_kind_check(")")) {
+                // The `eof` half of this condition is what keeps a truncated
+                // `enum E { V(` from spinning forever. `current()` clamps to the
+                // EOF token rather than reading out of bounds (BUGS #164), so a
+                // loop scanning for `)` that never arrives would otherwise see
+                // EOF on every iteration and never advance — a hang, which in an
+                // editor is worse than the crash the clamp removed. This was the
+                // only negative-condition token loop in the file missing the
+                // guard; `consume(")")` below still reports the missing paren.
+                while (!this.match_kind_check(")") and !this.match_kind_check("eof")) {
                     if (!first) {
                         fields_sb.append(",")
                         this.consume(",")

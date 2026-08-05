@@ -69,15 +69,44 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+// Walk up from this file looking for `build/saffronc`, rather than counting
+// directory levels.
+//
+// The count was wrong from the first commit that introduced this function and
+// stayed wrong: `path.resolve(__dirname, "..", "..")` from
+// `editors/shared/out/` lands on `editors/`, so it probed
+// `editors/build/saffronc` — which never exists.
+//
+// It went unnoticed because `onInitialize` independently probes
+// `<rootUri>/build/saffronc` and overwrites this result, so opening the saffron
+// repo itself works and hides the bug entirely. It bites when the workspace root
+// is NOT the repo — a sample project in another directory, a multi-root window,
+// or any single-file open with no rootUri — which is precisely the
+// "exercise it against a sample project" case. Then this function's answer is
+// the only one, and it fell through to the bare name `saffronc`, making every
+// feature depend on that being on PATH.
+//
+// Walking up is not just a fix for the off-by-one: it is what makes the
+// function correct under both layouts it has to serve. `__dirname` is
+// `editors/shared/out` for a repo checkout, but the descriptor also accepts a
+// server installed at `~/.saffron/lsp/server.js`, where no ancestor has a
+// `build/` at a fixed depth at all. A search terminates correctly in both.
 function findCompiler(): string {
-  const serverDir = __dirname;
-  const projectRoot = path.resolve(serverDir, "..", "..");
-  const localBinary = path.join(projectRoot, "build", "saffronc");
-  if (fs.existsSync(localBinary)) return localBinary;
+  let dir = __dirname;
+  // Stop at the filesystem root, where dirname() becomes a fixed point.
+  for (;;) {
+    const candidate = path.join(dir, "build", "saffronc");
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
 
   const homeBinary = path.join(process.env.HOME || "", ".saffron", "bin", "saffronc");
   if (fs.existsSync(homeBinary)) return homeBinary;
 
+  // Last resort: hope it is on PATH. The caller logs which path was chosen, so
+  // a bare name in the log is the signal that no binary was located.
   return "saffronc";
 }
 
@@ -85,6 +114,12 @@ const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
 let compilerPath = findCompiler();
+
+// The last spawn failure reported, as "<code> <path>", so a compiler that cannot
+// be run is logged once rather than on every keystroke. Reset when a run
+// succeeds, so a compiler that is rebuilt mid-session reports again if it breaks
+// again.
+let lastSpawnFailure: string | null = null;
 
 // The semantic-token types this server can produce, and nothing more. A client
 // indexes tokens by their position in this legend, so the order is part of the
@@ -448,26 +483,42 @@ function positionAtByteOffset(doc: TextDocument, byteOffset: number): Position {
 }
 
 function mapDiagnostics(raw: SaffronDiagnostic[], doc?: TextDocument): Diagnostic[] {
-  // Only located diagnostics become in-file squiggles. An unlocated one (the
-  // compiler emits `located:false` for the many checker errors that have no
-  // source region yet) has no defensible place to point — putting it at 0:0
-  // would blame the top of the file for an error elsewhere. Those surface via
-  // the message pane path instead (see publishDiagnostics), never as a range.
-  return raw
-    .filter((d) => d.located && d.line !== undefined && d.column !== undefined)
-    .map((d) => {
-      return {
-        // `doc` is optional and absent only where no buffer is open; byteRange
-        // then falls back to the byte column, which is exact for ASCII.
-        range: byteRange(doc, d.line!, d.column!, d.length ?? 1),
-        severity:
-          d.severity === "warning"
-            ? DiagnosticSeverity.Warning
-            : DiagnosticSeverity.Error,
-        message: d.message,
-        source: "saffron",
-      };
-    });
+  // A located diagnostic becomes a squiggle on its own range. An unlocated one
+  // is reported against the first line, with the message marked so the position
+  // is not read as a claim.
+  //
+  // This used to `filter` unlocated diagnostics out entirely, on the reasoning
+  // that 0:0 "would blame the top of the file for an error elsewhere" — and the
+  // comment claimed they surfaced "via the message pane path instead". No such
+  // path exists; they were simply dropped. That is the worse trade by a wide
+  // margin, because it is not a rare case: of 31 diagnostic call sites in
+  // checker.sf, 20 still use the span-less `error`/`warn`. Among them is the
+  // plain argument-type mismatch, so `take(42)` against `fun take(s: String)`
+  // showed **nothing at all** in the editor — a clean-looking file with a type
+  // error in it, which is exactly the failure this whole LSP is meant to fix.
+  //
+  // Mislocated-but-visible beats invisible: the Problems panel groups by file,
+  // so the diagnostic is findable and the text carries the real information.
+  // As checker sites migrate to `error_at`, entries move out of this branch on
+  // their own — nothing here needs revisiting.
+  return raw.map((d) => {
+    const located = d.located && d.line !== undefined && d.column !== undefined;
+    return {
+      // `doc` is optional and absent only where no buffer is open; byteRange
+      // then falls back to the byte column, which is exact for ASCII.
+      range: located
+        ? byteRange(doc, d.line!, d.column!, d.length ?? 1)
+        : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      severity:
+        d.severity === "warning"
+          ? DiagnosticSeverity.Warning
+          : DiagnosticSeverity.Error,
+      message: located
+        ? d.message
+        : `${d.message}  (no source location — reported for the whole file)`,
+      source: "saffron",
+    };
+  });
 }
 
 // Compile a file (or the given in-memory text) in --json mode and parse the
@@ -516,6 +567,29 @@ async function runCheck(uri: string, text?: string): Promise<CheckOutput | null>
       // --json exits non-zero when the file has errors; the JSON is still on
       // stdout. Only stdout is JSON — stderr, if any, is not.
       output = err.stdout || "";
+
+      // But distinguish "the compiler ran and rejected the file" from "the
+      // compiler never ran". A spawn failure (ENOENT when the binary is not
+      // where we looked, EACCES when it is not executable) also lands here with
+      // no stdout, and an empty payload parses to zero diagnostics — reported to
+      // the editor as a clean file. A missing compiler thus looked exactly like
+      // code with no errors, which is the most misleading answer available.
+      //
+      // Logged once per distinct reason: this runs on every keystroke after the
+      // debounce, and a message per change would bury the first one.
+      if (!output && (err?.code === "ENOENT" || err?.code === "EACCES")) {
+        const reason = `${err.code} ${compilerPath}`;
+        if (reason !== lastSpawnFailure) {
+          lastSpawnFailure = reason;
+          connection.console.error(
+            `Saffron LSP: cannot run the compiler at ${compilerPath} (${err.code}). ` +
+              `No diagnostics will be produced. Build it with ./bootstrap.sh, or set ` +
+              `saffron.compilerPath.`
+          );
+        }
+      } else if (output) {
+        lastSpawnFailure = null;
+      }
     }
     const result = parseCheckOutput(realPath, output);
     if (result) fileCache.set(uri, result);
