@@ -2,8 +2,12 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165. Next free number is **#170**.
+**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #170. Next free number is **#171**.
+
+#170 (a `for-in` list loop traps in wasm32 while working natively) was filed
+from the playground: 3 of its 7 bundled examples crashed on it. Added to the set
+above; count 12 → 13, next-free 170 → 171, nothing else moved.
 
 #161 was in this list and is now fixed — a method call on a receiver from one
 module bound to a same-named class in another, because codegen dispatch keyed on
@@ -305,6 +309,43 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 170. OPEN — a `for-in` loop over a list traps with IndexError on wasm32, though it works natively and via direct indexing
+
+**Severity: high on wasm32.** Silent for the author (native and the checker are
+fine), fatal at runtime in the browser. It blocks any Turmeric/playground program
+that iterates a list the idiomatic way.
+
+```saffron
+var s = 0
+for (i in [1, 2, 3, 4, 5]) { s = s + i }
+IO.println("sum=" + s.to_string())
+```
+
+- **Native**: prints `sum=15`.
+- **wasm32**: `Runtime Error: IndexError: index %ld out of bounds (length %ld)`
+  then `unreachable`. (The `%ld` is literal — the error formatter itself is
+  unformatted on this path, a second smaller bug.)
+
+**It is `for-in` specifically, not list access.** Direct indexing and `.length()`
+are correct on wasm32:
+
+```saffron
+var l = [10, 20, 30]
+IO.println(l[0].to_string())        // 10, correct on wasm32
+IO.println(l.length().to_string())  // 3,  correct on wasm32
+```
+
+CLAUDE.md documents that `for-in` desugars to `length()` + an element read, so the
+desugared index read is walking past the end **only in the loop form** on wasm32 —
+the loop bound or the index is computed wrong on this target. A native build of the
+identical desugaring is fine, so this is wasm32 codegen, not the desugaring itself.
+
+**Found via the playground.** Running the 7 bundled examples through the compile→
+run pipeline, the 3 that use `for-in` (`closures`, `collections`, `enums_match`)
+all trap here; the other 4 pass. Reproduced outside the browser by instantiating
+the compiled wasm with a minimal import env, so it is not a playground-runtime
+issue — the trap is in the module the compiler emits.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
