@@ -9,6 +9,126 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 75. FIXED — a value re-entering wasm from JS was untagged, so it never matched a `Map` key it was stored under
+
+**FIXED 2026-08-06.** The export boundary now re-tags numeric parameters of
+exported entry points in the function prologue (`output_body.sf`, gated on
+`target=="wasm32" and !identity_mode` and the emitted symbol containing `__on_`
+or `__dispatch_`). New runtime helpers `__rt_normalize_incoming_float` /
+`__rt_normalize_incoming_int` (`wasm_base_32.ll`) convert a bare machine integer
+to the module's nanbox form and pass through anything already tagged. `String`/
+pointer params are left alone (tagged elsewhere); native and wasm64 are untouched.
+The repro's round-tripped id now prints `FOUND HELLO` (was `MISSING`); a
+non-exported wasm32 function emits zero normalize calls. The List-based workaround
+below is no longer required, though it remains valid. (The `Bool.to_string()` note
+below was already stale — fixed under #77.)
+
+--- original entry ---
+**Reproduction** (wasm32; `t.sf`):
+
+```saffron
+@extern("void js_note(i64)")
+fun _note(id: Float)
+
+var _next_id: Float = 0
+var _cb: Map<Float, String> = {}
+
+fun reg(payload: String): Float {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _cb.set(id, payload)
+    return id
+}
+
+fun kick() { _note(reg("HELLO")) }
+
+// Exported to JS (the `__on_` prefix is what tools/saffron:392 exports).
+fun __on_back(id: Float) {
+    if (_cb.has(id)) { IO.println("FOUND " + _cb.get(id)) }
+    else { IO.println("MISSING") }
+}
+
+kick()
+```
+
+Build with `tools/saffron build t.sf --target wasm32 -o t.wasm`, then from JS call
+`_start()` (which invokes `js_note` and hands you the id) and pass that exact id
+straight back to `__on_back`:
+
+```
+js_note got id = 1n
+MISSING
+```
+
+The id makes a round trip and stops being findable. Handing the *bit pattern of
+1.0* back instead prints `FOUND HELLO`, which localizes it exactly:
+
+```js
+const bb = new ArrayBuffer(8); new Float64Array(bb)[0] = 1.0;
+inst.exports.__on_back(new BigInt64Array(bb)[0]);   // FOUND HELLO
+```
+
+So the two representations of "1" involved are:
+
+| Path | Value seen by `__map_key_cmp` |
+|---|---|
+| stored by `reg()` | `0x3FF0000000000000` — the f64 bit pattern of 1.0 |
+| arriving from JS | `0x0000000000000001` — a bare machine integer |
+
+An exported wasm function's `i64` parameter is whatever JS passed; nothing on the
+boundary re-tags it into the NaN-boxed form the module uses internally. And
+`__map_key_cmp` (`src/runtime/runtime.sf:287`) compares non-string keys by exact
+bit pattern — correctly, for its own purposes — so the lookup misses. Note
+`__val_untag_float` (`src/runtime/wasm_base_32.ll:763`) would convert `1` to `1.0`
+happily; it is simply never called, because a `Map` key is compared as an opaque
+i64 and never untagged at all.
+
+**Why it is nastier than a plain type-mismatch:** every symptom is silent. There
+is no diagnostic at compile time, no trap at runtime, and `has()` returning false
+is a legitimate result, so the callback is *dropped* rather than failing. In the
+playground this meant the Run button POSTed correctly, the service replied
+correctly, and then nothing happened at all — no error in the console, no status
+change. The pattern it breaks (hand JS an opaque id, get it back later) is the
+only way to do asynchronous work across the wasm boundary, so any callback
+registry written the obvious way is affected.
+
+Also note `Bool.to_string()` on wasm32 prints `"false"` for `true` — a separate,
+unfiled printing bug (the branch `if (t)` is taken correctly). It matters here
+because it made an early `IO.println(_cb.has(id).to_string())` read as a Map
+failure in cases where the Map was fine, and it will mislead anyone debugging this
+by printing booleans.
+
+**Workaround (in use):** index a `List` instead of keying a `Map`. An index only
+has to compare numerically, which survives the representation change:
+
+```saffron
+var _callbacks: List<(String) => Nil> = []
+fun _register(cb: (String) => Nil): Float {
+    _callbacks.push(cb)
+    return _callbacks.length() - 1
+}
+fun _resolve(id: Float, payload: String) {
+    if (id >= 0 and id < _callbacks.length()) {
+        var cb: (String) => Nil = _callbacks[id]
+        cb(payload)
+    }
+}
+```
+
+Applied at `playground/frontend/src/api.sf`. This is also why Turmeric's own
+`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based —
+it works, but the reason was not written down, so the Map version looks fine
+until you try it.
+
+The real fix is to normalise incoming values at the export boundary: codegen knows
+each exported function's declared parameter types, so a `Float` parameter on an
+exported function should be re-tagged (`__val_tag_float` on the integer, or a
+tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
+Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
+boundary.
+
+---
+
 ### 158. FIXED — a `match` textually above its enum's declaration compiled to an unconditional destructure of the first arm, with no tag check
 
 `enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the
