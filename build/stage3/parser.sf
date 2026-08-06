@@ -562,6 +562,27 @@ class Parser {
                         args = args + ">"
                     }
                     this.advance()
+                } else if (this.match_kind_check(">=")) {
+                    // Maximal munch glued the closing `>` of this generic to the
+                    // `=` that begins the initializer, e.g. `var a:List<Int>=[...]`
+                    // (BUGS #174). The lexer only ever forms `>=`, never `>>=`, so
+                    // this closes exactly one level. Consume the `>` here and, if it
+                    // was the last level, rewrite the current token in place to a
+                    // bare `=` (without advancing) so the surrounding declaration's
+                    // `consume("=")` still finds its assignment. If more levels
+                    // remain (`List<List<Int>=`, itself malformed), close one `>`
+                    // and drop the `=`, which the caller reports as a missing `=`.
+                    depth = depth - 1
+                    if (depth > 0) {
+                        args = args + ">"
+                        this.advance()
+                    } else {
+                        var geq: Lexer.Token = this.current()
+                        var geq_line: Float = match (geq) { Token(k, l, c, o, n) => l }
+                        var geq_col: Float = match (geq) { Token(k, l, c, o, n) => c }
+                        var geq_off: Float = match (geq) { Token(k, l, c, o, n) => o }
+                        this.tokens[this.pos] = Lexer.Token.Token(Lexer.TokenKind.TkEq, geq_line, geq_col, geq_off, 1)
+                    }
                 } else if (this.match_kind_check(",")) {
                     args = args + ","
                     this.advance()

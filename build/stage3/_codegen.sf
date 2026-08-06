@@ -9871,35 +9871,68 @@ class Codegen {
         this.emit("}")
         this.block_terminated = false
 
-        // __reflect_construct_from_map: given a class constructor ptr and a map, construct instance
+        // __reflect_construct_from_map: given a class VALUE and a map, construct an
+        // instance and fill its fields from the map.
+        //
+        // `%klass` is a class name used as a value, which gen_func_ref lowers to a
+        // heap closure box `[2 x i64]` = {trampoline_fn_ptr, env}. The trampoline is
+        // a per-use-site `@__wrap_NN_<class>` whose body is `call @<class>(); ret`,
+        // so there is NO stable ctor symbol to compare `%klass` against — the old
+        // code compared it to `ptrtoint @<class>` and every arm missed, falling to
+        // `ret 0`, and the caller then dereferenced null (segfault: json.sf,
+        // deep_deserialize.sf).
+        //
+        // The fix (BUGS-reflect-construct): CALL the box as a closure to construct
+        // the bare instance — this runs the right ctor regardless of which
+        // `__wrap_NN` is in slot 0 — then dispatch the field-fill by the instance's
+        // runtime GC class tag (`__val_class_tag`), the same stable per-class id
+        // every other reflect helper switches on. The default arm returns the
+        // (constructed) instance rather than 0, so an unrecognized tag can no longer
+        // segfault. gen_func_ref and the closure ABI are untouched.
         this.emit("")
         this.emit("define i64 @__reflect_construct_from_map(i64 %klass, i64 %map) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
+        // Unpack the closure box and call the trampoline with its env (arity 1,
+        // matching a zero-user-param ctor trampoline `i64 @__wrap(i64 %env)`).
+        var rc_box: String = this.val_to_typed_ptr("%klass", "[2 x i64]*")
+        var rc_fslot: String = this.fresh_local()
+        this.emit_indent(rc_fslot + " = getelementptr [2 x i64], [2 x i64]* " + rc_box + ", i64 0, i64 0")
+        var rc_fp_i: String = this.fresh_local()
+        this.emit_indent(rc_fp_i + " = load i64, i64* " + rc_fslot)
+        var rc_eslot: String = this.fresh_local()
+        this.emit_indent(rc_eslot + " = getelementptr [2 x i64], [2 x i64]* " + rc_box + ", i64 0, i64 1")
+        var rc_env: String = this.fresh_local()
+        this.emit_indent(rc_env + " = load i64, i64* " + rc_eslot)
+        var rc_fp: String = this.val_to_fn_ptr(rc_fp_i, "i64 (i64)*")
+        var rc_inst: String = this.fresh_local()
+        this.emit_indent(rc_inst + " = call i64 " + rc_fp + "(i64 " + rc_env + ")")
+        // Dispatch field-fill by the instance's GC class tag.
+        var rc_tag: String = this.fresh_local()
+        this.emit_indent(rc_tag + " = call i64 @__val_class_tag(i64 " + rc_inst + ")")
         var rc_end: String = this.fresh_label("rcon.end")
+        var rc_switch: String = ""
+        var rc_arms: List<String> = []
         ci = 0
         while (ci < class_names.length()) {
+            var rc_lbl: String = this.fresh_label("rcon.c")
+            rc_arms.push(rc_lbl)
+            var rc_tid: Float = this.class_type_ids.get(class_names[ci])
+            rc_switch = rc_switch + " i64 " + rc_tid.floor().to_string() + ", label %" + rc_lbl
+            ci = ci + 1
+        }
+        this.emit_indent("switch i64 " + rc_tag + ", label %" + rc_end + " [" + rc_switch + " ]")
+        this.block_terminated = true
+        ci = 0
+        while (ci < class_names.length()) {
+            this.start_block(rc_arms[ci])
             var cname3: String = class_names[ci]
-            var fn_ptr_val: String = this.fresh_local()
-            this.emit_indent(fn_ptr_val + " = ptrtoint i64 (...)* bitcast (i64 ()* @" + cname3 + " to i64 (...)*) to i64")
-            var cmp_r: String = this.fresh_local()
-            this.emit_indent(cmp_r + " = icmp eq i64 %klass, " + fn_ptr_val)
-            var rc_arm: String = this.fresh_label("rcon.hit")
-            var rc_next: String = this.fresh_label("rcon.next")
-            if (ci < class_names.length() - 1) {
-                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arm + ", label %" + rc_next)
-            } else {
-                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arm + ", label %" + rc_end)
-            }
-            this.start_block(rc_arm)
-            var new_inst: String = this.fresh_local()
-            this.emit_indent(new_inst + " = call i64 @" + cname3 + "()")
             var c_entries: List<String> = []
             if (this.class_field_list.has(cname3)) { c_entries = this.class_field_list.get(cname3) }
             if (c_entries.length() > 0) {
                 var c_ptr: String = this.fresh_local()
-                this.emit_indent(c_ptr + " = inttoptr i64 " + new_inst + " to %" + cname3 + "*")
+                this.emit_indent(c_ptr + " = inttoptr i64 " + rc_inst + " to %" + cname3 + "*")
                 var cfi: Float = 0
                 while (cfi < c_entries.length()) {
                     var cfp: List<String> = c_entries[cfi].split(":")
@@ -9908,7 +9941,11 @@ class Codegen {
                     var cf_key_len: Float = cf_name.length() + 1
                     var cf_key_gep: String = this.fresh_local()
                     this.emit_indent(cf_key_gep + " = getelementptr [" + cf_key_len.to_string() + " x i8], [" + cf_key_len.to_string() + " x i8]* " + cf_key_const + ", i64 0, i64 0")
-                    var cf_key_i64: String = this.ptr_to_val(cf_key_gep)
+                    // The map was populated with NaN-box-TAGGED string keys
+                    // (__val_tag_ptr), so the lookup key must be tagged the same way.
+                    // ptr_to_val emitted a bare ptrtoint, which never equalled a
+                    // tagged key and made __map_get miss every field.
+                    var cf_key_i64: String = this.emit_tag_ptr(cf_key_gep)
                     var cf_val: String = this.fresh_local()
                     this.emit_indent(cf_val + " = call i64 @__map_get(i64 %map, i64 " + cf_key_i64 + ")")
                     var cf_fld_ptr: String = this.fresh_local()
@@ -9917,14 +9954,11 @@ class Codegen {
                     cfi = cfi + 1
                 }
             }
-            this.emit_terminator("ret i64 " + new_inst)
-            if (ci < class_names.length() - 1) {
-                this.start_block(rc_next)
-            }
+            this.emit_terminator("ret i64 " + rc_inst)
             ci = ci + 1
         }
         this.start_block(rc_end)
-        this.emit_terminator("ret i64 0")
+        this.emit_terminator("ret i64 " + rc_inst)
         this.emit("}")
         this.block_terminated = false
     }

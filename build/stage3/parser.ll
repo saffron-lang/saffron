@@ -670,1040 +670,1042 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.666 = private unnamed_addr constant [3 x i8] c">>\00"
 @.str.667 = private unnamed_addr constant [3 x i8] c">>\00"
 @.str.668 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.669 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.670 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.671 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.672 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.673 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.674 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.675 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.676 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.677 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.678 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.679 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.680 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.681 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.682 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.683 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.684 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.685 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.686 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.687 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.688 = private unnamed_addr constant [3 x i8] c"or\00"
-@.str.689 = private unnamed_addr constant [3 x i8] c"or\00"
-@.str.690 = private unnamed_addr constant [4 x i8] c"and\00"
-@.str.691 = private unnamed_addr constant [4 x i8] c"and\00"
-@.str.692 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.693 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.694 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.695 = private unnamed_addr constant [2 x i8] c"^\00"
-@.str.696 = private unnamed_addr constant [2 x i8] c"^\00"
-@.str.697 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.698 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.699 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.700 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.701 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.702 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.703 = private unnamed_addr constant [2 x i8] c"~\00"
-@.str.704 = private unnamed_addr constant [2 x i8] c"~\00"
-@.str.705 = private unnamed_addr constant [3 x i8] c"++\00"
-@.str.706 = private unnamed_addr constant [3 x i8] c"--\00"
-@.str.707 = private unnamed_addr constant [2 x i8] c"'\00"
-@.str.708 = private unnamed_addr constant [40 x i8] c"' is postfix only in Saffron - write 'x\00"
-@.str.709 = private unnamed_addr constant [37 x i8] c"' or, for the incremented value, 'x \00"
-@.str.710 = private unnamed_addr constant [4 x i8] c" 1'\00"
-@.str.711 = private unnamed_addr constant [3 x i8] c"++\00"
-@.str.712 = private unnamed_addr constant [3 x i8] c"--\00"
-@.str.713 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.669 = private unnamed_addr constant [3 x i8] c">=\00"
+@.str.670 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.671 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.672 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.673 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.674 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.675 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.676 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.677 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.678 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.679 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.680 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.681 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.682 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.683 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.684 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.685 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.686 = private unnamed_addr constant [2 x i8] c"?\00"
+@.str.687 = private unnamed_addr constant [2 x i8] c"?\00"
+@.str.688 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.689 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.690 = private unnamed_addr constant [3 x i8] c"or\00"
+@.str.691 = private unnamed_addr constant [3 x i8] c"or\00"
+@.str.692 = private unnamed_addr constant [4 x i8] c"and\00"
+@.str.693 = private unnamed_addr constant [4 x i8] c"and\00"
+@.str.694 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.695 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.696 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.697 = private unnamed_addr constant [2 x i8] c"^\00"
+@.str.698 = private unnamed_addr constant [2 x i8] c"^\00"
+@.str.699 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.700 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.701 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.702 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.703 = private unnamed_addr constant [2 x i8] c"!\00"
+@.str.704 = private unnamed_addr constant [2 x i8] c"!\00"
+@.str.705 = private unnamed_addr constant [2 x i8] c"~\00"
+@.str.706 = private unnamed_addr constant [2 x i8] c"~\00"
+@.str.707 = private unnamed_addr constant [3 x i8] c"++\00"
+@.str.708 = private unnamed_addr constant [3 x i8] c"--\00"
+@.str.709 = private unnamed_addr constant [2 x i8] c"'\00"
+@.str.710 = private unnamed_addr constant [40 x i8] c"' is postfix only in Saffron - write 'x\00"
+@.str.711 = private unnamed_addr constant [37 x i8] c"' or, for the incremented value, 'x \00"
+@.str.712 = private unnamed_addr constant [4 x i8] c" 1'\00"
+@.str.713 = private unnamed_addr constant [3 x i8] c"++\00"
 @.str.714 = private unnamed_addr constant [3 x i8] c"--\00"
-@.str.715 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.716 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.717 = private unnamed_addr constant [17 x i8] c"the operand of '\00"
-@.str.718 = private unnamed_addr constant [58 x i8] c"' must be a variable, field or element, not an expression\00"
-@.str.719 = private unnamed_addr constant [6 x i8] c"__inc\00"
-@.str.720 = private unnamed_addr constant [6 x i8] c"index\00"
-@.str.721 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
-@.str.722 = private unnamed_addr constant [10 x i8] c"__inc_idx\00"
-@.str.723 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.724 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.715 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.716 = private unnamed_addr constant [3 x i8] c"--\00"
+@.str.717 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.718 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.719 = private unnamed_addr constant [17 x i8] c"the operand of '\00"
+@.str.720 = private unnamed_addr constant [58 x i8] c"' must be a variable, field or element, not an expression\00"
+@.str.721 = private unnamed_addr constant [6 x i8] c"__inc\00"
+@.str.722 = private unnamed_addr constant [6 x i8] c"index\00"
+@.str.723 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
+@.str.724 = private unnamed_addr constant [10 x i8] c"__inc_idx\00"
 @.str.725 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.726 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.727 = private unnamed_addr constant [7 x i8] c"member\00"
-@.str.728 = private unnamed_addr constant [10 x i8] c"get_field\00"
-@.str.729 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.730 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
+@.str.727 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.728 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.729 = private unnamed_addr constant [7 x i8] c"member\00"
+@.str.730 = private unnamed_addr constant [10 x i8] c"get_field\00"
 @.str.731 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.732 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.732 = private unnamed_addr constant [11 x i8] c"__inc_recv\00"
 @.str.733 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.734 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.735 = private unnamed_addr constant [2 x i8] c"_\00"
-@.str.736 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.737 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.738 = private unnamed_addr constant [92 x i8] c"'..' is not an operator - Saffron has no range syntax; build a list or use a while/for loop\00"
-@.str.739 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.740 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.735 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.736 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.737 = private unnamed_addr constant [2 x i8] c"_\00"
+@.str.738 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.739 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.740 = private unnamed_addr constant [92 x i8] c"'..' is not an operator - Saffron has no range syntax; build a list or use a while/for loop\00"
 @.str.741 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.742 = private unnamed_addr constant [4 x i8] c"int\00"
-@.str.743 = private unnamed_addr constant [97 x i8] c"cannot use '.' field access on a float literal - a '.' right after a number is its decimal point\00"
-@.str.744 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.745 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.746 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.742 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.743 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.744 = private unnamed_addr constant [4 x i8] c"int\00"
+@.str.745 = private unnamed_addr constant [97 x i8] c"cannot use '.' field access on a float literal - a '.' right after a number is its decimal point\00"
+@.str.746 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.747 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.748 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.749 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.750 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.751 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.752 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.753 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.748 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.749 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.750 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.751 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.752 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.753 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.754 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.755 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.756 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.757 = private unnamed_addr constant [6 x i8] c"yield\00"
-@.str.758 = private unnamed_addr constant [6 x i8] c"yield\00"
-@.str.759 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.760 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.761 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.755 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.756 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.757 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.758 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.759 = private unnamed_addr constant [6 x i8] c"yield\00"
+@.str.760 = private unnamed_addr constant [6 x i8] c"yield\00"
+@.str.761 = private unnamed_addr constant [2 x i8] c"[\00"
 @.str.762 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.763 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.764 = private unnamed_addr constant [4 x i8] c"try\00"
-@.str.765 = private unnamed_addr constant [6 x i8] c"match\00"
-@.str.766 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.767 = private unnamed_addr constant [5 x i8] c"this\00"
-@.str.768 = private unnamed_addr constant [6 x i8] c"super\00"
-@.str.769 = private unnamed_addr constant [6 x i8] c"super\00"
-@.str.770 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.771 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.772 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.773 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.774 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.775 = private unnamed_addr constant [10 x i8] c"[KL-PATH]\00"
-@.str.776 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.777 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.778 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.779 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.780 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.781 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.763 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.764 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.765 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.766 = private unnamed_addr constant [4 x i8] c"try\00"
+@.str.767 = private unnamed_addr constant [6 x i8] c"match\00"
+@.str.768 = private unnamed_addr constant [4 x i8] c"fun\00"
+@.str.769 = private unnamed_addr constant [5 x i8] c"this\00"
+@.str.770 = private unnamed_addr constant [6 x i8] c"super\00"
+@.str.771 = private unnamed_addr constant [6 x i8] c"super\00"
+@.str.772 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.773 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.774 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.775 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.776 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.777 = private unnamed_addr constant [10 x i8] c"[KL-PATH]\00"
+@.str.778 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.779 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.780 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.781 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.782 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.783 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.784 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.785 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.786 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.783 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.784 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.785 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.786 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.787 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.788 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.789 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.790 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.791 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.792 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.793 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.788 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.789 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.790 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.791 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.792 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.793 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.794 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.795 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.796 = private unnamed_addr constant [6 x i8] c"__map\00"
-@.str.797 = private unnamed_addr constant [4 x i8] c"Map\00"
-@.str.798 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.799 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.800 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.801 = private unnamed_addr constant [4 x i8] c"set\00"
-@.str.802 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.803 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.804 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.805 = private unnamed_addr constant [4 x i8] c"set\00"
-@.str.806 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.807 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.808 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.809 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.810 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.811 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.795 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.796 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.797 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.798 = private unnamed_addr constant [6 x i8] c"__map\00"
+@.str.799 = private unnamed_addr constant [4 x i8] c"Map\00"
+@.str.800 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.801 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.802 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.803 = private unnamed_addr constant [4 x i8] c"set\00"
+@.str.804 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.805 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.806 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.807 = private unnamed_addr constant [4 x i8] c"set\00"
+@.str.808 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.809 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.810 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.811 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.812 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.813 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.814 = private unnamed_addr constant [3 x i8] c"as\00"
-@.str.815 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.816 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.817 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.818 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.813 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.814 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.815 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.816 = private unnamed_addr constant [3 x i8] c"as\00"
+@.str.817 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.818 = private unnamed_addr constant [3 x i8] c"is\00"
 @.str.819 = private unnamed_addr constant [2 x i8] c",\00"
 @.str.820 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.821 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.821 = private unnamed_addr constant [2 x i8] c",\00"
 @.str.822 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.823 = private unnamed_addr constant [37 x i8] c"expected a literal, name or '(' here\00"
-@.str.824 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.825 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.823 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.824 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.825 = private unnamed_addr constant [37 x i8] c"expected a literal, name or '(' here\00"
 @.str.826 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.827 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.828 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.829 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.830 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.831 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.832 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.833 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.834 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.835 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.836 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.837 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.838 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.839 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.840 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.841 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.842 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.843 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.827 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.828 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.829 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.830 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.831 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.832 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.833 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.834 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.835 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.836 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.837 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.838 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.839 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.840 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.841 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.842 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.843 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.844 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.845 = private unnamed_addr constant [5 x i8] c"else\00"
-@.str.846 = private unnamed_addr constant [38 x i8] c"if-expression requires an else branch\00"
-@.str.847 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.848 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.849 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.850 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.851 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.852 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.853 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.845 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.846 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.847 = private unnamed_addr constant [5 x i8] c"else\00"
+@.str.848 = private unnamed_addr constant [38 x i8] c"if-expression requires an else branch\00"
+@.str.849 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.850 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.851 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.852 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.853 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.854 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.855 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.855 = private unnamed_addr constant [4 x i8] c"eof\00"
 @.str.856 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.857 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.858 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.859 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.860 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.857 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.858 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.859 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.860 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.861 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.862 = private unnamed_addr constant [6 x i8] c"catch\00"
-@.str.863 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.864 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.865 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.866 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.867 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.868 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.869 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.870 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.862 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.863 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.864 = private unnamed_addr constant [6 x i8] c"catch\00"
+@.str.865 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.866 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.867 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.868 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.869 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.870 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.871 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.872 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.873 = private unnamed_addr constant [4 x i8] c"int\00"
-@.str.874 = private unnamed_addr constant [6 x i8] c"float\00"
-@.str.875 = private unnamed_addr constant [2 x i8] c"0\00"
-@.str.876 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.877 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.878 = private unnamed_addr constant [10 x i8] c"__strpat:\00"
-@.str.879 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.880 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.881 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.872 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.873 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.874 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.875 = private unnamed_addr constant [4 x i8] c"int\00"
+@.str.876 = private unnamed_addr constant [6 x i8] c"float\00"
+@.str.877 = private unnamed_addr constant [2 x i8] c"0\00"
+@.str.878 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.879 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.880 = private unnamed_addr constant [10 x i8] c"__strpat:\00"
+@.str.881 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.882 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.883 = private unnamed_addr constant [4 x i8] c"Int\00"
-@.str.884 = private unnamed_addr constant [7 x i8] c"Number\00"
-@.str.885 = private unnamed_addr constant [6 x i8] c"Float\00"
-@.str.886 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.887 = private unnamed_addr constant [7 x i8] c"String\00"
-@.str.888 = private unnamed_addr constant [4 x i8] c"Nil\00"
-@.str.889 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.890 = private unnamed_addr constant [5 x i8] c"Fun(\00"
-@.str.891 = private unnamed_addr constant [5 x i8] c"Fun[\00"
-@.str.892 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.893 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.894 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.895 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.896 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.897 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.898 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.899 = private unnamed_addr constant [4 x i8] c"Int\00"
-@.str.900 = private unnamed_addr constant [6 x i8] c"Float\00"
-@.str.901 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.902 = private unnamed_addr constant [7 x i8] c"String\00"
-@.str.903 = private unnamed_addr constant [4 x i8] c"Nil\00"
-@.str.904 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.905 = private unnamed_addr constant [6 x i8] c"Union\00"
-@.str.906 = private unnamed_addr constant [4 x i8] c"Fun\00"
-@.str.907 = private unnamed_addr constant [9 x i8] c"Nullable\00"
-@.str.908 = private unnamed_addr constant [8 x i8] c"Unknown\00"
-@.str.909 = private unnamed_addr constant [6 x i8] c"Never\00"
-@.str.910 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.911 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.912 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.913 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.914 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.915 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.916 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.917 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.918 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.919 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.920 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.921 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.922 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
-@.str.923 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
-@.str.924 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.925 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.926 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.927 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.928 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.929 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.930 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
-@.str.931 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
-@.str.932 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.933 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.934 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.935 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.936 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.937 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.938 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.939 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.940 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.941 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.942 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.943 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.944 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.945 = private unnamed_addr constant [2 x i8] c"%\00"
-@.str.946 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.947 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.948 = private unnamed_addr constant [2 x i8] c"^\00"
-@.str.949 = private unnamed_addr constant [2 x i8] c"~\00"
-@.str.950 = private unnamed_addr constant [3 x i8] c"<<\00"
-@.str.951 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.952 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.953 = private unnamed_addr constant [3 x i8] c"!=\00"
-@.str.954 = private unnamed_addr constant [3 x i8] c"==\00"
-@.str.955 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.956 = private unnamed_addr constant [3 x i8] c"<=\00"
-@.str.957 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.958 = private unnamed_addr constant [3 x i8] c">=\00"
-@.str.959 = private unnamed_addr constant [3 x i8] c"+=\00"
-@.str.960 = private unnamed_addr constant [3 x i8] c"-=\00"
-@.str.961 = private unnamed_addr constant [3 x i8] c"*=\00"
-@.str.962 = private unnamed_addr constant [3 x i8] c"/=\00"
-@.str.963 = private unnamed_addr constant [3 x i8] c"%=\00"
-@.str.964 = private unnamed_addr constant [3 x i8] c"++\00"
-@.str.965 = private unnamed_addr constant [3 x i8] c"--\00"
-@.str.966 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.967 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.968 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.969 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.970 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.971 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.972 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.973 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.974 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.975 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.976 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.977 = private unnamed_addr constant [3 x i8] c"->\00"
-@.str.978 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.979 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.980 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.981 = private unnamed_addr constant [4 x i8] c"let\00"
-@.str.982 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.983 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.984 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.985 = private unnamed_addr constant [5 x i8] c"else\00"
-@.str.986 = private unnamed_addr constant [6 x i8] c"while\00"
-@.str.987 = private unnamed_addr constant [3 x i8] c"or\00"
-@.str.988 = private unnamed_addr constant [4 x i8] c"and\00"
-@.str.989 = private unnamed_addr constant [5 x i8] c"true\00"
-@.str.990 = private unnamed_addr constant [6 x i8] c"false\00"
-@.str.991 = private unnamed_addr constant [4 x i8] c"nil\00"
-@.str.992 = private unnamed_addr constant [7 x i8] c"import\00"
-@.str.993 = private unnamed_addr constant [3 x i8] c"as\00"
-@.str.994 = private unnamed_addr constant [5 x i8] c"enum\00"
-@.str.995 = private unnamed_addr constant [6 x i8] c"match\00"
-@.str.996 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.997 = private unnamed_addr constant [5 x i8] c"this\00"
-@.str.998 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.999 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1000 = private unnamed_addr constant [4 x i8] c"try\00"
-@.str.1001 = private unnamed_addr constant [6 x i8] c"catch\00"
-@.str.1002 = private unnamed_addr constant [6 x i8] c"throw\00"
-@.str.1003 = private unnamed_addr constant [8 x i8] c"finally\00"
-@.str.1004 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1005 = private unnamed_addr constant [6 x i8] c"yield\00"
-@.str.1006 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1007 = private unnamed_addr constant [4 x i8] c"int\00"
-@.str.1008 = private unnamed_addr constant [6 x i8] c"float\00"
-@.str.1009 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1010 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1011 = private unnamed_addr constant [12 x i8] c"doc_comment\00"
-@.str.1012 = private unnamed_addr constant [11 x i8] c"module_doc\00"
-@.str.1013 = private unnamed_addr constant [8 x i8] c"newline\00"
-@.str.1014 = private unnamed_addr constant [3 x i8] c"==\00"
-@.str.1015 = private unnamed_addr constant [3 x i8] c"!=\00"
-@.str.1016 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1017 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1018 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1019 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1020 = private unnamed_addr constant [3 x i8] c"<=\00"
-@.str.1021 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1022 = private unnamed_addr constant [3 x i8] c">=\00"
+@.str.883 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.884 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.885 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.886 = private unnamed_addr constant [7 x i8] c"Number\00"
+@.str.887 = private unnamed_addr constant [6 x i8] c"Float\00"
+@.str.888 = private unnamed_addr constant [5 x i8] c"Bool\00"
+@.str.889 = private unnamed_addr constant [7 x i8] c"String\00"
+@.str.890 = private unnamed_addr constant [4 x i8] c"Nil\00"
+@.str.891 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.892 = private unnamed_addr constant [5 x i8] c"Fun(\00"
+@.str.893 = private unnamed_addr constant [5 x i8] c"Fun[\00"
+@.str.894 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.895 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.896 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.897 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.898 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.899 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.900 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.901 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.902 = private unnamed_addr constant [6 x i8] c"Float\00"
+@.str.903 = private unnamed_addr constant [5 x i8] c"Bool\00"
+@.str.904 = private unnamed_addr constant [7 x i8] c"String\00"
+@.str.905 = private unnamed_addr constant [4 x i8] c"Nil\00"
+@.str.906 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.907 = private unnamed_addr constant [6 x i8] c"Union\00"
+@.str.908 = private unnamed_addr constant [4 x i8] c"Fun\00"
+@.str.909 = private unnamed_addr constant [9 x i8] c"Nullable\00"
+@.str.910 = private unnamed_addr constant [8 x i8] c"Unknown\00"
+@.str.911 = private unnamed_addr constant [6 x i8] c"Never\00"
+@.str.912 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.913 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.914 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.915 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.916 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.917 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.918 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.919 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.920 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.921 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.922 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.923 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.924 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
+@.str.925 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
+@.str.926 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.927 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.928 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.929 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.930 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.931 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.932 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
+@.str.933 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
+@.str.934 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.935 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.936 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.937 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.938 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.939 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.940 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.941 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.942 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.943 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.944 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.945 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.946 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.947 = private unnamed_addr constant [2 x i8] c"%\00"
+@.str.948 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.949 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.950 = private unnamed_addr constant [2 x i8] c"^\00"
+@.str.951 = private unnamed_addr constant [2 x i8] c"~\00"
+@.str.952 = private unnamed_addr constant [3 x i8] c"<<\00"
+@.str.953 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.954 = private unnamed_addr constant [2 x i8] c"!\00"
+@.str.955 = private unnamed_addr constant [3 x i8] c"!=\00"
+@.str.956 = private unnamed_addr constant [3 x i8] c"==\00"
+@.str.957 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.958 = private unnamed_addr constant [3 x i8] c"<=\00"
+@.str.959 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.960 = private unnamed_addr constant [3 x i8] c">=\00"
+@.str.961 = private unnamed_addr constant [3 x i8] c"+=\00"
+@.str.962 = private unnamed_addr constant [3 x i8] c"-=\00"
+@.str.963 = private unnamed_addr constant [3 x i8] c"*=\00"
+@.str.964 = private unnamed_addr constant [3 x i8] c"/=\00"
+@.str.965 = private unnamed_addr constant [3 x i8] c"%=\00"
+@.str.966 = private unnamed_addr constant [3 x i8] c"++\00"
+@.str.967 = private unnamed_addr constant [3 x i8] c"--\00"
+@.str.968 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.969 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.970 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.971 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.972 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.973 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.974 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.975 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.976 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.977 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.978 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.979 = private unnamed_addr constant [3 x i8] c"->\00"
+@.str.980 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.981 = private unnamed_addr constant [2 x i8] c"?\00"
+@.str.982 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.983 = private unnamed_addr constant [4 x i8] c"let\00"
+@.str.984 = private unnamed_addr constant [4 x i8] c"fun\00"
+@.str.985 = private unnamed_addr constant [7 x i8] c"return\00"
+@.str.986 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.987 = private unnamed_addr constant [5 x i8] c"else\00"
+@.str.988 = private unnamed_addr constant [6 x i8] c"while\00"
+@.str.989 = private unnamed_addr constant [3 x i8] c"or\00"
+@.str.990 = private unnamed_addr constant [4 x i8] c"and\00"
+@.str.991 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.992 = private unnamed_addr constant [6 x i8] c"false\00"
+@.str.993 = private unnamed_addr constant [4 x i8] c"nil\00"
+@.str.994 = private unnamed_addr constant [7 x i8] c"import\00"
+@.str.995 = private unnamed_addr constant [3 x i8] c"as\00"
+@.str.996 = private unnamed_addr constant [5 x i8] c"enum\00"
+@.str.997 = private unnamed_addr constant [6 x i8] c"match\00"
+@.str.998 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.999 = private unnamed_addr constant [5 x i8] c"this\00"
+@.str.1000 = private unnamed_addr constant [4 x i8] c"for\00"
+@.str.1001 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1002 = private unnamed_addr constant [4 x i8] c"try\00"
+@.str.1003 = private unnamed_addr constant [6 x i8] c"catch\00"
+@.str.1004 = private unnamed_addr constant [6 x i8] c"throw\00"
+@.str.1005 = private unnamed_addr constant [8 x i8] c"finally\00"
+@.str.1006 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1007 = private unnamed_addr constant [6 x i8] c"yield\00"
+@.str.1008 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1009 = private unnamed_addr constant [4 x i8] c"int\00"
+@.str.1010 = private unnamed_addr constant [6 x i8] c"float\00"
+@.str.1011 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1012 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1013 = private unnamed_addr constant [12 x i8] c"doc_comment\00"
+@.str.1014 = private unnamed_addr constant [11 x i8] c"module_doc\00"
+@.str.1015 = private unnamed_addr constant [8 x i8] c"newline\00"
+@.str.1016 = private unnamed_addr constant [3 x i8] c"==\00"
+@.str.1017 = private unnamed_addr constant [3 x i8] c"!=\00"
+@.str.1018 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1019 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1020 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1021 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1022 = private unnamed_addr constant [3 x i8] c"<=\00"
 @.str.1023 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1024 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1025 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1026 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1027 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1028 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.1029 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1030 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1031 = private unnamed_addr constant [3 x i8] c"<<\00"
-@.str.1032 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1033 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1034 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.1035 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.1036 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1037 = private unnamed_addr constant [2 x i8] c"%\00"
-@.str.1038 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1039 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.1040 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.1041 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1042 = private unnamed_addr constant [2 x i8] c"%\00"
-@.str.1043 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.1044 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.1045 = private unnamed_addr constant [2 x i8] c"^\00"
-@.str.1046 = private unnamed_addr constant [3 x i8] c"<<\00"
-@.str.1047 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1048 = private unnamed_addr constant [3 x i8] c"!=\00"
-@.str.1049 = private unnamed_addr constant [3 x i8] c"==\00"
-@.str.1050 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1051 = private unnamed_addr constant [3 x i8] c"<=\00"
-@.str.1052 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1053 = private unnamed_addr constant [3 x i8] c">=\00"
-@.str.1054 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1055 = private unnamed_addr constant [12 x i8] c"doc_comment\00"
+@.str.1024 = private unnamed_addr constant [3 x i8] c">=\00"
+@.str.1025 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1026 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1027 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1028 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1029 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1030 = private unnamed_addr constant [4 x i8] c"for\00"
+@.str.1031 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1032 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1033 = private unnamed_addr constant [3 x i8] c"<<\00"
+@.str.1034 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1035 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1036 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.1037 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.1038 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1039 = private unnamed_addr constant [2 x i8] c"%\00"
+@.str.1040 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1041 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.1042 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.1043 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1044 = private unnamed_addr constant [2 x i8] c"%\00"
+@.str.1045 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.1046 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.1047 = private unnamed_addr constant [2 x i8] c"^\00"
+@.str.1048 = private unnamed_addr constant [3 x i8] c"<<\00"
+@.str.1049 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1050 = private unnamed_addr constant [3 x i8] c"!=\00"
+@.str.1051 = private unnamed_addr constant [3 x i8] c"==\00"
+@.str.1052 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1053 = private unnamed_addr constant [3 x i8] c"<=\00"
+@.str.1054 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1055 = private unnamed_addr constant [3 x i8] c">=\00"
 @.str.1056 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1057 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1058 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.1059 = private unnamed_addr constant [11 x i8] c"module_doc\00"
-@.str.1060 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1061 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1062 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.1063 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1064 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1057 = private unnamed_addr constant [12 x i8] c"doc_comment\00"
+@.str.1058 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1059 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1060 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.1061 = private unnamed_addr constant [11 x i8] c"module_doc\00"
+@.str.1062 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1063 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1064 = private unnamed_addr constant [2 x i8] c"\0A\00"
 @.str.1065 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1066 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1067 = private unnamed_addr constant [5 x i8] c"type\00"
-@.str.1068 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1069 = private unnamed_addr constant [12 x i8] c"@type_alias\00"
-@.str.1070 = private unnamed_addr constant [7 x i8] c"extend\00"
-@.str.1071 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.1072 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1073 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1074 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1075 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
-@.str.1076 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
-@.str.1077 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1078 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1066 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1067 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1068 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1069 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.1070 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1071 = private unnamed_addr constant [12 x i8] c"@type_alias\00"
+@.str.1072 = private unnamed_addr constant [7 x i8] c"extend\00"
+@.str.1073 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.1074 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1075 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1076 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1077 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
+@.str.1078 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
 @.str.1079 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1080 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1081 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1082 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
-@.str.1083 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
-@.str.1084 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1085 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1080 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1081 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1082 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1083 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1084 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
+@.str.1085 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
 @.str.1086 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1087 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1088 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1089 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1090 = private unnamed_addr constant [9 x i8] c"@extend:\00"
-@.str.1091 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.1092 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1093 = private unnamed_addr constant [10 x i8] c"intrinsic\00"
-@.str.1094 = private unnamed_addr constant [11 x i8] c"@intrinsic\00"
-@.str.1095 = private unnamed_addr constant [7 x i8] c"extern\00"
-@.str.1096 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1097 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1098 = private unnamed_addr constant [73 x i8] c"@extern requires a signature string, e.g. @extern(\22double sqrt(double)\22)\00"
-@.str.1099 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1100 = private unnamed_addr constant [9 x i8] c"@extern:\00"
+@.str.1087 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1088 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1089 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1090 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1091 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1092 = private unnamed_addr constant [9 x i8] c"@extend:\00"
+@.str.1093 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.1094 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1095 = private unnamed_addr constant [10 x i8] c"intrinsic\00"
+@.str.1096 = private unnamed_addr constant [11 x i8] c"@intrinsic\00"
+@.str.1097 = private unnamed_addr constant [7 x i8] c"extern\00"
+@.str.1098 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1099 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1100 = private unnamed_addr constant [73 x i8] c"@extern requires a signature string, e.g. @extern(\22double sqrt(double)\22)\00"
 @.str.1101 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1102 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1103 = private unnamed_addr constant [9 x i8] c"@extern:\00"
-@.str.1104 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.1105 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1106 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1107 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1108 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1109 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1110 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1111 = private unnamed_addr constant [26 x i8] c"visibility given twice: '\00"
-@.str.1112 = private unnamed_addr constant [29 x i8] c"' before the decorator and '\00"
-@.str.1113 = private unnamed_addr constant [11 x i8] c"' after it\00"
-@.str.1114 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1115 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.1116 = private unnamed_addr constant [4 x i8] c"let\00"
-@.str.1117 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.1118 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1119 = private unnamed_addr constant [5 x i8] c"enum\00"
-@.str.1120 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1121 = private unnamed_addr constant [10 x i8] c"interface\00"
-@.str.1122 = private unnamed_addr constant [6 x i8] c"actor\00"
-@.str.1123 = private unnamed_addr constant [8 x i8] c"@actor\0A\00"
-@.str.1124 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1125 = private unnamed_addr constant [2 x i8] c"'\00"
-@.str.1126 = private unnamed_addr constant [36 x i8] c"' must be followed by a declaration\00"
-@.str.1127 = private unnamed_addr constant [7 x i8] c"import\00"
-@.str.1128 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.1129 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.1130 = private unnamed_addr constant [6 x i8] c"while\00"
-@.str.1131 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.1132 = private unnamed_addr constant [4 x i8] c"try\00"
-@.str.1133 = private unnamed_addr constant [6 x i8] c"throw\00"
-@.str.1134 = private unnamed_addr constant [6 x i8] c"break\00"
-@.str.1135 = private unnamed_addr constant [9 x i8] c"continue\00"
-@.str.1136 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1137 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1138 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1139 = private unnamed_addr constant [5 x i8] c"this\00"
+@.str.1102 = private unnamed_addr constant [9 x i8] c"@extern:\00"
+@.str.1103 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1104 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1105 = private unnamed_addr constant [9 x i8] c"@extern:\00"
+@.str.1106 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.1107 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1108 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1109 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1110 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1111 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1112 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1113 = private unnamed_addr constant [26 x i8] c"visibility given twice: '\00"
+@.str.1114 = private unnamed_addr constant [29 x i8] c"' before the decorator and '\00"
+@.str.1115 = private unnamed_addr constant [11 x i8] c"' after it\00"
+@.str.1116 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1117 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.1118 = private unnamed_addr constant [4 x i8] c"let\00"
+@.str.1119 = private unnamed_addr constant [4 x i8] c"fun\00"
+@.str.1120 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1121 = private unnamed_addr constant [5 x i8] c"enum\00"
+@.str.1122 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1123 = private unnamed_addr constant [10 x i8] c"interface\00"
+@.str.1124 = private unnamed_addr constant [6 x i8] c"actor\00"
+@.str.1125 = private unnamed_addr constant [8 x i8] c"@actor\0A\00"
+@.str.1126 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1127 = private unnamed_addr constant [2 x i8] c"'\00"
+@.str.1128 = private unnamed_addr constant [36 x i8] c"' must be followed by a declaration\00"
+@.str.1129 = private unnamed_addr constant [7 x i8] c"import\00"
+@.str.1130 = private unnamed_addr constant [7 x i8] c"return\00"
+@.str.1131 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1132 = private unnamed_addr constant [6 x i8] c"while\00"
+@.str.1133 = private unnamed_addr constant [4 x i8] c"for\00"
+@.str.1134 = private unnamed_addr constant [4 x i8] c"try\00"
+@.str.1135 = private unnamed_addr constant [6 x i8] c"throw\00"
+@.str.1136 = private unnamed_addr constant [6 x i8] c"break\00"
+@.str.1137 = private unnamed_addr constant [9 x i8] c"continue\00"
+@.str.1138 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1139 = private unnamed_addr constant [6 x i8] c"ident\00"
 @.str.1140 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1141 = private unnamed_addr constant [7 x i8] c"member\00"
-@.str.1142 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1143 = private unnamed_addr constant [6 x i8] c"index\00"
-@.str.1144 = private unnamed_addr constant [10 x i8] c"get_field\00"
-@.str.1145 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1146 = private unnamed_addr constant [9 x i8] c"variable\00"
+@.str.1141 = private unnamed_addr constant [5 x i8] c"this\00"
+@.str.1142 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1143 = private unnamed_addr constant [7 x i8] c"member\00"
+@.str.1144 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1145 = private unnamed_addr constant [6 x i8] c"index\00"
+@.str.1146 = private unnamed_addr constant [10 x i8] c"get_field\00"
 @.str.1147 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1148 = private unnamed_addr constant [33 x i8] c"cannot assign to this expression\00"
-@.str.1149 = private unnamed_addr constant [9 x i8] c"variable\00"
-@.str.1150 = private unnamed_addr constant [7 x i8] c"member\00"
-@.str.1151 = private unnamed_addr constant [10 x i8] c"get_field\00"
-@.str.1152 = private unnamed_addr constant [6 x i8] c"index\00"
-@.str.1153 = private unnamed_addr constant [19 x i8] c"the left side of '\00"
-@.str.1154 = private unnamed_addr constant [59 x i8] c"=' must be a variable, field or element, not an expression\00"
-@.str.1155 = private unnamed_addr constant [3 x i8] c"+=\00"
-@.str.1156 = private unnamed_addr constant [3 x i8] c"-=\00"
-@.str.1157 = private unnamed_addr constant [3 x i8] c"*=\00"
-@.str.1158 = private unnamed_addr constant [3 x i8] c"/=\00"
-@.str.1159 = private unnamed_addr constant [3 x i8] c"%=\00"
-@.str.1160 = private unnamed_addr constant [3 x i8] c"+=\00"
-@.str.1161 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1162 = private unnamed_addr constant [3 x i8] c"-=\00"
-@.str.1163 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.1164 = private unnamed_addr constant [3 x i8] c"*=\00"
-@.str.1165 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.1166 = private unnamed_addr constant [3 x i8] c"/=\00"
-@.str.1167 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1168 = private unnamed_addr constant [3 x i8] c"%=\00"
-@.str.1169 = private unnamed_addr constant [2 x i8] c"%\00"
-@.str.1170 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1171 = private unnamed_addr constant [3 x i8] c"++\00"
-@.str.1172 = private unnamed_addr constant [3 x i8] c"--\00"
-@.str.1173 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.1174 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.1175 = private unnamed_addr constant [2 x i8] c"^\00"
-@.str.1176 = private unnamed_addr constant [4 x i8] c"and\00"
-@.str.1177 = private unnamed_addr constant [3 x i8] c"or\00"
-@.str.1178 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1179 = private unnamed_addr constant [7 x i8] c"member\00"
-@.str.1180 = private unnamed_addr constant [10 x i8] c"get_field\00"
-@.str.1181 = private unnamed_addr constant [6 x i8] c"index\00"
-@.str.1182 = private unnamed_addr constant [9 x i8] c"variable\00"
-@.str.1183 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1184 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1185 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1186 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1187 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1188 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1189 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.1190 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1191 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.1148 = private unnamed_addr constant [9 x i8] c"variable\00"
+@.str.1149 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1150 = private unnamed_addr constant [33 x i8] c"cannot assign to this expression\00"
+@.str.1151 = private unnamed_addr constant [9 x i8] c"variable\00"
+@.str.1152 = private unnamed_addr constant [7 x i8] c"member\00"
+@.str.1153 = private unnamed_addr constant [10 x i8] c"get_field\00"
+@.str.1154 = private unnamed_addr constant [6 x i8] c"index\00"
+@.str.1155 = private unnamed_addr constant [19 x i8] c"the left side of '\00"
+@.str.1156 = private unnamed_addr constant [59 x i8] c"=' must be a variable, field or element, not an expression\00"
+@.str.1157 = private unnamed_addr constant [3 x i8] c"+=\00"
+@.str.1158 = private unnamed_addr constant [3 x i8] c"-=\00"
+@.str.1159 = private unnamed_addr constant [3 x i8] c"*=\00"
+@.str.1160 = private unnamed_addr constant [3 x i8] c"/=\00"
+@.str.1161 = private unnamed_addr constant [3 x i8] c"%=\00"
+@.str.1162 = private unnamed_addr constant [3 x i8] c"+=\00"
+@.str.1163 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1164 = private unnamed_addr constant [3 x i8] c"-=\00"
+@.str.1165 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.1166 = private unnamed_addr constant [3 x i8] c"*=\00"
+@.str.1167 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.1168 = private unnamed_addr constant [3 x i8] c"/=\00"
+@.str.1169 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1170 = private unnamed_addr constant [3 x i8] c"%=\00"
+@.str.1171 = private unnamed_addr constant [2 x i8] c"%\00"
+@.str.1172 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1173 = private unnamed_addr constant [3 x i8] c"++\00"
+@.str.1174 = private unnamed_addr constant [3 x i8] c"--\00"
+@.str.1175 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.1176 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.1177 = private unnamed_addr constant [2 x i8] c"^\00"
+@.str.1178 = private unnamed_addr constant [4 x i8] c"and\00"
+@.str.1179 = private unnamed_addr constant [3 x i8] c"or\00"
+@.str.1180 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1181 = private unnamed_addr constant [7 x i8] c"member\00"
+@.str.1182 = private unnamed_addr constant [10 x i8] c"get_field\00"
+@.str.1183 = private unnamed_addr constant [6 x i8] c"index\00"
+@.str.1184 = private unnamed_addr constant [9 x i8] c"variable\00"
+@.str.1185 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.1186 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1187 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1188 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1189 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1190 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1191 = private unnamed_addr constant [2 x i8] c"[\00"
 @.str.1192 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1193 = private unnamed_addr constant [88 x i8] c"qualified name is only valid in a destructuring pattern, e.g. let Shape.Circle(r) = ...\00"
+@.str.1193 = private unnamed_addr constant [2 x i8] c".\00"
 @.str.1194 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1195 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1196 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1195 = private unnamed_addr constant [88 x i8] c"qualified name is only valid in a destructuring pattern, e.g. let Shape.Circle(r) = ...\00"
+@.str.1196 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1197 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1198 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1199 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1198 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1199 = private unnamed_addr constant [2 x i8] c")\00"
 @.str.1200 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1201 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1202 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1203 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.1204 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1201 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1202 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1203 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1204 = private unnamed_addr constant [2 x i8] c"]\00"
 @.str.1205 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.1206 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1207 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1208 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1209 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1206 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1207 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.1208 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.1209 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.1210 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1211 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1212 = private unnamed_addr constant [11 x i8] c"__destruct\00"
-@.str.1213 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1214 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1211 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1212 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1213 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1214 = private unnamed_addr constant [11 x i8] c"__destruct\00"
 @.str.1215 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1216 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1217 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1218 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1219 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1220 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1221 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1222 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1223 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1224 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1225 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1226 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1227 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1228 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1229 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1230 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1231 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1232 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1233 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1234 = private unnamed_addr constant [10 x i8] c"@generic:\00"
-@.str.1235 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.1219 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1220 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1221 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1222 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1223 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1224 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1225 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1226 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1227 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1228 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1229 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1230 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1231 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1232 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1233 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1234 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1235 = private unnamed_addr constant [6 x i8] c"ident\00"
 @.str.1236 = private unnamed_addr constant [10 x i8] c"@generic:\00"
 @.str.1237 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.1238 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1239 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1240 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1241 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1242 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1243 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1238 = private unnamed_addr constant [10 x i8] c"@generic:\00"
+@.str.1239 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.1240 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1241 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1242 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1243 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1244 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1245 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1246 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1247 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1248 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1249 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1250 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1251 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1245 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1246 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1247 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1248 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1249 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1250 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1251 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1252 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1253 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1254 = private unnamed_addr constant [4 x i8] c"__p\00"
-@.str.1255 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1256 = private unnamed_addr constant [2 x i8] c"_\00"
-@.str.1257 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1258 = private unnamed_addr constant [4 x i8] c"__p\00"
-@.str.1259 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1260 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1261 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
-@.str.1262 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
-@.str.1263 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1264 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1265 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1266 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1267 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1253 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1254 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1255 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1256 = private unnamed_addr constant [4 x i8] c"__p\00"
+@.str.1257 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1258 = private unnamed_addr constant [2 x i8] c"_\00"
+@.str.1259 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1260 = private unnamed_addr constant [4 x i8] c"__p\00"
+@.str.1261 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1262 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1263 = private unnamed_addr constant [12 x i8] c"Parameter '\00"
+@.str.1264 = private unnamed_addr constant [29 x i8] c"' requires a type annotation\00"
+@.str.1265 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1266 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1267 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.1268 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1269 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1270 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1269 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1270 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1271 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1272 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1273 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1274 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1275 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1276 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1272 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1273 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1274 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1275 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1276 = private unnamed_addr constant [2 x i8] c"{\00"
 @.str.1277 = private unnamed_addr constant [2 x i8] c"}\00"
 @.str.1278 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1279 = private unnamed_addr constant [8 x i8] c"private\00"
-@.str.1280 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1281 = private unnamed_addr constant [9 x i8] c"internal\00"
-@.str.1282 = private unnamed_addr constant [10 x i8] c"protected\00"
-@.str.1283 = private unnamed_addr constant [71 x i8] c"enum variants cannot have a visibility modifier; mark the whole enum '\00"
-@.str.1284 = private unnamed_addr constant [10 x i8] c"' instead\00"
-@.str.1285 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1286 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1287 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1288 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1289 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1290 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1291 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1292 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1293 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1294 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1295 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1296 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.1297 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1279 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1280 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1281 = private unnamed_addr constant [8 x i8] c"private\00"
+@.str.1282 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1283 = private unnamed_addr constant [9 x i8] c"internal\00"
+@.str.1284 = private unnamed_addr constant [10 x i8] c"protected\00"
+@.str.1285 = private unnamed_addr constant [71 x i8] c"enum variants cannot have a visibility modifier; mark the whole enum '\00"
+@.str.1286 = private unnamed_addr constant [10 x i8] c"' instead\00"
+@.str.1287 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1288 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1289 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1290 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1291 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1292 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1293 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1294 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1295 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1296 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1297 = private unnamed_addr constant [2 x i8] c"}\00"
 @.str.1298 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.1299 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.1300 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.1301 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1302 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1303 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1304 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1305 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1299 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1300 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.1301 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.1302 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.1303 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.1304 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1305 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1306 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1307 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1308 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1309 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1310 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1307 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1308 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1309 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1310 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1311 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1312 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.1313 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1314 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1315 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1312 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1313 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1314 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.1315 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1316 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1317 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1318 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.1319 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1320 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1321 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1322 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1323 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1324 = private unnamed_addr constant [10 x i8] c"interface\00"
-@.str.1325 = private unnamed_addr constant [10 x i8] c"interface\00"
-@.str.1326 = private unnamed_addr constant [6 x i8] c"actor\00"
-@.str.1327 = private unnamed_addr constant [6 x i8] c"actor\00"
-@.str.1328 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1329 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1317 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1318 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1319 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1320 = private unnamed_addr constant [2 x i8] c"[\00"
+@.str.1321 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.1322 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1323 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1324 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1325 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1326 = private unnamed_addr constant [10 x i8] c"interface\00"
+@.str.1327 = private unnamed_addr constant [10 x i8] c"interface\00"
+@.str.1328 = private unnamed_addr constant [6 x i8] c"actor\00"
+@.str.1329 = private unnamed_addr constant [6 x i8] c"actor\00"
 @.str.1330 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1331 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1332 = private unnamed_addr constant [3 x i8] c">>\00"
-@.str.1333 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1334 = private unnamed_addr constant [8 x i8] c"extends\00"
-@.str.1335 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1336 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1337 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1338 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1339 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1340 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1341 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1331 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1332 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1333 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1334 = private unnamed_addr constant [3 x i8] c">>\00"
+@.str.1335 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1336 = private unnamed_addr constant [8 x i8] c"extends\00"
+@.str.1337 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1338 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1339 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1340 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1341 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1342 = private unnamed_addr constant [2 x i8] c"}\00"
 @.str.1343 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1344 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1345 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.1346 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.1347 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1348 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1349 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.1350 = private unnamed_addr constant [7 x i8] c"String\00"
-@.str.1351 = private unnamed_addr constant [4 x i8] c"Int\00"
-@.str.1352 = private unnamed_addr constant [6 x i8] c"Float\00"
-@.str.1353 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.1354 = private unnamed_addr constant [4 x i8] c"Nil\00"
-@.str.1355 = private unnamed_addr constant [5 x i8] c"List\00"
-@.str.1356 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.1357 = private unnamed_addr constant [4 x i8] c"Any\00"
-@.str.1358 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.1359 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.1360 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1361 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1362 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1363 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1364 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1365 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.1366 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.1367 = private unnamed_addr constant [13 x i8] c"unexpected '\00"
-@.str.1368 = private unnamed_addr constant [25 x i8] c"' in the body of class '\00"
-@.str.1369 = private unnamed_addr constant [32 x i8] c"'; expected 'var', 'fun' or '}'\00"
-@.str.1370 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.1371 = private unnamed_addr constant [4 x i8] c"fun\00"
-@.str.1372 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1373 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1344 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1345 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1346 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1347 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.1348 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1349 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1350 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1351 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1352 = private unnamed_addr constant [7 x i8] c"String\00"
+@.str.1353 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.1354 = private unnamed_addr constant [6 x i8] c"Float\00"
+@.str.1355 = private unnamed_addr constant [5 x i8] c"Bool\00"
+@.str.1356 = private unnamed_addr constant [4 x i8] c"Nil\00"
+@.str.1357 = private unnamed_addr constant [5 x i8] c"List\00"
+@.str.1358 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1359 = private unnamed_addr constant [4 x i8] c"Any\00"
+@.str.1360 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.1361 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.1362 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1363 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1364 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1365 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1366 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1367 = private unnamed_addr constant [4 x i8] c"fun\00"
+@.str.1368 = private unnamed_addr constant [4 x i8] c"fun\00"
+@.str.1369 = private unnamed_addr constant [13 x i8] c"unexpected '\00"
+@.str.1370 = private unnamed_addr constant [25 x i8] c"' in the body of class '\00"
+@.str.1371 = private unnamed_addr constant [32 x i8] c"'; expected 'var', 'fun' or '}'\00"
+@.str.1372 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.1373 = private unnamed_addr constant [4 x i8] c"fun\00"
 @.str.1374 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1375 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1376 = private unnamed_addr constant [5 x i8] c"init\00"
-@.str.1377 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1375 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1376 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1377 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1378 = private unnamed_addr constant [5 x i8] c"init\00"
-@.str.1379 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1379 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1380 = private unnamed_addr constant [5 x i8] c"init\00"
 @.str.1381 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1382 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1383 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1384 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1385 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1386 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1387 = private unnamed_addr constant [5 x i8] c"from\00"
-@.str.1388 = private unnamed_addr constant [54 x i8] c"expected 'from' after the imported names, but found '\00"
-@.str.1389 = private unnamed_addr constant [2 x i8] c"'\00"
-@.str.1390 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1391 = private unnamed_addr constant [56 x i8] c"expected a quoted module path after 'from', but found '\00"
-@.str.1392 = private unnamed_addr constant [2 x i8] c"'\00"
-@.str.1393 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1394 = private unnamed_addr constant [58 x i8] c"expected a quoted module path after 'import', but found '\00"
-@.str.1395 = private unnamed_addr constant [2 x i8] c"'\00"
-@.str.1396 = private unnamed_addr constant [3 x i8] c"as\00"
-@.str.1397 = private unnamed_addr constant [3 x i8] c"as\00"
-@.str.1398 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1399 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1400 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1401 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1402 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1403 = private unnamed_addr constant [5 x i8] c"else\00"
-@.str.1404 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.1405 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1406 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1407 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1382 = private unnamed_addr constant [5 x i8] c"init\00"
+@.str.1383 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1384 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1385 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1386 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1387 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1388 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1389 = private unnamed_addr constant [5 x i8] c"from\00"
+@.str.1390 = private unnamed_addr constant [54 x i8] c"expected 'from' after the imported names, but found '\00"
+@.str.1391 = private unnamed_addr constant [2 x i8] c"'\00"
+@.str.1392 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1393 = private unnamed_addr constant [56 x i8] c"expected a quoted module path after 'from', but found '\00"
+@.str.1394 = private unnamed_addr constant [2 x i8] c"'\00"
+@.str.1395 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1396 = private unnamed_addr constant [58 x i8] c"expected a quoted module path after 'import', but found '\00"
+@.str.1397 = private unnamed_addr constant [2 x i8] c"'\00"
+@.str.1398 = private unnamed_addr constant [3 x i8] c"as\00"
+@.str.1399 = private unnamed_addr constant [3 x i8] c"as\00"
+@.str.1400 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1401 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1402 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1403 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1404 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1405 = private unnamed_addr constant [5 x i8] c"else\00"
+@.str.1406 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1407 = private unnamed_addr constant [2 x i8] c"{\00"
 @.str.1408 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1409 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.1410 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1411 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1412 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1413 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1414 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1415 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1416 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1417 = private unnamed_addr constant [2 x i8] c"[\00"
-@.str.1418 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1419 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1409 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1410 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1411 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.1412 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1413 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1414 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1415 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1416 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1417 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1418 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1419 = private unnamed_addr constant [2 x i8] c"[\00"
 @.str.1420 = private unnamed_addr constant [2 x i8] c"]\00"
-@.str.1421 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1422 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1423 = private unnamed_addr constant [11 x i8] c"__for_item\00"
-@.str.1424 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1425 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1426 = private unnamed_addr constant [11 x i8] c"__for_item\00"
-@.str.1427 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1428 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1429 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1421 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1422 = private unnamed_addr constant [2 x i8] c"]\00"
+@.str.1423 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1424 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1425 = private unnamed_addr constant [11 x i8] c"__for_item\00"
+@.str.1426 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1427 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1428 = private unnamed_addr constant [11 x i8] c"__for_item\00"
+@.str.1429 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1430 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1431 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1431 = private unnamed_addr constant [2 x i8] c",\00"
 @.str.1432 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1433 = private unnamed_addr constant [11 x i8] c"__for_item\00"
-@.str.1434 = private unnamed_addr constant [11 x i8] c"__for_item\00"
-@.str.1435 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1436 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1437 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1438 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1439 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1440 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1441 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1442 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1443 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1444 = private unnamed_addr constant [10 x i8] c"__for_src\00"
-@.str.1445 = private unnamed_addr constant [8 x i8] c"__for_i\00"
-@.str.1446 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1447 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1433 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1434 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1435 = private unnamed_addr constant [11 x i8] c"__for_item\00"
+@.str.1436 = private unnamed_addr constant [11 x i8] c"__for_item\00"
+@.str.1437 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1438 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1439 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1440 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1441 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1442 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1443 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1444 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1445 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1446 = private unnamed_addr constant [10 x i8] c"__for_src\00"
+@.str.1447 = private unnamed_addr constant [8 x i8] c"__for_i\00"
 @.str.1448 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.1449 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1450 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1451 = private unnamed_addr constant [7 x i8] c"length\00"
-@.str.1452 = private unnamed_addr constant [11 x i8] c"__iter_get\00"
-@.str.1453 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1454 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1455 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.1456 = private unnamed_addr constant [6 x i8] c"catch\00"
-@.str.1457 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.1458 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.1459 = private unnamed_addr constant [8 x i8] c"finally\00"
-@.str.1460 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1461 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1462 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.1463 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1464 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1465 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1466 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1467 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1468 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1450 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1451 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1452 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1453 = private unnamed_addr constant [7 x i8] c"length\00"
+@.str.1454 = private unnamed_addr constant [11 x i8] c"__iter_get\00"
+@.str.1455 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1456 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1457 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.1458 = private unnamed_addr constant [6 x i8] c"catch\00"
+@.str.1459 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.1460 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.1461 = private unnamed_addr constant [8 x i8] c"finally\00"
+@.str.1462 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1463 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1464 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.1465 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1466 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1467 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1468 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1469 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1470 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1471 = private unnamed_addr constant [5 x i8] c"text\00"
-@.str.1472 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1473 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1474 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.1475 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1476 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1477 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1478 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1479 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1470 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1471 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1472 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1473 = private unnamed_addr constant [5 x i8] c"text\00"
+@.str.1474 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1475 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1476 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.1477 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1478 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1479 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1480 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1481 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1482 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1483 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1484 = private unnamed_addr constant [2 x i8] c"A\00"
-@.str.1485 = private unnamed_addr constant [2 x i8] c"Z\00"
-@.str.1486 = private unnamed_addr constant [4 x i8] c"div\00"
-@.str.1487 = private unnamed_addr constant [5 x i8] c"span\00"
-@.str.1488 = private unnamed_addr constant [2 x i8] c"p\00"
-@.str.1489 = private unnamed_addr constant [2 x i8] c"a\00"
-@.str.1490 = private unnamed_addr constant [3 x i8] c"h1\00"
-@.str.1491 = private unnamed_addr constant [3 x i8] c"h2\00"
-@.str.1492 = private unnamed_addr constant [3 x i8] c"h3\00"
-@.str.1493 = private unnamed_addr constant [3 x i8] c"h4\00"
-@.str.1494 = private unnamed_addr constant [3 x i8] c"h5\00"
-@.str.1495 = private unnamed_addr constant [3 x i8] c"h6\00"
-@.str.1496 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.1497 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.1498 = private unnamed_addr constant [5 x i8] c"form\00"
-@.str.1499 = private unnamed_addr constant [6 x i8] c"label\00"
-@.str.1500 = private unnamed_addr constant [4 x i8] c"img\00"
-@.str.1501 = private unnamed_addr constant [3 x i8] c"ul\00"
-@.str.1502 = private unnamed_addr constant [3 x i8] c"ol\00"
-@.str.1503 = private unnamed_addr constant [3 x i8] c"li\00"
-@.str.1504 = private unnamed_addr constant [6 x i8] c"table\00"
-@.str.1505 = private unnamed_addr constant [3 x i8] c"tr\00"
-@.str.1506 = private unnamed_addr constant [3 x i8] c"td\00"
-@.str.1507 = private unnamed_addr constant [3 x i8] c"th\00"
-@.str.1508 = private unnamed_addr constant [6 x i8] c"thead\00"
-@.str.1509 = private unnamed_addr constant [6 x i8] c"tbody\00"
-@.str.1510 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.1511 = private unnamed_addr constant [7 x i8] c"header\00"
-@.str.1512 = private unnamed_addr constant [7 x i8] c"footer\00"
-@.str.1513 = private unnamed_addr constant [5 x i8] c"main\00"
-@.str.1514 = private unnamed_addr constant [8 x i8] c"section\00"
-@.str.1515 = private unnamed_addr constant [8 x i8] c"article\00"
-@.str.1516 = private unnamed_addr constant [6 x i8] c"aside\00"
-@.str.1517 = private unnamed_addr constant [3 x i8] c"br\00"
-@.str.1518 = private unnamed_addr constant [3 x i8] c"hr\00"
-@.str.1519 = private unnamed_addr constant [7 x i8] c"select\00"
-@.str.1520 = private unnamed_addr constant [7 x i8] c"option\00"
-@.str.1521 = private unnamed_addr constant [9 x i8] c"textarea\00"
-@.str.1522 = private unnamed_addr constant [4 x i8] c"pre\00"
-@.str.1523 = private unnamed_addr constant [5 x i8] c"code\00"
-@.str.1524 = private unnamed_addr constant [11 x i8] c"blockquote\00"
-@.str.1525 = private unnamed_addr constant [3 x i8] c"em\00"
-@.str.1526 = private unnamed_addr constant [7 x i8] c"strong\00"
-@.str.1527 = private unnamed_addr constant [6 x i8] c"small\00"
-@.str.1528 = private unnamed_addr constant [5 x i8] c"mark\00"
-@.str.1529 = private unnamed_addr constant [4 x i8] c"del\00"
-@.str.1530 = private unnamed_addr constant [4 x i8] c"ins\00"
-@.str.1531 = private unnamed_addr constant [6 x i8] c"video\00"
-@.str.1532 = private unnamed_addr constant [6 x i8] c"audio\00"
-@.str.1533 = private unnamed_addr constant [7 x i8] c"canvas\00"
-@.str.1534 = private unnamed_addr constant [7 x i8] c"source\00"
-@.str.1535 = private unnamed_addr constant [8 x i8] c"details\00"
-@.str.1536 = private unnamed_addr constant [8 x i8] c"summary\00"
-@.str.1537 = private unnamed_addr constant [7 x i8] c"dialog\00"
-@.str.1538 = private unnamed_addr constant [9 x i8] c"fieldset\00"
-@.str.1539 = private unnamed_addr constant [7 x i8] c"legend\00"
-@.str.1540 = private unnamed_addr constant [9 x i8] c"optgroup\00"
-@.str.1541 = private unnamed_addr constant [7 x i8] c"iframe\00"
-@.str.1542 = private unnamed_addr constant [6 x i8] c"embed\00"
-@.str.1543 = private unnamed_addr constant [7 x i8] c"object\00"
-@.str.1544 = private unnamed_addr constant [5 x i8] c"link\00"
-@.str.1545 = private unnamed_addr constant [5 x i8] c"meta\00"
-@.str.1546 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.1547 = private unnamed_addr constant [7 x i8] c"script\00"
-@.str.1548 = private unnamed_addr constant [5 x i8] c"head\00"
-@.str.1549 = private unnamed_addr constant [5 x i8] c"body\00"
-@.str.1550 = private unnamed_addr constant [5 x i8] c"html\00"
-@.str.1551 = private unnamed_addr constant [6 x i8] c"title\00"
-@.str.1552 = private unnamed_addr constant [3 x i8] c"dl\00"
-@.str.1553 = private unnamed_addr constant [3 x i8] c"dt\00"
-@.str.1554 = private unnamed_addr constant [3 x i8] c"dd\00"
-@.str.1555 = private unnamed_addr constant [7 x i8] c"figure\00"
-@.str.1556 = private unnamed_addr constant [11 x i8] c"figcaption\00"
-@.str.1557 = private unnamed_addr constant [8 x i8] c"picture\00"
-@.str.1558 = private unnamed_addr constant [5 x i8] c"area\00"
-@.str.1559 = private unnamed_addr constant [5 x i8] c"base\00"
-@.str.1560 = private unnamed_addr constant [4 x i8] c"col\00"
-@.str.1561 = private unnamed_addr constant [9 x i8] c"colgroup\00"
-@.str.1562 = private unnamed_addr constant [8 x i8] c"caption\00"
-@.str.1563 = private unnamed_addr constant [6 x i8] c"track\00"
-@.str.1564 = private unnamed_addr constant [4 x i8] c"wbr\00"
-@.str.1565 = private unnamed_addr constant [5 x i8] c"slot\00"
-@.str.1566 = private unnamed_addr constant [9 x i8] c"template\00"
-@.str.1567 = private unnamed_addr constant [3 x i8] c"br\00"
-@.str.1568 = private unnamed_addr constant [3 x i8] c"hr\00"
-@.str.1569 = private unnamed_addr constant [4 x i8] c"img\00"
-@.str.1570 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.1571 = private unnamed_addr constant [5 x i8] c"area\00"
-@.str.1572 = private unnamed_addr constant [5 x i8] c"base\00"
-@.str.1573 = private unnamed_addr constant [4 x i8] c"col\00"
-@.str.1574 = private unnamed_addr constant [6 x i8] c"embed\00"
-@.str.1575 = private unnamed_addr constant [5 x i8] c"link\00"
-@.str.1576 = private unnamed_addr constant [5 x i8] c"meta\00"
-@.str.1577 = private unnamed_addr constant [7 x i8] c"source\00"
-@.str.1578 = private unnamed_addr constant [6 x i8] c"track\00"
-@.str.1579 = private unnamed_addr constant [4 x i8] c"wbr\00"
-@.str.1580 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1581 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1582 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1583 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1584 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1585 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1586 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.1587 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1588 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1589 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1590 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.1591 = private unnamed_addr constant [4 x i8] c"cls\00"
-@.str.1592 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.1593 = private unnamed_addr constant [9 x i8] c"html_for\00"
-@.str.1594 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1595 = private unnamed_addr constant [3 x i8] c"in\00"
-@.str.1596 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1597 = private unnamed_addr constant [3 x i8] c"is\00"
-@.str.1598 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1599 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1600 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1601 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1602 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1603 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.1604 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1481 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1482 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1483 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1484 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1485 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1486 = private unnamed_addr constant [2 x i8] c"A\00"
+@.str.1487 = private unnamed_addr constant [2 x i8] c"Z\00"
+@.str.1488 = private unnamed_addr constant [4 x i8] c"div\00"
+@.str.1489 = private unnamed_addr constant [5 x i8] c"span\00"
+@.str.1490 = private unnamed_addr constant [2 x i8] c"p\00"
+@.str.1491 = private unnamed_addr constant [2 x i8] c"a\00"
+@.str.1492 = private unnamed_addr constant [3 x i8] c"h1\00"
+@.str.1493 = private unnamed_addr constant [3 x i8] c"h2\00"
+@.str.1494 = private unnamed_addr constant [3 x i8] c"h3\00"
+@.str.1495 = private unnamed_addr constant [3 x i8] c"h4\00"
+@.str.1496 = private unnamed_addr constant [3 x i8] c"h5\00"
+@.str.1497 = private unnamed_addr constant [3 x i8] c"h6\00"
+@.str.1498 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.1499 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.1500 = private unnamed_addr constant [5 x i8] c"form\00"
+@.str.1501 = private unnamed_addr constant [6 x i8] c"label\00"
+@.str.1502 = private unnamed_addr constant [4 x i8] c"img\00"
+@.str.1503 = private unnamed_addr constant [3 x i8] c"ul\00"
+@.str.1504 = private unnamed_addr constant [3 x i8] c"ol\00"
+@.str.1505 = private unnamed_addr constant [3 x i8] c"li\00"
+@.str.1506 = private unnamed_addr constant [6 x i8] c"table\00"
+@.str.1507 = private unnamed_addr constant [3 x i8] c"tr\00"
+@.str.1508 = private unnamed_addr constant [3 x i8] c"td\00"
+@.str.1509 = private unnamed_addr constant [3 x i8] c"th\00"
+@.str.1510 = private unnamed_addr constant [6 x i8] c"thead\00"
+@.str.1511 = private unnamed_addr constant [6 x i8] c"tbody\00"
+@.str.1512 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.1513 = private unnamed_addr constant [7 x i8] c"header\00"
+@.str.1514 = private unnamed_addr constant [7 x i8] c"footer\00"
+@.str.1515 = private unnamed_addr constant [5 x i8] c"main\00"
+@.str.1516 = private unnamed_addr constant [8 x i8] c"section\00"
+@.str.1517 = private unnamed_addr constant [8 x i8] c"article\00"
+@.str.1518 = private unnamed_addr constant [6 x i8] c"aside\00"
+@.str.1519 = private unnamed_addr constant [3 x i8] c"br\00"
+@.str.1520 = private unnamed_addr constant [3 x i8] c"hr\00"
+@.str.1521 = private unnamed_addr constant [7 x i8] c"select\00"
+@.str.1522 = private unnamed_addr constant [7 x i8] c"option\00"
+@.str.1523 = private unnamed_addr constant [9 x i8] c"textarea\00"
+@.str.1524 = private unnamed_addr constant [4 x i8] c"pre\00"
+@.str.1525 = private unnamed_addr constant [5 x i8] c"code\00"
+@.str.1526 = private unnamed_addr constant [11 x i8] c"blockquote\00"
+@.str.1527 = private unnamed_addr constant [3 x i8] c"em\00"
+@.str.1528 = private unnamed_addr constant [7 x i8] c"strong\00"
+@.str.1529 = private unnamed_addr constant [6 x i8] c"small\00"
+@.str.1530 = private unnamed_addr constant [5 x i8] c"mark\00"
+@.str.1531 = private unnamed_addr constant [4 x i8] c"del\00"
+@.str.1532 = private unnamed_addr constant [4 x i8] c"ins\00"
+@.str.1533 = private unnamed_addr constant [6 x i8] c"video\00"
+@.str.1534 = private unnamed_addr constant [6 x i8] c"audio\00"
+@.str.1535 = private unnamed_addr constant [7 x i8] c"canvas\00"
+@.str.1536 = private unnamed_addr constant [7 x i8] c"source\00"
+@.str.1537 = private unnamed_addr constant [8 x i8] c"details\00"
+@.str.1538 = private unnamed_addr constant [8 x i8] c"summary\00"
+@.str.1539 = private unnamed_addr constant [7 x i8] c"dialog\00"
+@.str.1540 = private unnamed_addr constant [9 x i8] c"fieldset\00"
+@.str.1541 = private unnamed_addr constant [7 x i8] c"legend\00"
+@.str.1542 = private unnamed_addr constant [9 x i8] c"optgroup\00"
+@.str.1543 = private unnamed_addr constant [7 x i8] c"iframe\00"
+@.str.1544 = private unnamed_addr constant [6 x i8] c"embed\00"
+@.str.1545 = private unnamed_addr constant [7 x i8] c"object\00"
+@.str.1546 = private unnamed_addr constant [5 x i8] c"link\00"
+@.str.1547 = private unnamed_addr constant [5 x i8] c"meta\00"
+@.str.1548 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.1549 = private unnamed_addr constant [7 x i8] c"script\00"
+@.str.1550 = private unnamed_addr constant [5 x i8] c"head\00"
+@.str.1551 = private unnamed_addr constant [5 x i8] c"body\00"
+@.str.1552 = private unnamed_addr constant [5 x i8] c"html\00"
+@.str.1553 = private unnamed_addr constant [6 x i8] c"title\00"
+@.str.1554 = private unnamed_addr constant [3 x i8] c"dl\00"
+@.str.1555 = private unnamed_addr constant [3 x i8] c"dt\00"
+@.str.1556 = private unnamed_addr constant [3 x i8] c"dd\00"
+@.str.1557 = private unnamed_addr constant [7 x i8] c"figure\00"
+@.str.1558 = private unnamed_addr constant [11 x i8] c"figcaption\00"
+@.str.1559 = private unnamed_addr constant [8 x i8] c"picture\00"
+@.str.1560 = private unnamed_addr constant [5 x i8] c"area\00"
+@.str.1561 = private unnamed_addr constant [5 x i8] c"base\00"
+@.str.1562 = private unnamed_addr constant [4 x i8] c"col\00"
+@.str.1563 = private unnamed_addr constant [9 x i8] c"colgroup\00"
+@.str.1564 = private unnamed_addr constant [8 x i8] c"caption\00"
+@.str.1565 = private unnamed_addr constant [6 x i8] c"track\00"
+@.str.1566 = private unnamed_addr constant [4 x i8] c"wbr\00"
+@.str.1567 = private unnamed_addr constant [5 x i8] c"slot\00"
+@.str.1568 = private unnamed_addr constant [9 x i8] c"template\00"
+@.str.1569 = private unnamed_addr constant [3 x i8] c"br\00"
+@.str.1570 = private unnamed_addr constant [3 x i8] c"hr\00"
+@.str.1571 = private unnamed_addr constant [4 x i8] c"img\00"
+@.str.1572 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.1573 = private unnamed_addr constant [5 x i8] c"area\00"
+@.str.1574 = private unnamed_addr constant [5 x i8] c"base\00"
+@.str.1575 = private unnamed_addr constant [4 x i8] c"col\00"
+@.str.1576 = private unnamed_addr constant [6 x i8] c"embed\00"
+@.str.1577 = private unnamed_addr constant [5 x i8] c"link\00"
+@.str.1578 = private unnamed_addr constant [5 x i8] c"meta\00"
+@.str.1579 = private unnamed_addr constant [7 x i8] c"source\00"
+@.str.1580 = private unnamed_addr constant [6 x i8] c"track\00"
+@.str.1581 = private unnamed_addr constant [4 x i8] c"wbr\00"
+@.str.1582 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1583 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1584 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1585 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1586 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1587 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1588 = private unnamed_addr constant [4 x i8] c"for\00"
+@.str.1589 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1590 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1591 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1592 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.1593 = private unnamed_addr constant [4 x i8] c"cls\00"
+@.str.1594 = private unnamed_addr constant [4 x i8] c"for\00"
+@.str.1595 = private unnamed_addr constant [9 x i8] c"html_for\00"
+@.str.1596 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1597 = private unnamed_addr constant [3 x i8] c"in\00"
+@.str.1598 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1599 = private unnamed_addr constant [3 x i8] c"is\00"
+@.str.1600 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.1601 = private unnamed_addr constant [7 x i8] c"string\00"
+@.str.1602 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1603 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1604 = private unnamed_addr constant [6 x i8] c"ident\00"
 @.str.1605 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.1606 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1607 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1608 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1609 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1610 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1611 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1606 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1607 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.1608 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1609 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1610 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1611 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1612 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1613 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1614 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1615 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1616 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1613 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1614 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1615 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1616 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1617 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1618 = private unnamed_addr constant [3 x i8] c"=>\00"
-@.str.1619 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1620 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1621 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1622 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1623 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1618 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1619 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1620 = private unnamed_addr constant [3 x i8] c"=>\00"
+@.str.1621 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1622 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1623 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1624 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1625 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1626 = private unnamed_addr constant [6 x i8] c"__map\00"
-@.str.1627 = private unnamed_addr constant [4 x i8] c"Map\00"
-@.str.1628 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1629 = private unnamed_addr constant [7 x i8] c"public\00"
-@.str.1630 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1631 = private unnamed_addr constant [4 x i8] c"set\00"
-@.str.1632 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1633 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1634 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1635 = private unnamed_addr constant [4 x i8] c"set\00"
-@.str.1636 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1637 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1638 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1639 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1640 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.1641 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1642 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.1643 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1625 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1626 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1627 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1628 = private unnamed_addr constant [6 x i8] c"__map\00"
+@.str.1629 = private unnamed_addr constant [4 x i8] c"Map\00"
+@.str.1630 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1631 = private unnamed_addr constant [7 x i8] c"public\00"
+@.str.1632 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1633 = private unnamed_addr constant [4 x i8] c"set\00"
+@.str.1634 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1635 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1636 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1637 = private unnamed_addr constant [4 x i8] c"set\00"
+@.str.1638 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1639 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1640 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1641 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1642 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.1643 = private unnamed_addr constant [2 x i8] c">\00"
 @.str.1644 = private unnamed_addr constant [2 x i8] c">\00"
 @.str.1645 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1646 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.1647 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1648 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1649 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1650 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1651 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1652 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1646 = private unnamed_addr constant [2 x i8] c">\00"
+@.str.1647 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1648 = private unnamed_addr constant [6 x i8] c"ident\00"
+@.str.1649 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1650 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1651 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1652 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1653 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1654 = private unnamed_addr constant [5 x i8] c"text\00"
-@.str.1655 = private unnamed_addr constant [7 x i8] c"string\00"
-@.str.1656 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1657 = private unnamed_addr constant [5 x i8] c"text\00"
+@.str.1654 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1655 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1656 = private unnamed_addr constant [5 x i8] c"text\00"
+@.str.1657 = private unnamed_addr constant [7 x i8] c"string\00"
 @.str.1658 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1659 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.1660 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.1661 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1662 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1663 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.1664 = private unnamed_addr constant [2 x i8] c",\00"
-@.str.1665 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.1666 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.1667 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1668 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1669 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.1670 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.1671 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.1672 = private unnamed_addr constant [5 x i8] c"text\00"
-@.str.1673 = private unnamed_addr constant [2 x i8] c"{\00"
-@.str.1674 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1675 = private unnamed_addr constant [4 x i8] c"eof\00"
-@.str.1676 = private unnamed_addr constant [2 x i8] c";\00"
-@.str.1677 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1678 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1659 = private unnamed_addr constant [5 x i8] c"text\00"
+@.str.1660 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1661 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1662 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.1663 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1664 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1665 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.1666 = private unnamed_addr constant [2 x i8] c",\00"
+@.str.1667 = private unnamed_addr constant [2 x i8] c"!\00"
+@.str.1668 = private unnamed_addr constant [2 x i8] c"?\00"
+@.str.1669 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.1670 = private unnamed_addr constant [2 x i8] c";\00"
+@.str.1671 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.1672 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.1673 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.1674 = private unnamed_addr constant [5 x i8] c"text\00"
+@.str.1675 = private unnamed_addr constant [2 x i8] c"{\00"
+@.str.1676 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1677 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1678 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1679 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1680 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.1681 = private unnamed_addr constant [5 x i8] c"expr\00"
-@.str.1682 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1683 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.1680 = private unnamed_addr constant [4 x i8] c"eof\00"
+@.str.1681 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1682 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.1683 = private unnamed_addr constant [5 x i8] c"expr\00"
 @.str.1684 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1685 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1686 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1687 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1687 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1688 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1689 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.1689 = private unnamed_addr constant [3 x i8] c"if\00"
 @.str.1690 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1691 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1692 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1693 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1694 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1695 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1696 = private unnamed_addr constant [5 x i8] c"expr\00"
-@.str.1697 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1696 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.1697 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.1698 = private unnamed_addr constant [5 x i8] c"expr\00"
 @.str.1699 = private unnamed_addr constant [3 x i8] c"if\00"
-@.str.1700 = private unnamed_addr constant [6 x i8] c"other\00"
-@.str.1701 = private unnamed_addr constant [5 x i8] c"expr\00"
-@.str.1702 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1700 = private unnamed_addr constant [5 x i8] c"expr\00"
+@.str.1701 = private unnamed_addr constant [3 x i8] c"if\00"
+@.str.1702 = private unnamed_addr constant [6 x i8] c"other\00"
+@.str.1703 = private unnamed_addr constant [5 x i8] c"expr\00"
+@.str.1704 = private unnamed_addr constant [3 x i8] c"if\00"
 
 %Addable = type {  }
 %Subtractable = type {  }
@@ -14983,6 +14985,15 @@ entry:
   %part = alloca i64
   %args = alloca i64
   %depth = alloca i64
+  %geq = alloca i64
+  %geq_line = alloca i64
+  %k = alloca i64
+  %l = alloca i64
+  %c = alloca i64
+  %o = alloca i64
+  %n = alloca i64
+  %geq_col = alloca i64
+  %geq_off = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
   %t2 = getelementptr [2 x i8], [2 x i8]* @.str.632, i64 0, i64 0
@@ -15783,238 +15794,266 @@ endif1074:
   br label %endif1064
 else1073:
   %t547 = load i64, i64* %self
-  %t548 = getelementptr [2 x i8], [2 x i8]* @.str.669, i64 0, i64 0
+  %t548 = getelementptr [3 x i8], [3 x i8]* @.str.669, i64 0, i64 0
   %t549 = ptrtoint i8* %t548 to i64
   %t550 = call i64 @Parser__match_kind_check(i64 %t547, i64 %t549)
   %t551 = trunc i64 %t550 to i1
   br i1 %t551, label %then1079, label %else1080
 then1079:
-  %t552 = load i64, i64* %args
-  %t553 = getelementptr [2 x i8], [2 x i8]* @.str.670, i64 0, i64 0
-  %t554 = ptrtoint i8* %t553 to i64
-  %t555 = inttoptr i64 %t552 to i8*
-  %t556 = inttoptr i64 %t554 to i8*
-  %t557 = call i64 @strlen(i8* %t555)
-  %t558 = call i64 @strlen(i8* %t556)
-  %t559 = add i64 %t557, %t558
-  %t560 = add i64 %t559, 1
-  %t561 = call i8* @__sf_malloc(i64 %t560)
-  call i8* @strcpy(i8* %t561, i8* %t555)
-  call i8* @strcat(i8* %t561, i8* %t556)
+  %t552 = load i64, i64* %depth
+  %t553 = add i64 0, 1
+  %t554 = sub i64 %t552, %t553
+  store i64 %t554, i64* %depth
+  %t555 = load i64, i64* %depth
+  %t556 = add i64 0, 0
+  %t558 = icmp sgt i64 %t555, %t556
+  %t557 = zext i1 %t558 to i64
+  %t559 = trunc i64 %t557 to i1
+  br i1 %t559, label %then1082, label %else1083
+then1082:
+  %t560 = load i64, i64* %args
+  %t561 = getelementptr [2 x i8], [2 x i8]* @.str.670, i64 0, i64 0
   %t562 = ptrtoint i8* %t561 to i64
-  %t563 = call i64 @__string_intern(i64 %t562)
-  %t564 = inttoptr i64 %t563 to i8*
-  %t565 = ptrtoint i8* %t564 to i64
-  store i64 %t565, i64* %args
-  %t566 = load i64, i64* %self
-  %t567 = call i64 @Parser__advance(i64 %t566)
+  %t563 = inttoptr i64 %t560 to i8*
+  %t564 = inttoptr i64 %t562 to i8*
+  %t565 = call i64 @strlen(i8* %t563)
+  %t566 = call i64 @strlen(i8* %t564)
+  %t567 = add i64 %t565, %t566
+  %t568 = add i64 %t567, 1
+  %t569 = call i8* @__sf_malloc(i64 %t568)
+  call i8* @strcpy(i8* %t569, i8* %t563)
+  call i8* @strcat(i8* %t569, i8* %t564)
+  %t570 = ptrtoint i8* %t569 to i64
+  %t571 = call i64 @__string_intern(i64 %t570)
+  %t572 = inttoptr i64 %t571 to i8*
+  %t573 = ptrtoint i8* %t572 to i64
+  store i64 %t573, i64* %args
+  %t574 = load i64, i64* %self
+  %t575 = call i64 @Parser__advance(i64 %t574)
+  br label %endif1081
+else1083:
+  %t576 = load i64, i64* %self
+  %t577 = call i64 @Parser__current(i64 %t576)
+  store i64 %t577, i64* %geq
+  %t578 = load i64, i64* %geq
+  %t579 = alloca i64
+  %t581 = inttoptr i64 %t578 to i64*
+  %t582 = load i64, i64* %t581
+  %t580 = trunc i64 %t582 to i8
+  switch i8 %t580, label %match.end1084 [ i8 0, label %match.arm1085 ]
+match.arm1085:
+  %t583 = load i64, i64* %k
+  %t584 = load i64, i64* %l
+  %t585 = load i64, i64* %c
+  %t586 = load i64, i64* %o
+  %t587 = load i64, i64* %n
+  %t588 = inttoptr i64 %t578 to [6 x i64]*
+  %t589 = getelementptr [6 x i64], [6 x i64]* %t588, i64 0, i64 1
+  %t590 = load i64, i64* %t589
+  store i64 %t590, i64* %k
+  %t591 = getelementptr [6 x i64], [6 x i64]* %t588, i64 0, i64 2
+  %t592 = load i64, i64* %t591
+  store i64 %t592, i64* %l
+  %t593 = getelementptr [6 x i64], [6 x i64]* %t588, i64 0, i64 3
+  %t594 = load i64, i64* %t593
+  store i64 %t594, i64* %c
+  %t595 = getelementptr [6 x i64], [6 x i64]* %t588, i64 0, i64 4
+  %t596 = load i64, i64* %t595
+  store i64 %t596, i64* %o
+  %t597 = getelementptr [6 x i64], [6 x i64]* %t588, i64 0, i64 5
+  %t598 = load i64, i64* %t597
+  store i64 %t598, i64* %n
+  %t599 = load i64, i64* %l
+  store i64 %t599, i64* %t579
+  store i64 %t583, i64* %k
+  store i64 %t584, i64* %l
+  store i64 %t585, i64* %c
+  store i64 %t586, i64* %o
+  store i64 %t587, i64* %n
+  br label %match.end1084
+match.end1084:
+  %t600 = load i64, i64* %t579
+  store i64 %t600, i64* %geq_line
+  %t601 = load i64, i64* %geq
+  %t602 = alloca i64
+  %t604 = inttoptr i64 %t601 to i64*
+  %t605 = load i64, i64* %t604
+  %t603 = trunc i64 %t605 to i8
+  switch i8 %t603, label %match.end1086 [ i8 0, label %match.arm1087 ]
+match.arm1087:
+  %t606 = load i64, i64* %k
+  %t607 = load i64, i64* %l
+  %t608 = load i64, i64* %c
+  %t609 = load i64, i64* %o
+  %t610 = load i64, i64* %n
+  %t611 = inttoptr i64 %t601 to [6 x i64]*
+  %t612 = getelementptr [6 x i64], [6 x i64]* %t611, i64 0, i64 1
+  %t613 = load i64, i64* %t612
+  store i64 %t613, i64* %k
+  %t614 = getelementptr [6 x i64], [6 x i64]* %t611, i64 0, i64 2
+  %t615 = load i64, i64* %t614
+  store i64 %t615, i64* %l
+  %t616 = getelementptr [6 x i64], [6 x i64]* %t611, i64 0, i64 3
+  %t617 = load i64, i64* %t616
+  store i64 %t617, i64* %c
+  %t618 = getelementptr [6 x i64], [6 x i64]* %t611, i64 0, i64 4
+  %t619 = load i64, i64* %t618
+  store i64 %t619, i64* %o
+  %t620 = getelementptr [6 x i64], [6 x i64]* %t611, i64 0, i64 5
+  %t621 = load i64, i64* %t620
+  store i64 %t621, i64* %n
+  %t622 = load i64, i64* %c
+  store i64 %t622, i64* %t602
+  store i64 %t606, i64* %k
+  store i64 %t607, i64* %l
+  store i64 %t608, i64* %c
+  store i64 %t609, i64* %o
+  store i64 %t610, i64* %n
+  br label %match.end1086
+match.end1086:
+  %t623 = load i64, i64* %t602
+  store i64 %t623, i64* %geq_col
+  %t624 = load i64, i64* %geq
+  %t625 = alloca i64
+  %t627 = inttoptr i64 %t624 to i64*
+  %t628 = load i64, i64* %t627
+  %t626 = trunc i64 %t628 to i8
+  switch i8 %t626, label %match.end1088 [ i8 0, label %match.arm1089 ]
+match.arm1089:
+  %t629 = load i64, i64* %k
+  %t630 = load i64, i64* %l
+  %t631 = load i64, i64* %c
+  %t632 = load i64, i64* %o
+  %t633 = load i64, i64* %n
+  %t634 = inttoptr i64 %t624 to [6 x i64]*
+  %t635 = getelementptr [6 x i64], [6 x i64]* %t634, i64 0, i64 1
+  %t636 = load i64, i64* %t635
+  store i64 %t636, i64* %k
+  %t637 = getelementptr [6 x i64], [6 x i64]* %t634, i64 0, i64 2
+  %t638 = load i64, i64* %t637
+  store i64 %t638, i64* %l
+  %t639 = getelementptr [6 x i64], [6 x i64]* %t634, i64 0, i64 3
+  %t640 = load i64, i64* %t639
+  store i64 %t640, i64* %c
+  %t641 = getelementptr [6 x i64], [6 x i64]* %t634, i64 0, i64 4
+  %t642 = load i64, i64* %t641
+  store i64 %t642, i64* %o
+  %t643 = getelementptr [6 x i64], [6 x i64]* %t634, i64 0, i64 5
+  %t644 = load i64, i64* %t643
+  store i64 %t644, i64* %n
+  %t645 = load i64, i64* %o
+  store i64 %t645, i64* %t625
+  store i64 %t629, i64* %k
+  store i64 %t630, i64* %l
+  store i64 %t631, i64* %c
+  store i64 %t632, i64* %o
+  store i64 %t633, i64* %n
+  br label %match.end1088
+match.end1088:
+  %t646 = load i64, i64* %t625
+  store i64 %t646, i64* %geq_off
+  %t647 = load i64, i64* %self
+  %t648 = inttoptr i64 %t647 to %Parser*
+  %t649 = getelementptr %Parser, %Parser* %t648, i32 0, i32 0
+  %t650 = load volatile i64, i64* %t649
+  %t651 = load i64, i64* %self
+  %t652 = inttoptr i64 %t651 to %Parser*
+  %t653 = getelementptr %Parser, %Parser* %t652, i32 0, i32 1
+  %t654 = load volatile i64, i64* %t653
+  %t655 = call i8* @__sf_malloc(i64 8)
+  %t656 = bitcast i8* %t655 to [1 x i64]*
+  %t657 = getelementptr [1 x i64], [1 x i64]* %t656, i64 0, i64 0
+  store i64 43, i64* %t657
+  %t658 = ptrtoint [1 x i64]* %t656 to i64
+  %t659 = load i64, i64* %geq_line
+  %t660 = load i64, i64* %geq_col
+  %t661 = load i64, i64* %geq_off
+  %t662 = add i64 0, 1
+  %t663 = call i8* @__sf_malloc(i64 48)
+  %t664 = bitcast i8* %t663 to [6 x i64]*
+  %t665 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 0
+  store i64 0, i64* %t665
+  %t666 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 1
+  store i64 %t658, i64* %t666
+  %t667 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 2
+  store i64 %t659, i64* %t667
+  %t668 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 3
+  store i64 %t660, i64* %t668
+  %t669 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 4
+  store i64 %t661, i64* %t669
+  %t670 = getelementptr [6 x i64], [6 x i64]* %t664, i64 0, i64 5
+  store i64 %t662, i64* %t670
+  %t671 = ptrtoint [6 x i64]* %t664 to i64
+  %t672 = call i64 @__list_set(i64 %t650, i64 %t654, i64 %t671)
+  br label %endif1081
+endif1081:
   br label %endif1064
 else1080:
-  %t568 = load i64, i64* %self
-  %t569 = getelementptr [6 x i8], [6 x i8]* @.str.671, i64 0, i64 0
-  %t570 = ptrtoint i8* %t569 to i64
-  %t571 = call i64 @Parser__match_kind_check(i64 %t568, i64 %t570)
-  %t572 = trunc i64 %t571 to i1
-  br i1 %t572, label %then1081, label %else1082
-then1081:
-  %t573 = load i64, i64* %self
-  %t574 = call i64 @Parser__expect_ident(i64 %t573)
-  store i64 %t574, i64* %part
-  %t575 = load i64, i64* %args
-  %t576 = load i64, i64* %part
-  %t577 = inttoptr i64 %t575 to i8*
-  %t578 = inttoptr i64 %t576 to i8*
-  %t579 = call i64 @strlen(i8* %t577)
-  %t580 = call i64 @strlen(i8* %t578)
-  %t581 = add i64 %t579, %t580
-  %t582 = add i64 %t581, 1
-  %t583 = call i8* @__sf_malloc(i64 %t582)
-  call i8* @strcpy(i8* %t583, i8* %t577)
-  call i8* @strcat(i8* %t583, i8* %t578)
-  %t584 = ptrtoint i8* %t583 to i64
-  %t585 = call i64 @__string_intern(i64 %t584)
-  %t586 = inttoptr i64 %t585 to i8*
-  %t587 = ptrtoint i8* %t586 to i64
-  store i64 %t587, i64* %args
-  br label %endif1064
-else1082:
-  %t588 = load i64, i64* %self
-  %t589 = getelementptr [2 x i8], [2 x i8]* @.str.672, i64 0, i64 0
-  %t590 = ptrtoint i8* %t589 to i64
-  %t591 = call i64 @Parser__match_kind_check(i64 %t588, i64 %t590)
-  %t592 = trunc i64 %t591 to i1
-  br i1 %t592, label %then1083, label %else1084
-then1083:
-  %t593 = load i64, i64* %args
-  %t594 = getelementptr [2 x i8], [2 x i8]* @.str.673, i64 0, i64 0
-  %t595 = ptrtoint i8* %t594 to i64
-  %t596 = inttoptr i64 %t593 to i8*
-  %t597 = inttoptr i64 %t595 to i8*
-  %t598 = call i64 @strlen(i8* %t596)
-  %t599 = call i64 @strlen(i8* %t597)
-  %t600 = add i64 %t598, %t599
-  %t601 = add i64 %t600, 1
-  %t602 = call i8* @__sf_malloc(i64 %t601)
-  call i8* @strcpy(i8* %t602, i8* %t596)
-  call i8* @strcat(i8* %t602, i8* %t597)
-  %t603 = ptrtoint i8* %t602 to i64
-  %t604 = call i64 @__string_intern(i64 %t603)
-  %t605 = inttoptr i64 %t604 to i8*
-  %t606 = ptrtoint i8* %t605 to i64
-  store i64 %t606, i64* %args
-  %t607 = load i64, i64* %self
-  %t608 = call i64 @Parser__advance(i64 %t607)
-  br label %endif1064
-else1084:
-  %t609 = load i64, i64* %self
-  %t610 = getelementptr [2 x i8], [2 x i8]* @.str.674, i64 0, i64 0
-  %t611 = ptrtoint i8* %t610 to i64
-  %t612 = call i64 @Parser__match_kind_check(i64 %t609, i64 %t611)
-  %t613 = trunc i64 %t612 to i1
-  br i1 %t613, label %then1085, label %else1086
-then1085:
-  %t614 = load i64, i64* %args
-  %t615 = getelementptr [2 x i8], [2 x i8]* @.str.675, i64 0, i64 0
-  %t616 = ptrtoint i8* %t615 to i64
-  %t617 = inttoptr i64 %t614 to i8*
-  %t618 = inttoptr i64 %t616 to i8*
-  %t619 = call i64 @strlen(i8* %t617)
-  %t620 = call i64 @strlen(i8* %t618)
-  %t621 = add i64 %t619, %t620
-  %t622 = add i64 %t621, 1
-  %t623 = call i8* @__sf_malloc(i64 %t622)
-  call i8* @strcpy(i8* %t623, i8* %t617)
-  call i8* @strcat(i8* %t623, i8* %t618)
-  %t624 = ptrtoint i8* %t623 to i64
-  %t625 = call i64 @__string_intern(i64 %t624)
-  %t626 = inttoptr i64 %t625 to i8*
-  %t627 = ptrtoint i8* %t626 to i64
-  store i64 %t627, i64* %args
-  %t628 = load i64, i64* %self
-  %t629 = call i64 @Parser__advance(i64 %t628)
-  br label %endif1064
-else1086:
-  %t630 = load i64, i64* %self
-  %t631 = getelementptr [2 x i8], [2 x i8]* @.str.676, i64 0, i64 0
-  %t632 = ptrtoint i8* %t631 to i64
-  %t633 = call i64 @Parser__match_kind_check(i64 %t630, i64 %t632)
-  %t634 = trunc i64 %t633 to i1
-  br i1 %t634, label %then1087, label %else1088
-then1087:
-  %t635 = load i64, i64* %args
-  %t636 = getelementptr [2 x i8], [2 x i8]* @.str.677, i64 0, i64 0
-  %t637 = ptrtoint i8* %t636 to i64
-  %t638 = inttoptr i64 %t635 to i8*
-  %t639 = inttoptr i64 %t637 to i8*
-  %t640 = call i64 @strlen(i8* %t638)
-  %t641 = call i64 @strlen(i8* %t639)
-  %t642 = add i64 %t640, %t641
-  %t643 = add i64 %t642, 1
-  %t644 = call i8* @__sf_malloc(i64 %t643)
-  call i8* @strcpy(i8* %t644, i8* %t638)
-  call i8* @strcat(i8* %t644, i8* %t639)
-  %t645 = ptrtoint i8* %t644 to i64
-  %t646 = call i64 @__string_intern(i64 %t645)
-  %t647 = inttoptr i64 %t646 to i8*
-  %t648 = ptrtoint i8* %t647 to i64
-  store i64 %t648, i64* %args
-  %t649 = load i64, i64* %self
-  %t650 = call i64 @Parser__advance(i64 %t649)
-  br label %endif1064
-else1088:
-  %t651 = load i64, i64* %self
-  %t652 = getelementptr [2 x i8], [2 x i8]* @.str.678, i64 0, i64 0
-  %t653 = ptrtoint i8* %t652 to i64
-  %t654 = call i64 @Parser__match_kind_check(i64 %t651, i64 %t653)
-  %t655 = trunc i64 %t654 to i1
-  br i1 %t655, label %then1089, label %else1090
-then1089:
-  %t656 = load i64, i64* %args
-  %t657 = getelementptr [2 x i8], [2 x i8]* @.str.679, i64 0, i64 0
-  %t658 = ptrtoint i8* %t657 to i64
-  %t659 = inttoptr i64 %t656 to i8*
-  %t660 = inttoptr i64 %t658 to i8*
-  %t661 = call i64 @strlen(i8* %t659)
-  %t662 = call i64 @strlen(i8* %t660)
-  %t663 = add i64 %t661, %t662
-  %t664 = add i64 %t663, 1
-  %t665 = call i8* @__sf_malloc(i64 %t664)
-  call i8* @strcpy(i8* %t665, i8* %t659)
-  call i8* @strcat(i8* %t665, i8* %t660)
-  %t666 = ptrtoint i8* %t665 to i64
-  %t667 = call i64 @__string_intern(i64 %t666)
-  %t668 = inttoptr i64 %t667 to i8*
-  %t669 = ptrtoint i8* %t668 to i64
-  store i64 %t669, i64* %args
-  %t670 = load i64, i64* %self
-  %t671 = call i64 @Parser__advance(i64 %t670)
-  br label %endif1064
-else1090:
-  %t672 = load i64, i64* %self
-  %t673 = getelementptr [3 x i8], [3 x i8]* @.str.680, i64 0, i64 0
-  %t674 = ptrtoint i8* %t673 to i64
-  %t675 = call i64 @Parser__match_kind_check(i64 %t672, i64 %t674)
-  %t676 = trunc i64 %t675 to i1
-  br i1 %t676, label %then1091, label %else1092
-then1091:
-  %t677 = load i64, i64* %args
-  %t678 = getelementptr [3 x i8], [3 x i8]* @.str.681, i64 0, i64 0
-  %t679 = ptrtoint i8* %t678 to i64
-  %t680 = inttoptr i64 %t677 to i8*
-  %t681 = inttoptr i64 %t679 to i8*
-  %t682 = call i64 @strlen(i8* %t680)
+  %t673 = load i64, i64* %self
+  %t674 = getelementptr [2 x i8], [2 x i8]* @.str.671, i64 0, i64 0
+  %t675 = ptrtoint i8* %t674 to i64
+  %t676 = call i64 @Parser__match_kind_check(i64 %t673, i64 %t675)
+  %t677 = trunc i64 %t676 to i1
+  br i1 %t677, label %then1090, label %else1091
+then1090:
+  %t678 = load i64, i64* %args
+  %t679 = getelementptr [2 x i8], [2 x i8]* @.str.672, i64 0, i64 0
+  %t680 = ptrtoint i8* %t679 to i64
+  %t681 = inttoptr i64 %t678 to i8*
+  %t682 = inttoptr i64 %t680 to i8*
   %t683 = call i64 @strlen(i8* %t681)
-  %t684 = add i64 %t682, %t683
-  %t685 = add i64 %t684, 1
-  %t686 = call i8* @__sf_malloc(i64 %t685)
-  call i8* @strcpy(i8* %t686, i8* %t680)
-  call i8* @strcat(i8* %t686, i8* %t681)
-  %t687 = ptrtoint i8* %t686 to i64
-  %t688 = call i64 @__string_intern(i64 %t687)
-  %t689 = inttoptr i64 %t688 to i8*
-  %t690 = ptrtoint i8* %t689 to i64
-  store i64 %t690, i64* %args
-  %t691 = load i64, i64* %self
-  %t692 = call i64 @Parser__advance(i64 %t691)
+  %t684 = call i64 @strlen(i8* %t682)
+  %t685 = add i64 %t683, %t684
+  %t686 = add i64 %t685, 1
+  %t687 = call i8* @__sf_malloc(i64 %t686)
+  call i8* @strcpy(i8* %t687, i8* %t681)
+  call i8* @strcat(i8* %t687, i8* %t682)
+  %t688 = ptrtoint i8* %t687 to i64
+  %t689 = call i64 @__string_intern(i64 %t688)
+  %t690 = inttoptr i64 %t689 to i8*
+  %t691 = ptrtoint i8* %t690 to i64
+  store i64 %t691, i64* %args
+  %t692 = load i64, i64* %self
+  %t693 = call i64 @Parser__advance(i64 %t692)
   br label %endif1064
-else1092:
-  %t693 = load i64, i64* %self
-  %t694 = getelementptr [2 x i8], [2 x i8]* @.str.682, i64 0, i64 0
-  %t695 = ptrtoint i8* %t694 to i64
-  %t696 = call i64 @Parser__match_kind_check(i64 %t693, i64 %t695)
-  %t697 = trunc i64 %t696 to i1
-  br i1 %t697, label %then1093, label %else1094
-then1093:
-  %t698 = load i64, i64* %args
-  %t699 = getelementptr [2 x i8], [2 x i8]* @.str.683, i64 0, i64 0
-  %t700 = ptrtoint i8* %t699 to i64
-  %t701 = inttoptr i64 %t698 to i8*
-  %t702 = inttoptr i64 %t700 to i8*
-  %t703 = call i64 @strlen(i8* %t701)
-  %t704 = call i64 @strlen(i8* %t702)
-  %t705 = add i64 %t703, %t704
-  %t706 = add i64 %t705, 1
-  %t707 = call i8* @__sf_malloc(i64 %t706)
-  call i8* @strcpy(i8* %t707, i8* %t701)
-  call i8* @strcat(i8* %t707, i8* %t702)
-  %t708 = ptrtoint i8* %t707 to i64
-  %t709 = call i64 @__string_intern(i64 %t708)
-  %t710 = inttoptr i64 %t709 to i8*
-  %t711 = ptrtoint i8* %t710 to i64
-  store i64 %t711, i64* %args
-  %t712 = load i64, i64* %self
-  %t713 = call i64 @Parser__advance(i64 %t712)
+else1091:
+  %t694 = load i64, i64* %self
+  %t695 = getelementptr [6 x i8], [6 x i8]* @.str.673, i64 0, i64 0
+  %t696 = ptrtoint i8* %t695 to i64
+  %t697 = call i64 @Parser__match_kind_check(i64 %t694, i64 %t696)
+  %t698 = trunc i64 %t697 to i1
+  br i1 %t698, label %then1092, label %else1093
+then1092:
+  %t699 = load i64, i64* %self
+  %t700 = call i64 @Parser__expect_ident(i64 %t699)
+  store i64 %t700, i64* %part
+  %t701 = load i64, i64* %args
+  %t702 = load i64, i64* %part
+  %t703 = inttoptr i64 %t701 to i8*
+  %t704 = inttoptr i64 %t702 to i8*
+  %t705 = call i64 @strlen(i8* %t703)
+  %t706 = call i64 @strlen(i8* %t704)
+  %t707 = add i64 %t705, %t706
+  %t708 = add i64 %t707, 1
+  %t709 = call i8* @__sf_malloc(i64 %t708)
+  call i8* @strcpy(i8* %t709, i8* %t703)
+  call i8* @strcat(i8* %t709, i8* %t704)
+  %t710 = ptrtoint i8* %t709 to i64
+  %t711 = call i64 @__string_intern(i64 %t710)
+  %t712 = inttoptr i64 %t711 to i8*
+  %t713 = ptrtoint i8* %t712 to i64
+  store i64 %t713, i64* %args
   br label %endif1064
-else1094:
+else1093:
   %t714 = load i64, i64* %self
-  %t715 = getelementptr [2 x i8], [2 x i8]* @.str.684, i64 0, i64 0
+  %t715 = getelementptr [2 x i8], [2 x i8]* @.str.674, i64 0, i64 0
   %t716 = ptrtoint i8* %t715 to i64
   %t717 = call i64 @Parser__match_kind_check(i64 %t714, i64 %t716)
   %t718 = trunc i64 %t717 to i1
-  br i1 %t718, label %then1095, label %else1096
-then1095:
+  br i1 %t718, label %then1094, label %else1095
+then1094:
   %t719 = load i64, i64* %args
-  %t720 = getelementptr [2 x i8], [2 x i8]* @.str.685, i64 0, i64 0
+  %t720 = getelementptr [2 x i8], [2 x i8]* @.str.675, i64 0, i64 0
   %t721 = ptrtoint i8* %t720 to i64
   %t722 = inttoptr i64 %t719 to i8*
   %t723 = inttoptr i64 %t721 to i8*
@@ -16033,65 +16072,233 @@ then1095:
   %t733 = load i64, i64* %self
   %t734 = call i64 @Parser__advance(i64 %t733)
   br label %endif1064
-else1096:
+else1095:
   %t735 = load i64, i64* %self
-  %t736 = call i64 @Parser__advance(i64 %t735)
+  %t736 = getelementptr [2 x i8], [2 x i8]* @.str.676, i64 0, i64 0
+  %t737 = ptrtoint i8* %t736 to i64
+  %t738 = call i64 @Parser__match_kind_check(i64 %t735, i64 %t737)
+  %t739 = trunc i64 %t738 to i1
+  br i1 %t739, label %then1096, label %else1097
+then1096:
+  %t740 = load i64, i64* %args
+  %t741 = getelementptr [2 x i8], [2 x i8]* @.str.677, i64 0, i64 0
+  %t742 = ptrtoint i8* %t741 to i64
+  %t743 = inttoptr i64 %t740 to i8*
+  %t744 = inttoptr i64 %t742 to i8*
+  %t745 = call i64 @strlen(i8* %t743)
+  %t746 = call i64 @strlen(i8* %t744)
+  %t747 = add i64 %t745, %t746
+  %t748 = add i64 %t747, 1
+  %t749 = call i8* @__sf_malloc(i64 %t748)
+  call i8* @strcpy(i8* %t749, i8* %t743)
+  call i8* @strcat(i8* %t749, i8* %t744)
+  %t750 = ptrtoint i8* %t749 to i64
+  %t751 = call i64 @__string_intern(i64 %t750)
+  %t752 = inttoptr i64 %t751 to i8*
+  %t753 = ptrtoint i8* %t752 to i64
+  store i64 %t753, i64* %args
+  %t754 = load i64, i64* %self
+  %t755 = call i64 @Parser__advance(i64 %t754)
+  br label %endif1064
+else1097:
+  %t756 = load i64, i64* %self
+  %t757 = getelementptr [2 x i8], [2 x i8]* @.str.678, i64 0, i64 0
+  %t758 = ptrtoint i8* %t757 to i64
+  %t759 = call i64 @Parser__match_kind_check(i64 %t756, i64 %t758)
+  %t760 = trunc i64 %t759 to i1
+  br i1 %t760, label %then1098, label %else1099
+then1098:
+  %t761 = load i64, i64* %args
+  %t762 = getelementptr [2 x i8], [2 x i8]* @.str.679, i64 0, i64 0
+  %t763 = ptrtoint i8* %t762 to i64
+  %t764 = inttoptr i64 %t761 to i8*
+  %t765 = inttoptr i64 %t763 to i8*
+  %t766 = call i64 @strlen(i8* %t764)
+  %t767 = call i64 @strlen(i8* %t765)
+  %t768 = add i64 %t766, %t767
+  %t769 = add i64 %t768, 1
+  %t770 = call i8* @__sf_malloc(i64 %t769)
+  call i8* @strcpy(i8* %t770, i8* %t764)
+  call i8* @strcat(i8* %t770, i8* %t765)
+  %t771 = ptrtoint i8* %t770 to i64
+  %t772 = call i64 @__string_intern(i64 %t771)
+  %t773 = inttoptr i64 %t772 to i8*
+  %t774 = ptrtoint i8* %t773 to i64
+  store i64 %t774, i64* %args
+  %t775 = load i64, i64* %self
+  %t776 = call i64 @Parser__advance(i64 %t775)
+  br label %endif1064
+else1099:
+  %t777 = load i64, i64* %self
+  %t778 = getelementptr [2 x i8], [2 x i8]* @.str.680, i64 0, i64 0
+  %t779 = ptrtoint i8* %t778 to i64
+  %t780 = call i64 @Parser__match_kind_check(i64 %t777, i64 %t779)
+  %t781 = trunc i64 %t780 to i1
+  br i1 %t781, label %then1100, label %else1101
+then1100:
+  %t782 = load i64, i64* %args
+  %t783 = getelementptr [2 x i8], [2 x i8]* @.str.681, i64 0, i64 0
+  %t784 = ptrtoint i8* %t783 to i64
+  %t785 = inttoptr i64 %t782 to i8*
+  %t786 = inttoptr i64 %t784 to i8*
+  %t787 = call i64 @strlen(i8* %t785)
+  %t788 = call i64 @strlen(i8* %t786)
+  %t789 = add i64 %t787, %t788
+  %t790 = add i64 %t789, 1
+  %t791 = call i8* @__sf_malloc(i64 %t790)
+  call i8* @strcpy(i8* %t791, i8* %t785)
+  call i8* @strcat(i8* %t791, i8* %t786)
+  %t792 = ptrtoint i8* %t791 to i64
+  %t793 = call i64 @__string_intern(i64 %t792)
+  %t794 = inttoptr i64 %t793 to i8*
+  %t795 = ptrtoint i8* %t794 to i64
+  store i64 %t795, i64* %args
+  %t796 = load i64, i64* %self
+  %t797 = call i64 @Parser__advance(i64 %t796)
+  br label %endif1064
+else1101:
+  %t798 = load i64, i64* %self
+  %t799 = getelementptr [3 x i8], [3 x i8]* @.str.682, i64 0, i64 0
+  %t800 = ptrtoint i8* %t799 to i64
+  %t801 = call i64 @Parser__match_kind_check(i64 %t798, i64 %t800)
+  %t802 = trunc i64 %t801 to i1
+  br i1 %t802, label %then1102, label %else1103
+then1102:
+  %t803 = load i64, i64* %args
+  %t804 = getelementptr [3 x i8], [3 x i8]* @.str.683, i64 0, i64 0
+  %t805 = ptrtoint i8* %t804 to i64
+  %t806 = inttoptr i64 %t803 to i8*
+  %t807 = inttoptr i64 %t805 to i8*
+  %t808 = call i64 @strlen(i8* %t806)
+  %t809 = call i64 @strlen(i8* %t807)
+  %t810 = add i64 %t808, %t809
+  %t811 = add i64 %t810, 1
+  %t812 = call i8* @__sf_malloc(i64 %t811)
+  call i8* @strcpy(i8* %t812, i8* %t806)
+  call i8* @strcat(i8* %t812, i8* %t807)
+  %t813 = ptrtoint i8* %t812 to i64
+  %t814 = call i64 @__string_intern(i64 %t813)
+  %t815 = inttoptr i64 %t814 to i8*
+  %t816 = ptrtoint i8* %t815 to i64
+  store i64 %t816, i64* %args
+  %t817 = load i64, i64* %self
+  %t818 = call i64 @Parser__advance(i64 %t817)
+  br label %endif1064
+else1103:
+  %t819 = load i64, i64* %self
+  %t820 = getelementptr [2 x i8], [2 x i8]* @.str.684, i64 0, i64 0
+  %t821 = ptrtoint i8* %t820 to i64
+  %t822 = call i64 @Parser__match_kind_check(i64 %t819, i64 %t821)
+  %t823 = trunc i64 %t822 to i1
+  br i1 %t823, label %then1104, label %else1105
+then1104:
+  %t824 = load i64, i64* %args
+  %t825 = getelementptr [2 x i8], [2 x i8]* @.str.685, i64 0, i64 0
+  %t826 = ptrtoint i8* %t825 to i64
+  %t827 = inttoptr i64 %t824 to i8*
+  %t828 = inttoptr i64 %t826 to i8*
+  %t829 = call i64 @strlen(i8* %t827)
+  %t830 = call i64 @strlen(i8* %t828)
+  %t831 = add i64 %t829, %t830
+  %t832 = add i64 %t831, 1
+  %t833 = call i8* @__sf_malloc(i64 %t832)
+  call i8* @strcpy(i8* %t833, i8* %t827)
+  call i8* @strcat(i8* %t833, i8* %t828)
+  %t834 = ptrtoint i8* %t833 to i64
+  %t835 = call i64 @__string_intern(i64 %t834)
+  %t836 = inttoptr i64 %t835 to i8*
+  %t837 = ptrtoint i8* %t836 to i64
+  store i64 %t837, i64* %args
+  %t838 = load i64, i64* %self
+  %t839 = call i64 @Parser__advance(i64 %t838)
+  br label %endif1064
+else1105:
+  %t840 = load i64, i64* %self
+  %t841 = getelementptr [2 x i8], [2 x i8]* @.str.686, i64 0, i64 0
+  %t842 = ptrtoint i8* %t841 to i64
+  %t843 = call i64 @Parser__match_kind_check(i64 %t840, i64 %t842)
+  %t844 = trunc i64 %t843 to i1
+  br i1 %t844, label %then1106, label %else1107
+then1106:
+  %t845 = load i64, i64* %args
+  %t846 = getelementptr [2 x i8], [2 x i8]* @.str.687, i64 0, i64 0
+  %t847 = ptrtoint i8* %t846 to i64
+  %t848 = inttoptr i64 %t845 to i8*
+  %t849 = inttoptr i64 %t847 to i8*
+  %t850 = call i64 @strlen(i8* %t848)
+  %t851 = call i64 @strlen(i8* %t849)
+  %t852 = add i64 %t850, %t851
+  %t853 = add i64 %t852, 1
+  %t854 = call i8* @__sf_malloc(i64 %t853)
+  call i8* @strcpy(i8* %t854, i8* %t848)
+  call i8* @strcat(i8* %t854, i8* %t849)
+  %t855 = ptrtoint i8* %t854 to i64
+  %t856 = call i64 @__string_intern(i64 %t855)
+  %t857 = inttoptr i64 %t856 to i8*
+  %t858 = ptrtoint i8* %t857 to i64
+  store i64 %t858, i64* %args
+  %t859 = load i64, i64* %self
+  %t860 = call i64 @Parser__advance(i64 %t859)
+  br label %endif1064
+else1107:
+  %t861 = load i64, i64* %self
+  %t862 = call i64 @Parser__advance(i64 %t861)
   br label %endif1064
 endif1064:
   br label %while.cond1057
 while.end1059:
-  %t737 = load i64, i64* %name
-  %t738 = getelementptr [2 x i8], [2 x i8]* @.str.686, i64 0, i64 0
-  %t739 = ptrtoint i8* %t738 to i64
-  %t740 = inttoptr i64 %t737 to i8*
-  %t741 = inttoptr i64 %t739 to i8*
-  %t742 = call i64 @strlen(i8* %t740)
-  %t743 = call i64 @strlen(i8* %t741)
-  %t744 = add i64 %t742, %t743
-  %t745 = add i64 %t744, 1
-  %t746 = call i8* @__sf_malloc(i64 %t745)
-  call i8* @strcpy(i8* %t746, i8* %t740)
-  call i8* @strcat(i8* %t746, i8* %t741)
-  %t747 = ptrtoint i8* %t746 to i64
-  %t748 = call i64 @__string_intern(i64 %t747)
-  %t749 = inttoptr i64 %t748 to i8*
-  %t750 = ptrtoint i8* %t749 to i64
-  %t751 = load i64, i64* %args
-  %t752 = inttoptr i64 %t750 to i8*
-  %t753 = inttoptr i64 %t751 to i8*
-  %t754 = call i64 @strlen(i8* %t752)
-  %t755 = call i64 @strlen(i8* %t753)
-  %t756 = add i64 %t754, %t755
-  %t757 = add i64 %t756, 1
-  %t758 = call i8* @__sf_malloc(i64 %t757)
-  call i8* @strcpy(i8* %t758, i8* %t752)
-  call i8* @strcat(i8* %t758, i8* %t753)
-  %t759 = ptrtoint i8* %t758 to i64
-  %t760 = call i64 @__string_intern(i64 %t759)
-  %t761 = inttoptr i64 %t760 to i8*
-  %t762 = ptrtoint i8* %t761 to i64
-  %t763 = getelementptr [2 x i8], [2 x i8]* @.str.687, i64 0, i64 0
-  %t764 = ptrtoint i8* %t763 to i64
-  %t765 = inttoptr i64 %t762 to i8*
-  %t766 = inttoptr i64 %t764 to i8*
-  %t767 = call i64 @strlen(i8* %t765)
-  %t768 = call i64 @strlen(i8* %t766)
-  %t769 = add i64 %t767, %t768
-  %t770 = add i64 %t769, 1
-  %t771 = call i8* @__sf_malloc(i64 %t770)
-  call i8* @strcpy(i8* %t771, i8* %t765)
-  call i8* @strcat(i8* %t771, i8* %t766)
-  %t772 = ptrtoint i8* %t771 to i64
-  %t773 = call i64 @__string_intern(i64 %t772)
-  %t774 = inttoptr i64 %t773 to i8*
-  %t775 = ptrtoint i8* %t774 to i64
-  store i64 %t775, i64* %name
+  %t863 = load i64, i64* %name
+  %t864 = getelementptr [2 x i8], [2 x i8]* @.str.688, i64 0, i64 0
+  %t865 = ptrtoint i8* %t864 to i64
+  %t866 = inttoptr i64 %t863 to i8*
+  %t867 = inttoptr i64 %t865 to i8*
+  %t868 = call i64 @strlen(i8* %t866)
+  %t869 = call i64 @strlen(i8* %t867)
+  %t870 = add i64 %t868, %t869
+  %t871 = add i64 %t870, 1
+  %t872 = call i8* @__sf_malloc(i64 %t871)
+  call i8* @strcpy(i8* %t872, i8* %t866)
+  call i8* @strcat(i8* %t872, i8* %t867)
+  %t873 = ptrtoint i8* %t872 to i64
+  %t874 = call i64 @__string_intern(i64 %t873)
+  %t875 = inttoptr i64 %t874 to i8*
+  %t876 = ptrtoint i8* %t875 to i64
+  %t877 = load i64, i64* %args
+  %t878 = inttoptr i64 %t876 to i8*
+  %t879 = inttoptr i64 %t877 to i8*
+  %t880 = call i64 @strlen(i8* %t878)
+  %t881 = call i64 @strlen(i8* %t879)
+  %t882 = add i64 %t880, %t881
+  %t883 = add i64 %t882, 1
+  %t884 = call i8* @__sf_malloc(i64 %t883)
+  call i8* @strcpy(i8* %t884, i8* %t878)
+  call i8* @strcat(i8* %t884, i8* %t879)
+  %t885 = ptrtoint i8* %t884 to i64
+  %t886 = call i64 @__string_intern(i64 %t885)
+  %t887 = inttoptr i64 %t886 to i8*
+  %t888 = ptrtoint i8* %t887 to i64
+  %t889 = getelementptr [2 x i8], [2 x i8]* @.str.689, i64 0, i64 0
+  %t890 = ptrtoint i8* %t889 to i64
+  %t891 = inttoptr i64 %t888 to i8*
+  %t892 = inttoptr i64 %t890 to i8*
+  %t893 = call i64 @strlen(i8* %t891)
+  %t894 = call i64 @strlen(i8* %t892)
+  %t895 = add i64 %t893, %t894
+  %t896 = add i64 %t895, 1
+  %t897 = call i8* @__sf_malloc(i64 %t896)
+  call i8* @strcpy(i8* %t897, i8* %t891)
+  call i8* @strcat(i8* %t897, i8* %t892)
+  %t898 = ptrtoint i8* %t897 to i64
+  %t899 = call i64 @__string_intern(i64 %t898)
+  %t900 = inttoptr i64 %t899 to i8*
+  %t901 = ptrtoint i8* %t900 to i64
+  store i64 %t901, i64* %name
   br label %endif1054
 else1056:
   br label %endif1054
 endif1054:
-  %t776 = load i64, i64* %name
-  ret i64 %t776
+  %t902 = load i64, i64* %name
+  ret i64 %t902
 }
 
 define i64 @Parser__parse_expr(i64 %self.arg) {
@@ -16112,22 +16319,22 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_and(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1097
-while.cond1097:
+  br label %while.cond1108
+while.cond1108:
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.688, i64 0, i64 0
+  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.690, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %while.body1098, label %while.end1099
-while.body1098:
+  br i1 %t7, label %while.body1109, label %while.end1110
+while.body1109:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__advance(i64 %t8)
   %t10 = load i64, i64* %self
   %t11 = call i64 @Parser__parse_and(i64 %t10)
   store i64 %t11, i64* %right
   %t12 = load i64, i64* %left
-  %t13 = getelementptr [3 x i8], [3 x i8]* @.str.689, i64 0, i64 0
+  %t13 = getelementptr [3 x i8], [3 x i8]* @.str.691, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = load i64, i64* %right
   %t16 = call i8* @__sf_malloc(i64 32)
@@ -16142,8 +16349,8 @@ while.body1098:
   store i64 %t15, i64* %t21
   %t22 = ptrtoint [4 x i64]* %t17 to i64
   store i64 %t22, i64* %left
-  br label %while.cond1097
-while.end1099:
+  br label %while.cond1108
+while.end1110:
   %t23 = load i64, i64* %left
   ret i64 %t23
 }
@@ -16157,22 +16364,22 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_equality(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1100
-while.cond1100:
+  br label %while.cond1111
+while.cond1111:
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.690, i64 0, i64 0
+  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.692, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %while.body1101, label %while.end1102
-while.body1101:
+  br i1 %t7, label %while.body1112, label %while.end1113
+while.body1112:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__advance(i64 %t8)
   %t10 = load i64, i64* %self
   %t11 = call i64 @Parser__parse_equality(i64 %t10)
   store i64 %t11, i64* %right
   %t12 = load i64, i64* %left
-  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.691, i64 0, i64 0
+  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.693, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = load i64, i64* %right
   %t16 = call i8* @__sf_malloc(i64 32)
@@ -16187,8 +16394,8 @@ while.body1101:
   store i64 %t15, i64* %t21
   %t22 = ptrtoint [4 x i64]* %t17 to i64
   store i64 %t22, i64* %left
-  br label %while.cond1100
-while.end1102:
+  br label %while.cond1111
+while.end1113:
   %t23 = load i64, i64* %left
   ret i64 %t23
 }
@@ -16203,13 +16410,13 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_comparison(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1103
-while.cond1103:
+  br label %while.cond1114
+while.cond1114:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__is_equality_op(i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %while.body1104, label %while.end1105
-while.body1104:
+  br i1 %t5, label %while.body1115, label %while.end1116
+while.body1115:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__get_op_string(i64 %t6)
   store i64 %t7, i64* %op
@@ -16233,8 +16440,8 @@ while.body1104:
   store i64 %t14, i64* %t20
   %t21 = ptrtoint [4 x i64]* %t16 to i64
   store i64 %t21, i64* %left
-  br label %while.cond1103
-while.end1105:
+  br label %while.cond1114
+while.end1116:
   %t22 = load i64, i64* %left
   ret i64 %t22
 }
@@ -16250,13 +16457,13 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_bitwise_or(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1106
-while.cond1106:
+  br label %while.cond1117
+while.cond1117:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__is_comparison_op(i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %while.body1107, label %while.end1108
-while.body1107:
+  br i1 %t5, label %while.body1118, label %while.end1119
+while.body1118:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__get_op_string(i64 %t6)
   store i64 %t7, i64* %op
@@ -16280,17 +16487,17 @@ while.body1107:
   store i64 %t14, i64* %t20
   %t21 = ptrtoint [4 x i64]* %t16 to i64
   store i64 %t21, i64* %left
-  br label %while.cond1106
-while.end1108:
+  br label %while.cond1117
+while.end1119:
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.692, i64 0, i64 0
+  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.694, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__match_kind_check(i64 %t22, i64 %t24)
   %t26 = trunc i64 %t25 to i1
-  br label %logic.entry1110
-logic.entry1110:
-  br i1 %t26, label %rhs1111, label %end1112
-rhs1111:
+  br label %logic.entry1121
+logic.entry1121:
+  br i1 %t26, label %rhs1122, label %end1123
+rhs1122:
   %t27 = load i64, i64* %self
   %t28 = call i64 @Parser__current_line_num(i64 %t27)
   %t29 = load i64, i64* %self
@@ -16298,15 +16505,15 @@ rhs1111:
   %t31 = icmp eq i64 %t28, %t30
   %t32 = zext i1 %t31 to i64
   %t33 = trunc i64 %t32 to i1
-  br label %rhs.exit1113
-rhs.exit1113:
-  br label %end1112
-end1112:
-  %t34 = phi i1 [%t26, %logic.entry1110], [%t33, %rhs.exit1113]
+  br label %rhs.exit1124
+rhs.exit1124:
+  br label %end1123
+end1123:
+  %t34 = phi i1 [%t26, %logic.entry1121], [%t33, %rhs.exit1124]
   %t35 = zext i1 %t34 to i64
   %t36 = trunc i64 %t35 to i1
-  br i1 %t36, label %then1114, label %else1115
-then1114:
+  br i1 %t36, label %then1125, label %else1126
+then1125:
   %t37 = load i64, i64* %self
   %t38 = call i64 @Parser__advance(i64 %t37)
   %t39 = load i64, i64* %self
@@ -16324,10 +16531,10 @@ then1114:
   store i64 %t42, i64* %t47
   %t48 = ptrtoint [3 x i64]* %t44 to i64
   store i64 %t48, i64* %left
-  br label %endif1109
-else1115:
-  br label %endif1109
-endif1109:
+  br label %endif1120
+else1126:
+  br label %endif1120
+endif1120:
   %t49 = load i64, i64* %left
   ret i64 %t49
 }
@@ -16341,64 +16548,19 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_bitwise_xor(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1116
-while.cond1116:
-  %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.693, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
-  %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %while.body1117, label %while.end1118
-while.body1117:
-  %t8 = load i64, i64* %self
-  %t9 = call i64 @Parser__advance(i64 %t8)
-  %t10 = load i64, i64* %self
-  %t11 = call i64 @Parser__parse_bitwise_xor(i64 %t10)
-  store i64 %t11, i64* %right
-  %t12 = load i64, i64* %left
-  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.694, i64 0, i64 0
-  %t14 = ptrtoint i8* %t13 to i64
-  %t15 = load i64, i64* %right
-  %t16 = call i8* @__sf_malloc(i64 32)
-  %t17 = bitcast i8* %t16 to [4 x i64]*
-  %t18 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 0
-  store i64 6, i64* %t18
-  %t19 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 1
-  store i64 %t12, i64* %t19
-  %t20 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 2
-  store i64 %t14, i64* %t20
-  %t21 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 3
-  store i64 %t15, i64* %t21
-  %t22 = ptrtoint [4 x i64]* %t17 to i64
-  store i64 %t22, i64* %left
-  br label %while.cond1116
-while.end1118:
-  %t23 = load i64, i64* %left
-  ret i64 %t23
-}
-
-define i64 @Parser__parse_bitwise_xor(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  %left = alloca i64
-  %right = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = call i64 @Parser__parse_bitwise_and(i64 %t1)
-  store i64 %t2, i64* %left
-  br label %while.cond1119
-while.cond1119:
+  br label %while.cond1127
+while.cond1127:
   %t3 = load i64, i64* %self
   %t4 = getelementptr [2 x i8], [2 x i8]* @.str.695, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %while.body1120, label %while.end1121
-while.body1120:
+  br i1 %t7, label %while.body1128, label %while.end1129
+while.body1128:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__advance(i64 %t8)
   %t10 = load i64, i64* %self
-  %t11 = call i64 @Parser__parse_bitwise_and(i64 %t10)
+  %t11 = call i64 @Parser__parse_bitwise_xor(i64 %t10)
   store i64 %t11, i64* %right
   %t12 = load i64, i64* %left
   %t13 = getelementptr [2 x i8], [2 x i8]* @.str.696, i64 0, i64 0
@@ -16416,34 +16578,34 @@ while.body1120:
   store i64 %t15, i64* %t21
   %t22 = ptrtoint [4 x i64]* %t17 to i64
   store i64 %t22, i64* %left
-  br label %while.cond1119
-while.end1121:
+  br label %while.cond1127
+while.end1129:
   %t23 = load i64, i64* %left
   ret i64 %t23
 }
 
-define i64 @Parser__parse_bitwise_and(i64 %self.arg) {
+define i64 @Parser__parse_bitwise_xor(i64 %self.arg) {
 entry:
   %self = alloca i64
   %left = alloca i64
   %right = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = call i64 @Parser__parse_shift(i64 %t1)
+  %t2 = call i64 @Parser__parse_bitwise_and(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1122
-while.cond1122:
+  br label %while.cond1130
+while.cond1130:
   %t3 = load i64, i64* %self
   %t4 = getelementptr [2 x i8], [2 x i8]* @.str.697, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %while.body1123, label %while.end1124
-while.body1123:
+  br i1 %t7, label %while.body1131, label %while.end1132
+while.body1131:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__advance(i64 %t8)
   %t10 = load i64, i64* %self
-  %t11 = call i64 @Parser__parse_shift(i64 %t10)
+  %t11 = call i64 @Parser__parse_bitwise_and(i64 %t10)
   store i64 %t11, i64* %right
   %t12 = load i64, i64* %left
   %t13 = getelementptr [2 x i8], [2 x i8]* @.str.698, i64 0, i64 0
@@ -16461,8 +16623,53 @@ while.body1123:
   store i64 %t15, i64* %t21
   %t22 = ptrtoint [4 x i64]* %t17 to i64
   store i64 %t22, i64* %left
-  br label %while.cond1122
-while.end1124:
+  br label %while.cond1130
+while.end1132:
+  %t23 = load i64, i64* %left
+  ret i64 %t23
+}
+
+define i64 @Parser__parse_bitwise_and(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  %left = alloca i64
+  %right = alloca i64
+  store i64 %self.arg, i64* %self
+  %t1 = load i64, i64* %self
+  %t2 = call i64 @Parser__parse_shift(i64 %t1)
+  store i64 %t2, i64* %left
+  br label %while.cond1133
+while.cond1133:
+  %t3 = load i64, i64* %self
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.699, i64 0, i64 0
+  %t5 = ptrtoint i8* %t4 to i64
+  %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
+  %t7 = trunc i64 %t6 to i1
+  br i1 %t7, label %while.body1134, label %while.end1135
+while.body1134:
+  %t8 = load i64, i64* %self
+  %t9 = call i64 @Parser__advance(i64 %t8)
+  %t10 = load i64, i64* %self
+  %t11 = call i64 @Parser__parse_shift(i64 %t10)
+  store i64 %t11, i64* %right
+  %t12 = load i64, i64* %left
+  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.700, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = load i64, i64* %right
+  %t16 = call i8* @__sf_malloc(i64 32)
+  %t17 = bitcast i8* %t16 to [4 x i64]*
+  %t18 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 0
+  store i64 6, i64* %t18
+  %t19 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 1
+  store i64 %t12, i64* %t19
+  %t20 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 2
+  store i64 %t14, i64* %t20
+  %t21 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 3
+  store i64 %t15, i64* %t21
+  %t22 = ptrtoint [4 x i64]* %t17 to i64
+  store i64 %t22, i64* %left
+  br label %while.cond1133
+while.end1135:
   %t23 = load i64, i64* %left
   ret i64 %t23
 }
@@ -16477,13 +16684,13 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_term(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1125
-while.cond1125:
+  br label %while.cond1136
+while.cond1136:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__is_shift_op(i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %while.body1126, label %while.end1127
-while.body1126:
+  br i1 %t5, label %while.body1137, label %while.end1138
+while.body1137:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__get_op_string(i64 %t6)
   store i64 %t7, i64* %op
@@ -16507,8 +16714,8 @@ while.body1126:
   store i64 %t14, i64* %t20
   %t21 = ptrtoint [4 x i64]* %t16 to i64
   store i64 %t21, i64* %left
-  br label %while.cond1125
-while.end1127:
+  br label %while.cond1136
+while.end1138:
   %t22 = load i64, i64* %left
   ret i64 %t22
 }
@@ -16523,13 +16730,13 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_factor(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1128
-while.cond1128:
+  br label %while.cond1139
+while.cond1139:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__is_term_op(i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %while.body1129, label %while.end1130
-while.body1129:
+  br i1 %t5, label %while.body1140, label %while.end1141
+while.body1140:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__get_op_string(i64 %t6)
   store i64 %t7, i64* %op
@@ -16553,8 +16760,8 @@ while.body1129:
   store i64 %t14, i64* %t20
   %t21 = ptrtoint [4 x i64]* %t16 to i64
   store i64 %t21, i64* %left
-  br label %while.cond1128
-while.end1130:
+  br label %while.cond1139
+while.end1141:
   %t22 = load i64, i64* %left
   ret i64 %t22
 }
@@ -16569,13 +16776,13 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__parse_unary(i64 %t1)
   store i64 %t2, i64* %left
-  br label %while.cond1131
-while.cond1131:
+  br label %while.cond1142
+while.cond1142:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__is_factor_op(i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %while.body1132, label %while.end1133
-while.body1132:
+  br i1 %t5, label %while.body1143, label %while.end1144
+while.body1143:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__get_op_string(i64 %t6)
   store i64 %t7, i64* %op
@@ -16599,8 +16806,8 @@ while.body1132:
   store i64 %t14, i64* %t20
   %t21 = ptrtoint [4 x i64]* %t16 to i64
   store i64 %t21, i64* %left
-  br label %while.cond1131
-while.end1133:
+  br label %while.cond1142
+while.end1144:
   %t22 = load i64, i64* %left
   ret i64 %t22
 }
@@ -16612,18 +16819,18 @@ entry:
   %pre_op = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.699, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.701, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then1135, label %else1136
-then1135:
+  br i1 %t5, label %then1146, label %else1147
+then1146:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__advance(i64 %t6)
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__parse_unary(i64 %t8)
   store i64 %t9, i64* %right
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.700, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.702, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = load i64, i64* %right
   %t13 = call i8* @__sf_malloc(i64 24)
@@ -16636,22 +16843,22 @@ then1135:
   store i64 %t12, i64* %t17
   %t18 = ptrtoint [3 x i64]* %t14 to i64
   ret i64 %t18
-else1136:
-  br label %endif1134
-endif1134:
+else1147:
+  br label %endif1145
+endif1145:
   %t19 = load i64, i64* %self
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.701, i64 0, i64 0
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.703, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   %t22 = call i64 @Parser__match_kind_check(i64 %t19, i64 %t21)
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then1138, label %else1139
-then1138:
+  br i1 %t23, label %then1149, label %else1150
+then1149:
   %t24 = load i64, i64* %self
   %t25 = call i64 @Parser__advance(i64 %t24)
   %t26 = load i64, i64* %self
   %t27 = call i64 @Parser__parse_unary(i64 %t26)
   store i64 %t27, i64* %right
-  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.702, i64 0, i64 0
+  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.704, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   %t30 = load i64, i64* %right
   %t31 = call i8* @__sf_malloc(i64 24)
@@ -16664,22 +16871,22 @@ then1138:
   store i64 %t30, i64* %t35
   %t36 = ptrtoint [3 x i64]* %t32 to i64
   ret i64 %t36
-else1139:
-  br label %endif1137
-endif1137:
+else1150:
+  br label %endif1148
+endif1148:
   %t37 = load i64, i64* %self
-  %t38 = getelementptr [2 x i8], [2 x i8]* @.str.703, i64 0, i64 0
+  %t38 = getelementptr [2 x i8], [2 x i8]* @.str.705, i64 0, i64 0
   %t39 = ptrtoint i8* %t38 to i64
   %t40 = call i64 @Parser__match_kind_check(i64 %t37, i64 %t39)
   %t41 = trunc i64 %t40 to i1
-  br i1 %t41, label %then1141, label %else1142
-then1141:
+  br i1 %t41, label %then1152, label %else1153
+then1152:
   %t42 = load i64, i64* %self
   %t43 = call i64 @Parser__advance(i64 %t42)
   %t44 = load i64, i64* %self
   %t45 = call i64 @Parser__parse_unary(i64 %t44)
   store i64 %t45, i64* %right
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.704, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.706, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = load i64, i64* %right
   %t49 = call i8* @__sf_malloc(i64 24)
@@ -16692,39 +16899,39 @@ then1141:
   store i64 %t48, i64* %t53
   %t54 = ptrtoint [3 x i64]* %t50 to i64
   ret i64 %t54
-else1142:
-  br label %endif1140
-endif1140:
+else1153:
+  br label %endif1151
+endif1151:
   %t55 = load i64, i64* %self
-  %t56 = getelementptr [3 x i8], [3 x i8]* @.str.705, i64 0, i64 0
+  %t56 = getelementptr [3 x i8], [3 x i8]* @.str.707, i64 0, i64 0
   %t57 = ptrtoint i8* %t56 to i64
   %t58 = call i64 @Parser__match_kind_check(i64 %t55, i64 %t57)
   %t59 = trunc i64 %t58 to i1
-  br label %logic.entry1144
-logic.entry1144:
-  br i1 %t59, label %end1146, label %rhs1145
-rhs1145:
+  br label %logic.entry1155
+logic.entry1155:
+  br i1 %t59, label %end1157, label %rhs1156
+rhs1156:
   %t60 = load i64, i64* %self
-  %t61 = getelementptr [3 x i8], [3 x i8]* @.str.706, i64 0, i64 0
+  %t61 = getelementptr [3 x i8], [3 x i8]* @.str.708, i64 0, i64 0
   %t62 = ptrtoint i8* %t61 to i64
   %t63 = call i64 @Parser__match_kind_check(i64 %t60, i64 %t62)
   %t64 = trunc i64 %t63 to i1
-  br label %rhs.exit1147
-rhs.exit1147:
-  br label %end1146
-end1146:
-  %t65 = phi i1 [%t59, %logic.entry1144], [%t64, %rhs.exit1147]
+  br label %rhs.exit1158
+rhs.exit1158:
+  br label %end1157
+end1157:
+  %t65 = phi i1 [%t59, %logic.entry1155], [%t64, %rhs.exit1158]
   %t66 = zext i1 %t65 to i64
   %t67 = trunc i64 %t66 to i1
-  br i1 %t67, label %then1148, label %else1149
-then1148:
+  br i1 %t67, label %then1159, label %else1160
+then1159:
   %t68 = load i64, i64* %self
   %t69 = load i64, i64* %self
   %t70 = call i64 @Parser__current_kind(i64 %t69)
   %t71 = call i64 @Parser__kind_name(i64 %t68, i64 %t70)
   store i64 %t71, i64* %pre_op
   %t72 = load i64, i64* %self
-  %t73 = getelementptr [2 x i8], [2 x i8]* @.str.707, i64 0, i64 0
+  %t73 = getelementptr [2 x i8], [2 x i8]* @.str.709, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   %t75 = load i64, i64* %pre_op
   %t76 = inttoptr i64 %t74 to i8*
@@ -16740,7 +16947,7 @@ then1148:
   %t84 = call i64 @__string_intern(i64 %t83)
   %t85 = inttoptr i64 %t84 to i8*
   %t86 = ptrtoint i8* %t85 to i64
-  %t87 = getelementptr [40 x i8], [40 x i8]* @.str.708, i64 0, i64 0
+  %t87 = getelementptr [40 x i8], [40 x i8]* @.str.710, i64 0, i64 0
   %t88 = ptrtoint i8* %t87 to i64
   %t89 = inttoptr i64 %t86 to i8*
   %t90 = inttoptr i64 %t88 to i8*
@@ -16769,7 +16976,7 @@ then1148:
   %t109 = call i64 @__string_intern(i64 %t108)
   %t110 = inttoptr i64 %t109 to i8*
   %t111 = ptrtoint i8* %t110 to i64
-  %t112 = getelementptr [37 x i8], [37 x i8]* @.str.709, i64 0, i64 0
+  %t112 = getelementptr [37 x i8], [37 x i8]* @.str.711, i64 0, i64 0
   %t113 = ptrtoint i8* %t112 to i64
   %t114 = inttoptr i64 %t111 to i8*
   %t115 = inttoptr i64 %t113 to i8*
@@ -16809,7 +17016,7 @@ then1148:
   %t143 = call i64 @__string_intern(i64 %t142)
   %t144 = inttoptr i64 %t143 to i8*
   %t145 = ptrtoint i8* %t144 to i64
-  %t146 = getelementptr [4 x i8], [4 x i8]* @.str.710, i64 0, i64 0
+  %t146 = getelementptr [4 x i8], [4 x i8]* @.str.712, i64 0, i64 0
   %t147 = ptrtoint i8* %t146 to i64
   %t148 = inttoptr i64 %t145 to i8*
   %t149 = inttoptr i64 %t147 to i8*
@@ -16830,9 +17037,9 @@ then1148:
   %t162 = load i64, i64* %self
   %t163 = call i64 @Parser__parse_unary(i64 %t162)
   ret i64 %t163
-else1149:
-  br label %endif1143
-endif1143:
+else1160:
+  br label %endif1154
+endif1154:
   %t164 = load i64, i64* %self
   %t165 = call i64 @Parser__parse_postfix(i64 %t164)
   ret i64 %t165
@@ -16849,45 +17056,45 @@ entry:
   %t2 = call i64 @Parser__parse_call(i64 %t1)
   store i64 %t2, i64* %expr
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.711, i64 0, i64 0
+  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.713, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br label %logic.entry1151
-logic.entry1151:
-  br i1 %t7, label %end1153, label %rhs1152
-rhs1152:
+  br label %logic.entry1162
+logic.entry1162:
+  br i1 %t7, label %end1164, label %rhs1163
+rhs1163:
   %t8 = load i64, i64* %self
-  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.712, i64 0, i64 0
+  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.714, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i64
   %t11 = call i64 @Parser__match_kind_check(i64 %t8, i64 %t10)
   %t12 = trunc i64 %t11 to i1
-  br label %rhs.exit1154
-rhs.exit1154:
-  br label %end1153
-end1153:
-  %t13 = phi i1 [%t7, %logic.entry1151], [%t12, %rhs.exit1154]
+  br label %rhs.exit1165
+rhs.exit1165:
+  br label %end1164
+end1164:
+  %t13 = phi i1 [%t7, %logic.entry1162], [%t12, %rhs.exit1165]
   %t14 = zext i1 %t13 to i64
   %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then1155, label %else1156
-then1155:
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.713, i64 0, i64 0
+  br i1 %t15, label %then1166, label %else1167
+then1166:
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.715, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %op
   %t18 = load i64, i64* %self
-  %t19 = getelementptr [3 x i8], [3 x i8]* @.str.714, i64 0, i64 0
+  %t19 = getelementptr [3 x i8], [3 x i8]* @.str.716, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @Parser__match_kind_check(i64 %t18, i64 %t20)
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %then1158, label %else1159
-then1158:
-  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.715, i64 0, i64 0
+  br i1 %t22, label %then1169, label %else1170
+then1169:
+  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.717, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   store i64 %t24, i64* %op
-  br label %endif1157
-else1159:
-  br label %endif1157
-endif1157:
+  br label %endif1168
+else1170:
+  br label %endif1168
+endif1168:
   %t25 = load i64, i64* %self
   %t26 = load i64, i64* %self
   %t27 = call i64 @Parser__current_kind(i64 %t26)
@@ -16901,9 +17108,9 @@ endif1157:
   %t34 = load i64, i64* %spelling
   %t35 = call i64 @Parser__build_postfix_incr(i64 %t31, i64 %t32, i64 %t33, i64 %t34)
   ret i64 %t35
-else1156:
-  br label %endif1150
-endif1150:
+else1167:
+  br label %endif1161
+endif1161:
   %t36 = load i64, i64* %expr
   ret i64 %t36
 }
@@ -16944,14 +17151,14 @@ entry:
   %t3 = call i64 @Parser__classify_expr_for_assign(i64 %t1, i64 %t2)
   store i64 %t3, i64* %ek
   %t4 = load i64, i64* %ek
-  %t5 = getelementptr [6 x i8], [6 x i8]* @.str.716, i64 0, i64 0
+  %t5 = getelementptr [6 x i8], [6 x i8]* @.str.718, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @__string_eq(i64 %t4, i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then1161, label %else1162
-then1161:
+  br i1 %t8, label %then1172, label %else1173
+then1172:
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [17 x i8], [17 x i8]* @.str.717, i64 0, i64 0
+  %t10 = getelementptr [17 x i8], [17 x i8]* @.str.719, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = load i64, i64* %spelling
   %t13 = inttoptr i64 %t11 to i8*
@@ -16967,7 +17174,7 @@ then1161:
   %t21 = call i64 @__string_intern(i64 %t20)
   %t22 = inttoptr i64 %t21 to i8*
   %t23 = ptrtoint i8* %t22 to i64
-  %t24 = getelementptr [58 x i8], [58 x i8]* @.str.718, i64 0, i64 0
+  %t24 = getelementptr [58 x i8], [58 x i8]* @.str.720, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = inttoptr i64 %t23 to i8*
   %t27 = inttoptr i64 %t25 to i8*
@@ -16985,13 +17192,13 @@ then1161:
   %t37 = call i64 @Parser__parse_error(i64 %t9, i64 %t36)
   %t38 = load i64, i64* %target
   ret i64 %t38
-else1162:
-  br label %endif1160
-endif1160:
+else1173:
+  br label %endif1171
+endif1171:
   %t39 = load i64, i64* %self
   %t40 = call i64 @Parser__next_incr_uid(i64 %t39)
   store i64 %t40, i64* %uid
-  %t41 = getelementptr [6 x i8], [6 x i8]* @.str.719, i64 0, i64 0
+  %t41 = getelementptr [6 x i8], [6 x i8]* @.str.721, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = load i64, i64* %uid
   %t44 = inttoptr i64 %t42 to i8*
@@ -17015,19 +17222,19 @@ endif1160:
   %t57 = load i64, i64* %target
   store i64 %t57, i64* %place
   %t58 = load i64, i64* %ek
-  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.720, i64 0, i64 0
+  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.722, i64 0, i64 0
   %t60 = ptrtoint i8* %t59 to i64
   %t61 = call i64 @__string_eq(i64 %t58, i64 %t60)
   %t62 = trunc i64 %t61 to i1
-  br i1 %t62, label %then1164, label %else1165
-then1164:
+  br i1 %t62, label %then1175, label %else1176
+then1175:
   %t63 = load i64, i64* %target
   %t64 = alloca i64
   %t66 = inttoptr i64 %t63 to i64*
   %t67 = load i64, i64* %t66
   %t65 = trunc i64 %t67 to i8
-  switch i8 %t65, label %match.arm1168 [ i8 19, label %match.arm1167 ]
-match.arm1167:
+  switch i8 %t65, label %match.arm1179 [ i8 19, label %match.arm1178 ]
+match.arm1178:
   %t68 = load i64, i64* %o
   %t69 = load i64, i64* %i
   %t70 = inttoptr i64 %t63 to [3 x i64]*
@@ -17041,16 +17248,16 @@ match.arm1167:
   store i64 %t75, i64* %t64
   store i64 %t68, i64* %o
   store i64 %t69, i64* %i
-  br label %match.end1166
-match.arm1168:
+  br label %match.end1177
+match.arm1179:
   %t76 = call i8* @__sf_malloc(i64 8)
   %t77 = bitcast i8* %t76 to [1 x i64]*
   %t78 = getelementptr [1 x i64], [1 x i64]* %t77, i64 0, i64 0
   store i64 4, i64* %t78
   %t79 = ptrtoint [1 x i64]* %t77 to i64
   store i64 %t79, i64* %t64
-  br label %match.end1166
-match.end1166:
+  br label %match.end1177
+match.end1177:
   %t80 = load i64, i64* %t64
   store i64 %t80, i64* %iobj
   %t81 = load i64, i64* %target
@@ -17058,8 +17265,8 @@ match.end1166:
   %t84 = inttoptr i64 %t81 to i64*
   %t85 = load i64, i64* %t84
   %t83 = trunc i64 %t85 to i8
-  switch i8 %t83, label %match.arm1171 [ i8 19, label %match.arm1170 ]
-match.arm1170:
+  switch i8 %t83, label %match.arm1182 [ i8 19, label %match.arm1181 ]
+match.arm1181:
   %t86 = load i64, i64* %o
   %t87 = load i64, i64* %i
   %t88 = inttoptr i64 %t81 to [3 x i64]*
@@ -17073,19 +17280,19 @@ match.arm1170:
   store i64 %t93, i64* %t82
   store i64 %t86, i64* %o
   store i64 %t87, i64* %i
-  br label %match.end1169
-match.arm1171:
+  br label %match.end1180
+match.arm1182:
   %t94 = call i8* @__sf_malloc(i64 8)
   %t95 = bitcast i8* %t94 to [1 x i64]*
   %t96 = getelementptr [1 x i64], [1 x i64]* %t95, i64 0, i64 0
   store i64 4, i64* %t96
   %t97 = ptrtoint [1 x i64]* %t95 to i64
   store i64 %t97, i64* %t82
-  br label %match.end1169
-match.end1169:
+  br label %match.end1180
+match.end1180:
   %t98 = load i64, i64* %t82
   store i64 %t98, i64* %iidx
-  %t99 = getelementptr [11 x i8], [11 x i8]* @.str.721, i64 0, i64 0
+  %t99 = getelementptr [11 x i8], [11 x i8]* @.str.723, i64 0, i64 0
   %t100 = ptrtoint i8* %t99 to i64
   %t101 = load i64, i64* %uid
   %t102 = inttoptr i64 %t100 to i8*
@@ -17102,7 +17309,7 @@ match.end1169:
   %t111 = inttoptr i64 %t110 to i8*
   %t112 = ptrtoint i8* %t111 to i64
   store i64 %t112, i64* %recv_name
-  %t113 = getelementptr [10 x i8], [10 x i8]* @.str.722, i64 0, i64 0
+  %t113 = getelementptr [10 x i8], [10 x i8]* @.str.724, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = load i64, i64* %uid
   %t116 = inttoptr i64 %t114 to i8*
@@ -17127,9 +17334,9 @@ match.end1169:
   store i64 12, i64* %t131
   %t132 = ptrtoint [1 x i64]* %t130 to i64
   %t133 = load i64, i64* %iobj
-  %t134 = getelementptr [1 x i8], [1 x i8]* @.str.723, i64 0, i64 0
+  %t134 = getelementptr [1 x i8], [1 x i8]* @.str.725, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
-  %t136 = getelementptr [7 x i8], [7 x i8]* @.str.724, i64 0, i64 0
+  %t136 = getelementptr [7 x i8], [7 x i8]* @.str.726, i64 0, i64 0
   %t137 = ptrtoint i8* %t136 to i64
   %t138 = load i64, i64* %synth
   %t139 = load i64, i64* %synth
@@ -17161,9 +17368,9 @@ match.end1169:
   store i64 12, i64* %t156
   %t157 = ptrtoint [1 x i64]* %t155 to i64
   %t158 = load i64, i64* %iidx
-  %t159 = getelementptr [1 x i8], [1 x i8]* @.str.725, i64 0, i64 0
+  %t159 = getelementptr [1 x i8], [1 x i8]* @.str.727, i64 0, i64 0
   %t160 = ptrtoint i8* %t159 to i64
-  %t161 = getelementptr [7 x i8], [7 x i8]* @.str.726, i64 0, i64 0
+  %t161 = getelementptr [7 x i8], [7 x i8]* @.str.728, i64 0, i64 0
   %t162 = ptrtoint i8* %t161 to i64
   %t163 = load i64, i64* %synth
   %t164 = load i64, i64* %synth
@@ -17219,38 +17426,38 @@ match.end1169:
   store i64 %t192, i64* %t197
   %t198 = ptrtoint [3 x i64]* %t194 to i64
   store i64 %t198, i64* %place
-  br label %endif1163
-else1165:
+  br label %endif1174
+else1176:
   %t199 = load i64, i64* %ek
-  %t200 = getelementptr [7 x i8], [7 x i8]* @.str.727, i64 0, i64 0
+  %t200 = getelementptr [7 x i8], [7 x i8]* @.str.729, i64 0, i64 0
   %t201 = ptrtoint i8* %t200 to i64
   %t202 = call i64 @__string_eq(i64 %t199, i64 %t201)
   %t203 = trunc i64 %t202 to i1
-  br label %logic.entry1172
-logic.entry1172:
-  br i1 %t203, label %end1174, label %rhs1173
-rhs1173:
+  br label %logic.entry1183
+logic.entry1183:
+  br i1 %t203, label %end1185, label %rhs1184
+rhs1184:
   %t204 = load i64, i64* %ek
-  %t205 = getelementptr [10 x i8], [10 x i8]* @.str.728, i64 0, i64 0
+  %t205 = getelementptr [10 x i8], [10 x i8]* @.str.730, i64 0, i64 0
   %t206 = ptrtoint i8* %t205 to i64
   %t207 = call i64 @__string_eq(i64 %t204, i64 %t206)
   %t208 = trunc i64 %t207 to i1
-  br label %rhs.exit1175
-rhs.exit1175:
-  br label %end1174
-end1174:
-  %t209 = phi i1 [%t203, %logic.entry1172], [%t208, %rhs.exit1175]
+  br label %rhs.exit1186
+rhs.exit1186:
+  br label %end1185
+end1185:
+  %t209 = phi i1 [%t203, %logic.entry1183], [%t208, %rhs.exit1186]
   %t210 = zext i1 %t209 to i64
   %t211 = trunc i64 %t210 to i1
-  br i1 %t211, label %then1176, label %else1177
-then1176:
+  br i1 %t211, label %then1187, label %else1188
+then1187:
   %t212 = load i64, i64* %target
   %t213 = alloca i64
   %t215 = inttoptr i64 %t212 to i64*
   %t216 = load i64, i64* %t215
   %t214 = trunc i64 %t216 to i8
-  switch i8 %t214, label %match.arm1181 [ i8 11, label %match.arm1179 i8 15, label %match.arm1180 ]
-match.arm1179:
+  switch i8 %t214, label %match.arm1192 [ i8 11, label %match.arm1190 i8 15, label %match.arm1191 ]
+match.arm1190:
   %t217 = load i64, i64* %o
   %t218 = load i64, i64* %f
   %t219 = load i64, i64* %__ms
@@ -17269,8 +17476,8 @@ match.arm1179:
   store i64 %t217, i64* %o
   store i64 %t218, i64* %f
   store i64 %t219, i64* %__ms
-  br label %match.end1178
-match.arm1180:
+  br label %match.end1189
+match.arm1191:
   %t228 = load i64, i64* %o
   %t229 = load i64, i64* %f
   %t230 = load i64, i64* %__gs
@@ -17289,16 +17496,16 @@ match.arm1180:
   store i64 %t228, i64* %o
   store i64 %t229, i64* %f
   store i64 %t230, i64* %__gs
-  br label %match.end1178
-match.arm1181:
+  br label %match.end1189
+match.arm1192:
   %t239 = call i8* @__sf_malloc(i64 8)
   %t240 = bitcast i8* %t239 to [1 x i64]*
   %t241 = getelementptr [1 x i64], [1 x i64]* %t240, i64 0, i64 0
   store i64 4, i64* %t241
   %t242 = ptrtoint [1 x i64]* %t240 to i64
   store i64 %t242, i64* %t213
-  br label %match.end1178
-match.end1178:
+  br label %match.end1189
+match.end1189:
   %t243 = load i64, i64* %t213
   store i64 %t243, i64* %mobj
   %t244 = load i64, i64* %target
@@ -17306,8 +17513,8 @@ match.end1178:
   %t247 = inttoptr i64 %t244 to i64*
   %t248 = load i64, i64* %t247
   %t246 = trunc i64 %t248 to i8
-  switch i8 %t246, label %match.arm1185 [ i8 11, label %match.arm1183 i8 15, label %match.arm1184 ]
-match.arm1183:
+  switch i8 %t246, label %match.arm1196 [ i8 11, label %match.arm1194 i8 15, label %match.arm1195 ]
+match.arm1194:
   %t249 = load i64, i64* %o
   %t250 = load i64, i64* %f
   %t251 = load i64, i64* %__ms
@@ -17326,8 +17533,8 @@ match.arm1183:
   store i64 %t249, i64* %o
   store i64 %t250, i64* %f
   store i64 %t251, i64* %__ms
-  br label %match.end1182
-match.arm1184:
+  br label %match.end1193
+match.arm1195:
   %t260 = load i64, i64* %o
   %t261 = load i64, i64* %f
   %t262 = load i64, i64* %__gs
@@ -17346,13 +17553,13 @@ match.arm1184:
   store i64 %t260, i64* %o
   store i64 %t261, i64* %f
   store i64 %t262, i64* %__gs
-  br label %match.end1182
-match.arm1185:
-  %t271 = getelementptr [1 x i8], [1 x i8]* @.str.729, i64 0, i64 0
+  br label %match.end1193
+match.arm1196:
+  %t271 = getelementptr [1 x i8], [1 x i8]* @.str.731, i64 0, i64 0
   %t272 = ptrtoint i8* %t271 to i64
   store i64 %t272, i64* %t245
-  br label %match.end1182
-match.end1182:
+  br label %match.end1193
+match.end1193:
   %t273 = load i64, i64* %t245
   store i64 %t273, i64* %mfield
   %t274 = load i64, i64* %target
@@ -17360,8 +17567,8 @@ match.end1182:
   %t277 = inttoptr i64 %t274 to i64*
   %t278 = load i64, i64* %t277
   %t276 = trunc i64 %t278 to i8
-  switch i8 %t276, label %match.arm1189 [ i8 11, label %match.arm1187 i8 15, label %match.arm1188 ]
-match.arm1187:
+  switch i8 %t276, label %match.arm1200 [ i8 11, label %match.arm1198 i8 15, label %match.arm1199 ]
+match.arm1198:
   %t279 = load i64, i64* %o
   %t280 = load i64, i64* %f
   %t281 = load i64, i64* %__ms
@@ -17380,8 +17587,8 @@ match.arm1187:
   store i64 %t279, i64* %o
   store i64 %t280, i64* %f
   store i64 %t281, i64* %__ms
-  br label %match.end1186
-match.arm1188:
+  br label %match.end1197
+match.arm1199:
   %t290 = load i64, i64* %o
   %t291 = load i64, i64* %f
   %t292 = load i64, i64* %__gs
@@ -17400,12 +17607,12 @@ match.arm1188:
   store i64 %t290, i64* %o
   store i64 %t291, i64* %f
   store i64 %t292, i64* %__gs
-  br label %match.end1186
-match.arm1189:
+  br label %match.end1197
+match.arm1200:
   %t301 = call i64 @ast_span_none()
   store i64 %t301, i64* %t275
-  br label %match.end1186
-match.end1186:
+  br label %match.end1197
+match.end1197:
   %t302 = load i64, i64* %t275
   store i64 %t302, i64* %mfs
   %t303 = load i64, i64* %mobj
@@ -17413,22 +17620,22 @@ match.end1186:
   %t306 = inttoptr i64 %t303 to i64*
   %t307 = load i64, i64* %t306
   %t305 = trunc i64 %t307 to i8
-  switch i8 %t305, label %match.arm1192 [ i8 17, label %match.arm1191 ]
-match.arm1191:
+  switch i8 %t305, label %match.arm1203 [ i8 17, label %match.arm1202 ]
+match.arm1202:
   %t308 = add i64 0, 1
   store i64 %t308, i64* %t304
-  br label %match.end1190
-match.arm1192:
+  br label %match.end1201
+match.arm1203:
   %t309 = add i64 0, 0
   store i64 %t309, i64* %t304
-  br label %match.end1190
-match.end1190:
+  br label %match.end1201
+match.end1201:
   %t310 = load i64, i64* %t304
   store i64 %t310, i64* %recv_is_this
   %t311 = load i64, i64* %recv_is_this
   %t312 = trunc i64 %t311 to i1
-  br i1 %t312, label %then1194, label %else1195
-then1194:
+  br i1 %t312, label %then1205, label %else1206
+then1205:
   %t313 = call i8* @__sf_malloc(i64 8)
   %t314 = bitcast i8* %t313 to [1 x i64]*
   %t315 = getelementptr [1 x i64], [1 x i64]* %t314, i64 0, i64 0
@@ -17448,9 +17655,9 @@ then1194:
   store i64 %t318, i64* %t324
   %t325 = ptrtoint [4 x i64]* %t320 to i64
   store i64 %t325, i64* %place
-  br label %endif1193
-else1195:
-  %t326 = getelementptr [11 x i8], [11 x i8]* @.str.730, i64 0, i64 0
+  br label %endif1204
+else1206:
+  %t326 = getelementptr [11 x i8], [11 x i8]* @.str.732, i64 0, i64 0
   %t327 = ptrtoint i8* %t326 to i64
   %t328 = load i64, i64* %uid
   %t329 = inttoptr i64 %t327 to i8*
@@ -17475,9 +17682,9 @@ else1195:
   store i64 12, i64* %t344
   %t345 = ptrtoint [1 x i64]* %t343 to i64
   %t346 = load i64, i64* %mobj
-  %t347 = getelementptr [1 x i8], [1 x i8]* @.str.731, i64 0, i64 0
+  %t347 = getelementptr [1 x i8], [1 x i8]* @.str.733, i64 0, i64 0
   %t348 = ptrtoint i8* %t347 to i64
-  %t349 = getelementptr [7 x i8], [7 x i8]* @.str.732, i64 0, i64 0
+  %t349 = getelementptr [7 x i8], [7 x i8]* @.str.734, i64 0, i64 0
   %t350 = ptrtoint i8* %t349 to i64
   %t351 = load i64, i64* %synth
   %t352 = load i64, i64* %synth
@@ -17526,12 +17733,12 @@ else1195:
   store i64 %t374, i64* %t380
   %t381 = ptrtoint [4 x i64]* %t376 to i64
   store i64 %t381, i64* %place
-  br label %endif1193
-endif1193:
-  br label %endif1163
-else1177:
-  br label %endif1163
-endif1163:
+  br label %endif1204
+endif1204:
+  br label %endif1174
+else1188:
+  br label %endif1174
+endif1174:
   %t382 = load i64, i64* %stmts
   %t383 = load i64, i64* %val_name
   %t384 = call i8* @__sf_malloc(i64 8)
@@ -17540,9 +17747,9 @@ endif1163:
   store i64 12, i64* %t386
   %t387 = ptrtoint [1 x i64]* %t385 to i64
   %t388 = load i64, i64* %place
-  %t389 = getelementptr [1 x i8], [1 x i8]* @.str.733, i64 0, i64 0
+  %t389 = getelementptr [1 x i8], [1 x i8]* @.str.735, i64 0, i64 0
   %t390 = ptrtoint i8* %t389 to i64
-  %t391 = getelementptr [7 x i8], [7 x i8]* @.str.734, i64 0, i64 0
+  %t391 = getelementptr [7 x i8], [7 x i8]* @.str.736, i64 0, i64 0
   %t392 = ptrtoint i8* %t391 to i64
   %t393 = load i64, i64* %synth
   %t394 = load i64, i64* %synth
@@ -17642,7 +17849,7 @@ entry:
   %t8 = inttoptr i64 %t1 to %Parser*
   %t9 = getelementptr %Parser, %Parser* %t8, i32 0, i32 8
   store volatile i64 %t7, i64* %t9
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.735, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.737, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = load i64, i64* %self
   %t13 = inttoptr i64 %t12 to %Parser*
@@ -17693,83 +17900,83 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__parse_primary(i64 %t3)
   store i64 %t4, i64* %expr
-  br label %while.cond1196
-while.cond1196:
+  br label %while.cond1207
+while.cond1207:
   %t5 = add i64 0, 1
   %t6 = trunc i64 %t5 to i1
-  br i1 %t6, label %while.body1197, label %while.end1198
-while.body1197:
+  br i1 %t6, label %while.body1208, label %while.end1209
+while.body1208:
   %t7 = load i64, i64* %self
-  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.736, i64 0, i64 0
+  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.738, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i64 @Parser__match_kind_check(i64 %t7, i64 %t9)
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then1200, label %else1201
-then1200:
+  br i1 %t11, label %then1211, label %else1212
+then1211:
   %t12 = load i64, i64* %self
-  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.737, i64 0, i64 0
+  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.739, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @Parser__peek_is(i64 %t12, i64 %t14)
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then1203, label %else1204
-then1203:
+  br i1 %t16, label %then1214, label %else1215
+then1214:
   %t17 = load i64, i64* %self
-  %t18 = getelementptr [92 x i8], [92 x i8]* @.str.738, i64 0, i64 0
+  %t18 = getelementptr [92 x i8], [92 x i8]* @.str.740, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = call i64 @Parser__parse_error(i64 %t17, i64 %t19)
   %t21 = load i64, i64* %self
-  %t22 = getelementptr [4 x i8], [4 x i8]* @.str.739, i64 0, i64 0
+  %t22 = getelementptr [4 x i8], [4 x i8]* @.str.741, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   %t24 = call i64 @Parser__match_kind_check(i64 %t21, i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then1206, label %else1207
-then1206:
-  br label %while.end1198
-else1207:
-  br label %endif1205
-endif1205:
+  br i1 %t25, label %then1217, label %else1218
+then1217:
+  br label %while.end1209
+else1218:
+  br label %endif1216
+endif1216:
   %t26 = load i64, i64* %self
   %t27 = call i64 @Parser__advance(i64 %t26)
   %t28 = load i64, i64* %self
-  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.740, i64 0, i64 0
+  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.742, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i64 @Parser__match_kind_check(i64 %t28, i64 %t30)
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then1209, label %else1210
-then1209:
+  br i1 %t32, label %then1220, label %else1221
+then1220:
   %t33 = load i64, i64* %self
   %t34 = call i64 @Parser__advance(i64 %t33)
-  br label %endif1208
-else1210:
-  br label %endif1208
-endif1208:
+  br label %endif1219
+else1221:
+  br label %endif1219
+endif1219:
   %t35 = load i64, i64* %self
-  %t36 = getelementptr [4 x i8], [4 x i8]* @.str.741, i64 0, i64 0
+  %t36 = getelementptr [4 x i8], [4 x i8]* @.str.743, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @Parser__match_kind_check(i64 %t35, i64 %t37)
   %t39 = xor i64 %t38, 1
   %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %then1212, label %else1213
-then1212:
+  br i1 %t40, label %then1223, label %else1224
+then1223:
   %t41 = load i64, i64* %self
   %t42 = call i64 @Parser__parse_unary(i64 %t41)
-  br label %endif1211
-else1213:
-  br label %endif1211
-endif1211:
-  br label %while.end1198
-else1204:
-  br label %endif1202
-endif1202:
+  br label %endif1222
+else1224:
+  br label %endif1222
+endif1222:
+  br label %while.end1209
+else1215:
+  br label %endif1213
+endif1213:
   %t43 = load i64, i64* %self
   %t44 = call i64 @Parser__advance(i64 %t43)
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.742, i64 0, i64 0
+  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.744, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__match_kind_check(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then1215, label %else1216
-then1215:
+  br i1 %t49, label %then1226, label %else1227
+then1226:
   %t50 = load i64, i64* %self
   %t51 = call i64 @Parser__current_kind(i64 %t50)
   store i64 %t51, i64* %idx_kind
@@ -17778,8 +17985,8 @@ then1215:
   %t55 = inttoptr i64 %t52 to i64*
   %t56 = load i64, i64* %t55
   %t54 = trunc i64 %t56 to i8
-  switch i8 %t54, label %match.arm1219 [ i8 0, label %match.arm1218 ]
-match.arm1218:
+  switch i8 %t54, label %match.arm1230 [ i8 0, label %match.arm1229 ]
+match.arm1229:
   %t57 = load i64, i64* %v
   %t58 = inttoptr i64 %t52 to [2 x i64]*
   %t59 = getelementptr [2 x i64], [2 x i64]* %t58, i64 0, i64 1
@@ -17788,12 +17995,12 @@ match.arm1218:
   %t61 = load i64, i64* %v
   store i64 %t61, i64* %t53
   store i64 %t57, i64* %v
-  br label %match.end1217
-match.arm1219:
+  br label %match.end1228
+match.arm1230:
   %t62 = add i64 0, 0
   store i64 %t62, i64* %t53
-  br label %match.end1217
-match.end1217:
+  br label %match.end1228
+match.end1228:
   %t63 = load i64, i64* %t53
   store i64 %t63, i64* %idx_val
   %t64 = load i64, i64* %expr
@@ -17801,8 +18008,8 @@ match.end1217:
   %t67 = inttoptr i64 %t64 to i64*
   %t68 = load i64, i64* %t67
   %t66 = trunc i64 %t68 to i8
-  switch i8 %t66, label %match.arm1222 [ i8 1, label %match.arm1221 ]
-match.arm1221:
+  switch i8 %t66, label %match.arm1233 [ i8 1, label %match.arm1232 ]
+match.arm1232:
   %t69 = load i64, i64* %v
   %t70 = inttoptr i64 %t64 to [2 x i64]*
   %t71 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 1
@@ -17811,28 +18018,28 @@ match.arm1221:
   %t73 = add i64 0, 1
   store i64 %t73, i64* %t65
   store i64 %t69, i64* %v
-  br label %match.end1220
-match.arm1222:
+  br label %match.end1231
+match.arm1233:
   %t74 = add i64 0, 0
   store i64 %t74, i64* %t65
-  br label %match.end1220
-match.end1220:
+  br label %match.end1231
+match.end1231:
   %t75 = load i64, i64* %t65
   store i64 %t75, i64* %recv_is_float
   %t76 = load i64, i64* %recv_is_float
   %t77 = trunc i64 %t76 to i1
-  br i1 %t77, label %then1224, label %else1225
-then1224:
+  br i1 %t77, label %then1235, label %else1236
+then1235:
   %t78 = load i64, i64* %self
-  %t79 = getelementptr [97 x i8], [97 x i8]* @.str.743, i64 0, i64 0
+  %t79 = getelementptr [97 x i8], [97 x i8]* @.str.745, i64 0, i64 0
   %t80 = ptrtoint i8* %t79 to i64
   %t81 = call i64 @Parser__parse_error(i64 %t78, i64 %t80)
   %t82 = load i64, i64* %self
   %t83 = call i64 @Parser__advance(i64 %t82)
-  br label %while.cond1196
-else1225:
-  br label %endif1223
-endif1223:
+  br label %while.cond1207
+else1236:
+  br label %endif1234
+endif1234:
   %t84 = load i64, i64* %self
   %t85 = call i64 @Parser__advance(i64 %t84)
   %t86 = load i64, i64* %expr
@@ -17854,10 +18061,10 @@ endif1223:
   store i64 %t92, i64* %t97
   %t98 = ptrtoint [3 x i64]* %t94 to i64
   store i64 %t98, i64* %expr
-  br label %while.cond1196
-else1216:
-  br label %endif1214
-endif1214:
+  br label %while.cond1207
+else1227:
+  br label %endif1225
+endif1225:
   %t99 = load i64, i64* %self
   %t100 = call i64 @Parser__ident_span(i64 %t99)
   store i64 %t100, i64* %field_span
@@ -17865,68 +18072,68 @@ endif1214:
   %t102 = call i64 @Parser__expect_ident(i64 %t101)
   store i64 %t102, i64* %field
   %t103 = load i64, i64* %self
-  %t104 = getelementptr [2 x i8], [2 x i8]* @.str.744, i64 0, i64 0
+  %t104 = getelementptr [2 x i8], [2 x i8]* @.str.746, i64 0, i64 0
   %t105 = ptrtoint i8* %t104 to i64
   %t106 = call i64 @Parser__match_kind_check(i64 %t103, i64 %t105)
   %t107 = trunc i64 %t106 to i1
-  br i1 %t107, label %then1227, label %else1228
-then1227:
+  br i1 %t107, label %then1238, label %else1239
+then1238:
   %t108 = load i64, i64* %self
   %t109 = call i64 @Parser__advance(i64 %t108)
   %t110 = call i64 @__list_new()
   store i64 %t110, i64* %args
   %t111 = load i64, i64* %self
-  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.745, i64 0, i64 0
+  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.747, i64 0, i64 0
   %t113 = ptrtoint i8* %t112 to i64
   %t114 = call i64 @Parser__match_kind_check(i64 %t111, i64 %t113)
   %t115 = xor i64 %t114, 1
   %t116 = trunc i64 %t115 to i1
-  br i1 %t116, label %then1230, label %else1231
-then1230:
+  br i1 %t116, label %then1241, label %else1242
+then1241:
   %t117 = load i64, i64* %args
   %t118 = load i64, i64* %self
   %t119 = call i64 @Parser__parse_call_arg(i64 %t118)
   %t120 = call i64 @__list_push(i64 %t117, i64 %t119)
-  br label %while.cond1232
-while.cond1232:
+  br label %while.cond1243
+while.cond1243:
   %t121 = load i64, i64* %self
-  %t122 = getelementptr [2 x i8], [2 x i8]* @.str.746, i64 0, i64 0
+  %t122 = getelementptr [2 x i8], [2 x i8]* @.str.748, i64 0, i64 0
   %t123 = ptrtoint i8* %t122 to i64
   %t124 = call i64 @Parser__match_kind(i64 %t121, i64 %t123)
   %t125 = trunc i64 %t124 to i1
-  br i1 %t125, label %while.body1233, label %while.end1234
-while.body1233:
+  br i1 %t125, label %while.body1244, label %while.end1245
+while.body1244:
   %t126 = load i64, i64* %args
   %t127 = load i64, i64* %self
   %t128 = call i64 @Parser__parse_call_arg(i64 %t127)
   %t129 = call i64 @__list_push(i64 %t126, i64 %t128)
-  br label %while.cond1232
-while.end1234:
+  br label %while.cond1243
+while.end1245:
   %t130 = load i64, i64* %self
-  %t131 = getelementptr [2 x i8], [2 x i8]* @.str.747, i64 0, i64 0
+  %t131 = getelementptr [2 x i8], [2 x i8]* @.str.749, i64 0, i64 0
   %t132 = ptrtoint i8* %t131 to i64
   %t133 = call i64 @Parser__consume(i64 %t130, i64 %t132)
-  br label %endif1229
-else1231:
+  br label %endif1240
+else1242:
   %t134 = load i64, i64* %self
   %t135 = call i64 @Parser__advance(i64 %t134)
-  br label %endif1229
-endif1229:
+  br label %endif1240
+endif1240:
   %t136 = load i64, i64* %self
-  %t137 = getelementptr [2 x i8], [2 x i8]* @.str.748, i64 0, i64 0
+  %t137 = getelementptr [2 x i8], [2 x i8]* @.str.750, i64 0, i64 0
   %t138 = ptrtoint i8* %t137 to i64
   %t139 = call i64 @Parser__match_kind_check(i64 %t136, i64 %t138)
   %t140 = trunc i64 %t139 to i1
-  br i1 %t140, label %then1236, label %else1237
-then1236:
+  br i1 %t140, label %then1247, label %else1248
+then1247:
   %t141 = load i64, i64* %args
   %t142 = load i64, i64* %self
   %t143 = call i64 @Parser__parse_trailing_closure(i64 %t142)
   %t144 = call i64 @__list_push(i64 %t141, i64 %t143)
-  br label %endif1235
-else1237:
-  br label %endif1235
-endif1235:
+  br label %endif1246
+else1248:
+  br label %endif1246
+endif1246:
   %t145 = load i64, i64* %expr
   %t146 = load i64, i64* %field
   %t147 = load i64, i64* %args
@@ -17945,8 +18152,8 @@ endif1235:
   store i64 %t148, i64* %t155
   %t156 = ptrtoint [5 x i64]* %t150 to i64
   store i64 %t156, i64* %expr
-  br label %endif1226
-else1228:
+  br label %endif1237
+else1239:
   %t157 = load i64, i64* %expr
   %t158 = load i64, i64* %field
   %t159 = load i64, i64* %field_span
@@ -17962,24 +18169,24 @@ else1228:
   store i64 %t159, i64* %t165
   %t166 = ptrtoint [4 x i64]* %t161 to i64
   store i64 %t166, i64* %expr
-  br label %endif1226
-endif1226:
-  br label %endif1199
-else1201:
+  br label %endif1237
+endif1237:
+  br label %endif1210
+else1212:
   %t167 = load i64, i64* %self
-  %t168 = getelementptr [2 x i8], [2 x i8]* @.str.749, i64 0, i64 0
+  %t168 = getelementptr [2 x i8], [2 x i8]* @.str.751, i64 0, i64 0
   %t169 = ptrtoint i8* %t168 to i64
   %t170 = call i64 @Parser__match_kind_check(i64 %t167, i64 %t169)
   %t171 = trunc i64 %t170 to i1
-  br i1 %t171, label %then1238, label %else1239
-then1238:
+  br i1 %t171, label %then1249, label %else1250
+then1249:
   %t172 = load i64, i64* %self
   %t173 = call i64 @Parser__advance(i64 %t172)
   %t174 = load i64, i64* %self
   %t175 = call i64 @Parser__parse_expr(i64 %t174)
   store i64 %t175, i64* %idx
   %t176 = load i64, i64* %self
-  %t177 = getelementptr [2 x i8], [2 x i8]* @.str.750, i64 0, i64 0
+  %t177 = getelementptr [2 x i8], [2 x i8]* @.str.752, i64 0, i64 0
   %t178 = ptrtoint i8* %t177 to i64
   %t179 = call i64 @Parser__consume(i64 %t176, i64 %t178)
   %t180 = load i64, i64* %expr
@@ -17994,71 +18201,71 @@ then1238:
   store i64 %t181, i64* %t186
   %t187 = ptrtoint [3 x i64]* %t183 to i64
   store i64 %t187, i64* %expr
-  br label %endif1199
-else1239:
+  br label %endif1210
+else1250:
   %t188 = load i64, i64* %self
-  %t189 = getelementptr [2 x i8], [2 x i8]* @.str.751, i64 0, i64 0
+  %t189 = getelementptr [2 x i8], [2 x i8]* @.str.753, i64 0, i64 0
   %t190 = ptrtoint i8* %t189 to i64
   %t191 = call i64 @Parser__match_kind_check(i64 %t188, i64 %t190)
   %t192 = trunc i64 %t191 to i1
-  br i1 %t192, label %then1240, label %else1241
-then1240:
+  br i1 %t192, label %then1251, label %else1252
+then1251:
   %t193 = load i64, i64* %self
   %t194 = call i64 @Parser__advance(i64 %t193)
   %t195 = call i64 @__list_new()
   store i64 %t195, i64* %args
   %t196 = load i64, i64* %self
-  %t197 = getelementptr [2 x i8], [2 x i8]* @.str.752, i64 0, i64 0
+  %t197 = getelementptr [2 x i8], [2 x i8]* @.str.754, i64 0, i64 0
   %t198 = ptrtoint i8* %t197 to i64
   %t199 = call i64 @Parser__match_kind_check(i64 %t196, i64 %t198)
   %t200 = xor i64 %t199, 1
   %t201 = trunc i64 %t200 to i1
-  br i1 %t201, label %then1243, label %else1244
-then1243:
+  br i1 %t201, label %then1254, label %else1255
+then1254:
   %t202 = load i64, i64* %args
   %t203 = load i64, i64* %self
   %t204 = call i64 @Parser__parse_call_arg(i64 %t203)
   %t205 = call i64 @__list_push(i64 %t202, i64 %t204)
-  br label %while.cond1245
-while.cond1245:
+  br label %while.cond1256
+while.cond1256:
   %t206 = load i64, i64* %self
-  %t207 = getelementptr [2 x i8], [2 x i8]* @.str.753, i64 0, i64 0
+  %t207 = getelementptr [2 x i8], [2 x i8]* @.str.755, i64 0, i64 0
   %t208 = ptrtoint i8* %t207 to i64
   %t209 = call i64 @Parser__match_kind(i64 %t206, i64 %t208)
   %t210 = trunc i64 %t209 to i1
-  br i1 %t210, label %while.body1246, label %while.end1247
-while.body1246:
+  br i1 %t210, label %while.body1257, label %while.end1258
+while.body1257:
   %t211 = load i64, i64* %args
   %t212 = load i64, i64* %self
   %t213 = call i64 @Parser__parse_call_arg(i64 %t212)
   %t214 = call i64 @__list_push(i64 %t211, i64 %t213)
-  br label %while.cond1245
-while.end1247:
+  br label %while.cond1256
+while.end1258:
   %t215 = load i64, i64* %self
-  %t216 = getelementptr [2 x i8], [2 x i8]* @.str.754, i64 0, i64 0
+  %t216 = getelementptr [2 x i8], [2 x i8]* @.str.756, i64 0, i64 0
   %t217 = ptrtoint i8* %t216 to i64
   %t218 = call i64 @Parser__consume(i64 %t215, i64 %t217)
-  br label %endif1242
-else1244:
+  br label %endif1253
+else1255:
   %t219 = load i64, i64* %self
   %t220 = call i64 @Parser__advance(i64 %t219)
-  br label %endif1242
-endif1242:
+  br label %endif1253
+endif1253:
   %t221 = load i64, i64* %self
-  %t222 = getelementptr [2 x i8], [2 x i8]* @.str.755, i64 0, i64 0
+  %t222 = getelementptr [2 x i8], [2 x i8]* @.str.757, i64 0, i64 0
   %t223 = ptrtoint i8* %t222 to i64
   %t224 = call i64 @Parser__match_kind_check(i64 %t221, i64 %t223)
   %t225 = trunc i64 %t224 to i1
-  br i1 %t225, label %then1249, label %else1250
-then1249:
+  br i1 %t225, label %then1260, label %else1261
+then1260:
   %t226 = load i64, i64* %args
   %t227 = load i64, i64* %self
   %t228 = call i64 @Parser__parse_trailing_closure(i64 %t227)
   %t229 = call i64 @__list_push(i64 %t226, i64 %t228)
-  br label %endif1248
-else1250:
-  br label %endif1248
-endif1248:
+  br label %endif1259
+else1261:
+  br label %endif1259
+endif1259:
   %t230 = load i64, i64* %expr
   %t231 = load i64, i64* %args
   %t232 = load i64, i64* %self
@@ -18076,17 +18283,17 @@ endif1248:
   store i64 %t234, i64* %t240
   %t241 = ptrtoint [4 x i64]* %t236 to i64
   store i64 %t241, i64* %expr
-  br label %endif1199
-else1241:
+  br label %endif1210
+else1252:
   %t242 = load i64, i64* %self
-  %t243 = getelementptr [2 x i8], [2 x i8]* @.str.756, i64 0, i64 0
+  %t243 = getelementptr [2 x i8], [2 x i8]* @.str.758, i64 0, i64 0
   %t244 = ptrtoint i8* %t243 to i64
   %t245 = call i64 @Parser__match_kind_check(i64 %t242, i64 %t244)
   %t246 = trunc i64 %t245 to i1
-  br label %logic.entry1251
-logic.entry1251:
-  br i1 %t246, label %rhs1252, label %end1253
-rhs1252:
+  br label %logic.entry1262
+logic.entry1262:
+  br i1 %t246, label %rhs1263, label %end1264
+rhs1263:
   %t247 = load i64, i64* %self
   %t248 = call i64 @Parser__current_line_num(i64 %t247)
   %t249 = load i64, i64* %self
@@ -18094,22 +18301,22 @@ rhs1252:
   %t251 = icmp eq i64 %t248, %t250
   %t252 = zext i1 %t251 to i64
   %t253 = trunc i64 %t252 to i1
-  br label %rhs.exit1254
-rhs.exit1254:
-  br label %end1253
-end1253:
-  %t254 = phi i1 [%t246, %logic.entry1251], [%t253, %rhs.exit1254]
+  br label %rhs.exit1265
+rhs.exit1265:
+  br label %end1264
+end1264:
+  %t254 = phi i1 [%t246, %logic.entry1262], [%t253, %rhs.exit1265]
   %t255 = zext i1 %t254 to i64
   %t256 = trunc i64 %t255 to i1
-  br i1 %t256, label %then1255, label %else1256
-then1255:
+  br i1 %t256, label %then1266, label %else1267
+then1266:
   %t257 = load i64, i64* %expr
   %t258 = alloca i64
   %t260 = inttoptr i64 %t257 to i64*
   %t261 = load i64, i64* %t260
   %t259 = trunc i64 %t261 to i8
-  switch i8 %t259, label %match.arm1260 [ i8 5, label %match.arm1258 i8 11, label %match.arm1259 ]
-match.arm1258:
+  switch i8 %t259, label %match.arm1271 [ i8 5, label %match.arm1269 i8 11, label %match.arm1270 ]
+match.arm1269:
   %t262 = load i64, i64* %n
   %t263 = load i64, i64* %__vs
   %t264 = inttoptr i64 %t257 to [3 x i64]*
@@ -18123,8 +18330,8 @@ match.arm1258:
   store i64 %t269, i64* %t258
   store i64 %t262, i64* %n
   store i64 %t263, i64* %__vs
-  br label %match.end1257
-match.arm1259:
+  br label %match.end1268
+match.arm1270:
   %t270 = load i64, i64* %o
   %t271 = load i64, i64* %f
   %t272 = load i64, i64* %__ms
@@ -18143,18 +18350,18 @@ match.arm1259:
   store i64 %t270, i64* %o
   store i64 %t271, i64* %f
   store i64 %t272, i64* %__ms
-  br label %match.end1257
-match.arm1260:
+  br label %match.end1268
+match.arm1271:
   %t281 = add i64 0, 0
   store i64 %t281, i64* %t258
-  br label %match.end1257
-match.end1257:
+  br label %match.end1268
+match.end1268:
   %t282 = load i64, i64* %t258
   store i64 %t282, i64* %is_callable
   %t283 = load i64, i64* %is_callable
   %t284 = trunc i64 %t283 to i1
-  br i1 %t284, label %then1262, label %else1263
-then1262:
+  br i1 %t284, label %then1273, label %else1274
+then1273:
   %t285 = call i64 @__list_new()
   %t286 = load i64, i64* %self
   %t287 = call i64 @Parser__parse_trailing_closure(i64 %t286)
@@ -18177,16 +18384,16 @@ then1262:
   store i64 %t293, i64* %t299
   %t300 = ptrtoint [4 x i64]* %t295 to i64
   store i64 %t300, i64* %expr
-  br label %endif1261
-else1263:
-  br label %while.end1198
-endif1261:
-  br label %endif1199
-else1256:
-  br label %while.end1198
-endif1199:
-  br label %while.cond1196
-while.end1198:
+  br label %endif1272
+else1274:
+  br label %while.end1209
+endif1272:
+  br label %endif1210
+else1267:
+  br label %while.end1209
+endif1210:
+  br label %while.cond1207
+while.end1209:
   %t301 = load i64, i64* %expr
   ret i64 %t301
 }
@@ -18223,37 +18430,37 @@ entry:
   %elems = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.757, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.759, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1265
-logic.entry1265:
-  br i1 %t5, label %end1267, label %rhs1266
-rhs1266:
+  br label %logic.entry1276
+logic.entry1276:
+  br i1 %t5, label %end1278, label %rhs1277
+rhs1277:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.758, i64 0, i64 0
+  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.760, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__is_ident_named(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1268
-rhs.exit1268:
-  br label %end1267
-end1267:
-  %t11 = phi i1 [%t5, %logic.entry1265], [%t10, %rhs.exit1268]
+  br label %rhs.exit1279
+rhs.exit1279:
+  br label %end1278
+end1278:
+  %t11 = phi i1 [%t5, %logic.entry1276], [%t10, %rhs.exit1279]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then1269, label %else1270
-then1269:
+  br i1 %t13, label %then1280, label %else1281
+then1280:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__advance(i64 %t14)
   %t16 = load i64, i64* %self
-  %t17 = getelementptr [2 x i8], [2 x i8]* @.str.759, i64 0, i64 0
+  %t17 = getelementptr [2 x i8], [2 x i8]* @.str.761, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @Parser__match_kind_check(i64 %t16, i64 %t18)
   %t20 = trunc i64 %t19 to i1
-  br i1 %t20, label %then1272, label %else1273
-then1272:
+  br i1 %t20, label %then1283, label %else1284
+then1283:
   %t21 = load i64, i64* %self
   %t22 = call i64 @Parser__parse_expr(i64 %t21)
   store i64 %t22, i64* %yval
@@ -18266,9 +18473,9 @@ then1272:
   store i64 %t23, i64* %t27
   %t28 = ptrtoint [2 x i64]* %t25 to i64
   ret i64 %t28
-else1273:
-  br label %endif1271
-endif1271:
+else1284:
+  br label %endif1282
+endif1282:
   %t29 = call i8* @__sf_malloc(i64 8)
   %t30 = bitcast i8* %t29 to [1 x i64]*
   %t31 = getelementptr [1 x i64], [1 x i64]* %t30, i64 0, i64 0
@@ -18282,124 +18489,124 @@ endif1271:
   store i64 %t32, i64* %t36
   %t37 = ptrtoint [2 x i64]* %t34 to i64
   ret i64 %t37
-else1270:
-  br label %endif1264
-endif1264:
+else1281:
+  br label %endif1275
+endif1275:
   %t38 = load i64, i64* %self
-  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.760, i64 0, i64 0
+  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.762, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = call i64 @Parser__match_kind_check(i64 %t38, i64 %t40)
   %t42 = trunc i64 %t41 to i1
-  br label %logic.entry1275
-logic.entry1275:
-  br i1 %t42, label %rhs1276, label %end1277
-rhs1276:
+  br label %logic.entry1286
+logic.entry1286:
+  br i1 %t42, label %rhs1287, label %end1288
+rhs1287:
   %t43 = load i64, i64* %self
-  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.761, i64 0, i64 0
+  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.763, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i64
   %t46 = call i64 @Parser__peek_is(i64 %t43, i64 %t45)
   %t47 = trunc i64 %t46 to i1
-  br label %rhs.exit1278
-rhs.exit1278:
-  br label %end1277
-end1277:
-  %t48 = phi i1 [%t42, %logic.entry1275], [%t47, %rhs.exit1278]
+  br label %rhs.exit1289
+rhs.exit1289:
+  br label %end1288
+end1288:
+  %t48 = phi i1 [%t42, %logic.entry1286], [%t47, %rhs.exit1289]
   %t49 = zext i1 %t48 to i64
   %t50 = trunc i64 %t49 to i1
-  br i1 %t50, label %then1279, label %else1280
-then1279:
+  br i1 %t50, label %then1290, label %else1291
+then1290:
   %t51 = load i64, i64* %self
   %t52 = call i64 @Parser__parse_html_fragment(i64 %t51)
   ret i64 %t52
-else1280:
-  br label %endif1274
-endif1274:
+else1291:
+  br label %endif1285
+endif1285:
   %t53 = load i64, i64* %self
-  %t54 = getelementptr [2 x i8], [2 x i8]* @.str.762, i64 0, i64 0
+  %t54 = getelementptr [2 x i8], [2 x i8]* @.str.764, i64 0, i64 0
   %t55 = ptrtoint i8* %t54 to i64
   %t56 = call i64 @Parser__match_kind_check(i64 %t53, i64 %t55)
   %t57 = trunc i64 %t56 to i1
-  br label %logic.entry1282
-logic.entry1282:
-  br i1 %t57, label %rhs1283, label %end1284
-rhs1283:
+  br label %logic.entry1293
+logic.entry1293:
+  br i1 %t57, label %rhs1294, label %end1295
+rhs1294:
   %t58 = load i64, i64* %self
   %t59 = call i64 @Parser__peek_is_html_start(i64 %t58)
   %t60 = trunc i64 %t59 to i1
-  br label %rhs.exit1285
-rhs.exit1285:
-  br label %end1284
-end1284:
-  %t61 = phi i1 [%t57, %logic.entry1282], [%t60, %rhs.exit1285]
+  br label %rhs.exit1296
+rhs.exit1296:
+  br label %end1295
+end1295:
+  %t61 = phi i1 [%t57, %logic.entry1293], [%t60, %rhs.exit1296]
   %t62 = zext i1 %t61 to i64
   %t63 = trunc i64 %t62 to i1
-  br i1 %t63, label %then1286, label %else1287
-then1286:
+  br i1 %t63, label %then1297, label %else1298
+then1297:
   %t64 = load i64, i64* %self
   %t65 = call i64 @Parser__parse_html_element(i64 %t64)
   ret i64 %t65
-else1287:
-  br label %endif1281
-endif1281:
+else1298:
+  br label %endif1292
+endif1292:
   %t66 = load i64, i64* %self
-  %t67 = getelementptr [3 x i8], [3 x i8]* @.str.763, i64 0, i64 0
+  %t67 = getelementptr [3 x i8], [3 x i8]* @.str.765, i64 0, i64 0
   %t68 = ptrtoint i8* %t67 to i64
   %t69 = call i64 @Parser__match_kind_check(i64 %t66, i64 %t68)
   %t70 = trunc i64 %t69 to i1
-  br i1 %t70, label %then1289, label %else1290
-then1289:
+  br i1 %t70, label %then1300, label %else1301
+then1300:
   %t71 = load i64, i64* %self
   %t72 = call i64 @Parser__parse_if_expr(i64 %t71)
   ret i64 %t72
-else1290:
-  br label %endif1288
-endif1288:
+else1301:
+  br label %endif1299
+endif1299:
   %t73 = load i64, i64* %self
-  %t74 = getelementptr [4 x i8], [4 x i8]* @.str.764, i64 0, i64 0
+  %t74 = getelementptr [4 x i8], [4 x i8]* @.str.766, i64 0, i64 0
   %t75 = ptrtoint i8* %t74 to i64
   %t76 = call i64 @Parser__match_kind_check(i64 %t73, i64 %t75)
   %t77 = trunc i64 %t76 to i1
-  br i1 %t77, label %then1292, label %else1293
-then1292:
+  br i1 %t77, label %then1303, label %else1304
+then1303:
   %t78 = load i64, i64* %self
   %t79 = call i64 @Parser__parse_try_expr(i64 %t78)
   ret i64 %t79
-else1293:
-  br label %endif1291
-endif1291:
+else1304:
+  br label %endif1302
+endif1302:
   %t80 = load i64, i64* %self
-  %t81 = getelementptr [6 x i8], [6 x i8]* @.str.765, i64 0, i64 0
+  %t81 = getelementptr [6 x i8], [6 x i8]* @.str.767, i64 0, i64 0
   %t82 = ptrtoint i8* %t81 to i64
   %t83 = call i64 @Parser__match_kind_check(i64 %t80, i64 %t82)
   %t84 = trunc i64 %t83 to i1
-  br i1 %t84, label %then1295, label %else1296
-then1295:
+  br i1 %t84, label %then1306, label %else1307
+then1306:
   %t85 = load i64, i64* %self
   %t86 = call i64 @Parser__parse_match_expr(i64 %t85)
   ret i64 %t86
-else1296:
-  br label %endif1294
-endif1294:
+else1307:
+  br label %endif1305
+endif1305:
   %t87 = load i64, i64* %self
-  %t88 = getelementptr [4 x i8], [4 x i8]* @.str.766, i64 0, i64 0
+  %t88 = getelementptr [4 x i8], [4 x i8]* @.str.768, i64 0, i64 0
   %t89 = ptrtoint i8* %t88 to i64
   %t90 = call i64 @Parser__match_kind_check(i64 %t87, i64 %t89)
   %t91 = trunc i64 %t90 to i1
-  br i1 %t91, label %then1298, label %else1299
-then1298:
+  br i1 %t91, label %then1309, label %else1310
+then1309:
   %t92 = load i64, i64* %self
   %t93 = call i64 @Parser__parse_lambda(i64 %t92)
   ret i64 %t93
-else1299:
-  br label %endif1297
-endif1297:
+else1310:
+  br label %endif1308
+endif1308:
   %t94 = load i64, i64* %self
-  %t95 = getelementptr [5 x i8], [5 x i8]* @.str.767, i64 0, i64 0
+  %t95 = getelementptr [5 x i8], [5 x i8]* @.str.769, i64 0, i64 0
   %t96 = ptrtoint i8* %t95 to i64
   %t97 = call i64 @Parser__match_kind_check(i64 %t94, i64 %t96)
   %t98 = trunc i64 %t97 to i1
-  br i1 %t98, label %then1301, label %else1302
-then1301:
+  br i1 %t98, label %then1312, label %else1313
+then1312:
   %t99 = load i64, i64* %self
   %t100 = call i64 @Parser__advance(i64 %t99)
   %t101 = call i8* @__sf_malloc(i64 8)
@@ -18408,22 +18615,22 @@ then1301:
   store i64 17, i64* %t103
   %t104 = ptrtoint [1 x i64]* %t102 to i64
   ret i64 %t104
-else1302:
-  br label %endif1300
-endif1300:
+else1313:
+  br label %endif1311
+endif1311:
   %t105 = load i64, i64* %self
-  %t106 = getelementptr [6 x i8], [6 x i8]* @.str.768, i64 0, i64 0
+  %t106 = getelementptr [6 x i8], [6 x i8]* @.str.770, i64 0, i64 0
   %t107 = ptrtoint i8* %t106 to i64
   %t108 = call i64 @Parser__is_ident_named(i64 %t105, i64 %t107)
   %t109 = trunc i64 %t108 to i1
-  br i1 %t109, label %then1304, label %else1305
-then1304:
+  br i1 %t109, label %then1315, label %else1316
+then1315:
   %t110 = load i64, i64* %self
   %t111 = call i64 @Parser__current_span(i64 %t110)
   store i64 %t111, i64* %super_span
   %t112 = load i64, i64* %self
   %t113 = call i64 @Parser__advance(i64 %t112)
-  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.769, i64 0, i64 0
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.771, i64 0, i64 0
   %t115 = ptrtoint i8* %t114 to i64
   %t116 = load i64, i64* %super_span
   %t117 = call i8* @__sf_malloc(i64 24)
@@ -18436,38 +18643,38 @@ then1304:
   store i64 %t116, i64* %t121
   %t122 = ptrtoint [3 x i64]* %t118 to i64
   ret i64 %t122
-else1305:
-  br label %endif1303
-endif1303:
+else1316:
+  br label %endif1314
+endif1314:
   %t123 = load i64, i64* %self
-  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.770, i64 0, i64 0
+  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.772, i64 0, i64 0
   %t125 = ptrtoint i8* %t124 to i64
   %t126 = call i64 @Parser__match_kind_check(i64 %t123, i64 %t125)
   %t127 = trunc i64 %t126 to i1
-  br i1 %t127, label %then1307, label %else1308
-then1307:
+  br i1 %t127, label %then1318, label %else1319
+then1318:
   %t128 = load i64, i64* %self
   %t129 = call i64 @Parser__parse_list_lit(i64 %t128)
   ret i64 %t129
-else1308:
-  br label %endif1306
-endif1306:
+else1319:
+  br label %endif1317
+endif1317:
   %t130 = load i64, i64* %self
-  %t131 = getelementptr [2 x i8], [2 x i8]* @.str.771, i64 0, i64 0
+  %t131 = getelementptr [2 x i8], [2 x i8]* @.str.773, i64 0, i64 0
   %t132 = ptrtoint i8* %t131 to i64
   %t133 = call i64 @Parser__match_kind_check(i64 %t130, i64 %t132)
   %t134 = trunc i64 %t133 to i1
-  br i1 %t134, label %then1310, label %else1311
-then1310:
+  br i1 %t134, label %then1321, label %else1322
+then1321:
   %t135 = load i64, i64* %self
   %t136 = call i64 @Parser__advance(i64 %t135)
   %t137 = load i64, i64* %self
-  %t138 = getelementptr [2 x i8], [2 x i8]* @.str.772, i64 0, i64 0
+  %t138 = getelementptr [2 x i8], [2 x i8]* @.str.774, i64 0, i64 0
   %t139 = ptrtoint i8* %t138 to i64
   %t140 = call i64 @Parser__match_kind_check(i64 %t137, i64 %t139)
   %t141 = trunc i64 %t140 to i1
-  br i1 %t141, label %then1313, label %else1314
-then1313:
+  br i1 %t141, label %then1324, label %else1325
+then1324:
   %t142 = load i64, i64* %self
   %t143 = call i64 @Parser__advance(i64 %t142)
   %t144 = call i8* @__sf_malloc(i64 8)
@@ -18476,34 +18683,34 @@ then1313:
   store i64 22, i64* %t146
   %t147 = ptrtoint [1 x i64]* %t145 to i64
   ret i64 %t147
-else1314:
-  br label %endif1312
-endif1312:
+else1325:
+  br label %endif1323
+endif1323:
   %t148 = load i64, i64* %self
   %t149 = inttoptr i64 %t148 to %Parser*
   %t150 = getelementptr %Parser, %Parser* %t149, i32 0, i32 1
   %t151 = load volatile i64, i64* %t150
   store i64 %t151, i64* %kl_before
   %t152 = load i64, i64* %self
-  %t153 = getelementptr [6 x i8], [6 x i8]* @.str.773, i64 0, i64 0
+  %t153 = getelementptr [6 x i8], [6 x i8]* @.str.775, i64 0, i64 0
   %t154 = ptrtoint i8* %t153 to i64
   %t155 = call i64 @Parser__match_kind_check(i64 %t152, i64 %t154)
   %t156 = trunc i64 %t155 to i1
-  br i1 %t156, label %then1316, label %else1317
-then1316:
+  br i1 %t156, label %then1327, label %else1328
+then1327:
   %t157 = load i64, i64* %self
   %t158 = call i64 @Parser__expect_ident(i64 %t157)
   store i64 %t158, i64* %kl_name
   %t159 = load i64, i64* %self
-  %t160 = getelementptr [3 x i8], [3 x i8]* @.str.774, i64 0, i64 0
+  %t160 = getelementptr [3 x i8], [3 x i8]* @.str.776, i64 0, i64 0
   %t161 = ptrtoint i8* %t160 to i64
   %t162 = call i64 @Parser__match_kind(i64 %t159, i64 %t161)
   %t163 = trunc i64 %t162 to i1
-  br i1 %t163, label %then1319, label %else1320
-then1319:
+  br i1 %t163, label %then1330, label %else1331
+then1330:
   %t164 = call i64 @__list_new()
   store i64 %t164, i64* %lparams
-  %t165 = getelementptr [10 x i8], [10 x i8]* @.str.775, i64 0, i64 0
+  %t165 = getelementptr [10 x i8], [10 x i8]* @.str.777, i64 0, i64 0
   %t166 = ptrtoint i8* %t165 to i64
   %t167 = call i64 @__io_println(i64 %t166)
   %t168 = load i64, i64* %lparams
@@ -18518,7 +18725,7 @@ then1319:
   %t176 = getelementptr [1 x i64], [1 x i64]* %t175, i64 0, i64 0
   store i64 4, i64* %t176
   %t177 = ptrtoint [1 x i64]* %t175 to i64
-  %t178 = getelementptr [7 x i8], [7 x i8]* @.str.776, i64 0, i64 0
+  %t178 = getelementptr [7 x i8], [7 x i8]* @.str.778, i64 0, i64 0
   %t179 = ptrtoint i8* %t178 to i64
   %t180 = call i64 @ast_span_none()
   %t181 = call i8* @__sf_malloc(i64 48)
@@ -18539,79 +18746,79 @@ then1319:
   %t190 = call i64 @__list_push(i64 %t168, i64 %t189)
   %t191 = call i64 @__list_new()
   store i64 %t191, i64* %lbody
-  br label %while.cond1321
-while.cond1321:
+  br label %while.cond1332
+while.cond1332:
   %t192 = load i64, i64* %self
-  %t193 = getelementptr [2 x i8], [2 x i8]* @.str.777, i64 0, i64 0
+  %t193 = getelementptr [2 x i8], [2 x i8]* @.str.779, i64 0, i64 0
   %t194 = ptrtoint i8* %t193 to i64
   %t195 = call i64 @Parser__match_kind_check(i64 %t192, i64 %t194)
   %t196 = xor i64 %t195, 1
   %t197 = trunc i64 %t196 to i1
-  br label %logic.entry1324
-logic.entry1324:
-  br i1 %t197, label %rhs1325, label %end1326
-rhs1325:
+  br label %logic.entry1335
+logic.entry1335:
+  br i1 %t197, label %rhs1336, label %end1337
+rhs1336:
   %t198 = load i64, i64* %self
-  %t199 = getelementptr [4 x i8], [4 x i8]* @.str.778, i64 0, i64 0
+  %t199 = getelementptr [4 x i8], [4 x i8]* @.str.780, i64 0, i64 0
   %t200 = ptrtoint i8* %t199 to i64
   %t201 = call i64 @Parser__match_kind_check(i64 %t198, i64 %t200)
   %t202 = xor i64 %t201, 1
   %t203 = trunc i64 %t202 to i1
-  br label %rhs.exit1327
-rhs.exit1327:
-  br label %end1326
-end1326:
-  %t204 = phi i1 [%t197, %logic.entry1324], [%t203, %rhs.exit1327]
+  br label %rhs.exit1338
+rhs.exit1338:
+  br label %end1337
+end1337:
+  %t204 = phi i1 [%t197, %logic.entry1335], [%t203, %rhs.exit1338]
   %t205 = zext i1 %t204 to i64
   %t206 = trunc i64 %t205 to i1
-  br i1 %t206, label %while.body1322, label %while.end1323
-while.body1322:
-  br label %while.cond1328
-while.cond1328:
+  br i1 %t206, label %while.body1333, label %while.end1334
+while.body1333:
+  br label %while.cond1339
+while.cond1339:
   %t207 = load i64, i64* %self
-  %t208 = getelementptr [2 x i8], [2 x i8]* @.str.779, i64 0, i64 0
+  %t208 = getelementptr [2 x i8], [2 x i8]* @.str.781, i64 0, i64 0
   %t209 = ptrtoint i8* %t208 to i64
   %t210 = call i64 @Parser__match_kind(i64 %t207, i64 %t209)
   %t211 = trunc i64 %t210 to i1
-  br i1 %t211, label %while.body1329, label %while.end1330
-while.body1329:
-  br label %while.cond1328
-while.end1330:
+  br i1 %t211, label %while.body1340, label %while.end1341
+while.body1340:
+  br label %while.cond1339
+while.end1341:
   %t212 = load i64, i64* %self
-  %t213 = getelementptr [2 x i8], [2 x i8]* @.str.780, i64 0, i64 0
+  %t213 = getelementptr [2 x i8], [2 x i8]* @.str.782, i64 0, i64 0
   %t214 = ptrtoint i8* %t213 to i64
   %t215 = call i64 @Parser__match_kind_check(i64 %t212, i64 %t214)
   %t216 = trunc i64 %t215 to i1
-  br label %logic.entry1332
-logic.entry1332:
-  br i1 %t216, label %end1334, label %rhs1333
-rhs1333:
+  br label %logic.entry1343
+logic.entry1343:
+  br i1 %t216, label %end1345, label %rhs1344
+rhs1344:
   %t217 = load i64, i64* %self
-  %t218 = getelementptr [4 x i8], [4 x i8]* @.str.781, i64 0, i64 0
+  %t218 = getelementptr [4 x i8], [4 x i8]* @.str.783, i64 0, i64 0
   %t219 = ptrtoint i8* %t218 to i64
   %t220 = call i64 @Parser__match_kind_check(i64 %t217, i64 %t219)
   %t221 = trunc i64 %t220 to i1
-  br label %rhs.exit1335
-rhs.exit1335:
-  br label %end1334
-end1334:
-  %t222 = phi i1 [%t216, %logic.entry1332], [%t221, %rhs.exit1335]
+  br label %rhs.exit1346
+rhs.exit1346:
+  br label %end1345
+end1345:
+  %t222 = phi i1 [%t216, %logic.entry1343], [%t221, %rhs.exit1346]
   %t223 = zext i1 %t222 to i64
   %t224 = trunc i64 %t223 to i1
-  br i1 %t224, label %then1336, label %else1337
-then1336:
-  br label %while.end1323
-else1337:
-  br label %endif1331
-endif1331:
+  br i1 %t224, label %then1347, label %else1348
+then1347:
+  br label %while.end1334
+else1348:
+  br label %endif1342
+endif1342:
   %t225 = load i64, i64* %lbody
   %t226 = load i64, i64* %self
   %t227 = call i64 @Parser__parse_stmt(i64 %t226)
   %t228 = call i64 @__list_push(i64 %t225, i64 %t227)
-  br label %while.cond1321
-while.end1323:
+  br label %while.cond1332
+while.end1334:
   %t229 = load i64, i64* %self
-  %t230 = getelementptr [2 x i8], [2 x i8]* @.str.782, i64 0, i64 0
+  %t230 = getelementptr [2 x i8], [2 x i8]* @.str.784, i64 0, i64 0
   %t231 = ptrtoint i8* %t230 to i64
   %t232 = call i64 @Parser__consume(i64 %t229, i64 %t231)
   %t233 = load i64, i64* %lbody
@@ -18620,8 +18827,8 @@ while.end1323:
   %t237 = icmp sgt i64 %t234, %t235
   %t236 = zext i1 %t237 to i64
   %t238 = trunc i64 %t236 to i1
-  br i1 %t238, label %then1339, label %else1340
-then1339:
+  br i1 %t238, label %then1350, label %else1351
+then1350:
   %t239 = load i64, i64* %lbody
   %t240 = load i64, i64* %lbody
   %t241 = call i64 @__list_length(i64 %t240)
@@ -18638,8 +18845,8 @@ then1339:
   %t252 = inttoptr i64 %t249 to i64*
   %t253 = load i64, i64* %t252
   %t251 = trunc i64 %t253 to i8
-  switch i8 %t251, label %match.arm1343 [ i8 0, label %match.arm1342 ]
-match.arm1342:
+  switch i8 %t251, label %match.arm1354 [ i8 0, label %match.arm1353 ]
+match.arm1353:
   %t254 = load i64, i64* %e
   %t255 = inttoptr i64 %t249 to [2 x i64]*
   %t256 = getelementptr [2 x i64], [2 x i64]* %t255, i64 0, i64 1
@@ -18648,25 +18855,25 @@ match.arm1342:
   %t258 = add i64 0, 1
   store i64 %t258, i64* %t250
   store i64 %t254, i64* %e
-  br label %match.end1341
-match.arm1343:
+  br label %match.end1352
+match.arm1354:
   %t259 = add i64 0, 0
   store i64 %t259, i64* %t250
-  br label %match.end1341
-match.end1341:
+  br label %match.end1352
+match.end1352:
   %t260 = load i64, i64* %t250
   store i64 %t260, i64* %kis_expr
   %t261 = load i64, i64* %kis_expr
   %t262 = trunc i64 %t261 to i1
-  br i1 %t262, label %then1345, label %else1346
-then1345:
+  br i1 %t262, label %then1356, label %else1357
+then1356:
   %t263 = load i64, i64* %klast
   %t264 = alloca i64
   %t266 = inttoptr i64 %t263 to i64*
   %t267 = load i64, i64* %t266
   %t265 = trunc i64 %t267 to i8
-  switch i8 %t265, label %match.arm1349 [ i8 0, label %match.arm1348 ]
-match.arm1348:
+  switch i8 %t265, label %match.arm1360 [ i8 0, label %match.arm1359 ]
+match.arm1359:
   %t268 = load i64, i64* %e
   %t269 = inttoptr i64 %t263 to [2 x i64]*
   %t270 = getelementptr [2 x i64], [2 x i64]* %t269, i64 0, i64 1
@@ -18675,16 +18882,16 @@ match.arm1348:
   %t272 = load i64, i64* %e
   store i64 %t272, i64* %t264
   store i64 %t268, i64* %e
-  br label %match.end1347
-match.arm1349:
+  br label %match.end1358
+match.arm1360:
   %t273 = call i8* @__sf_malloc(i64 8)
   %t274 = bitcast i8* %t273 to [1 x i64]*
   %t275 = getelementptr [1 x i64], [1 x i64]* %t274, i64 0, i64 0
   store i64 4, i64* %t275
   %t276 = ptrtoint [1 x i64]* %t274 to i64
   store i64 %t276, i64* %t264
-  br label %match.end1347
-match.end1347:
+  br label %match.end1358
+match.end1358:
   %t277 = load i64, i64* %t264
   store i64 %t277, i64* %kexpr
   %t278 = load i64, i64* %lbody
@@ -18701,14 +18908,14 @@ match.end1347:
   store i64 %t283, i64* %t287
   %t288 = ptrtoint [2 x i64]* %t285 to i64
   %t289 = call i64 @__list_set(i64 %t278, i64 %t282, i64 %t288)
-  br label %endif1344
-else1346:
-  br label %endif1344
-endif1344:
-  br label %endif1338
-else1340:
-  br label %endif1338
-endif1338:
+  br label %endif1355
+else1357:
+  br label %endif1355
+endif1355:
+  br label %endif1349
+else1351:
+  br label %endif1349
+endif1349:
   %t290 = load i64, i64* %lparams
   %t291 = call i8* @__sf_malloc(i64 8)
   %t292 = bitcast i8* %t291 to [1 x i64]*
@@ -18728,14 +18935,14 @@ endif1338:
   store i64 %t295, i64* %t301
   %t302 = ptrtoint [4 x i64]* %t297 to i64
   ret i64 %t302
-else1320:
+else1331:
   %t303 = load i64, i64* %self
-  %t304 = getelementptr [2 x i8], [2 x i8]* @.str.783, i64 0, i64 0
+  %t304 = getelementptr [2 x i8], [2 x i8]* @.str.785, i64 0, i64 0
   %t305 = ptrtoint i8* %t304 to i64
   %t306 = call i64 @Parser__match_kind(i64 %t303, i64 %t305)
   %t307 = trunc i64 %t306 to i1
-  br i1 %t307, label %then1350, label %else1351
-then1350:
+  br i1 %t307, label %then1361, label %else1362
+then1361:
   %t308 = call i64 @__list_new()
   store i64 %t308, i64* %lparams
   %t309 = load i64, i64* %lparams
@@ -18750,7 +18957,7 @@ then1350:
   %t317 = getelementptr [1 x i64], [1 x i64]* %t316, i64 0, i64 0
   store i64 4, i64* %t317
   %t318 = ptrtoint [1 x i64]* %t316 to i64
-  %t319 = getelementptr [7 x i8], [7 x i8]* @.str.784, i64 0, i64 0
+  %t319 = getelementptr [7 x i8], [7 x i8]* @.str.786, i64 0, i64 0
   %t320 = ptrtoint i8* %t319 to i64
   %t321 = call i64 @ast_span_none()
   %t322 = call i8* @__sf_malloc(i64 48)
@@ -18784,7 +18991,7 @@ then1350:
   %t342 = getelementptr [1 x i64], [1 x i64]* %t341, i64 0, i64 0
   store i64 4, i64* %t342
   %t343 = ptrtoint [1 x i64]* %t341 to i64
-  %t344 = getelementptr [7 x i8], [7 x i8]* @.str.785, i64 0, i64 0
+  %t344 = getelementptr [7 x i8], [7 x i8]* @.str.787, i64 0, i64 0
   %t345 = ptrtoint i8* %t344 to i64
   %t346 = call i64 @ast_span_none()
   %t347 = call i8* @__sf_malloc(i64 48)
@@ -18803,15 +19010,15 @@ then1350:
   store i64 %t346, i64* %t354
   %t355 = ptrtoint [6 x i64]* %t348 to i64
   %t356 = call i64 @__list_push(i64 %t334, i64 %t355)
-  br label %while.cond1352
-while.cond1352:
+  br label %while.cond1363
+while.cond1363:
   %t357 = load i64, i64* %self
-  %t358 = getelementptr [2 x i8], [2 x i8]* @.str.786, i64 0, i64 0
+  %t358 = getelementptr [2 x i8], [2 x i8]* @.str.788, i64 0, i64 0
   %t359 = ptrtoint i8* %t358 to i64
   %t360 = call i64 @Parser__match_kind(i64 %t357, i64 %t359)
   %t361 = trunc i64 %t360 to i1
-  br i1 %t361, label %while.body1353, label %while.end1354
-while.body1353:
+  br i1 %t361, label %while.body1364, label %while.end1365
+while.body1364:
   %t362 = load i64, i64* %self
   %t363 = call i64 @Parser__expect_ident(i64 %t362)
   store i64 %t363, i64* %lpname
@@ -18827,7 +19034,7 @@ while.body1353:
   %t372 = getelementptr [1 x i64], [1 x i64]* %t371, i64 0, i64 0
   store i64 4, i64* %t372
   %t373 = ptrtoint [1 x i64]* %t371 to i64
-  %t374 = getelementptr [7 x i8], [7 x i8]* @.str.787, i64 0, i64 0
+  %t374 = getelementptr [7 x i8], [7 x i8]* @.str.789, i64 0, i64 0
   %t375 = ptrtoint i8* %t374 to i64
   %t376 = call i64 @ast_span_none()
   %t377 = call i8* @__sf_malloc(i64 48)
@@ -18846,87 +19053,87 @@ while.body1353:
   store i64 %t376, i64* %t384
   %t385 = ptrtoint [6 x i64]* %t378 to i64
   %t386 = call i64 @__list_push(i64 %t364, i64 %t385)
-  br label %while.cond1352
-while.end1354:
+  br label %while.cond1363
+while.end1365:
   %t387 = load i64, i64* %self
-  %t388 = getelementptr [3 x i8], [3 x i8]* @.str.788, i64 0, i64 0
+  %t388 = getelementptr [3 x i8], [3 x i8]* @.str.790, i64 0, i64 0
   %t389 = ptrtoint i8* %t388 to i64
   %t390 = call i64 @Parser__consume(i64 %t387, i64 %t389)
   %t391 = call i64 @__list_new()
   store i64 %t391, i64* %lbody
-  br label %while.cond1355
-while.cond1355:
+  br label %while.cond1366
+while.cond1366:
   %t392 = load i64, i64* %self
-  %t393 = getelementptr [2 x i8], [2 x i8]* @.str.789, i64 0, i64 0
+  %t393 = getelementptr [2 x i8], [2 x i8]* @.str.791, i64 0, i64 0
   %t394 = ptrtoint i8* %t393 to i64
   %t395 = call i64 @Parser__match_kind_check(i64 %t392, i64 %t394)
   %t396 = xor i64 %t395, 1
   %t397 = trunc i64 %t396 to i1
-  br label %logic.entry1358
-logic.entry1358:
-  br i1 %t397, label %rhs1359, label %end1360
-rhs1359:
+  br label %logic.entry1369
+logic.entry1369:
+  br i1 %t397, label %rhs1370, label %end1371
+rhs1370:
   %t398 = load i64, i64* %self
-  %t399 = getelementptr [4 x i8], [4 x i8]* @.str.790, i64 0, i64 0
+  %t399 = getelementptr [4 x i8], [4 x i8]* @.str.792, i64 0, i64 0
   %t400 = ptrtoint i8* %t399 to i64
   %t401 = call i64 @Parser__match_kind_check(i64 %t398, i64 %t400)
   %t402 = xor i64 %t401, 1
   %t403 = trunc i64 %t402 to i1
-  br label %rhs.exit1361
-rhs.exit1361:
-  br label %end1360
-end1360:
-  %t404 = phi i1 [%t397, %logic.entry1358], [%t403, %rhs.exit1361]
+  br label %rhs.exit1372
+rhs.exit1372:
+  br label %end1371
+end1371:
+  %t404 = phi i1 [%t397, %logic.entry1369], [%t403, %rhs.exit1372]
   %t405 = zext i1 %t404 to i64
   %t406 = trunc i64 %t405 to i1
-  br i1 %t406, label %while.body1356, label %while.end1357
-while.body1356:
-  br label %while.cond1362
-while.cond1362:
+  br i1 %t406, label %while.body1367, label %while.end1368
+while.body1367:
+  br label %while.cond1373
+while.cond1373:
   %t407 = load i64, i64* %self
-  %t408 = getelementptr [2 x i8], [2 x i8]* @.str.791, i64 0, i64 0
+  %t408 = getelementptr [2 x i8], [2 x i8]* @.str.793, i64 0, i64 0
   %t409 = ptrtoint i8* %t408 to i64
   %t410 = call i64 @Parser__match_kind(i64 %t407, i64 %t409)
   %t411 = trunc i64 %t410 to i1
-  br i1 %t411, label %while.body1363, label %while.end1364
-while.body1363:
-  br label %while.cond1362
-while.end1364:
+  br i1 %t411, label %while.body1374, label %while.end1375
+while.body1374:
+  br label %while.cond1373
+while.end1375:
   %t412 = load i64, i64* %self
-  %t413 = getelementptr [2 x i8], [2 x i8]* @.str.792, i64 0, i64 0
+  %t413 = getelementptr [2 x i8], [2 x i8]* @.str.794, i64 0, i64 0
   %t414 = ptrtoint i8* %t413 to i64
   %t415 = call i64 @Parser__match_kind_check(i64 %t412, i64 %t414)
   %t416 = trunc i64 %t415 to i1
-  br label %logic.entry1366
-logic.entry1366:
-  br i1 %t416, label %end1368, label %rhs1367
-rhs1367:
+  br label %logic.entry1377
+logic.entry1377:
+  br i1 %t416, label %end1379, label %rhs1378
+rhs1378:
   %t417 = load i64, i64* %self
-  %t418 = getelementptr [4 x i8], [4 x i8]* @.str.793, i64 0, i64 0
+  %t418 = getelementptr [4 x i8], [4 x i8]* @.str.795, i64 0, i64 0
   %t419 = ptrtoint i8* %t418 to i64
   %t420 = call i64 @Parser__match_kind_check(i64 %t417, i64 %t419)
   %t421 = trunc i64 %t420 to i1
-  br label %rhs.exit1369
-rhs.exit1369:
-  br label %end1368
-end1368:
-  %t422 = phi i1 [%t416, %logic.entry1366], [%t421, %rhs.exit1369]
+  br label %rhs.exit1380
+rhs.exit1380:
+  br label %end1379
+end1379:
+  %t422 = phi i1 [%t416, %logic.entry1377], [%t421, %rhs.exit1380]
   %t423 = zext i1 %t422 to i64
   %t424 = trunc i64 %t423 to i1
-  br i1 %t424, label %then1370, label %else1371
-then1370:
-  br label %while.end1357
-else1371:
-  br label %endif1365
-endif1365:
+  br i1 %t424, label %then1381, label %else1382
+then1381:
+  br label %while.end1368
+else1382:
+  br label %endif1376
+endif1376:
   %t425 = load i64, i64* %lbody
   %t426 = load i64, i64* %self
   %t427 = call i64 @Parser__parse_stmt(i64 %t426)
   %t428 = call i64 @__list_push(i64 %t425, i64 %t427)
-  br label %while.cond1355
-while.end1357:
+  br label %while.cond1366
+while.end1368:
   %t429 = load i64, i64* %self
-  %t430 = getelementptr [2 x i8], [2 x i8]* @.str.794, i64 0, i64 0
+  %t430 = getelementptr [2 x i8], [2 x i8]* @.str.796, i64 0, i64 0
   %t431 = ptrtoint i8* %t430 to i64
   %t432 = call i64 @Parser__consume(i64 %t429, i64 %t431)
   %t433 = load i64, i64* %lbody
@@ -18935,8 +19142,8 @@ while.end1357:
   %t437 = icmp sgt i64 %t434, %t435
   %t436 = zext i1 %t437 to i64
   %t438 = trunc i64 %t436 to i1
-  br i1 %t438, label %then1373, label %else1374
-then1373:
+  br i1 %t438, label %then1384, label %else1385
+then1384:
   %t439 = load i64, i64* %lbody
   %t440 = load i64, i64* %lbody
   %t441 = call i64 @__list_length(i64 %t440)
@@ -18953,8 +19160,8 @@ then1373:
   %t452 = inttoptr i64 %t449 to i64*
   %t453 = load i64, i64* %t452
   %t451 = trunc i64 %t453 to i8
-  switch i8 %t451, label %match.arm1377 [ i8 0, label %match.arm1376 ]
-match.arm1376:
+  switch i8 %t451, label %match.arm1388 [ i8 0, label %match.arm1387 ]
+match.arm1387:
   %t454 = load i64, i64* %e
   %t455 = inttoptr i64 %t449 to [2 x i64]*
   %t456 = getelementptr [2 x i64], [2 x i64]* %t455, i64 0, i64 1
@@ -18963,25 +19170,25 @@ match.arm1376:
   %t458 = add i64 0, 1
   store i64 %t458, i64* %t450
   store i64 %t454, i64* %e
-  br label %match.end1375
-match.arm1377:
+  br label %match.end1386
+match.arm1388:
   %t459 = add i64 0, 0
   store i64 %t459, i64* %t450
-  br label %match.end1375
-match.end1375:
+  br label %match.end1386
+match.end1386:
   %t460 = load i64, i64* %t450
   store i64 %t460, i64* %kis_expr
   %t461 = load i64, i64* %kis_expr
   %t462 = trunc i64 %t461 to i1
-  br i1 %t462, label %then1379, label %else1380
-then1379:
+  br i1 %t462, label %then1390, label %else1391
+then1390:
   %t463 = load i64, i64* %klast
   %t464 = alloca i64
   %t466 = inttoptr i64 %t463 to i64*
   %t467 = load i64, i64* %t466
   %t465 = trunc i64 %t467 to i8
-  switch i8 %t465, label %match.arm1383 [ i8 0, label %match.arm1382 ]
-match.arm1382:
+  switch i8 %t465, label %match.arm1394 [ i8 0, label %match.arm1393 ]
+match.arm1393:
   %t468 = load i64, i64* %e
   %t469 = inttoptr i64 %t463 to [2 x i64]*
   %t470 = getelementptr [2 x i64], [2 x i64]* %t469, i64 0, i64 1
@@ -18990,16 +19197,16 @@ match.arm1382:
   %t472 = load i64, i64* %e
   store i64 %t472, i64* %t464
   store i64 %t468, i64* %e
-  br label %match.end1381
-match.arm1383:
+  br label %match.end1392
+match.arm1394:
   %t473 = call i8* @__sf_malloc(i64 8)
   %t474 = bitcast i8* %t473 to [1 x i64]*
   %t475 = getelementptr [1 x i64], [1 x i64]* %t474, i64 0, i64 0
   store i64 4, i64* %t475
   %t476 = ptrtoint [1 x i64]* %t474 to i64
   store i64 %t476, i64* %t464
-  br label %match.end1381
-match.end1381:
+  br label %match.end1392
+match.end1392:
   %t477 = load i64, i64* %t464
   store i64 %t477, i64* %kexpr
   %t478 = load i64, i64* %lbody
@@ -19016,14 +19223,14 @@ match.end1381:
   store i64 %t483, i64* %t487
   %t488 = ptrtoint [2 x i64]* %t485 to i64
   %t489 = call i64 @__list_set(i64 %t478, i64 %t482, i64 %t488)
-  br label %endif1378
-else1380:
-  br label %endif1378
-endif1378:
-  br label %endif1372
-else1374:
-  br label %endif1372
-endif1372:
+  br label %endif1389
+else1391:
+  br label %endif1389
+endif1389:
+  br label %endif1383
+else1385:
+  br label %endif1383
+endif1383:
   %t490 = load i64, i64* %lparams
   %t491 = call i8* @__sf_malloc(i64 8)
   %t492 = bitcast i8* %t491 to [1 x i64]*
@@ -19043,40 +19250,40 @@ endif1372:
   store i64 %t495, i64* %t501
   %t502 = ptrtoint [4 x i64]* %t497 to i64
   ret i64 %t502
-else1351:
+else1362:
   %t503 = load i64, i64* %self
   %t504 = load i64, i64* %kl_before
   %t505 = inttoptr i64 %t503 to %Parser*
   %t506 = getelementptr %Parser, %Parser* %t505, i32 0, i32 1
   store volatile i64 %t504, i64* %t506
-  br label %endif1318
-endif1318:
-  br label %endif1315
-else1317:
-  br label %endif1315
-endif1315:
+  br label %endif1329
+endif1329:
+  br label %endif1326
+else1328:
+  br label %endif1326
+endif1326:
   %t507 = load i64, i64* %self
   %t508 = call i64 @Parser__is_map_key_start(i64 %t507)
   %t509 = trunc i64 %t508 to i1
-  br label %logic.entry1385
-logic.entry1385:
-  br i1 %t509, label %rhs1386, label %end1387
-rhs1386:
+  br label %logic.entry1396
+logic.entry1396:
+  br i1 %t509, label %rhs1397, label %end1398
+rhs1397:
   %t510 = load i64, i64* %self
-  %t511 = getelementptr [2 x i8], [2 x i8]* @.str.795, i64 0, i64 0
+  %t511 = getelementptr [2 x i8], [2 x i8]* @.str.797, i64 0, i64 0
   %t512 = ptrtoint i8* %t511 to i64
   %t513 = call i64 @Parser__peek_is(i64 %t510, i64 %t512)
   %t514 = trunc i64 %t513 to i1
-  br label %rhs.exit1388
-rhs.exit1388:
-  br label %end1387
-end1387:
-  %t515 = phi i1 [%t509, %logic.entry1385], [%t514, %rhs.exit1388]
+  br label %rhs.exit1399
+rhs.exit1399:
+  br label %end1398
+end1398:
+  %t515 = phi i1 [%t509, %logic.entry1396], [%t514, %rhs.exit1399]
   %t516 = zext i1 %t515 to i64
   %t517 = trunc i64 %t516 to i1
-  br i1 %t517, label %then1389, label %else1390
-then1389:
-  %t518 = getelementptr [6 x i8], [6 x i8]* @.str.796, i64 0, i64 0
+  br i1 %t517, label %then1400, label %else1401
+then1400:
+  %t518 = getelementptr [6 x i8], [6 x i8]* @.str.798, i64 0, i64 0
   %t519 = ptrtoint i8* %t518 to i64
   %t520 = load i64, i64* %self
   %t521 = call i64 @Parser__next_map_uid(i64 %t520)
@@ -19098,7 +19305,7 @@ then1389:
   store i64 %t533, i64* %map_stmts
   %t534 = load i64, i64* %map_stmts
   %t535 = load i64, i64* %mvar
-  %t536 = getelementptr [4 x i8], [4 x i8]* @.str.797, i64 0, i64 0
+  %t536 = getelementptr [4 x i8], [4 x i8]* @.str.799, i64 0, i64 0
   %t537 = ptrtoint i8* %t536 to i64
   %t538 = call i8* @__sf_malloc(i64 16)
   %t539 = bitcast i8* %t538 to [2 x i64]*
@@ -19112,9 +19319,9 @@ then1389:
   %t545 = getelementptr [1 x i64], [1 x i64]* %t544, i64 0, i64 0
   store i64 22, i64* %t545
   %t546 = ptrtoint [1 x i64]* %t544 to i64
-  %t547 = getelementptr [1 x i8], [1 x i8]* @.str.798, i64 0, i64 0
+  %t547 = getelementptr [1 x i8], [1 x i8]* @.str.800, i64 0, i64 0
   %t548 = ptrtoint i8* %t547 to i64
-  %t549 = getelementptr [7 x i8], [7 x i8]* @.str.799, i64 0, i64 0
+  %t549 = getelementptr [7 x i8], [7 x i8]* @.str.801, i64 0, i64 0
   %t550 = ptrtoint i8* %t549 to i64
   %t551 = call i64 @ast_span_none()
   %t552 = call i64 @ast_span_none()
@@ -19142,7 +19349,7 @@ then1389:
   %t566 = call i64 @Parser__parse_map_key(i64 %t565)
   store i64 %t566, i64* %key
   %t567 = load i64, i64* %self
-  %t568 = getelementptr [2 x i8], [2 x i8]* @.str.800, i64 0, i64 0
+  %t568 = getelementptr [2 x i8], [2 x i8]* @.str.802, i64 0, i64 0
   %t569 = ptrtoint i8* %t568 to i64
   %t570 = call i64 @Parser__consume(i64 %t567, i64 %t569)
   %t571 = load i64, i64* %self
@@ -19160,7 +19367,7 @@ then1389:
   %t580 = getelementptr [3 x i64], [3 x i64]* %t577, i64 0, i64 2
   store i64 %t575, i64* %t580
   %t581 = ptrtoint [3 x i64]* %t577 to i64
-  %t582 = getelementptr [4 x i8], [4 x i8]* @.str.801, i64 0, i64 0
+  %t582 = getelementptr [4 x i8], [4 x i8]* @.str.803, i64 0, i64 0
   %t583 = ptrtoint i8* %t582 to i64
   %t584 = call i64 @__list_new()
   %t585 = load i64, i64* %key
@@ -19189,31 +19396,31 @@ then1389:
   store i64 %t597, i64* %t601
   %t602 = ptrtoint [2 x i64]* %t599 to i64
   %t603 = call i64 @__list_push(i64 %t573, i64 %t602)
-  br label %while.cond1391
-while.cond1391:
+  br label %while.cond1402
+while.cond1402:
   %t604 = load i64, i64* %self
-  %t605 = getelementptr [2 x i8], [2 x i8]* @.str.802, i64 0, i64 0
+  %t605 = getelementptr [2 x i8], [2 x i8]* @.str.804, i64 0, i64 0
   %t606 = ptrtoint i8* %t605 to i64
   %t607 = call i64 @Parser__match_kind(i64 %t604, i64 %t606)
   %t608 = trunc i64 %t607 to i1
-  br i1 %t608, label %while.body1392, label %while.end1393
-while.body1392:
+  br i1 %t608, label %while.body1403, label %while.end1404
+while.body1403:
   %t609 = load i64, i64* %self
-  %t610 = getelementptr [2 x i8], [2 x i8]* @.str.803, i64 0, i64 0
+  %t610 = getelementptr [2 x i8], [2 x i8]* @.str.805, i64 0, i64 0
   %t611 = ptrtoint i8* %t610 to i64
   %t612 = call i64 @Parser__match_kind_check(i64 %t609, i64 %t611)
   %t613 = trunc i64 %t612 to i1
-  br i1 %t613, label %then1395, label %else1396
-then1395:
-  br label %while.end1393
-else1396:
-  br label %endif1394
-endif1394:
+  br i1 %t613, label %then1406, label %else1407
+then1406:
+  br label %while.end1404
+else1407:
+  br label %endif1405
+endif1405:
   %t614 = load i64, i64* %self
   %t615 = call i64 @Parser__parse_map_key(i64 %t614)
   store i64 %t615, i64* %k
   %t616 = load i64, i64* %self
-  %t617 = getelementptr [2 x i8], [2 x i8]* @.str.804, i64 0, i64 0
+  %t617 = getelementptr [2 x i8], [2 x i8]* @.str.806, i64 0, i64 0
   %t618 = ptrtoint i8* %t617 to i64
   %t619 = call i64 @Parser__consume(i64 %t616, i64 %t618)
   %t620 = load i64, i64* %self
@@ -19231,7 +19438,7 @@ endif1394:
   %t629 = getelementptr [3 x i64], [3 x i64]* %t626, i64 0, i64 2
   store i64 %t624, i64* %t629
   %t630 = ptrtoint [3 x i64]* %t626 to i64
-  %t631 = getelementptr [4 x i8], [4 x i8]* @.str.805, i64 0, i64 0
+  %t631 = getelementptr [4 x i8], [4 x i8]* @.str.807, i64 0, i64 0
   %t632 = ptrtoint i8* %t631 to i64
   %t633 = call i64 @__list_new()
   %t634 = load i64, i64* %k
@@ -19260,10 +19467,10 @@ endif1394:
   store i64 %t646, i64* %t650
   %t651 = ptrtoint [2 x i64]* %t648 to i64
   %t652 = call i64 @__list_push(i64 %t622, i64 %t651)
-  br label %while.cond1391
-while.end1393:
+  br label %while.cond1402
+while.end1404:
   %t653 = load i64, i64* %self
-  %t654 = getelementptr [2 x i8], [2 x i8]* @.str.806, i64 0, i64 0
+  %t654 = getelementptr [2 x i8], [2 x i8]* @.str.808, i64 0, i64 0
   %t655 = ptrtoint i8* %t654 to i64
   %t656 = call i64 @Parser__consume(i64 %t653, i64 %t655)
   %t657 = load i64, i64* %map_stmts
@@ -19288,74 +19495,74 @@ while.end1393:
   store i64 %t665, i64* %t670
   %t671 = ptrtoint [3 x i64]* %t667 to i64
   ret i64 %t671
-else1390:
-  br label %endif1384
-endif1384:
+else1401:
+  br label %endif1395
+endif1395:
   %t672 = call i64 @__list_new()
   store i64 %t672, i64* %block_stmts
-  br label %while.cond1397
-while.cond1397:
+  br label %while.cond1408
+while.cond1408:
   %t673 = load i64, i64* %self
-  %t674 = getelementptr [2 x i8], [2 x i8]* @.str.807, i64 0, i64 0
+  %t674 = getelementptr [2 x i8], [2 x i8]* @.str.809, i64 0, i64 0
   %t675 = ptrtoint i8* %t674 to i64
   %t676 = call i64 @Parser__match_kind_check(i64 %t673, i64 %t675)
   %t677 = xor i64 %t676, 1
   %t678 = trunc i64 %t677 to i1
-  br label %logic.entry1400
-logic.entry1400:
-  br i1 %t678, label %rhs1401, label %end1402
-rhs1401:
+  br label %logic.entry1411
+logic.entry1411:
+  br i1 %t678, label %rhs1412, label %end1413
+rhs1412:
   %t679 = load i64, i64* %self
-  %t680 = getelementptr [4 x i8], [4 x i8]* @.str.808, i64 0, i64 0
+  %t680 = getelementptr [4 x i8], [4 x i8]* @.str.810, i64 0, i64 0
   %t681 = ptrtoint i8* %t680 to i64
   %t682 = call i64 @Parser__match_kind_check(i64 %t679, i64 %t681)
   %t683 = xor i64 %t682, 1
   %t684 = trunc i64 %t683 to i1
-  br label %rhs.exit1403
-rhs.exit1403:
-  br label %end1402
-end1402:
-  %t685 = phi i1 [%t678, %logic.entry1400], [%t684, %rhs.exit1403]
+  br label %rhs.exit1414
+rhs.exit1414:
+  br label %end1413
+end1413:
+  %t685 = phi i1 [%t678, %logic.entry1411], [%t684, %rhs.exit1414]
   %t686 = zext i1 %t685 to i64
   %t687 = trunc i64 %t686 to i1
-  br i1 %t687, label %while.body1398, label %while.end1399
-while.body1398:
-  br label %while.cond1404
-while.cond1404:
+  br i1 %t687, label %while.body1409, label %while.end1410
+while.body1409:
+  br label %while.cond1415
+while.cond1415:
   %t688 = load i64, i64* %self
-  %t689 = getelementptr [2 x i8], [2 x i8]* @.str.809, i64 0, i64 0
+  %t689 = getelementptr [2 x i8], [2 x i8]* @.str.811, i64 0, i64 0
   %t690 = ptrtoint i8* %t689 to i64
   %t691 = call i64 @Parser__match_kind(i64 %t688, i64 %t690)
   %t692 = trunc i64 %t691 to i1
-  br i1 %t692, label %while.body1405, label %while.end1406
-while.body1405:
-  br label %while.cond1404
-while.end1406:
+  br i1 %t692, label %while.body1416, label %while.end1417
+while.body1416:
+  br label %while.cond1415
+while.end1417:
   %t693 = load i64, i64* %self
-  %t694 = getelementptr [2 x i8], [2 x i8]* @.str.810, i64 0, i64 0
+  %t694 = getelementptr [2 x i8], [2 x i8]* @.str.812, i64 0, i64 0
   %t695 = ptrtoint i8* %t694 to i64
   %t696 = call i64 @Parser__match_kind_check(i64 %t693, i64 %t695)
   %t697 = trunc i64 %t696 to i1
-  br label %logic.entry1408
-logic.entry1408:
-  br i1 %t697, label %end1410, label %rhs1409
-rhs1409:
+  br label %logic.entry1419
+logic.entry1419:
+  br i1 %t697, label %end1421, label %rhs1420
+rhs1420:
   %t698 = load i64, i64* %self
-  %t699 = getelementptr [4 x i8], [4 x i8]* @.str.811, i64 0, i64 0
+  %t699 = getelementptr [4 x i8], [4 x i8]* @.str.813, i64 0, i64 0
   %t700 = ptrtoint i8* %t699 to i64
   %t701 = call i64 @Parser__match_kind_check(i64 %t698, i64 %t700)
   %t702 = trunc i64 %t701 to i1
-  br label %rhs.exit1411
-rhs.exit1411:
-  br label %end1410
-end1410:
-  %t703 = phi i1 [%t697, %logic.entry1408], [%t702, %rhs.exit1411]
+  br label %rhs.exit1422
+rhs.exit1422:
+  br label %end1421
+end1421:
+  %t703 = phi i1 [%t697, %logic.entry1419], [%t702, %rhs.exit1422]
   %t704 = zext i1 %t703 to i64
   %t705 = trunc i64 %t704 to i1
-  br i1 %t705, label %then1412, label %else1413
-then1412:
+  br i1 %t705, label %then1423, label %else1424
+then1423:
   %t706 = load i64, i64* %self
-  %t707 = getelementptr [2 x i8], [2 x i8]* @.str.812, i64 0, i64 0
+  %t707 = getelementptr [2 x i8], [2 x i8]* @.str.814, i64 0, i64 0
   %t708 = ptrtoint i8* %t707 to i64
   %t709 = call i64 @Parser__consume(i64 %t706, i64 %t708)
   %t710 = load i64, i64* %block_stmts
@@ -19374,17 +19581,17 @@ then1412:
   store i64 %t714, i64* %t719
   %t720 = ptrtoint [3 x i64]* %t716 to i64
   ret i64 %t720
-else1413:
-  br label %endif1407
-endif1407:
+else1424:
+  br label %endif1418
+endif1418:
   %t721 = load i64, i64* %block_stmts
   %t722 = load i64, i64* %self
   %t723 = call i64 @Parser__parse_stmt(i64 %t722)
   %t724 = call i64 @__list_push(i64 %t721, i64 %t723)
-  br label %while.cond1397
-while.end1399:
+  br label %while.cond1408
+while.end1410:
   %t725 = load i64, i64* %self
-  %t726 = getelementptr [2 x i8], [2 x i8]* @.str.813, i64 0, i64 0
+  %t726 = getelementptr [2 x i8], [2 x i8]* @.str.815, i64 0, i64 0
   %t727 = ptrtoint i8* %t726 to i64
   %t728 = call i64 @Parser__consume(i64 %t725, i64 %t727)
   %t729 = load i64, i64* %block_stmts
@@ -19393,8 +19600,8 @@ while.end1399:
   %t733 = icmp sgt i64 %t730, %t731
   %t732 = zext i1 %t733 to i64
   %t734 = trunc i64 %t732 to i1
-  br i1 %t734, label %then1415, label %else1416
-then1415:
+  br i1 %t734, label %then1426, label %else1427
+then1426:
   %t735 = load i64, i64* %block_stmts
   %t736 = load i64, i64* %block_stmts
   %t737 = call i64 @__list_length(i64 %t736)
@@ -19412,8 +19619,8 @@ then1415:
   store i64 %t747, i64* %is_value_producing
   %t748 = load i64, i64* %is_value_producing
   %t749 = trunc i64 %t748 to i1
-  br i1 %t749, label %then1418, label %else1419
-then1418:
+  br i1 %t749, label %then1429, label %else1430
+then1429:
   %t750 = load i64, i64* %self
   %t751 = load i64, i64* %last
   %t752 = call i64 @Parser__stmt_to_expr(i64 %t750, i64 %t751)
@@ -19432,9 +19639,9 @@ then1418:
   store i64 %t756, i64* %t761
   %t762 = ptrtoint [3 x i64]* %t758 to i64
   ret i64 %t762
-else1419:
-  br label %endif1417
-endif1417:
+else1430:
+  br label %endif1428
+endif1428:
   %t763 = load i64, i64* %block_stmts
   %t764 = call i8* @__sf_malloc(i64 8)
   %t765 = bitcast i8* %t764 to [1 x i64]*
@@ -19451,9 +19658,9 @@ endif1417:
   store i64 %t767, i64* %t772
   %t773 = ptrtoint [3 x i64]* %t769 to i64
   ret i64 %t773
-else1416:
-  br label %endif1414
-endif1414:
+else1427:
+  br label %endif1425
+endif1425:
   %t774 = call i64 @__list_new()
   %t775 = call i8* @__sf_malloc(i64 8)
   %t776 = bitcast i8* %t775 to [1 x i64]*
@@ -19470,9 +19677,9 @@ endif1414:
   store i64 %t778, i64* %t783
   %t784 = ptrtoint [3 x i64]* %t780 to i64
   ret i64 %t784
-else1311:
-  br label %endif1309
-endif1309:
+else1322:
+  br label %endif1320
+endif1320:
   %t785 = load i64, i64* %self
   %t786 = call i64 @Parser__current_kind(i64 %t785)
   store i64 %t786, i64* %kind
@@ -19486,8 +19693,8 @@ endif1309:
   %t794 = inttoptr i64 %t791 to i64*
   %t795 = load i64, i64* %t794
   %t793 = trunc i64 %t795 to i8
-  switch i8 %t793, label %match.arm1432 [ i8 0, label %match.arm1421 i8 1, label %match.arm1422 i8 3, label %match.arm1423 i8 4, label %match.arm1424 i8 5, label %match.arm1425 i8 2, label %match.arm1426 i8 6, label %match.arm1427 i8 17, label %match.arm1428 i8 23, label %match.arm1429 i8 28, label %match.arm1430 i8 56, label %match.arm1431 ]
-match.arm1421:
+  switch i8 %t793, label %match.arm1443 [ i8 0, label %match.arm1432 i8 1, label %match.arm1433 i8 3, label %match.arm1434 i8 4, label %match.arm1435 i8 5, label %match.arm1436 i8 2, label %match.arm1437 i8 6, label %match.arm1438 i8 17, label %match.arm1439 i8 23, label %match.arm1440 i8 28, label %match.arm1441 i8 56, label %match.arm1442 ]
+match.arm1432:
   %t796 = load i64, i64* %v
   %t797 = inttoptr i64 %t791 to [2 x i64]*
   %t798 = getelementptr [2 x i64], [2 x i64]* %t797, i64 0, i64 1
@@ -19503,8 +19710,8 @@ match.arm1421:
   %t805 = ptrtoint [2 x i64]* %t802 to i64
   store i64 %t805, i64* %t792
   store i64 %t796, i64* %v
-  br label %match.end1420
-match.arm1422:
+  br label %match.end1431
+match.arm1433:
   %t806 = load i64, i64* %v
   %t807 = inttoptr i64 %t791 to [2 x i64]*
   %t808 = getelementptr [2 x i64], [2 x i64]* %t807, i64 0, i64 1
@@ -19520,8 +19727,8 @@ match.arm1422:
   %t815 = ptrtoint [2 x i64]* %t812 to i64
   store i64 %t815, i64* %t792
   store i64 %t806, i64* %v
-  br label %match.end1420
-match.arm1423:
+  br label %match.end1431
+match.arm1434:
   %t816 = add i64 0, 1
   %t817 = call i8* @__sf_malloc(i64 16)
   %t818 = bitcast i8* %t817 to [2 x i64]*
@@ -19531,8 +19738,8 @@ match.arm1423:
   store i64 %t816, i64* %t820
   %t821 = ptrtoint [2 x i64]* %t818 to i64
   store i64 %t821, i64* %t792
-  br label %match.end1420
-match.arm1424:
+  br label %match.end1431
+match.arm1435:
   %t822 = add i64 0, 0
   %t823 = call i8* @__sf_malloc(i64 16)
   %t824 = bitcast i8* %t823 to [2 x i64]*
@@ -19542,16 +19749,16 @@ match.arm1424:
   store i64 %t822, i64* %t826
   %t827 = ptrtoint [2 x i64]* %t824 to i64
   store i64 %t827, i64* %t792
-  br label %match.end1420
-match.arm1425:
+  br label %match.end1431
+match.arm1436:
   %t828 = call i8* @__sf_malloc(i64 8)
   %t829 = bitcast i8* %t828 to [1 x i64]*
   %t830 = getelementptr [1 x i64], [1 x i64]* %t829, i64 0, i64 0
   store i64 4, i64* %t830
   %t831 = ptrtoint [1 x i64]* %t829 to i64
   store i64 %t831, i64* %t792
-  br label %match.end1420
-match.arm1426:
+  br label %match.end1431
+match.arm1437:
   %t832 = load i64, i64* %s
   %t833 = inttoptr i64 %t791 to [2 x i64]*
   %t834 = getelementptr [2 x i64], [2 x i64]* %t833, i64 0, i64 1
@@ -19567,8 +19774,8 @@ match.arm1426:
   %t841 = ptrtoint [2 x i64]* %t838 to i64
   store i64 %t841, i64* %t792
   store i64 %t832, i64* %s
-  br label %match.end1420
-match.arm1427:
+  br label %match.end1431
+match.arm1438:
   %t842 = load i64, i64* %name
   %t843 = inttoptr i64 %t791 to [2 x i64]*
   %t844 = getelementptr [2 x i64], [2 x i64]* %t843, i64 0, i64 1
@@ -19587,9 +19794,9 @@ match.arm1427:
   %t853 = ptrtoint [3 x i64]* %t849 to i64
   store i64 %t853, i64* %t792
   store i64 %t842, i64* %name
-  br label %match.end1420
-match.arm1428:
-  %t854 = getelementptr [3 x i8], [3 x i8]* @.str.814, i64 0, i64 0
+  br label %match.end1431
+match.arm1439:
+  %t854 = getelementptr [3 x i8], [3 x i8]* @.str.816, i64 0, i64 0
   %t855 = ptrtoint i8* %t854 to i64
   %t856 = load i64, i64* %prim_span
   %t857 = call i8* @__sf_malloc(i64 24)
@@ -19602,9 +19809,9 @@ match.arm1428:
   store i64 %t856, i64* %t861
   %t862 = ptrtoint [3 x i64]* %t858 to i64
   store i64 %t862, i64* %t792
-  br label %match.end1420
-match.arm1429:
-  %t863 = getelementptr [3 x i8], [3 x i8]* @.str.815, i64 0, i64 0
+  br label %match.end1431
+match.arm1440:
+  %t863 = getelementptr [3 x i8], [3 x i8]* @.str.817, i64 0, i64 0
   %t864 = ptrtoint i8* %t863 to i64
   %t865 = load i64, i64* %prim_span
   %t866 = call i8* @__sf_malloc(i64 24)
@@ -19617,9 +19824,9 @@ match.arm1429:
   store i64 %t865, i64* %t870
   %t871 = ptrtoint [3 x i64]* %t867 to i64
   store i64 %t871, i64* %t792
-  br label %match.end1420
-match.arm1430:
-  %t872 = getelementptr [3 x i8], [3 x i8]* @.str.816, i64 0, i64 0
+  br label %match.end1431
+match.arm1441:
+  %t872 = getelementptr [3 x i8], [3 x i8]* @.str.818, i64 0, i64 0
   %t873 = ptrtoint i8* %t872 to i64
   %t874 = load i64, i64* %prim_span
   %t875 = call i8* @__sf_malloc(i64 24)
@@ -19632,67 +19839,67 @@ match.arm1430:
   store i64 %t874, i64* %t879
   %t880 = ptrtoint [3 x i64]* %t876 to i64
   store i64 %t880, i64* %t792
-  br label %match.end1420
-match.arm1431:
+  br label %match.end1431
+match.arm1442:
   %t881 = load i64, i64* %self
   %t882 = call i64 @Parser__parse_expr(i64 %t881)
   store i64 %t882, i64* %expr
   %t883 = alloca i64
   %t884 = load i64, i64* %self
-  %t885 = getelementptr [2 x i8], [2 x i8]* @.str.817, i64 0, i64 0
+  %t885 = getelementptr [2 x i8], [2 x i8]* @.str.819, i64 0, i64 0
   %t886 = ptrtoint i8* %t885 to i64
   %t887 = call i64 @Parser__match_kind(i64 %t884, i64 %t886)
   %t888 = trunc i64 %t887 to i1
-  br i1 %t888, label %ifexpr.then1433, label %ifexpr.else1434
-ifexpr.then1433:
+  br i1 %t888, label %ifexpr.then1444, label %ifexpr.else1445
+ifexpr.then1444:
   %t889 = call i64 @__list_new()
   %t890 = load i64, i64* %expr
   %t891 = call i64 @__list_push(i64 %t889, i64 %t890)
   store i64 %t889, i64* %elems
   %t892 = load i64, i64* %self
-  %t893 = getelementptr [2 x i8], [2 x i8]* @.str.818, i64 0, i64 0
+  %t893 = getelementptr [2 x i8], [2 x i8]* @.str.820, i64 0, i64 0
   %t894 = ptrtoint i8* %t893 to i64
   %t895 = call i64 @Parser__match_kind_check(i64 %t892, i64 %t894)
   %t896 = xor i64 %t895, 1
   %t897 = trunc i64 %t896 to i1
-  br i1 %t897, label %then1437, label %else1438
-then1437:
+  br i1 %t897, label %then1448, label %else1449
+then1448:
   %t898 = load i64, i64* %elems
   %t899 = load i64, i64* %self
   %t900 = call i64 @Parser__parse_expr(i64 %t899)
   %t901 = call i64 @__list_push(i64 %t898, i64 %t900)
-  br label %while.cond1439
-while.cond1439:
+  br label %while.cond1450
+while.cond1450:
   %t902 = load i64, i64* %self
-  %t903 = getelementptr [2 x i8], [2 x i8]* @.str.819, i64 0, i64 0
+  %t903 = getelementptr [2 x i8], [2 x i8]* @.str.821, i64 0, i64 0
   %t904 = ptrtoint i8* %t903 to i64
   %t905 = call i64 @Parser__match_kind(i64 %t902, i64 %t904)
   %t906 = trunc i64 %t905 to i1
-  br i1 %t906, label %while.body1440, label %while.end1441
-while.body1440:
+  br i1 %t906, label %while.body1451, label %while.end1452
+while.body1451:
   %t907 = load i64, i64* %self
-  %t908 = getelementptr [2 x i8], [2 x i8]* @.str.820, i64 0, i64 0
+  %t908 = getelementptr [2 x i8], [2 x i8]* @.str.822, i64 0, i64 0
   %t909 = ptrtoint i8* %t908 to i64
   %t910 = call i64 @Parser__match_kind_check(i64 %t907, i64 %t909)
   %t911 = trunc i64 %t910 to i1
-  br i1 %t911, label %then1443, label %else1444
-then1443:
-  br label %while.end1441
-else1444:
-  br label %endif1442
-endif1442:
+  br i1 %t911, label %then1454, label %else1455
+then1454:
+  br label %while.end1452
+else1455:
+  br label %endif1453
+endif1453:
   %t912 = load i64, i64* %elems
   %t913 = load i64, i64* %self
   %t914 = call i64 @Parser__parse_expr(i64 %t913)
   %t915 = call i64 @__list_push(i64 %t912, i64 %t914)
-  br label %while.cond1439
-while.end1441:
-  br label %endif1436
-else1438:
-  br label %endif1436
-endif1436:
+  br label %while.cond1450
+while.end1452:
+  br label %endif1447
+else1449:
+  br label %endif1447
+endif1447:
   %t916 = load i64, i64* %self
-  %t917 = getelementptr [2 x i8], [2 x i8]* @.str.821, i64 0, i64 0
+  %t917 = getelementptr [2 x i8], [2 x i8]* @.str.823, i64 0, i64 0
   %t918 = ptrtoint i8* %t917 to i64
   %t919 = call i64 @Parser__consume(i64 %t916, i64 %t918)
   %t920 = load i64, i64* %elems
@@ -19704,22 +19911,22 @@ endif1436:
   store i64 %t920, i64* %t924
   %t925 = ptrtoint [2 x i64]* %t922 to i64
   store i64 %t925, i64* %t883
-  br label %ifexpr.end1435
-ifexpr.else1434:
+  br label %ifexpr.end1446
+ifexpr.else1445:
   %t926 = load i64, i64* %self
-  %t927 = getelementptr [2 x i8], [2 x i8]* @.str.822, i64 0, i64 0
+  %t927 = getelementptr [2 x i8], [2 x i8]* @.str.824, i64 0, i64 0
   %t928 = ptrtoint i8* %t927 to i64
   %t929 = call i64 @Parser__consume(i64 %t926, i64 %t928)
   %t930 = load i64, i64* %expr
   store i64 %t930, i64* %t883
-  br label %ifexpr.end1435
-ifexpr.end1435:
+  br label %ifexpr.end1446
+ifexpr.end1446:
   %t931 = load i64, i64* %t883
   store i64 %t931, i64* %t792
-  br label %match.end1420
-match.arm1432:
+  br label %match.end1431
+match.arm1443:
   %t932 = load i64, i64* %self
-  %t933 = getelementptr [37 x i8], [37 x i8]* @.str.823, i64 0, i64 0
+  %t933 = getelementptr [37 x i8], [37 x i8]* @.str.825, i64 0, i64 0
   %t934 = ptrtoint i8* %t933 to i64
   %t935 = call i64 @Parser__parse_error(i64 %t932, i64 %t934)
   %t936 = call i8* @__sf_malloc(i64 8)
@@ -19728,8 +19935,8 @@ match.arm1432:
   store i64 4, i64* %t938
   %t939 = ptrtoint [1 x i64]* %t937 to i64
   store i64 %t939, i64* %t792
-  br label %match.end1420
-match.end1420:
+  br label %match.end1431
+match.end1431:
   %t940 = load i64, i64* %t792
   ret i64 %t940
 }
@@ -19744,49 +19951,49 @@ entry:
   %t3 = call i64 @__list_new()
   store i64 %t3, i64* %elements
   %t4 = load i64, i64* %self
-  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.824, i64 0, i64 0
+  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.826, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @Parser__match_kind_check(i64 %t4, i64 %t6)
   %t8 = xor i64 %t7, 1
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then1446, label %else1447
-then1446:
+  br i1 %t9, label %then1457, label %else1458
+then1457:
   %t10 = load i64, i64* %elements
   %t11 = load i64, i64* %self
   %t12 = call i64 @Parser__parse_expr(i64 %t11)
   %t13 = call i64 @__list_push(i64 %t10, i64 %t12)
-  br label %while.cond1448
-while.cond1448:
+  br label %while.cond1459
+while.cond1459:
   %t14 = load i64, i64* %self
-  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.825, i64 0, i64 0
+  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.827, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @Parser__match_kind(i64 %t14, i64 %t16)
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %while.body1449, label %while.end1450
-while.body1449:
+  br i1 %t18, label %while.body1460, label %while.end1461
+while.body1460:
   %t19 = load i64, i64* %self
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.826, i64 0, i64 0
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.828, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   %t22 = call i64 @Parser__match_kind_check(i64 %t19, i64 %t21)
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then1452, label %else1453
-then1452:
-  br label %while.end1450
-else1453:
-  br label %endif1451
-endif1451:
+  br i1 %t23, label %then1463, label %else1464
+then1463:
+  br label %while.end1461
+else1464:
+  br label %endif1462
+endif1462:
   %t24 = load i64, i64* %elements
   %t25 = load i64, i64* %self
   %t26 = call i64 @Parser__parse_expr(i64 %t25)
   %t27 = call i64 @__list_push(i64 %t24, i64 %t26)
-  br label %while.cond1448
-while.end1450:
-  br label %endif1445
-else1447:
-  br label %endif1445
-endif1445:
+  br label %while.cond1459
+while.end1461:
+  br label %endif1456
+else1458:
+  br label %endif1456
+endif1456:
   %t28 = load i64, i64* %self
-  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.827, i64 0, i64 0
+  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.829, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i64 @Parser__consume(i64 %t28, i64 %t30)
   %t32 = load i64, i64* %elements
@@ -19811,54 +20018,54 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.828, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.830, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__parse_expr(i64 %t7)
   store i64 %t8, i64* %subject
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.829, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.831, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__consume(i64 %t9, i64 %t11)
   %t13 = load i64, i64* %self
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.830, i64 0, i64 0
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.832, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = call i64 @Parser__consume(i64 %t13, i64 %t15)
   %t17 = call i64 @__list_new()
   store i64 %t17, i64* %arms
-  br label %while.cond1454
-while.cond1454:
+  br label %while.cond1465
+while.cond1465:
   %t18 = load i64, i64* %self
-  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.831, i64 0, i64 0
+  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.833, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @Parser__match_kind_check(i64 %t18, i64 %t20)
   %t22 = xor i64 %t21, 1
   %t23 = trunc i64 %t22 to i1
-  br label %logic.entry1457
-logic.entry1457:
-  br i1 %t23, label %rhs1458, label %end1459
-rhs1458:
+  br label %logic.entry1468
+logic.entry1468:
+  br i1 %t23, label %rhs1469, label %end1470
+rhs1469:
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.832, i64 0, i64 0
+  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.834, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @Parser__match_kind_check(i64 %t24, i64 %t26)
   %t28 = xor i64 %t27, 1
   %t29 = trunc i64 %t28 to i1
-  br label %rhs.exit1460
-rhs.exit1460:
-  br label %end1459
-end1459:
-  %t30 = phi i1 [%t23, %logic.entry1457], [%t29, %rhs.exit1460]
+  br label %rhs.exit1471
+rhs.exit1471:
+  br label %end1470
+end1470:
+  %t30 = phi i1 [%t23, %logic.entry1468], [%t29, %rhs.exit1471]
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %while.body1455, label %while.end1456
-while.body1455:
+  br i1 %t32, label %while.body1466, label %while.end1467
+while.body1466:
   %t33 = load i64, i64* %self
   %t34 = call i64 @Parser__parse_pattern(i64 %t33)
   store i64 %t34, i64* %pattern
   %t35 = load i64, i64* %self
-  %t36 = getelementptr [3 x i8], [3 x i8]* @.str.833, i64 0, i64 0
+  %t36 = getelementptr [3 x i8], [3 x i8]* @.str.835, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @Parser__consume(i64 %t35, i64 %t37)
   %t39 = load i64, i64* %self
@@ -19878,13 +20085,13 @@ while.body1455:
   %t49 = ptrtoint [3 x i64]* %t45 to i64
   %t50 = call i64 @__list_push(i64 %t41, i64 %t49)
   %t51 = load i64, i64* %self
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.834, i64 0, i64 0
+  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.836, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @Parser__match_kind(i64 %t51, i64 %t53)
-  br label %while.cond1454
-while.end1456:
+  br label %while.cond1465
+while.end1467:
   %t55 = load i64, i64* %self
-  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.835, i64 0, i64 0
+  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.837, i64 0, i64 0
   %t57 = ptrtoint i8* %t56 to i64
   %t58 = call i64 @Parser__consume(i64 %t55, i64 %t57)
   %t59 = load i64, i64* %subject
@@ -19914,14 +20121,14 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.836, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.838, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__parse_expr(i64 %t7)
   store i64 %t8, i64* %cond
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.837, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.839, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__consume(i64 %t9, i64 %t11)
   %t13 = call i64 @__list_new()
@@ -19933,87 +20140,87 @@ entry:
   %t17 = ptrtoint [1 x i64]* %t15 to i64
   store i64 %t17, i64* %then_val
   %t18 = load i64, i64* %self
-  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.838, i64 0, i64 0
+  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.840, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @Parser__match_kind_check(i64 %t18, i64 %t20)
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %then1462, label %else1463
-then1462:
+  br i1 %t22, label %then1473, label %else1474
+then1473:
   %t23 = load i64, i64* %self
   %t24 = call i64 @Parser__advance(i64 %t23)
-  br label %while.cond1464
-while.cond1464:
+  br label %while.cond1475
+while.cond1475:
   %t25 = load i64, i64* %self
-  %t26 = getelementptr [2 x i8], [2 x i8]* @.str.839, i64 0, i64 0
+  %t26 = getelementptr [2 x i8], [2 x i8]* @.str.841, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   %t28 = call i64 @Parser__match_kind_check(i64 %t25, i64 %t27)
   %t29 = xor i64 %t28, 1
   %t30 = trunc i64 %t29 to i1
-  br label %logic.entry1467
-logic.entry1467:
-  br i1 %t30, label %rhs1468, label %end1469
-rhs1468:
+  br label %logic.entry1478
+logic.entry1478:
+  br i1 %t30, label %rhs1479, label %end1480
+rhs1479:
   %t31 = load i64, i64* %self
-  %t32 = getelementptr [4 x i8], [4 x i8]* @.str.840, i64 0, i64 0
+  %t32 = getelementptr [4 x i8], [4 x i8]* @.str.842, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   %t34 = call i64 @Parser__match_kind_check(i64 %t31, i64 %t33)
   %t35 = xor i64 %t34, 1
   %t36 = trunc i64 %t35 to i1
-  br label %rhs.exit1470
-rhs.exit1470:
-  br label %end1469
-end1469:
-  %t37 = phi i1 [%t30, %logic.entry1467], [%t36, %rhs.exit1470]
+  br label %rhs.exit1481
+rhs.exit1481:
+  br label %end1480
+end1480:
+  %t37 = phi i1 [%t30, %logic.entry1478], [%t36, %rhs.exit1481]
   %t38 = zext i1 %t37 to i64
   %t39 = trunc i64 %t38 to i1
-  br i1 %t39, label %while.body1465, label %while.end1466
-while.body1465:
-  br label %while.cond1471
-while.cond1471:
+  br i1 %t39, label %while.body1476, label %while.end1477
+while.body1476:
+  br label %while.cond1482
+while.cond1482:
   %t40 = load i64, i64* %self
-  %t41 = getelementptr [2 x i8], [2 x i8]* @.str.841, i64 0, i64 0
+  %t41 = getelementptr [2 x i8], [2 x i8]* @.str.843, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = call i64 @Parser__match_kind(i64 %t40, i64 %t42)
   %t44 = trunc i64 %t43 to i1
-  br i1 %t44, label %while.body1472, label %while.end1473
-while.body1472:
-  br label %while.cond1471
-while.end1473:
+  br i1 %t44, label %while.body1483, label %while.end1484
+while.body1483:
+  br label %while.cond1482
+while.end1484:
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.842, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.844, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__match_kind_check(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br label %logic.entry1475
-logic.entry1475:
-  br i1 %t49, label %end1477, label %rhs1476
-rhs1476:
+  br label %logic.entry1486
+logic.entry1486:
+  br i1 %t49, label %end1488, label %rhs1487
+rhs1487:
   %t50 = load i64, i64* %self
-  %t51 = getelementptr [4 x i8], [4 x i8]* @.str.843, i64 0, i64 0
+  %t51 = getelementptr [4 x i8], [4 x i8]* @.str.845, i64 0, i64 0
   %t52 = ptrtoint i8* %t51 to i64
   %t53 = call i64 @Parser__match_kind_check(i64 %t50, i64 %t52)
   %t54 = trunc i64 %t53 to i1
-  br label %rhs.exit1478
-rhs.exit1478:
-  br label %end1477
-end1477:
-  %t55 = phi i1 [%t49, %logic.entry1475], [%t54, %rhs.exit1478]
+  br label %rhs.exit1489
+rhs.exit1489:
+  br label %end1488
+end1488:
+  %t55 = phi i1 [%t49, %logic.entry1486], [%t54, %rhs.exit1489]
   %t56 = zext i1 %t55 to i64
   %t57 = trunc i64 %t56 to i1
-  br i1 %t57, label %then1479, label %else1480
-then1479:
-  br label %while.end1466
-else1480:
-  br label %endif1474
-endif1474:
+  br i1 %t57, label %then1490, label %else1491
+then1490:
+  br label %while.end1477
+else1491:
+  br label %endif1485
+endif1485:
   %t58 = load i64, i64* %then_stmts
   %t59 = load i64, i64* %self
   %t60 = call i64 @Parser__parse_stmt(i64 %t59)
   %t61 = call i64 @__list_push(i64 %t58, i64 %t60)
-  br label %while.cond1464
-while.end1466:
+  br label %while.cond1475
+while.end1477:
   %t62 = load i64, i64* %self
-  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.844, i64 0, i64 0
+  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.846, i64 0, i64 0
   %t64 = ptrtoint i8* %t63 to i64
   %t65 = call i64 @Parser__consume(i64 %t62, i64 %t64)
   %t66 = load i64, i64* %then_stmts
@@ -20022,8 +20229,8 @@ while.end1466:
   %t70 = icmp sgt i64 %t67, %t68
   %t69 = zext i1 %t70 to i64
   %t71 = trunc i64 %t69 to i1
-  br i1 %t71, label %then1482, label %else1483
-then1482:
+  br i1 %t71, label %then1493, label %else1494
+then1493:
   %t72 = load i64, i64* %then_stmts
   %t73 = load i64, i64* %then_stmts
   %t74 = call i64 @__list_length(i64 %t73)
@@ -20039,45 +20246,45 @@ then1482:
   %t83 = load i64, i64* %last
   %t84 = call i64 @Parser__is_value_stmt(i64 %t82, i64 %t83)
   %t85 = trunc i64 %t84 to i1
-  br i1 %t85, label %then1485, label %else1486
-then1485:
+  br i1 %t85, label %then1496, label %else1497
+then1496:
   %t86 = load i64, i64* %self
   %t87 = load i64, i64* %last
   %t88 = call i64 @Parser__stmt_to_expr(i64 %t86, i64 %t87)
   store i64 %t88, i64* %then_val
   %t89 = load i64, i64* %then_stmts
   %t90 = call i64 @__list_pop(i64 %t89)
-  br label %endif1484
-else1486:
-  br label %endif1484
-endif1484:
-  br label %endif1481
-else1483:
-  br label %endif1481
-endif1481:
-  br label %endif1461
-else1463:
+  br label %endif1495
+else1497:
+  br label %endif1495
+endif1495:
+  br label %endif1492
+else1494:
+  br label %endif1492
+endif1492:
+  br label %endif1472
+else1474:
   %t91 = load i64, i64* %self
   %t92 = call i64 @Parser__parse_expr(i64 %t91)
   store i64 %t92, i64* %then_val
-  br label %endif1461
-endif1461:
+  br label %endif1472
+endif1472:
   %t93 = load i64, i64* %self
-  %t94 = getelementptr [5 x i8], [5 x i8]* @.str.845, i64 0, i64 0
+  %t94 = getelementptr [5 x i8], [5 x i8]* @.str.847, i64 0, i64 0
   %t95 = ptrtoint i8* %t94 to i64
   %t96 = call i64 @Parser__match_kind(i64 %t93, i64 %t95)
   %t97 = xor i64 %t96, 1
   %t98 = trunc i64 %t97 to i1
-  br i1 %t98, label %then1488, label %else1489
-then1488:
+  br i1 %t98, label %then1499, label %else1500
+then1499:
   %t99 = load i64, i64* %self
-  %t100 = getelementptr [38 x i8], [38 x i8]* @.str.846, i64 0, i64 0
+  %t100 = getelementptr [38 x i8], [38 x i8]* @.str.848, i64 0, i64 0
   %t101 = ptrtoint i8* %t100 to i64
   %t102 = call i64 @Parser__parse_error(i64 %t99, i64 %t101)
-  br label %endif1487
-else1489:
-  br label %endif1487
-endif1487:
+  br label %endif1498
+else1500:
+  br label %endif1498
+endif1498:
   %t103 = call i64 @__list_new()
   store i64 %t103, i64* %else_stmts
   %t104 = call i8* @__sf_malloc(i64 8)
@@ -20087,99 +20294,99 @@ endif1487:
   %t107 = ptrtoint [1 x i64]* %t105 to i64
   store i64 %t107, i64* %else_val
   %t108 = load i64, i64* %self
-  %t109 = getelementptr [3 x i8], [3 x i8]* @.str.847, i64 0, i64 0
+  %t109 = getelementptr [3 x i8], [3 x i8]* @.str.849, i64 0, i64 0
   %t110 = ptrtoint i8* %t109 to i64
   %t111 = call i64 @Parser__match_kind_check(i64 %t108, i64 %t110)
   %t112 = trunc i64 %t111 to i1
-  br i1 %t112, label %then1491, label %else1492
-then1491:
+  br i1 %t112, label %then1502, label %else1503
+then1502:
   %t113 = load i64, i64* %self
   %t114 = call i64 @Parser__parse_if_expr(i64 %t113)
   store i64 %t114, i64* %else_val
-  br label %endif1490
-else1492:
+  br label %endif1501
+else1503:
   %t115 = load i64, i64* %self
-  %t116 = getelementptr [2 x i8], [2 x i8]* @.str.848, i64 0, i64 0
+  %t116 = getelementptr [2 x i8], [2 x i8]* @.str.850, i64 0, i64 0
   %t117 = ptrtoint i8* %t116 to i64
   %t118 = call i64 @Parser__match_kind_check(i64 %t115, i64 %t117)
   %t119 = trunc i64 %t118 to i1
-  br i1 %t119, label %then1493, label %else1494
-then1493:
+  br i1 %t119, label %then1504, label %else1505
+then1504:
   %t120 = load i64, i64* %self
   %t121 = call i64 @Parser__advance(i64 %t120)
-  br label %while.cond1495
-while.cond1495:
+  br label %while.cond1506
+while.cond1506:
   %t122 = load i64, i64* %self
-  %t123 = getelementptr [2 x i8], [2 x i8]* @.str.849, i64 0, i64 0
+  %t123 = getelementptr [2 x i8], [2 x i8]* @.str.851, i64 0, i64 0
   %t124 = ptrtoint i8* %t123 to i64
   %t125 = call i64 @Parser__match_kind_check(i64 %t122, i64 %t124)
   %t126 = xor i64 %t125, 1
   %t127 = trunc i64 %t126 to i1
-  br label %logic.entry1498
-logic.entry1498:
-  br i1 %t127, label %rhs1499, label %end1500
-rhs1499:
+  br label %logic.entry1509
+logic.entry1509:
+  br i1 %t127, label %rhs1510, label %end1511
+rhs1510:
   %t128 = load i64, i64* %self
-  %t129 = getelementptr [4 x i8], [4 x i8]* @.str.850, i64 0, i64 0
+  %t129 = getelementptr [4 x i8], [4 x i8]* @.str.852, i64 0, i64 0
   %t130 = ptrtoint i8* %t129 to i64
   %t131 = call i64 @Parser__match_kind_check(i64 %t128, i64 %t130)
   %t132 = xor i64 %t131, 1
   %t133 = trunc i64 %t132 to i1
-  br label %rhs.exit1501
-rhs.exit1501:
-  br label %end1500
-end1500:
-  %t134 = phi i1 [%t127, %logic.entry1498], [%t133, %rhs.exit1501]
+  br label %rhs.exit1512
+rhs.exit1512:
+  br label %end1511
+end1511:
+  %t134 = phi i1 [%t127, %logic.entry1509], [%t133, %rhs.exit1512]
   %t135 = zext i1 %t134 to i64
   %t136 = trunc i64 %t135 to i1
-  br i1 %t136, label %while.body1496, label %while.end1497
-while.body1496:
-  br label %while.cond1502
-while.cond1502:
+  br i1 %t136, label %while.body1507, label %while.end1508
+while.body1507:
+  br label %while.cond1513
+while.cond1513:
   %t137 = load i64, i64* %self
-  %t138 = getelementptr [2 x i8], [2 x i8]* @.str.851, i64 0, i64 0
+  %t138 = getelementptr [2 x i8], [2 x i8]* @.str.853, i64 0, i64 0
   %t139 = ptrtoint i8* %t138 to i64
   %t140 = call i64 @Parser__match_kind(i64 %t137, i64 %t139)
   %t141 = trunc i64 %t140 to i1
-  br i1 %t141, label %while.body1503, label %while.end1504
-while.body1503:
-  br label %while.cond1502
-while.end1504:
+  br i1 %t141, label %while.body1514, label %while.end1515
+while.body1514:
+  br label %while.cond1513
+while.end1515:
   %t142 = load i64, i64* %self
-  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.852, i64 0, i64 0
+  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.854, i64 0, i64 0
   %t144 = ptrtoint i8* %t143 to i64
   %t145 = call i64 @Parser__match_kind_check(i64 %t142, i64 %t144)
   %t146 = trunc i64 %t145 to i1
-  br label %logic.entry1506
-logic.entry1506:
-  br i1 %t146, label %end1508, label %rhs1507
-rhs1507:
+  br label %logic.entry1517
+logic.entry1517:
+  br i1 %t146, label %end1519, label %rhs1518
+rhs1518:
   %t147 = load i64, i64* %self
-  %t148 = getelementptr [4 x i8], [4 x i8]* @.str.853, i64 0, i64 0
+  %t148 = getelementptr [4 x i8], [4 x i8]* @.str.855, i64 0, i64 0
   %t149 = ptrtoint i8* %t148 to i64
   %t150 = call i64 @Parser__match_kind_check(i64 %t147, i64 %t149)
   %t151 = trunc i64 %t150 to i1
-  br label %rhs.exit1509
-rhs.exit1509:
-  br label %end1508
-end1508:
-  %t152 = phi i1 [%t146, %logic.entry1506], [%t151, %rhs.exit1509]
+  br label %rhs.exit1520
+rhs.exit1520:
+  br label %end1519
+end1519:
+  %t152 = phi i1 [%t146, %logic.entry1517], [%t151, %rhs.exit1520]
   %t153 = zext i1 %t152 to i64
   %t154 = trunc i64 %t153 to i1
-  br i1 %t154, label %then1510, label %else1511
-then1510:
-  br label %while.end1497
-else1511:
-  br label %endif1505
-endif1505:
+  br i1 %t154, label %then1521, label %else1522
+then1521:
+  br label %while.end1508
+else1522:
+  br label %endif1516
+endif1516:
   %t155 = load i64, i64* %else_stmts
   %t156 = load i64, i64* %self
   %t157 = call i64 @Parser__parse_stmt(i64 %t156)
   %t158 = call i64 @__list_push(i64 %t155, i64 %t157)
-  br label %while.cond1495
-while.end1497:
+  br label %while.cond1506
+while.end1508:
   %t159 = load i64, i64* %self
-  %t160 = getelementptr [2 x i8], [2 x i8]* @.str.854, i64 0, i64 0
+  %t160 = getelementptr [2 x i8], [2 x i8]* @.str.856, i64 0, i64 0
   %t161 = ptrtoint i8* %t160 to i64
   %t162 = call i64 @Parser__consume(i64 %t159, i64 %t161)
   %t163 = load i64, i64* %else_stmts
@@ -20188,8 +20395,8 @@ while.end1497:
   %t167 = icmp sgt i64 %t164, %t165
   %t166 = zext i1 %t167 to i64
   %t168 = trunc i64 %t166 to i1
-  br i1 %t168, label %then1513, label %else1514
-then1513:
+  br i1 %t168, label %then1524, label %else1525
+then1524:
   %t169 = load i64, i64* %else_stmts
   %t170 = load i64, i64* %else_stmts
   %t171 = call i64 @__list_length(i64 %t170)
@@ -20205,29 +20412,29 @@ then1513:
   %t180 = load i64, i64* %last
   %t181 = call i64 @Parser__is_value_stmt(i64 %t179, i64 %t180)
   %t182 = trunc i64 %t181 to i1
-  br i1 %t182, label %then1516, label %else1517
-then1516:
+  br i1 %t182, label %then1527, label %else1528
+then1527:
   %t183 = load i64, i64* %self
   %t184 = load i64, i64* %last
   %t185 = call i64 @Parser__stmt_to_expr(i64 %t183, i64 %t184)
   store i64 %t185, i64* %else_val
   %t186 = load i64, i64* %else_stmts
   %t187 = call i64 @__list_pop(i64 %t186)
-  br label %endif1515
-else1517:
-  br label %endif1515
-endif1515:
-  br label %endif1512
-else1514:
-  br label %endif1512
-endif1512:
-  br label %endif1490
-else1494:
+  br label %endif1526
+else1528:
+  br label %endif1526
+endif1526:
+  br label %endif1523
+else1525:
+  br label %endif1523
+endif1523:
+  br label %endif1501
+else1505:
   %t188 = load i64, i64* %self
   %t189 = call i64 @Parser__parse_expr(i64 %t188)
   store i64 %t189, i64* %else_val
-  br label %endif1490
-endif1490:
+  br label %endif1501
+endif1501:
   %t190 = load i64, i64* %cond
   %t191 = load i64, i64* %then_stmts
   %t192 = load i64, i64* %then_val
@@ -20264,84 +20471,84 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.855, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.857, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = call i64 @__list_new()
   store i64 %t7, i64* %try_stmts
-  br label %while.cond1518
-while.cond1518:
+  br label %while.cond1529
+while.cond1529:
   %t8 = load i64, i64* %self
-  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.856, i64 0, i64 0
+  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.858, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i64
   %t11 = call i64 @Parser__match_kind_check(i64 %t8, i64 %t10)
   %t12 = xor i64 %t11, 1
   %t13 = trunc i64 %t12 to i1
-  br label %logic.entry1521
-logic.entry1521:
-  br i1 %t13, label %rhs1522, label %end1523
-rhs1522:
+  br label %logic.entry1532
+logic.entry1532:
+  br i1 %t13, label %rhs1533, label %end1534
+rhs1533:
   %t14 = load i64, i64* %self
-  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.857, i64 0, i64 0
+  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.859, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @Parser__match_kind_check(i64 %t14, i64 %t16)
   %t18 = xor i64 %t17, 1
   %t19 = trunc i64 %t18 to i1
-  br label %rhs.exit1524
-rhs.exit1524:
-  br label %end1523
-end1523:
-  %t20 = phi i1 [%t13, %logic.entry1521], [%t19, %rhs.exit1524]
+  br label %rhs.exit1535
+rhs.exit1535:
+  br label %end1534
+end1534:
+  %t20 = phi i1 [%t13, %logic.entry1532], [%t19, %rhs.exit1535]
   %t21 = zext i1 %t20 to i64
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %while.body1519, label %while.end1520
-while.body1519:
-  br label %while.cond1525
-while.cond1525:
+  br i1 %t22, label %while.body1530, label %while.end1531
+while.body1530:
+  br label %while.cond1536
+while.cond1536:
   %t23 = load i64, i64* %self
-  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.858, i64 0, i64 0
+  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.860, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = call i64 @Parser__match_kind(i64 %t23, i64 %t25)
   %t27 = trunc i64 %t26 to i1
-  br i1 %t27, label %while.body1526, label %while.end1527
-while.body1526:
-  br label %while.cond1525
-while.end1527:
+  br i1 %t27, label %while.body1537, label %while.end1538
+while.body1537:
+  br label %while.cond1536
+while.end1538:
   %t28 = load i64, i64* %self
-  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.859, i64 0, i64 0
+  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.861, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i64 @Parser__match_kind_check(i64 %t28, i64 %t30)
   %t32 = trunc i64 %t31 to i1
-  br label %logic.entry1529
-logic.entry1529:
-  br i1 %t32, label %end1531, label %rhs1530
-rhs1530:
+  br label %logic.entry1540
+logic.entry1540:
+  br i1 %t32, label %end1542, label %rhs1541
+rhs1541:
   %t33 = load i64, i64* %self
-  %t34 = getelementptr [4 x i8], [4 x i8]* @.str.860, i64 0, i64 0
+  %t34 = getelementptr [4 x i8], [4 x i8]* @.str.862, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @Parser__match_kind_check(i64 %t33, i64 %t35)
   %t37 = trunc i64 %t36 to i1
-  br label %rhs.exit1532
-rhs.exit1532:
-  br label %end1531
-end1531:
-  %t38 = phi i1 [%t32, %logic.entry1529], [%t37, %rhs.exit1532]
+  br label %rhs.exit1543
+rhs.exit1543:
+  br label %end1542
+end1542:
+  %t38 = phi i1 [%t32, %logic.entry1540], [%t37, %rhs.exit1543]
   %t39 = zext i1 %t38 to i64
   %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %then1533, label %else1534
-then1533:
-  br label %while.end1520
-else1534:
-  br label %endif1528
-endif1528:
+  br i1 %t40, label %then1544, label %else1545
+then1544:
+  br label %while.end1531
+else1545:
+  br label %endif1539
+endif1539:
   %t41 = load i64, i64* %try_stmts
   %t42 = load i64, i64* %self
   %t43 = call i64 @Parser__parse_stmt(i64 %t42)
   %t44 = call i64 @__list_push(i64 %t41, i64 %t43)
-  br label %while.cond1518
-while.end1520:
+  br label %while.cond1529
+while.end1531:
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.861, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.863, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__consume(i64 %t45, i64 %t47)
   %t49 = call i8* @__sf_malloc(i64 8)
@@ -20356,8 +20563,8 @@ while.end1520:
   %t57 = icmp sgt i64 %t54, %t55
   %t56 = zext i1 %t57 to i64
   %t58 = trunc i64 %t56 to i1
-  br i1 %t58, label %then1536, label %else1537
-then1536:
+  br i1 %t58, label %then1547, label %else1548
+then1547:
   %t59 = load i64, i64* %try_stmts
   %t60 = load i64, i64* %try_stmts
   %t61 = call i64 @__list_length(i64 %t60)
@@ -20373,116 +20580,116 @@ then1536:
   %t70 = load i64, i64* %last
   %t71 = call i64 @Parser__is_value_stmt(i64 %t69, i64 %t70)
   %t72 = trunc i64 %t71 to i1
-  br i1 %t72, label %then1539, label %else1540
-then1539:
+  br i1 %t72, label %then1550, label %else1551
+then1550:
   %t73 = load i64, i64* %self
   %t74 = load i64, i64* %last
   %t75 = call i64 @Parser__stmt_to_expr(i64 %t73, i64 %t74)
   store i64 %t75, i64* %try_val
   %t76 = load i64, i64* %try_stmts
   %t77 = call i64 @__list_pop(i64 %t76)
-  br label %endif1538
-else1540:
-  br label %endif1538
-endif1538:
-  br label %endif1535
-else1537:
-  br label %endif1535
-endif1535:
+  br label %endif1549
+else1551:
+  br label %endif1549
+endif1549:
+  br label %endif1546
+else1548:
+  br label %endif1546
+endif1546:
   %t78 = load i64, i64* %self
-  %t79 = getelementptr [6 x i8], [6 x i8]* @.str.862, i64 0, i64 0
+  %t79 = getelementptr [6 x i8], [6 x i8]* @.str.864, i64 0, i64 0
   %t80 = ptrtoint i8* %t79 to i64
   %t81 = call i64 @Parser__consume(i64 %t78, i64 %t80)
   %t82 = load i64, i64* %self
-  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.863, i64 0, i64 0
+  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.865, i64 0, i64 0
   %t84 = ptrtoint i8* %t83 to i64
   %t85 = call i64 @Parser__consume(i64 %t82, i64 %t84)
   %t86 = load i64, i64* %self
   %t87 = call i64 @Parser__expect_ident(i64 %t86)
   store i64 %t87, i64* %catch_name
   %t88 = load i64, i64* %self
-  %t89 = getelementptr [2 x i8], [2 x i8]* @.str.864, i64 0, i64 0
+  %t89 = getelementptr [2 x i8], [2 x i8]* @.str.866, i64 0, i64 0
   %t90 = ptrtoint i8* %t89 to i64
   %t91 = call i64 @Parser__consume(i64 %t88, i64 %t90)
   %t92 = load i64, i64* %self
-  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.865, i64 0, i64 0
+  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.867, i64 0, i64 0
   %t94 = ptrtoint i8* %t93 to i64
   %t95 = call i64 @Parser__consume(i64 %t92, i64 %t94)
   %t96 = call i64 @__list_new()
   store i64 %t96, i64* %catch_stmts
-  br label %while.cond1541
-while.cond1541:
+  br label %while.cond1552
+while.cond1552:
   %t97 = load i64, i64* %self
-  %t98 = getelementptr [2 x i8], [2 x i8]* @.str.866, i64 0, i64 0
+  %t98 = getelementptr [2 x i8], [2 x i8]* @.str.868, i64 0, i64 0
   %t99 = ptrtoint i8* %t98 to i64
   %t100 = call i64 @Parser__match_kind_check(i64 %t97, i64 %t99)
   %t101 = xor i64 %t100, 1
   %t102 = trunc i64 %t101 to i1
-  br label %logic.entry1544
-logic.entry1544:
-  br i1 %t102, label %rhs1545, label %end1546
-rhs1545:
+  br label %logic.entry1555
+logic.entry1555:
+  br i1 %t102, label %rhs1556, label %end1557
+rhs1556:
   %t103 = load i64, i64* %self
-  %t104 = getelementptr [4 x i8], [4 x i8]* @.str.867, i64 0, i64 0
+  %t104 = getelementptr [4 x i8], [4 x i8]* @.str.869, i64 0, i64 0
   %t105 = ptrtoint i8* %t104 to i64
   %t106 = call i64 @Parser__match_kind_check(i64 %t103, i64 %t105)
   %t107 = xor i64 %t106, 1
   %t108 = trunc i64 %t107 to i1
-  br label %rhs.exit1547
-rhs.exit1547:
-  br label %end1546
-end1546:
-  %t109 = phi i1 [%t102, %logic.entry1544], [%t108, %rhs.exit1547]
+  br label %rhs.exit1558
+rhs.exit1558:
+  br label %end1557
+end1557:
+  %t109 = phi i1 [%t102, %logic.entry1555], [%t108, %rhs.exit1558]
   %t110 = zext i1 %t109 to i64
   %t111 = trunc i64 %t110 to i1
-  br i1 %t111, label %while.body1542, label %while.end1543
-while.body1542:
-  br label %while.cond1548
-while.cond1548:
+  br i1 %t111, label %while.body1553, label %while.end1554
+while.body1553:
+  br label %while.cond1559
+while.cond1559:
   %t112 = load i64, i64* %self
-  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.868, i64 0, i64 0
+  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.870, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = call i64 @Parser__match_kind(i64 %t112, i64 %t114)
   %t116 = trunc i64 %t115 to i1
-  br i1 %t116, label %while.body1549, label %while.end1550
-while.body1549:
-  br label %while.cond1548
-while.end1550:
+  br i1 %t116, label %while.body1560, label %while.end1561
+while.body1560:
+  br label %while.cond1559
+while.end1561:
   %t117 = load i64, i64* %self
-  %t118 = getelementptr [2 x i8], [2 x i8]* @.str.869, i64 0, i64 0
+  %t118 = getelementptr [2 x i8], [2 x i8]* @.str.871, i64 0, i64 0
   %t119 = ptrtoint i8* %t118 to i64
   %t120 = call i64 @Parser__match_kind_check(i64 %t117, i64 %t119)
   %t121 = trunc i64 %t120 to i1
-  br label %logic.entry1552
-logic.entry1552:
-  br i1 %t121, label %end1554, label %rhs1553
-rhs1553:
+  br label %logic.entry1563
+logic.entry1563:
+  br i1 %t121, label %end1565, label %rhs1564
+rhs1564:
   %t122 = load i64, i64* %self
-  %t123 = getelementptr [4 x i8], [4 x i8]* @.str.870, i64 0, i64 0
+  %t123 = getelementptr [4 x i8], [4 x i8]* @.str.872, i64 0, i64 0
   %t124 = ptrtoint i8* %t123 to i64
   %t125 = call i64 @Parser__match_kind_check(i64 %t122, i64 %t124)
   %t126 = trunc i64 %t125 to i1
-  br label %rhs.exit1555
-rhs.exit1555:
-  br label %end1554
-end1554:
-  %t127 = phi i1 [%t121, %logic.entry1552], [%t126, %rhs.exit1555]
+  br label %rhs.exit1566
+rhs.exit1566:
+  br label %end1565
+end1565:
+  %t127 = phi i1 [%t121, %logic.entry1563], [%t126, %rhs.exit1566]
   %t128 = zext i1 %t127 to i64
   %t129 = trunc i64 %t128 to i1
-  br i1 %t129, label %then1556, label %else1557
-then1556:
-  br label %while.end1543
-else1557:
-  br label %endif1551
-endif1551:
+  br i1 %t129, label %then1567, label %else1568
+then1567:
+  br label %while.end1554
+else1568:
+  br label %endif1562
+endif1562:
   %t130 = load i64, i64* %catch_stmts
   %t131 = load i64, i64* %self
   %t132 = call i64 @Parser__parse_stmt(i64 %t131)
   %t133 = call i64 @__list_push(i64 %t130, i64 %t132)
-  br label %while.cond1541
-while.end1543:
+  br label %while.cond1552
+while.end1554:
   %t134 = load i64, i64* %self
-  %t135 = getelementptr [2 x i8], [2 x i8]* @.str.871, i64 0, i64 0
+  %t135 = getelementptr [2 x i8], [2 x i8]* @.str.873, i64 0, i64 0
   %t136 = ptrtoint i8* %t135 to i64
   %t137 = call i64 @Parser__consume(i64 %t134, i64 %t136)
   %t138 = call i8* @__sf_malloc(i64 8)
@@ -20497,8 +20704,8 @@ while.end1543:
   %t146 = icmp sgt i64 %t143, %t144
   %t145 = zext i1 %t146 to i64
   %t147 = trunc i64 %t145 to i1
-  br i1 %t147, label %then1559, label %else1560
-then1559:
+  br i1 %t147, label %then1570, label %else1571
+then1570:
   %t148 = load i64, i64* %catch_stmts
   %t149 = load i64, i64* %catch_stmts
   %t150 = call i64 @__list_length(i64 %t149)
@@ -20514,22 +20721,22 @@ then1559:
   %t159 = load i64, i64* %last
   %t160 = call i64 @Parser__is_value_stmt(i64 %t158, i64 %t159)
   %t161 = trunc i64 %t160 to i1
-  br i1 %t161, label %then1562, label %else1563
-then1562:
+  br i1 %t161, label %then1573, label %else1574
+then1573:
   %t162 = load i64, i64* %self
   %t163 = load i64, i64* %last
   %t164 = call i64 @Parser__stmt_to_expr(i64 %t162, i64 %t163)
   store i64 %t164, i64* %catch_val
   %t165 = load i64, i64* %catch_stmts
   %t166 = call i64 @__list_pop(i64 %t165)
-  br label %endif1561
-else1563:
-  br label %endif1561
-endif1561:
-  br label %endif1558
-else1560:
-  br label %endif1558
-endif1558:
+  br label %endif1572
+else1574:
+  br label %endif1572
+endif1572:
+  br label %endif1569
+else1571:
+  br label %endif1569
+endif1569:
   %t167 = load i64, i64* %try_stmts
   %t168 = load i64, i64* %try_val
   %t169 = load i64, i64* %catch_name
@@ -20566,32 +20773,32 @@ entry:
   %first_ch = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.872, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.874, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind(i64 %t1, i64 %t3)
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [4 x i8], [4 x i8]* @.str.873, i64 0, i64 0
+  %t6 = getelementptr [4 x i8], [4 x i8]* @.str.875, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__match_kind_check(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br label %logic.entry1565
-logic.entry1565:
-  br i1 %t9, label %end1567, label %rhs1566
-rhs1566:
+  br label %logic.entry1576
+logic.entry1576:
+  br i1 %t9, label %end1578, label %rhs1577
+rhs1577:
   %t10 = load i64, i64* %self
-  %t11 = getelementptr [6 x i8], [6 x i8]* @.str.874, i64 0, i64 0
+  %t11 = getelementptr [6 x i8], [6 x i8]* @.str.876, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
   %t13 = call i64 @Parser__match_kind_check(i64 %t10, i64 %t12)
   %t14 = trunc i64 %t13 to i1
-  br label %rhs.exit1568
-rhs.exit1568:
-  br label %end1567
-end1567:
-  %t15 = phi i1 [%t9, %logic.entry1565], [%t14, %rhs.exit1568]
+  br label %rhs.exit1579
+rhs.exit1579:
+  br label %end1578
+end1578:
+  %t15 = phi i1 [%t9, %logic.entry1576], [%t14, %rhs.exit1579]
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then1569, label %else1570
-then1569:
+  br i1 %t17, label %then1580, label %else1581
+then1580:
   %t18 = load i64, i64* %self
   %t19 = call i64 @Parser__current_kind(i64 %t18)
   store i64 %t19, i64* %kind
@@ -20602,8 +20809,8 @@ then1569:
   %t25 = inttoptr i64 %t22 to i64*
   %t26 = load i64, i64* %t25
   %t24 = trunc i64 %t26 to i8
-  switch i8 %t24, label %match.arm1574 [ i8 0, label %match.arm1572 i8 1, label %match.arm1573 ]
-match.arm1572:
+  switch i8 %t24, label %match.arm1585 [ i8 0, label %match.arm1583 i8 1, label %match.arm1584 ]
+match.arm1583:
   %t27 = load i64, i64* %v
   %t28 = inttoptr i64 %t22 to [2 x i64]*
   %t29 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 1
@@ -20614,8 +20821,8 @@ match.arm1572:
   %t33 = call i64 @__rt_tag_ptr(i64 %t32)
   store i64 %t33, i64* %t23
   store i64 %t27, i64* %v
-  br label %match.end1571
-match.arm1573:
+  br label %match.end1582
+match.arm1584:
   %t34 = load i64, i64* %v
   %t35 = inttoptr i64 %t22 to [2 x i64]*
   %t36 = getelementptr [2 x i64], [2 x i64]* %t35, i64 0, i64 1
@@ -20624,13 +20831,13 @@ match.arm1573:
   %t38 = load i64, i64* %v
   store i64 %t38, i64* %t23
   store i64 %t34, i64* %v
-  br label %match.end1571
-match.arm1574:
-  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.875, i64 0, i64 0
+  br label %match.end1582
+match.arm1585:
+  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.877, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   store i64 %t40, i64* %t23
-  br label %match.end1571
-match.end1571:
+  br label %match.end1582
+match.end1582:
   %t41 = load i64, i64* %t23
   store i64 %t41, i64* %lit_val
   %t42 = load i64, i64* %lit_val
@@ -20645,16 +20852,16 @@ match.end1571:
   store i64 %t43, i64* %t48
   %t49 = ptrtoint [3 x i64]* %t45 to i64
   ret i64 %t49
-else1570:
-  br label %endif1564
-endif1564:
+else1581:
+  br label %endif1575
+endif1575:
   %t50 = load i64, i64* %self
-  %t51 = getelementptr [7 x i8], [7 x i8]* @.str.876, i64 0, i64 0
+  %t51 = getelementptr [7 x i8], [7 x i8]* @.str.878, i64 0, i64 0
   %t52 = ptrtoint i8* %t51 to i64
   %t53 = call i64 @Parser__match_kind_check(i64 %t50, i64 %t52)
   %t54 = trunc i64 %t53 to i1
-  br i1 %t54, label %then1576, label %else1577
-then1576:
+  br i1 %t54, label %then1587, label %else1588
+then1587:
   %t55 = load i64, i64* %self
   %t56 = call i64 @Parser__current_kind(i64 %t55)
   store i64 %t56, i64* %kind
@@ -20665,8 +20872,8 @@ then1576:
   %t62 = inttoptr i64 %t59 to i64*
   %t63 = load i64, i64* %t62
   %t61 = trunc i64 %t63 to i8
-  switch i8 %t61, label %match.arm1580 [ i8 2, label %match.arm1579 ]
-match.arm1579:
+  switch i8 %t61, label %match.arm1591 [ i8 2, label %match.arm1590 ]
+match.arm1590:
   %t64 = load i64, i64* %s
   %t65 = inttoptr i64 %t59 to [2 x i64]*
   %t66 = getelementptr [2 x i64], [2 x i64]* %t65, i64 0, i64 1
@@ -20675,16 +20882,16 @@ match.arm1579:
   %t68 = load i64, i64* %s
   store i64 %t68, i64* %t60
   store i64 %t64, i64* %s
-  br label %match.end1578
-match.arm1580:
-  %t69 = getelementptr [1 x i8], [1 x i8]* @.str.877, i64 0, i64 0
+  br label %match.end1589
+match.arm1591:
+  %t69 = getelementptr [1 x i8], [1 x i8]* @.str.879, i64 0, i64 0
   %t70 = ptrtoint i8* %t69 to i64
   store i64 %t70, i64* %t60
-  br label %match.end1578
-match.end1578:
+  br label %match.end1589
+match.end1589:
   %t71 = load i64, i64* %t60
   store i64 %t71, i64* %str_val
-  %t72 = getelementptr [10 x i8], [10 x i8]* @.str.878, i64 0, i64 0
+  %t72 = getelementptr [10 x i8], [10 x i8]* @.str.880, i64 0, i64 0
   %t73 = ptrtoint i8* %t72 to i64
   %t74 = load i64, i64* %str_val
   %t75 = inttoptr i64 %t73 to i8*
@@ -20711,54 +20918,54 @@ match.end1578:
   store i64 %t86, i64* %t91
   %t92 = ptrtoint [3 x i64]* %t88 to i64
   ret i64 %t92
-else1577:
-  br label %endif1575
-endif1575:
+else1588:
+  br label %endif1586
+endif1586:
   %t93 = load i64, i64* %self
   %t94 = call i64 @Parser__expect_ident(i64 %t93)
   store i64 %t94, i64* %name
   %t95 = load i64, i64* %self
-  %t96 = getelementptr [2 x i8], [2 x i8]* @.str.879, i64 0, i64 0
+  %t96 = getelementptr [2 x i8], [2 x i8]* @.str.881, i64 0, i64 0
   %t97 = ptrtoint i8* %t96 to i64
   %t98 = call i64 @Parser__match_kind(i64 %t95, i64 %t97)
   %t99 = trunc i64 %t98 to i1
-  br i1 %t99, label %then1582, label %else1583
-then1582:
+  br i1 %t99, label %then1593, label %else1594
+then1593:
   %t100 = call i64 @__list_new()
   store i64 %t100, i64* %bindings
   %t101 = load i64, i64* %self
-  %t102 = getelementptr [2 x i8], [2 x i8]* @.str.880, i64 0, i64 0
+  %t102 = getelementptr [2 x i8], [2 x i8]* @.str.882, i64 0, i64 0
   %t103 = ptrtoint i8* %t102 to i64
   %t104 = call i64 @Parser__match_kind_check(i64 %t101, i64 %t103)
   %t105 = xor i64 %t104, 1
   %t106 = trunc i64 %t105 to i1
-  br i1 %t106, label %then1585, label %else1586
-then1585:
+  br i1 %t106, label %then1596, label %else1597
+then1596:
   %t107 = load i64, i64* %bindings
   %t108 = load i64, i64* %self
   %t109 = call i64 @Parser__expect_ident(i64 %t108)
   %t110 = call i64 @__list_push(i64 %t107, i64 %t109)
-  br label %while.cond1587
-while.cond1587:
+  br label %while.cond1598
+while.cond1598:
   %t111 = load i64, i64* %self
-  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.881, i64 0, i64 0
+  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.883, i64 0, i64 0
   %t113 = ptrtoint i8* %t112 to i64
   %t114 = call i64 @Parser__match_kind(i64 %t111, i64 %t113)
   %t115 = trunc i64 %t114 to i1
-  br i1 %t115, label %while.body1588, label %while.end1589
-while.body1588:
+  br i1 %t115, label %while.body1599, label %while.end1600
+while.body1599:
   %t116 = load i64, i64* %bindings
   %t117 = load i64, i64* %self
   %t118 = call i64 @Parser__expect_ident(i64 %t117)
   %t119 = call i64 @__list_push(i64 %t116, i64 %t118)
-  br label %while.cond1587
-while.end1589:
-  br label %endif1584
-else1586:
-  br label %endif1584
-endif1584:
+  br label %while.cond1598
+while.end1600:
+  br label %endif1595
+else1597:
+  br label %endif1595
+endif1595:
   %t120 = load i64, i64* %self
-  %t121 = getelementptr [2 x i8], [2 x i8]* @.str.882, i64 0, i64 0
+  %t121 = getelementptr [2 x i8], [2 x i8]* @.str.884, i64 0, i64 0
   %t122 = ptrtoint i8* %t121 to i64
   %t123 = call i64 @Parser__consume(i64 %t120, i64 %t122)
   %t124 = load i64, i64* %name
@@ -20773,9 +20980,9 @@ endif1584:
   store i64 %t125, i64* %t130
   %t131 = ptrtoint [3 x i64]* %t127 to i64
   ret i64 %t131
-else1583:
-  br label %endif1581
-endif1581:
+else1594:
+  br label %endif1592
+endif1592:
   %t132 = load i64, i64* %name
   %t133 = inttoptr i64 %t132 to i8*
   %t134 = call i64 @strlen(i8* %t133)
@@ -20783,8 +20990,8 @@ endif1581:
   %t137 = icmp sgt i64 %t134, %t135
   %t136 = zext i1 %t137 to i64
   %t138 = trunc i64 %t136 to i1
-  br i1 %t138, label %then1591, label %else1592
-then1591:
+  br i1 %t138, label %then1602, label %else1603
+then1602:
   %t139 = load i64, i64* %name
   %t140 = inttoptr i64 %t139 to i8*
   %t141 = add i64 0, 0
@@ -20803,10 +21010,10 @@ then1591:
   %t151 = ptrtoint i8* %t150 to i64
   %t152 = call i64 @__string_eq(i64 %t147, i64 %t151)
   %t153 = trunc i64 %t152 to i1
-  br label %logic.entry1594
-logic.entry1594:
-  br i1 %t153, label %rhs1595, label %end1596
-rhs1595:
+  br label %logic.entry1605
+logic.entry1605:
+  br i1 %t153, label %rhs1606, label %end1607
+rhs1606:
   %t154 = load i64, i64* %first_ch
   %t155 = load i64, i64* %first_ch
   %t156 = call i64 @rt_str_to_upper(i64 %t155)
@@ -20814,15 +21021,15 @@ rhs1595:
   %t158 = ptrtoint i8* %t157 to i64
   %t159 = call i64 @__string_ne(i64 %t154, i64 %t158)
   %t160 = trunc i64 %t159 to i1
-  br label %rhs.exit1597
-rhs.exit1597:
-  br label %end1596
-end1596:
-  %t161 = phi i1 [%t153, %logic.entry1594], [%t160, %rhs.exit1597]
+  br label %rhs.exit1608
+rhs.exit1608:
+  br label %end1607
+end1607:
+  %t161 = phi i1 [%t153, %logic.entry1605], [%t160, %rhs.exit1608]
   %t162 = zext i1 %t161 to i64
   %t163 = trunc i64 %t162 to i1
-  br i1 %t163, label %then1598, label %else1599
-then1598:
+  br i1 %t163, label %then1609, label %else1610
+then1609:
   %t164 = load i64, i64* %name
   %t165 = call i8* @__sf_malloc(i64 16)
   %t166 = bitcast i8* %t165 to [2 x i64]*
@@ -20832,13 +21039,13 @@ then1598:
   store i64 %t164, i64* %t168
   %t169 = ptrtoint [2 x i64]* %t166 to i64
   ret i64 %t169
-else1599:
-  br label %endif1593
-endif1593:
-  br label %endif1590
-else1592:
-  br label %endif1590
-endif1590:
+else1610:
+  br label %endif1604
+endif1604:
+  br label %endif1601
+else1603:
+  br label %endif1601
+endif1601:
   %t170 = load i64, i64* %name
   %t171 = call i64 @__list_new()
   %t172 = call i8* @__sf_malloc(i64 24)
@@ -20869,120 +21076,120 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %s.arg, i64* %s
   %t1 = load i64, i64* %s
-  %t2 = getelementptr [4 x i8], [4 x i8]* @.str.883, i64 0, i64 0
+  %t2 = getelementptr [4 x i8], [4 x i8]* @.str.885, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @__string_eq(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1601
-logic.entry1601:
-  br i1 %t5, label %end1603, label %rhs1602
-rhs1602:
+  br label %logic.entry1612
+logic.entry1612:
+  br i1 %t5, label %end1614, label %rhs1613
+rhs1613:
   %t6 = load i64, i64* %s
-  %t7 = getelementptr [7 x i8], [7 x i8]* @.str.884, i64 0, i64 0
+  %t7 = getelementptr [7 x i8], [7 x i8]* @.str.886, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @__string_eq(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1604
-rhs.exit1604:
-  br label %end1603
-end1603:
-  %t11 = phi i1 [%t5, %logic.entry1601], [%t10, %rhs.exit1604]
+  br label %rhs.exit1615
+rhs.exit1615:
+  br label %end1614
+end1614:
+  %t11 = phi i1 [%t5, %logic.entry1612], [%t10, %rhs.exit1615]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then1605, label %else1606
-then1605:
+  br i1 %t13, label %then1616, label %else1617
+then1616:
   %t14 = call i8* @__sf_malloc(i64 8)
   %t15 = bitcast i8* %t14 to [1 x i64]*
   %t16 = getelementptr [1 x i64], [1 x i64]* %t15, i64 0, i64 0
   store i64 0, i64* %t16
   %t17 = ptrtoint [1 x i64]* %t15 to i64
   ret i64 %t17
-else1606:
-  br label %endif1600
-endif1600:
+else1617:
+  br label %endif1611
+endif1611:
   %t18 = load i64, i64* %s
-  %t19 = getelementptr [6 x i8], [6 x i8]* @.str.885, i64 0, i64 0
+  %t19 = getelementptr [6 x i8], [6 x i8]* @.str.887, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @__string_eq(i64 %t18, i64 %t20)
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %then1608, label %else1609
-then1608:
+  br i1 %t22, label %then1619, label %else1620
+then1619:
   %t23 = call i8* @__sf_malloc(i64 8)
   %t24 = bitcast i8* %t23 to [1 x i64]*
   %t25 = getelementptr [1 x i64], [1 x i64]* %t24, i64 0, i64 0
   store i64 1, i64* %t25
   %t26 = ptrtoint [1 x i64]* %t24 to i64
   ret i64 %t26
-else1609:
-  br label %endif1607
-endif1607:
+else1620:
+  br label %endif1618
+endif1618:
   %t27 = load i64, i64* %s
-  %t28 = getelementptr [5 x i8], [5 x i8]* @.str.886, i64 0, i64 0
+  %t28 = getelementptr [5 x i8], [5 x i8]* @.str.888, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   %t30 = call i64 @__string_eq(i64 %t27, i64 %t29)
   %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then1611, label %else1612
-then1611:
+  br i1 %t31, label %then1622, label %else1623
+then1622:
   %t32 = call i8* @__sf_malloc(i64 8)
   %t33 = bitcast i8* %t32 to [1 x i64]*
   %t34 = getelementptr [1 x i64], [1 x i64]* %t33, i64 0, i64 0
   store i64 2, i64* %t34
   %t35 = ptrtoint [1 x i64]* %t33 to i64
   ret i64 %t35
-else1612:
-  br label %endif1610
-endif1610:
+else1623:
+  br label %endif1621
+endif1621:
   %t36 = load i64, i64* %s
-  %t37 = getelementptr [7 x i8], [7 x i8]* @.str.887, i64 0, i64 0
+  %t37 = getelementptr [7 x i8], [7 x i8]* @.str.889, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
   %t39 = call i64 @__string_eq(i64 %t36, i64 %t38)
   %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %then1614, label %else1615
-then1614:
+  br i1 %t40, label %then1625, label %else1626
+then1625:
   %t41 = call i8* @__sf_malloc(i64 8)
   %t42 = bitcast i8* %t41 to [1 x i64]*
   %t43 = getelementptr [1 x i64], [1 x i64]* %t42, i64 0, i64 0
   store i64 3, i64* %t43
   %t44 = ptrtoint [1 x i64]* %t42 to i64
   ret i64 %t44
-else1615:
-  br label %endif1613
-endif1613:
+else1626:
+  br label %endif1624
+endif1624:
   %t45 = load i64, i64* %s
-  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.888, i64 0, i64 0
+  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.890, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @__string_eq(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then1617, label %else1618
-then1617:
+  br i1 %t49, label %then1628, label %else1629
+then1628:
   %t50 = call i8* @__sf_malloc(i64 8)
   %t51 = bitcast i8* %t50 to [1 x i64]*
   %t52 = getelementptr [1 x i64], [1 x i64]* %t51, i64 0, i64 0
   store i64 4, i64* %t52
   %t53 = ptrtoint [1 x i64]* %t51 to i64
   ret i64 %t53
-else1618:
-  br label %endif1616
-endif1616:
+else1629:
+  br label %endif1627
+endif1627:
   %t54 = load i64, i64* %s
-  %t55 = getelementptr [4 x i8], [4 x i8]* @.str.889, i64 0, i64 0
+  %t55 = getelementptr [4 x i8], [4 x i8]* @.str.891, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   %t57 = call i64 @__string_eq(i64 %t54, i64 %t56)
   %t58 = trunc i64 %t57 to i1
-  br i1 %t58, label %then1620, label %else1621
-then1620:
+  br i1 %t58, label %then1631, label %else1632
+then1631:
   %t59 = call i8* @__sf_malloc(i64 8)
   %t60 = bitcast i8* %t59 to [1 x i64]*
   %t61 = getelementptr [1 x i64], [1 x i64]* %t60, i64 0, i64 0
   store i64 5, i64* %t61
   %t62 = ptrtoint [1 x i64]* %t60 to i64
   ret i64 %t62
-else1621:
-  br label %endif1619
-endif1619:
+else1632:
+  br label %endif1630
+endif1630:
   %t63 = load i64, i64* %s
   %t64 = inttoptr i64 %t63 to i8*
-  %t65 = getelementptr [5 x i8], [5 x i8]* @.str.890, i64 0, i64 0
+  %t65 = getelementptr [5 x i8], [5 x i8]* @.str.892, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = inttoptr i64 %t66 to i8*
   %t68 = call i64 @strlen(i8* %t67)
@@ -20990,18 +21197,18 @@ endif1619:
   %t70 = icmp eq i32 %t69, 0
   %t71 = zext i1 %t70 to i64
   %t72 = trunc i64 %t71 to i1
-  br i1 %t72, label %then1623, label %else1624
-then1623:
+  br i1 %t72, label %then1634, label %else1635
+then1634:
   %t73 = load i64, i64* %self
   %t74 = load i64, i64* %s
   %t75 = call i64 @Parser__parse_fun_type_ast(i64 %t73, i64 %t74)
   ret i64 %t75
-else1624:
-  br label %endif1622
-endif1622:
+else1635:
+  br label %endif1633
+endif1633:
   %t76 = load i64, i64* %s
   %t77 = inttoptr i64 %t76 to i8*
-  %t78 = getelementptr [5 x i8], [5 x i8]* @.str.891, i64 0, i64 0
+  %t78 = getelementptr [5 x i8], [5 x i8]* @.str.893, i64 0, i64 0
   %t79 = ptrtoint i8* %t78 to i64
   %t80 = inttoptr i64 %t79 to i8*
   %t81 = call i64 @strlen(i8* %t80)
@@ -21009,8 +21216,8 @@ endif1622:
   %t83 = icmp eq i32 %t82, 0
   %t84 = zext i1 %t83 to i64
   %t85 = trunc i64 %t84 to i1
-  br i1 %t85, label %then1626, label %else1627
-then1626:
+  br i1 %t85, label %then1637, label %else1638
+then1637:
   %t86 = load i64, i64* %s
   %t87 = call i8* @__sf_malloc(i64 16)
   %t88 = bitcast i8* %t87 to [2 x i64]*
@@ -21020,22 +21227,22 @@ then1626:
   store i64 %t86, i64* %t90
   %t91 = ptrtoint [2 x i64]* %t88 to i64
   ret i64 %t91
-else1627:
-  br label %endif1625
-endif1625:
+else1638:
+  br label %endif1636
+endif1636:
   %t92 = load i64, i64* %s
   %t94 = inttoptr i64 %t92 to i8*
-  %t95 = getelementptr [2 x i8], [2 x i8]* @.str.892, i64 0, i64 0
+  %t95 = getelementptr [2 x i8], [2 x i8]* @.str.894, i64 0, i64 0
   %t96 = ptrtoint i8* %t95 to i64
   %t97 = inttoptr i64 %t96 to i8*
   %t98 = call i8* @strstr(i8* %t94, i8* %t97)
   %t99 = icmp ne i8* %t98, null
   %t100 = zext i1 %t99 to i64
   %t101 = trunc i64 %t100 to i1
-  br i1 %t101, label %then1629, label %else1630
-then1629:
+  br i1 %t101, label %then1640, label %else1641
+then1640:
   %t102 = load i64, i64* %s
-  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.893, i64 0, i64 0
+  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.895, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   %t105 = call i64 @__str_split(i64 %t102, i64 %t104)
   store i64 %t105, i64* %parts
@@ -21043,16 +21250,16 @@ then1629:
   store i64 %t106, i64* %types
   %t107 = add i64 0, 0
   store i64 %t107, i64* %i
-  br label %while.cond1631
-while.cond1631:
+  br label %while.cond1642
+while.cond1642:
   %t108 = load i64, i64* %i
   %t109 = load i64, i64* %parts
   %t110 = call i64 @__list_length(i64 %t109)
   %t112 = icmp slt i64 %t108, %t110
   %t111 = zext i1 %t112 to i64
   %t113 = trunc i64 %t111 to i1
-  br i1 %t113, label %while.body1632, label %while.end1633
-while.body1632:
+  br i1 %t113, label %while.body1643, label %while.end1644
+while.body1643:
   %t114 = load i64, i64* %types
   %t115 = load i64, i64* %self
   %t116 = load i64, i64* %parts
@@ -21068,8 +21275,8 @@ while.body1632:
   %t126 = add i64 0, 1
   %t127 = add i64 %t125, %t126
   store i64 %t127, i64* %i
-  br label %while.cond1631
-while.end1633:
+  br label %while.cond1642
+while.end1644:
   %t128 = load i64, i64* %types
   %t129 = call i8* @__sf_malloc(i64 16)
   %t130 = bitcast i8* %t129 to [2 x i64]*
@@ -21079,26 +21286,26 @@ while.end1633:
   store i64 %t128, i64* %t132
   %t133 = ptrtoint [2 x i64]* %t130 to i64
   ret i64 %t133
-else1630:
-  br label %endif1628
-endif1628:
+else1641:
+  br label %endif1639
+endif1639:
   %t134 = load i64, i64* %s
   %t136 = inttoptr i64 %t134 to i8*
-  %t137 = getelementptr [2 x i8], [2 x i8]* @.str.894, i64 0, i64 0
+  %t137 = getelementptr [2 x i8], [2 x i8]* @.str.896, i64 0, i64 0
   %t138 = ptrtoint i8* %t137 to i64
   %t139 = inttoptr i64 %t138 to i8*
   %t140 = call i8* @strstr(i8* %t136, i8* %t139)
   %t141 = icmp ne i8* %t140, null
   %t142 = zext i1 %t141 to i64
   %t143 = trunc i64 %t142 to i1
-  br i1 %t143, label %then1635, label %else1636
-then1635:
+  br i1 %t143, label %then1646, label %else1647
+then1646:
   %t144 = add i64 0, 0
   store i64 %t144, i64* %lt_pos
   %t145 = add i64 0, 0
   store i64 %t145, i64* %i
-  br label %while.cond1637
-while.cond1637:
+  br label %while.cond1648
+while.cond1648:
   %t146 = load i64, i64* %i
   %t147 = load i64, i64* %s
   %t148 = inttoptr i64 %t147 to i8*
@@ -21106,8 +21313,8 @@ while.cond1637:
   %t151 = icmp slt i64 %t146, %t149
   %t150 = zext i1 %t151 to i64
   %t152 = trunc i64 %t150 to i1
-  br i1 %t152, label %while.body1638, label %while.end1639
-while.body1638:
+  br i1 %t152, label %while.body1649, label %while.end1650
+while.body1649:
   %t153 = load i64, i64* %s
   %t154 = inttoptr i64 %t153 to i8*
   %t155 = load i64, i64* %i
@@ -21118,28 +21325,28 @@ while.body1638:
   %t159 = getelementptr i8, i8* %t157, i64 1
   store i8 0, i8* %t159
   %t160 = ptrtoint i8* %t157 to i64
-  %t161 = getelementptr [2 x i8], [2 x i8]* @.str.895, i64 0, i64 0
+  %t161 = getelementptr [2 x i8], [2 x i8]* @.str.897, i64 0, i64 0
   %t162 = ptrtoint i8* %t161 to i64
   %t163 = call i64 @__string_eq(i64 %t160, i64 %t162)
   %t164 = trunc i64 %t163 to i1
-  br i1 %t164, label %then1641, label %else1642
-then1641:
+  br i1 %t164, label %then1652, label %else1653
+then1652:
   %t165 = load i64, i64* %i
   store i64 %t165, i64* %lt_pos
   %t166 = load i64, i64* %s
   %t167 = inttoptr i64 %t166 to i8*
   %t168 = call i64 @strlen(i8* %t167)
   store i64 %t168, i64* %i
-  br label %endif1640
-else1642:
-  br label %endif1640
-endif1640:
+  br label %endif1651
+else1653:
+  br label %endif1651
+endif1651:
   %t169 = load i64, i64* %i
   %t170 = add i64 0, 1
   %t171 = add i64 %t169, %t170
   store i64 %t171, i64* %i
-  br label %while.cond1637
-while.end1639:
+  br label %while.cond1648
+while.end1650:
   %t172 = load i64, i64* %s
   %t173 = inttoptr i64 %t172 to i8*
   %t174 = add i64 0, 0
@@ -21180,16 +21387,16 @@ while.end1639:
   store i64 %t201, i64* %args
   %t202 = add i64 0, 0
   store i64 %t202, i64* %j
-  br label %while.cond1643
-while.cond1643:
+  br label %while.cond1654
+while.cond1654:
   %t203 = load i64, i64* %j
   %t204 = load i64, i64* %arg_strs
   %t205 = call i64 @__list_length(i64 %t204)
   %t207 = icmp slt i64 %t203, %t205
   %t206 = zext i1 %t207 to i64
   %t208 = trunc i64 %t206 to i1
-  br i1 %t208, label %while.body1644, label %while.end1645
-while.body1644:
+  br i1 %t208, label %while.body1655, label %while.end1656
+while.body1655:
   %t209 = load i64, i64* %args
   %t210 = load i64, i64* %self
   %t211 = load i64, i64* %arg_strs
@@ -21205,8 +21412,8 @@ while.body1644:
   %t221 = add i64 0, 1
   %t222 = add i64 %t220, %t221
   store i64 %t222, i64* %j
-  br label %while.cond1643
-while.end1645:
+  br label %while.cond1654
+while.end1656:
   %t223 = load i64, i64* %base
   %t224 = load i64, i64* %args
   %t225 = call i8* @__sf_malloc(i64 24)
@@ -21219,9 +21426,9 @@ while.end1645:
   store i64 %t224, i64* %t229
   %t230 = ptrtoint [3 x i64]* %t226 to i64
   ret i64 %t230
-else1636:
-  br label %endif1634
-endif1634:
+else1647:
+  br label %endif1645
+endif1645:
   %t231 = load i64, i64* %s
   %t232 = call i8* @__sf_malloc(i64 16)
   %t233 = bitcast i8* %t232 to [2 x i64]*
@@ -21258,8 +21465,8 @@ entry:
   store i64 %t4, i64* %close_paren
   %t5 = add i64 0, 4
   store i64 %t5, i64* %i
-  br label %while.cond1646
-while.cond1646:
+  br label %while.cond1657
+while.cond1657:
   %t6 = load i64, i64* %i
   %t7 = load i64, i64* %s
   %t8 = inttoptr i64 %t7 to i8*
@@ -21267,8 +21474,8 @@ while.cond1646:
   %t11 = icmp slt i64 %t6, %t9
   %t10 = zext i1 %t11 to i64
   %t12 = trunc i64 %t10 to i1
-  br i1 %t12, label %while.body1647, label %while.end1648
-while.body1647:
+  br i1 %t12, label %while.body1658, label %while.end1659
+while.body1658:
   %t13 = load i64, i64* %s
   %t14 = inttoptr i64 %t13 to i8*
   %t15 = load i64, i64* %i
@@ -21281,63 +21488,63 @@ while.body1647:
   %t20 = ptrtoint i8* %t17 to i64
   store i64 %t20, i64* %ch
   %t21 = load i64, i64* %ch
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.896, i64 0, i64 0
+  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.898, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   %t24 = call i64 @__string_eq(i64 %t21, i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then1650, label %else1651
-then1650:
+  br i1 %t25, label %then1661, label %else1662
+then1661:
   %t26 = load i64, i64* %depth
   %t27 = add i64 0, 1
   %t28 = add i64 %t26, %t27
   store i64 %t28, i64* %depth
-  br label %endif1649
-else1651:
+  br label %endif1660
+else1662:
   %t29 = load i64, i64* %ch
-  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.897, i64 0, i64 0
+  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.899, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   %t32 = call i64 @__string_eq(i64 %t29, i64 %t31)
   %t33 = trunc i64 %t32 to i1
-  br i1 %t33, label %then1652, label %else1653
-then1652:
+  br i1 %t33, label %then1663, label %else1664
+then1663:
   %t34 = load i64, i64* %depth
   %t35 = add i64 0, 0
   %t36 = icmp eq i64 %t34, %t35
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then1655, label %else1656
-then1655:
+  br i1 %t38, label %then1666, label %else1667
+then1666:
   %t39 = load i64, i64* %i
   store i64 %t39, i64* %close_paren
   %t40 = load i64, i64* %s
   %t41 = inttoptr i64 %t40 to i8*
   %t42 = call i64 @strlen(i8* %t41)
   store i64 %t42, i64* %i
-  br label %endif1654
-else1656:
+  br label %endif1665
+else1667:
   %t43 = load i64, i64* %depth
   %t44 = add i64 0, 1
   %t45 = sub i64 %t43, %t44
   store i64 %t45, i64* %depth
-  br label %endif1654
-endif1654:
-  br label %endif1649
-else1653:
-  br label %endif1649
-endif1649:
+  br label %endif1665
+endif1665:
+  br label %endif1660
+else1664:
+  br label %endif1660
+endif1660:
   %t46 = load i64, i64* %i
   %t47 = add i64 0, 1
   %t48 = add i64 %t46, %t47
   store i64 %t48, i64* %i
-  br label %while.cond1646
-while.end1648:
+  br label %while.cond1657
+while.end1659:
   %t49 = load i64, i64* %close_paren
   %t50 = add i64 0, 0
   %t52 = icmp slt i64 %t49, %t50
   %t51 = zext i1 %t52 to i64
   %t53 = trunc i64 %t51 to i1
-  br i1 %t53, label %then1658, label %else1659
-then1658:
+  br i1 %t53, label %then1669, label %else1670
+then1669:
   %t54 = call i64 @__list_new()
   %t55 = call i8* @__sf_malloc(i64 8)
   %t56 = bitcast i8* %t55 to [1 x i64]*
@@ -21354,9 +21561,9 @@ then1658:
   store i64 %t58, i64* %t63
   %t64 = ptrtoint [3 x i64]* %t60 to i64
   ret i64 %t64
-else1659:
-  br label %endif1657
-endif1657:
+else1670:
+  br label %endif1668
+endif1668:
   %t65 = load i64, i64* %s
   %t66 = inttoptr i64 %t65 to i8*
   %t67 = add i64 0, 4
@@ -21379,24 +21586,24 @@ endif1657:
   %t81 = icmp sgt i64 %t78, %t79
   %t80 = zext i1 %t81 to i64
   %t82 = trunc i64 %t80 to i1
-  br i1 %t82, label %then1661, label %else1662
-then1661:
+  br i1 %t82, label %then1672, label %else1673
+then1672:
   %t83 = load i64, i64* %self
   %t84 = load i64, i64* %params_str
   %t85 = call i64 @Parser__split_type_args(i64 %t83, i64 %t84)
   store i64 %t85, i64* %param_strs
   %t86 = add i64 0, 0
   store i64 %t86, i64* %pi
-  br label %while.cond1663
-while.cond1663:
+  br label %while.cond1674
+while.cond1674:
   %t87 = load i64, i64* %pi
   %t88 = load i64, i64* %param_strs
   %t89 = call i64 @__list_length(i64 %t88)
   %t91 = icmp slt i64 %t87, %t89
   %t90 = zext i1 %t91 to i64
   %t92 = trunc i64 %t90 to i1
-  br i1 %t92, label %while.body1664, label %while.end1665
-while.body1664:
+  br i1 %t92, label %while.body1675, label %while.end1676
+while.body1675:
   %t93 = load i64, i64* %param_strs
   %t94 = load i64, i64* %pi
   %t95 = icmp slt i64 %t94, 0
@@ -21415,27 +21622,27 @@ while.body1664:
   %t108 = icmp sgt i64 %t105, %t106
   %t107 = zext i1 %t108 to i64
   %t109 = trunc i64 %t107 to i1
-  br i1 %t109, label %then1667, label %else1668
-then1667:
+  br i1 %t109, label %then1678, label %else1679
+then1678:
   %t110 = load i64, i64* %param_types
   %t111 = load i64, i64* %self
   %t112 = load i64, i64* %p
   %t113 = call i64 @Parser__parse_type_ast(i64 %t111, i64 %t112)
   %t114 = call i64 @__list_push(i64 %t110, i64 %t113)
-  br label %endif1666
-else1668:
-  br label %endif1666
-endif1666:
+  br label %endif1677
+else1679:
+  br label %endif1677
+endif1677:
   %t115 = load i64, i64* %pi
   %t116 = add i64 0, 1
   %t117 = add i64 %t115, %t116
   store i64 %t117, i64* %pi
-  br label %while.cond1663
-while.end1665:
-  br label %endif1660
-else1662:
-  br label %endif1660
-endif1660:
+  br label %while.cond1674
+while.end1676:
+  br label %endif1671
+else1673:
+  br label %endif1671
+endif1671:
   %t118 = call i8* @__sf_malloc(i64 8)
   %t119 = bitcast i8* %t118 to [1 x i64]*
   %t120 = getelementptr [1 x i64], [1 x i64]* %t119, i64 0, i64 0
@@ -21451,10 +21658,10 @@ endif1660:
   %t129 = icmp slt i64 %t124, %t127
   %t128 = zext i1 %t129 to i64
   %t130 = trunc i64 %t128 to i1
-  br label %logic.entry1670
-logic.entry1670:
-  br i1 %t130, label %rhs1671, label %end1672
-rhs1671:
+  br label %logic.entry1681
+logic.entry1681:
+  br i1 %t130, label %rhs1682, label %end1683
+rhs1682:
   %t131 = load i64, i64* %s
   %t132 = inttoptr i64 %t131 to i8*
   %t133 = load i64, i64* %close_paren
@@ -21467,19 +21674,19 @@ rhs1671:
   %t139 = getelementptr i8, i8* %t137, i64 1
   store i8 0, i8* %t139
   %t140 = ptrtoint i8* %t137 to i64
-  %t141 = getelementptr [2 x i8], [2 x i8]* @.str.898, i64 0, i64 0
+  %t141 = getelementptr [2 x i8], [2 x i8]* @.str.900, i64 0, i64 0
   %t142 = ptrtoint i8* %t141 to i64
   %t143 = call i64 @__string_eq(i64 %t140, i64 %t142)
   %t144 = trunc i64 %t143 to i1
-  br label %rhs.exit1673
-rhs.exit1673:
-  br label %end1672
-end1672:
-  %t145 = phi i1 [%t130, %logic.entry1670], [%t144, %rhs.exit1673]
+  br label %rhs.exit1684
+rhs.exit1684:
+  br label %end1683
+end1683:
+  %t145 = phi i1 [%t130, %logic.entry1681], [%t144, %rhs.exit1684]
   %t146 = zext i1 %t145 to i64
   %t147 = trunc i64 %t146 to i1
-  br i1 %t147, label %then1674, label %else1675
-then1674:
+  br i1 %t147, label %then1685, label %else1686
+then1685:
   %t148 = load i64, i64* %s
   %t149 = inttoptr i64 %t148 to i8*
   %t150 = load i64, i64* %close_paren
@@ -21507,20 +21714,20 @@ then1674:
   %t170 = icmp sgt i64 %t167, %t168
   %t169 = zext i1 %t170 to i64
   %t171 = trunc i64 %t169 to i1
-  br i1 %t171, label %then1677, label %else1678
-then1677:
+  br i1 %t171, label %then1688, label %else1689
+then1688:
   %t172 = load i64, i64* %self
   %t173 = load i64, i64* %ret_str
   %t174 = call i64 @Parser__parse_type_ast(i64 %t172, i64 %t173)
   store i64 %t174, i64* %ret_type
-  br label %endif1676
-else1678:
-  br label %endif1676
-endif1676:
-  br label %endif1669
-else1675:
-  br label %endif1669
-endif1669:
+  br label %endif1687
+else1689:
+  br label %endif1687
+endif1687:
+  br label %endif1680
+else1686:
+  br label %endif1680
+endif1680:
   %t175 = load i64, i64* %param_types
   %t176 = load i64, i64* %ret_type
   %t177 = call i8* @__sf_malloc(i64 24)
@@ -21553,38 +21760,38 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.end1679 [ i8 0, label %match.arm1680 i8 1, label %match.arm1681 i8 2, label %match.arm1682 i8 3, label %match.arm1683 i8 4, label %match.arm1684 i8 5, label %match.arm1685 i8 6, label %match.arm1686 i8 7, label %match.arm1687 i8 8, label %match.arm1688 i8 9, label %match.arm1689 i8 10, label %match.arm1690 i8 11, label %match.arm1691 i8 12, label %match.arm1692 i8 13, label %match.arm1693 ]
-match.arm1680:
-  %t6 = getelementptr [4 x i8], [4 x i8]* @.str.899, i64 0, i64 0
+  switch i8 %t3, label %match.end1690 [ i8 0, label %match.arm1691 i8 1, label %match.arm1692 i8 2, label %match.arm1693 i8 3, label %match.arm1694 i8 4, label %match.arm1695 i8 5, label %match.arm1696 i8 6, label %match.arm1697 i8 7, label %match.arm1698 i8 8, label %match.arm1699 i8 9, label %match.arm1700 i8 10, label %match.arm1701 i8 11, label %match.arm1702 i8 12, label %match.arm1703 i8 13, label %match.arm1704 ]
+match.arm1691:
+  %t6 = getelementptr [4 x i8], [4 x i8]* @.str.901, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   store i64 %t7, i64* %t2
-  br label %match.end1679
-match.arm1681:
-  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.900, i64 0, i64 0
+  br label %match.end1690
+match.arm1692:
+  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.902, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   store i64 %t9, i64* %t2
-  br label %match.end1679
-match.arm1682:
-  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.901, i64 0, i64 0
+  br label %match.end1690
+match.arm1693:
+  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.903, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %t2
-  br label %match.end1679
-match.arm1683:
-  %t12 = getelementptr [7 x i8], [7 x i8]* @.str.902, i64 0, i64 0
+  br label %match.end1690
+match.arm1694:
+  %t12 = getelementptr [7 x i8], [7 x i8]* @.str.904, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   store i64 %t13, i64* %t2
-  br label %match.end1679
-match.arm1684:
-  %t14 = getelementptr [4 x i8], [4 x i8]* @.str.903, i64 0, i64 0
+  br label %match.end1690
+match.arm1695:
+  %t14 = getelementptr [4 x i8], [4 x i8]* @.str.905, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   store i64 %t15, i64* %t2
-  br label %match.end1679
-match.arm1685:
-  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.904, i64 0, i64 0
+  br label %match.end1690
+match.arm1696:
+  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.906, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %t2
-  br label %match.end1679
-match.arm1686:
+  br label %match.end1690
+match.arm1697:
   %t18 = load i64, i64* %n
   %t19 = inttoptr i64 %t1 to [2 x i64]*
   %t20 = getelementptr [2 x i64], [2 x i64]* %t19, i64 0, i64 1
@@ -21593,8 +21800,8 @@ match.arm1686:
   %t22 = load i64, i64* %n
   store i64 %t22, i64* %t2
   store i64 %t18, i64* %n
-  br label %match.end1679
-match.arm1687:
+  br label %match.end1690
+match.arm1698:
   %t23 = load i64, i64* %n
   %t24 = inttoptr i64 %t1 to [2 x i64]*
   %t25 = getelementptr [2 x i64], [2 x i64]* %t24, i64 0, i64 1
@@ -21603,8 +21810,8 @@ match.arm1687:
   %t27 = load i64, i64* %n
   store i64 %t27, i64* %t2
   store i64 %t23, i64* %n
-  br label %match.end1679
-match.arm1688:
+  br label %match.end1690
+match.arm1699:
   %t28 = load i64, i64* %base
   %t29 = load i64, i64* %args
   %t30 = inttoptr i64 %t1 to [3 x i64]*
@@ -21618,19 +21825,19 @@ match.arm1688:
   store i64 %t35, i64* %t2
   store i64 %t28, i64* %base
   store i64 %t29, i64* %args
-  br label %match.end1679
-match.arm1689:
+  br label %match.end1690
+match.arm1700:
   %t36 = load i64, i64* %types
   %t37 = inttoptr i64 %t1 to [2 x i64]*
   %t38 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 1
   %t39 = load i64, i64* %t38
   store i64 %t39, i64* %types
-  %t40 = getelementptr [6 x i8], [6 x i8]* @.str.905, i64 0, i64 0
+  %t40 = getelementptr [6 x i8], [6 x i8]* @.str.907, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   store i64 %t41, i64* %t2
   store i64 %t36, i64* %types
-  br label %match.end1679
-match.arm1690:
+  br label %match.end1690
+match.arm1701:
   %t42 = load i64, i64* %p
   %t43 = load i64, i64* %r
   %t44 = inttoptr i64 %t1 to [3 x i64]*
@@ -21640,34 +21847,34 @@ match.arm1690:
   %t47 = getelementptr [3 x i64], [3 x i64]* %t44, i64 0, i64 2
   %t48 = load i64, i64* %t47
   store i64 %t48, i64* %r
-  %t49 = getelementptr [4 x i8], [4 x i8]* @.str.906, i64 0, i64 0
+  %t49 = getelementptr [4 x i8], [4 x i8]* @.str.908, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   store i64 %t50, i64* %t2
   store i64 %t42, i64* %p
   store i64 %t43, i64* %r
-  br label %match.end1679
-match.arm1691:
+  br label %match.end1690
+match.arm1702:
   %t51 = load i64, i64* %inner
   %t52 = inttoptr i64 %t1 to [2 x i64]*
   %t53 = getelementptr [2 x i64], [2 x i64]* %t52, i64 0, i64 1
   %t54 = load i64, i64* %t53
   store i64 %t54, i64* %inner
-  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.907, i64 0, i64 0
+  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.909, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   store i64 %t56, i64* %t2
   store i64 %t51, i64* %inner
-  br label %match.end1679
-match.arm1692:
-  %t57 = getelementptr [8 x i8], [8 x i8]* @.str.908, i64 0, i64 0
+  br label %match.end1690
+match.arm1703:
+  %t57 = getelementptr [8 x i8], [8 x i8]* @.str.910, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   store i64 %t58, i64* %t2
-  br label %match.end1679
-match.arm1693:
-  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.909, i64 0, i64 0
+  br label %match.end1690
+match.arm1704:
+  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.911, i64 0, i64 0
   %t60 = ptrtoint i8* %t59 to i64
   store i64 %t60, i64* %t2
-  br label %match.end1679
-match.end1679:
+  br label %match.end1690
+match.end1690:
   %t61 = load i64, i64* %t2
   ret i64 %t61
 }
@@ -21685,15 +21892,15 @@ entry:
   store i64 %s.arg, i64* %s
   %t1 = call i64 @__list_new()
   store i64 %t1, i64* %args
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.910, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.912, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   store i64 %t3, i64* %current
   %t4 = add i64 0, 0
   store i64 %t4, i64* %depth
   %t5 = add i64 0, 0
   store i64 %t5, i64* %i
-  br label %while.cond1694
-while.cond1694:
+  br label %while.cond1705
+while.cond1705:
   %t6 = load i64, i64* %i
   %t7 = load i64, i64* %s
   %t8 = inttoptr i64 %t7 to i8*
@@ -21701,8 +21908,8 @@ while.cond1694:
   %t11 = icmp slt i64 %t6, %t9
   %t10 = zext i1 %t11 to i64
   %t12 = trunc i64 %t10 to i1
-  br i1 %t12, label %while.body1695, label %while.end1696
-while.body1695:
+  br i1 %t12, label %while.body1706, label %while.end1707
+while.body1706:
   %t13 = load i64, i64* %s
   %t14 = inttoptr i64 %t13 to i8*
   %t15 = load i64, i64* %i
@@ -21715,44 +21922,44 @@ while.body1695:
   %t20 = ptrtoint i8* %t17 to i64
   store i64 %t20, i64* %ch
   %t21 = load i64, i64* %ch
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.911, i64 0, i64 0
+  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.913, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   %t24 = call i64 @__string_eq(i64 %t21, i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br label %logic.entry1698
-logic.entry1698:
-  br i1 %t25, label %end1700, label %rhs1699
-rhs1699:
+  br label %logic.entry1709
+logic.entry1709:
+  br i1 %t25, label %end1711, label %rhs1710
+rhs1710:
   %t26 = load i64, i64* %ch
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.912, i64 0, i64 0
+  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.914, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   %t29 = call i64 @__string_eq(i64 %t26, i64 %t28)
   %t30 = trunc i64 %t29 to i1
-  br label %rhs.exit1701
-rhs.exit1701:
-  br label %end1700
-end1700:
-  %t31 = phi i1 [%t25, %logic.entry1698], [%t30, %rhs.exit1701]
+  br label %rhs.exit1712
+rhs.exit1712:
+  br label %end1711
+end1711:
+  %t31 = phi i1 [%t25, %logic.entry1709], [%t30, %rhs.exit1712]
   %t32 = zext i1 %t31 to i64
   %t33 = trunc i64 %t32 to i1
-  br label %logic.entry1702
-logic.entry1702:
-  br i1 %t33, label %end1704, label %rhs1703
-rhs1703:
+  br label %logic.entry1713
+logic.entry1713:
+  br i1 %t33, label %end1715, label %rhs1714
+rhs1714:
   %t34 = load i64, i64* %ch
-  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.913, i64 0, i64 0
+  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.915, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = call i64 @__string_eq(i64 %t34, i64 %t36)
   %t38 = trunc i64 %t37 to i1
-  br label %rhs.exit1705
-rhs.exit1705:
-  br label %end1704
-end1704:
-  %t39 = phi i1 [%t33, %logic.entry1702], [%t38, %rhs.exit1705]
+  br label %rhs.exit1716
+rhs.exit1716:
+  br label %end1715
+end1715:
+  %t39 = phi i1 [%t33, %logic.entry1713], [%t38, %rhs.exit1716]
   %t40 = zext i1 %t39 to i64
   %t41 = trunc i64 %t40 to i1
-  br i1 %t41, label %then1706, label %else1707
-then1706:
+  br i1 %t41, label %then1717, label %else1718
+then1717:
   %t42 = load i64, i64* %depth
   %t43 = add i64 0, 1
   %t44 = add i64 %t42, %t43
@@ -21773,47 +21980,47 @@ then1706:
   %t56 = inttoptr i64 %t55 to i8*
   %t57 = ptrtoint i8* %t56 to i64
   store i64 %t57, i64* %current
-  br label %endif1697
-else1707:
+  br label %endif1708
+else1718:
   %t58 = load i64, i64* %ch
-  %t59 = getelementptr [2 x i8], [2 x i8]* @.str.914, i64 0, i64 0
+  %t59 = getelementptr [2 x i8], [2 x i8]* @.str.916, i64 0, i64 0
   %t60 = ptrtoint i8* %t59 to i64
   %t61 = call i64 @__string_eq(i64 %t58, i64 %t60)
   %t62 = trunc i64 %t61 to i1
-  br label %logic.entry1708
-logic.entry1708:
-  br i1 %t62, label %end1710, label %rhs1709
-rhs1709:
+  br label %logic.entry1719
+logic.entry1719:
+  br i1 %t62, label %end1721, label %rhs1720
+rhs1720:
   %t63 = load i64, i64* %ch
-  %t64 = getelementptr [2 x i8], [2 x i8]* @.str.915, i64 0, i64 0
+  %t64 = getelementptr [2 x i8], [2 x i8]* @.str.917, i64 0, i64 0
   %t65 = ptrtoint i8* %t64 to i64
   %t66 = call i64 @__string_eq(i64 %t63, i64 %t65)
   %t67 = trunc i64 %t66 to i1
-  br label %rhs.exit1711
-rhs.exit1711:
-  br label %end1710
-end1710:
-  %t68 = phi i1 [%t62, %logic.entry1708], [%t67, %rhs.exit1711]
+  br label %rhs.exit1722
+rhs.exit1722:
+  br label %end1721
+end1721:
+  %t68 = phi i1 [%t62, %logic.entry1719], [%t67, %rhs.exit1722]
   %t69 = zext i1 %t68 to i64
   %t70 = trunc i64 %t69 to i1
-  br label %logic.entry1712
-logic.entry1712:
-  br i1 %t70, label %end1714, label %rhs1713
-rhs1713:
+  br label %logic.entry1723
+logic.entry1723:
+  br i1 %t70, label %end1725, label %rhs1724
+rhs1724:
   %t71 = load i64, i64* %ch
-  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.916, i64 0, i64 0
+  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.918, i64 0, i64 0
   %t73 = ptrtoint i8* %t72 to i64
   %t74 = call i64 @__string_eq(i64 %t71, i64 %t73)
   %t75 = trunc i64 %t74 to i1
-  br label %rhs.exit1715
-rhs.exit1715:
-  br label %end1714
-end1714:
-  %t76 = phi i1 [%t70, %logic.entry1712], [%t75, %rhs.exit1715]
+  br label %rhs.exit1726
+rhs.exit1726:
+  br label %end1725
+end1725:
+  %t76 = phi i1 [%t70, %logic.entry1723], [%t75, %rhs.exit1726]
   %t77 = zext i1 %t76 to i64
   %t78 = trunc i64 %t77 to i1
-  br i1 %t78, label %then1716, label %else1717
-then1716:
+  br i1 %t78, label %then1727, label %else1728
+then1727:
   %t79 = load i64, i64* %depth
   %t80 = add i64 0, 1
   %t81 = sub i64 %t79, %t80
@@ -21834,39 +22041,39 @@ then1716:
   %t93 = inttoptr i64 %t92 to i8*
   %t94 = ptrtoint i8* %t93 to i64
   store i64 %t94, i64* %current
-  br label %endif1697
-else1717:
+  br label %endif1708
+else1728:
   %t95 = load i64, i64* %ch
-  %t96 = getelementptr [2 x i8], [2 x i8]* @.str.917, i64 0, i64 0
+  %t96 = getelementptr [2 x i8], [2 x i8]* @.str.919, i64 0, i64 0
   %t97 = ptrtoint i8* %t96 to i64
   %t98 = call i64 @__string_eq(i64 %t95, i64 %t97)
   %t99 = trunc i64 %t98 to i1
-  br label %logic.entry1718
-logic.entry1718:
-  br i1 %t99, label %rhs1719, label %end1720
-rhs1719:
+  br label %logic.entry1729
+logic.entry1729:
+  br i1 %t99, label %rhs1730, label %end1731
+rhs1730:
   %t100 = load i64, i64* %depth
   %t101 = add i64 0, 0
   %t102 = icmp eq i64 %t100, %t101
   %t103 = zext i1 %t102 to i64
   %t104 = trunc i64 %t103 to i1
-  br label %rhs.exit1721
-rhs.exit1721:
-  br label %end1720
-end1720:
-  %t105 = phi i1 [%t99, %logic.entry1718], [%t104, %rhs.exit1721]
+  br label %rhs.exit1732
+rhs.exit1732:
+  br label %end1731
+end1731:
+  %t105 = phi i1 [%t99, %logic.entry1729], [%t104, %rhs.exit1732]
   %t106 = zext i1 %t105 to i64
   %t107 = trunc i64 %t106 to i1
-  br i1 %t107, label %then1722, label %else1723
-then1722:
+  br i1 %t107, label %then1733, label %else1734
+then1733:
   %t108 = load i64, i64* %args
   %t109 = load i64, i64* %current
   %t110 = call i64 @__list_push(i64 %t108, i64 %t109)
-  %t111 = getelementptr [1 x i8], [1 x i8]* @.str.918, i64 0, i64 0
+  %t111 = getelementptr [1 x i8], [1 x i8]* @.str.920, i64 0, i64 0
   %t112 = ptrtoint i8* %t111 to i64
   store i64 %t112, i64* %current
-  br label %endif1697
-else1723:
+  br label %endif1708
+else1734:
   %t113 = load i64, i64* %current
   %t114 = load i64, i64* %ch
   %t115 = inttoptr i64 %t113 to i8*
@@ -21883,14 +22090,14 @@ else1723:
   %t124 = inttoptr i64 %t123 to i8*
   %t125 = ptrtoint i8* %t124 to i64
   store i64 %t125, i64* %current
-  br label %endif1697
-endif1697:
+  br label %endif1708
+endif1708:
   %t126 = load i64, i64* %i
   %t127 = add i64 0, 1
   %t128 = add i64 %t126, %t127
   store i64 %t128, i64* %i
-  br label %while.cond1694
-while.end1696:
+  br label %while.cond1705
+while.end1707:
   %t129 = load i64, i64* %current
   %t130 = inttoptr i64 %t129 to i8*
   %t131 = call i64 @strlen(i8* %t130)
@@ -21898,15 +22105,15 @@ while.end1696:
   %t134 = icmp sgt i64 %t131, %t132
   %t133 = zext i1 %t134 to i64
   %t135 = trunc i64 %t133 to i1
-  br i1 %t135, label %then1725, label %else1726
-then1725:
+  br i1 %t135, label %then1736, label %else1737
+then1736:
   %t136 = load i64, i64* %args
   %t137 = load i64, i64* %current
   %t138 = call i64 @__list_push(i64 %t136, i64 %t137)
-  br label %endif1724
-else1726:
-  br label %endif1724
-endif1724:
+  br label %endif1735
+else1737:
+  br label %endif1735
+endif1735:
   %t139 = load i64, i64* %args
   ret i64 %t139
 }
@@ -21926,19 +22133,19 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.919, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.921, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = call i64 @__list_new()
   store i64 %t7, i64* %params
   %t8 = load i64, i64* %self
-  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.920, i64 0, i64 0
+  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.922, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i64
   %t11 = call i64 @Parser__match_kind_check(i64 %t8, i64 %t10)
   %t12 = xor i64 %t11, 1
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then1728, label %else1729
-then1728:
+  br i1 %t13, label %then1739, label %else1740
+then1739:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__ident_span(i64 %t14)
   store i64 %t15, i64* %pname_span
@@ -21946,15 +22153,15 @@ then1728:
   %t17 = call i64 @Parser__expect_ident(i64 %t16)
   store i64 %t17, i64* %pname
   %t18 = load i64, i64* %self
-  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.921, i64 0, i64 0
+  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.923, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @Parser__match_kind_check(i64 %t18, i64 %t20)
   %t22 = xor i64 %t21, 1
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then1731, label %else1732
-then1731:
+  br i1 %t23, label %then1742, label %else1743
+then1742:
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [12 x i8], [12 x i8]* @.str.922, i64 0, i64 0
+  %t25 = getelementptr [12 x i8], [12 x i8]* @.str.924, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = load i64, i64* %pname
   %t28 = inttoptr i64 %t26 to i8*
@@ -21970,7 +22177,7 @@ then1731:
   %t36 = call i64 @__string_intern(i64 %t35)
   %t37 = inttoptr i64 %t36 to i8*
   %t38 = ptrtoint i8* %t37 to i64
-  %t39 = getelementptr [29 x i8], [29 x i8]* @.str.923, i64 0, i64 0
+  %t39 = getelementptr [29 x i8], [29 x i8]* @.str.925, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = inttoptr i64 %t38 to i8*
   %t42 = inttoptr i64 %t40 to i8*
@@ -21998,7 +22205,7 @@ then1731:
   %t61 = getelementptr [1 x i64], [1 x i64]* %t60, i64 0, i64 0
   store i64 4, i64* %t61
   %t62 = ptrtoint [1 x i64]* %t60 to i64
-  %t63 = getelementptr [7 x i8], [7 x i8]* @.str.924, i64 0, i64 0
+  %t63 = getelementptr [7 x i8], [7 x i8]* @.str.926, i64 0, i64 0
   %t64 = ptrtoint i8* %t63 to i64
   %t65 = load i64, i64* %pname_span
   %t66 = call i8* @__sf_malloc(i64 48)
@@ -22017,10 +22224,10 @@ then1731:
   store i64 %t65, i64* %t73
   %t74 = ptrtoint [6 x i64]* %t67 to i64
   %t75 = call i64 @__list_push(i64 %t53, i64 %t74)
-  br label %endif1730
-else1732:
+  br label %endif1741
+else1743:
   %t76 = load i64, i64* %self
-  %t77 = getelementptr [2 x i8], [2 x i8]* @.str.925, i64 0, i64 0
+  %t77 = getelementptr [2 x i8], [2 x i8]* @.str.927, i64 0, i64 0
   %t78 = ptrtoint i8* %t77 to i64
   %t79 = call i64 @Parser__consume(i64 %t76, i64 %t78)
   %t80 = load i64, i64* %self
@@ -22033,26 +22240,26 @@ else1732:
   %t85 = ptrtoint [1 x i64]* %t83 to i64
   store i64 %t85, i64* %pdefault
   %t86 = load i64, i64* %self
-  %t87 = getelementptr [2 x i8], [2 x i8]* @.str.926, i64 0, i64 0
+  %t87 = getelementptr [2 x i8], [2 x i8]* @.str.928, i64 0, i64 0
   %t88 = ptrtoint i8* %t87 to i64
   %t89 = call i64 @Parser__match_kind(i64 %t86, i64 %t88)
   %t90 = trunc i64 %t89 to i1
-  br i1 %t90, label %then1734, label %else1735
-then1734:
+  br i1 %t90, label %then1745, label %else1746
+then1745:
   %t91 = load i64, i64* %self
   %t92 = call i64 @Parser__parse_expr(i64 %t91)
   store i64 %t92, i64* %pdefault
-  br label %endif1733
-else1735:
-  br label %endif1733
-endif1733:
+  br label %endif1744
+else1746:
+  br label %endif1744
+endif1744:
   %t93 = load i64, i64* %params
   %t94 = load i64, i64* %pname
   %t95 = load i64, i64* %self
   %t96 = load i64, i64* %ptype
   %t97 = call i64 @Parser__parse_type_ast(i64 %t95, i64 %t96)
   %t98 = load i64, i64* %pdefault
-  %t99 = getelementptr [7 x i8], [7 x i8]* @.str.927, i64 0, i64 0
+  %t99 = getelementptr [7 x i8], [7 x i8]* @.str.929, i64 0, i64 0
   %t100 = ptrtoint i8* %t99 to i64
   %t101 = load i64, i64* %pname_span
   %t102 = call i8* @__sf_malloc(i64 48)
@@ -22071,17 +22278,17 @@ endif1733:
   store i64 %t101, i64* %t109
   %t110 = ptrtoint [6 x i64]* %t103 to i64
   %t111 = call i64 @__list_push(i64 %t93, i64 %t110)
-  br label %endif1730
-endif1730:
-  br label %while.cond1736
-while.cond1736:
+  br label %endif1741
+endif1741:
+  br label %while.cond1747
+while.cond1747:
   %t112 = load i64, i64* %self
-  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.928, i64 0, i64 0
+  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.930, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = call i64 @Parser__match_kind(i64 %t112, i64 %t114)
   %t116 = trunc i64 %t115 to i1
-  br i1 %t116, label %while.body1737, label %while.end1738
-while.body1737:
+  br i1 %t116, label %while.body1748, label %while.end1749
+while.body1748:
   %t117 = load i64, i64* %self
   %t118 = call i64 @Parser__ident_span(i64 %t117)
   store i64 %t118, i64* %pname_span
@@ -22089,15 +22296,15 @@ while.body1737:
   %t120 = call i64 @Parser__expect_ident(i64 %t119)
   store i64 %t120, i64* %pname
   %t121 = load i64, i64* %self
-  %t122 = getelementptr [2 x i8], [2 x i8]* @.str.929, i64 0, i64 0
+  %t122 = getelementptr [2 x i8], [2 x i8]* @.str.931, i64 0, i64 0
   %t123 = ptrtoint i8* %t122 to i64
   %t124 = call i64 @Parser__match_kind_check(i64 %t121, i64 %t123)
   %t125 = xor i64 %t124, 1
   %t126 = trunc i64 %t125 to i1
-  br i1 %t126, label %then1740, label %else1741
-then1740:
+  br i1 %t126, label %then1751, label %else1752
+then1751:
   %t127 = load i64, i64* %self
-  %t128 = getelementptr [12 x i8], [12 x i8]* @.str.930, i64 0, i64 0
+  %t128 = getelementptr [12 x i8], [12 x i8]* @.str.932, i64 0, i64 0
   %t129 = ptrtoint i8* %t128 to i64
   %t130 = load i64, i64* %pname
   %t131 = inttoptr i64 %t129 to i8*
@@ -22113,7 +22320,7 @@ then1740:
   %t139 = call i64 @__string_intern(i64 %t138)
   %t140 = inttoptr i64 %t139 to i8*
   %t141 = ptrtoint i8* %t140 to i64
-  %t142 = getelementptr [29 x i8], [29 x i8]* @.str.931, i64 0, i64 0
+  %t142 = getelementptr [29 x i8], [29 x i8]* @.str.933, i64 0, i64 0
   %t143 = ptrtoint i8* %t142 to i64
   %t144 = inttoptr i64 %t141 to i8*
   %t145 = inttoptr i64 %t143 to i8*
@@ -22141,7 +22348,7 @@ then1740:
   %t164 = getelementptr [1 x i64], [1 x i64]* %t163, i64 0, i64 0
   store i64 4, i64* %t164
   %t165 = ptrtoint [1 x i64]* %t163 to i64
-  %t166 = getelementptr [7 x i8], [7 x i8]* @.str.932, i64 0, i64 0
+  %t166 = getelementptr [7 x i8], [7 x i8]* @.str.934, i64 0, i64 0
   %t167 = ptrtoint i8* %t166 to i64
   %t168 = load i64, i64* %pname_span
   %t169 = call i8* @__sf_malloc(i64 48)
@@ -22160,10 +22367,10 @@ then1740:
   store i64 %t168, i64* %t176
   %t177 = ptrtoint [6 x i64]* %t170 to i64
   %t178 = call i64 @__list_push(i64 %t156, i64 %t177)
-  br label %endif1739
-else1741:
+  br label %endif1750
+else1752:
   %t179 = load i64, i64* %self
-  %t180 = getelementptr [2 x i8], [2 x i8]* @.str.933, i64 0, i64 0
+  %t180 = getelementptr [2 x i8], [2 x i8]* @.str.935, i64 0, i64 0
   %t181 = ptrtoint i8* %t180 to i64
   %t182 = call i64 @Parser__consume(i64 %t179, i64 %t181)
   %t183 = load i64, i64* %self
@@ -22176,26 +22383,26 @@ else1741:
   %t188 = ptrtoint [1 x i64]* %t186 to i64
   store i64 %t188, i64* %pdefault
   %t189 = load i64, i64* %self
-  %t190 = getelementptr [2 x i8], [2 x i8]* @.str.934, i64 0, i64 0
+  %t190 = getelementptr [2 x i8], [2 x i8]* @.str.936, i64 0, i64 0
   %t191 = ptrtoint i8* %t190 to i64
   %t192 = call i64 @Parser__match_kind(i64 %t189, i64 %t191)
   %t193 = trunc i64 %t192 to i1
-  br i1 %t193, label %then1743, label %else1744
-then1743:
+  br i1 %t193, label %then1754, label %else1755
+then1754:
   %t194 = load i64, i64* %self
   %t195 = call i64 @Parser__parse_expr(i64 %t194)
   store i64 %t195, i64* %pdefault
-  br label %endif1742
-else1744:
-  br label %endif1742
-endif1742:
+  br label %endif1753
+else1755:
+  br label %endif1753
+endif1753:
   %t196 = load i64, i64* %params
   %t197 = load i64, i64* %pname
   %t198 = load i64, i64* %self
   %t199 = load i64, i64* %ptype
   %t200 = call i64 @Parser__parse_type_ast(i64 %t198, i64 %t199)
   %t201 = load i64, i64* %pdefault
-  %t202 = getelementptr [7 x i8], [7 x i8]* @.str.935, i64 0, i64 0
+  %t202 = getelementptr [7 x i8], [7 x i8]* @.str.937, i64 0, i64 0
   %t203 = ptrtoint i8* %t202 to i64
   %t204 = load i64, i64* %pname_span
   %t205 = call i8* @__sf_malloc(i64 48)
@@ -22214,16 +22421,16 @@ endif1742:
   store i64 %t204, i64* %t212
   %t213 = ptrtoint [6 x i64]* %t206 to i64
   %t214 = call i64 @__list_push(i64 %t196, i64 %t213)
-  br label %endif1739
-endif1739:
-  br label %while.cond1736
-while.end1738:
-  br label %endif1727
-else1729:
-  br label %endif1727
-endif1727:
+  br label %endif1750
+endif1750:
+  br label %while.cond1747
+while.end1749:
+  br label %endif1738
+else1740:
+  br label %endif1738
+endif1738:
   %t215 = load i64, i64* %self
-  %t216 = getelementptr [2 x i8], [2 x i8]* @.str.936, i64 0, i64 0
+  %t216 = getelementptr [2 x i8], [2 x i8]* @.str.938, i64 0, i64 0
   %t217 = ptrtoint i8* %t216 to i64
   %t218 = call i64 @Parser__consume(i64 %t215, i64 %t217)
   %t219 = call i8* @__sf_malloc(i64 8)
@@ -22233,28 +22440,28 @@ endif1727:
   %t222 = ptrtoint [1 x i64]* %t220 to i64
   store i64 %t222, i64* %ret_type
   %t223 = load i64, i64* %self
-  %t224 = getelementptr [2 x i8], [2 x i8]* @.str.937, i64 0, i64 0
+  %t224 = getelementptr [2 x i8], [2 x i8]* @.str.939, i64 0, i64 0
   %t225 = ptrtoint i8* %t224 to i64
   %t226 = call i64 @Parser__match_kind(i64 %t223, i64 %t225)
   %t227 = trunc i64 %t226 to i1
-  br i1 %t227, label %then1746, label %else1747
-then1746:
+  br i1 %t227, label %then1757, label %else1758
+then1757:
   %t228 = load i64, i64* %self
   %t229 = load i64, i64* %self
   %t230 = call i64 @Parser__parse_type(i64 %t229)
   %t231 = call i64 @Parser__parse_type_ast(i64 %t228, i64 %t230)
   store i64 %t231, i64* %ret_type
-  br label %endif1745
-else1747:
-  br label %endif1745
-endif1745:
+  br label %endif1756
+else1758:
+  br label %endif1756
+endif1756:
   %t232 = load i64, i64* %self
-  %t233 = getelementptr [3 x i8], [3 x i8]* @.str.938, i64 0, i64 0
+  %t233 = getelementptr [3 x i8], [3 x i8]* @.str.940, i64 0, i64 0
   %t234 = ptrtoint i8* %t233 to i64
   %t235 = call i64 @Parser__match_kind(i64 %t232, i64 %t234)
   %t236 = trunc i64 %t235 to i1
-  br i1 %t236, label %then1749, label %else1750
-then1749:
+  br i1 %t236, label %then1760, label %else1761
+then1760:
   %t237 = load i64, i64* %self
   %t238 = call i64 @Parser__parse_expr(i64 %t237)
   store i64 %t238, i64* %expr
@@ -22282,9 +22489,9 @@ then1749:
   store i64 %t241, i64* %t254
   %t255 = ptrtoint [4 x i64]* %t250 to i64
   ret i64 %t255
-else1750:
-  br label %endif1748
-endif1748:
+else1761:
+  br label %endif1759
+endif1759:
   %t256 = load i64, i64* %self
   %t257 = call i64 @Parser__parse_block_stmts(i64 %t256)
   store i64 %t257, i64* %v_body
@@ -22315,18 +22522,18 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %name.arg, i64* %name
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.939, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.941, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = xor i64 %t4, 1
   %t6 = trunc i64 %t5 to i1
-  br i1 %t6, label %then1752, label %else1753
-then1752:
+  br i1 %t6, label %then1763, label %else1764
+then1763:
   %t7 = add i64 0, 0
   ret i64 %t7
-else1753:
-  br label %endif1751
-endif1751:
+else1764:
+  br label %endif1762
+endif1762:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__current_kind(i64 %t8)
   store i64 %t9, i64* %kind
@@ -22335,8 +22542,8 @@ endif1751:
   %t13 = inttoptr i64 %t10 to i64*
   %t14 = load i64, i64* %t13
   %t12 = trunc i64 %t14 to i8
-  switch i8 %t12, label %match.arm1756 [ i8 6, label %match.arm1755 ]
-match.arm1755:
+  switch i8 %t12, label %match.arm1767 [ i8 6, label %match.arm1766 ]
+match.arm1766:
   %t15 = load i64, i64* %n
   %t16 = inttoptr i64 %t10 to [2 x i64]*
   %t17 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 1
@@ -22345,13 +22552,13 @@ match.arm1755:
   %t19 = load i64, i64* %n
   store i64 %t19, i64* %t11
   store i64 %t15, i64* %n
-  br label %match.end1754
-match.arm1756:
-  %t20 = getelementptr [1 x i8], [1 x i8]* @.str.940, i64 0, i64 0
+  br label %match.end1765
+match.arm1767:
+  %t20 = getelementptr [1 x i8], [1 x i8]* @.str.942, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   store i64 %t21, i64* %t11
-  br label %match.end1754
-match.end1754:
+  br label %match.end1765
+match.end1765:
   %t22 = load i64, i64* %t11
   store i64 %t22, i64* %ident_name
   %t23 = load i64, i64* %ident_name
@@ -22394,409 +22601,409 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.end1757 [ i8 30, label %match.arm1758 i8 31, label %match.arm1759 i8 32, label %match.arm1760 i8 33, label %match.arm1761 i8 34, label %match.arm1762 i8 35, label %match.arm1763 i8 36, label %match.arm1764 i8 37, label %match.arm1765 i8 38, label %match.arm1766 i8 39, label %match.arm1767 i8 40, label %match.arm1768 i8 41, label %match.arm1769 i8 42, label %match.arm1770 i8 44, label %match.arm1771 i8 45, label %match.arm1772 i8 46, label %match.arm1773 i8 47, label %match.arm1774 i8 48, label %match.arm1775 i8 49, label %match.arm1776 i8 50, label %match.arm1777 i8 51, label %match.arm1778 i8 52, label %match.arm1779 i8 53, label %match.arm1780 i8 54, label %match.arm1781 i8 55, label %match.arm1782 i8 56, label %match.arm1783 i8 57, label %match.arm1784 i8 58, label %match.arm1785 i8 59, label %match.arm1786 i8 60, label %match.arm1787 i8 61, label %match.arm1788 i8 63, label %match.arm1789 i8 62, label %match.arm1790 i8 64, label %match.arm1791 i8 65, label %match.arm1792 i8 43, label %match.arm1793 i8 66, label %match.arm1794 i8 67, label %match.arm1795 i8 68, label %match.arm1796 i8 7, label %match.arm1797 i8 8, label %match.arm1798 i8 9, label %match.arm1799 i8 10, label %match.arm1800 i8 11, label %match.arm1801 i8 12, label %match.arm1802 i8 13, label %match.arm1803 i8 15, label %match.arm1804 i8 14, label %match.arm1805 i8 3, label %match.arm1806 i8 4, label %match.arm1807 i8 5, label %match.arm1808 i8 16, label %match.arm1809 i8 17, label %match.arm1810 i8 18, label %match.arm1811 i8 19, label %match.arm1812 i8 20, label %match.arm1813 i8 21, label %match.arm1814 i8 22, label %match.arm1815 i8 23, label %match.arm1816 i8 24, label %match.arm1817 i8 25, label %match.arm1818 i8 26, label %match.arm1819 i8 27, label %match.arm1820 i8 28, label %match.arm1821 i8 29, label %match.arm1822 i8 72, label %match.arm1823 i8 0, label %match.arm1824 i8 1, label %match.arm1825 i8 2, label %match.arm1826 i8 6, label %match.arm1827 i8 69, label %match.arm1828 i8 70, label %match.arm1829 i8 71, label %match.arm1830 ]
-match.arm1758:
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.941, i64 0, i64 0
+  switch i8 %t3, label %match.end1768 [ i8 30, label %match.arm1769 i8 31, label %match.arm1770 i8 32, label %match.arm1771 i8 33, label %match.arm1772 i8 34, label %match.arm1773 i8 35, label %match.arm1774 i8 36, label %match.arm1775 i8 37, label %match.arm1776 i8 38, label %match.arm1777 i8 39, label %match.arm1778 i8 40, label %match.arm1779 i8 41, label %match.arm1780 i8 42, label %match.arm1781 i8 44, label %match.arm1782 i8 45, label %match.arm1783 i8 46, label %match.arm1784 i8 47, label %match.arm1785 i8 48, label %match.arm1786 i8 49, label %match.arm1787 i8 50, label %match.arm1788 i8 51, label %match.arm1789 i8 52, label %match.arm1790 i8 53, label %match.arm1791 i8 54, label %match.arm1792 i8 55, label %match.arm1793 i8 56, label %match.arm1794 i8 57, label %match.arm1795 i8 58, label %match.arm1796 i8 59, label %match.arm1797 i8 60, label %match.arm1798 i8 61, label %match.arm1799 i8 63, label %match.arm1800 i8 62, label %match.arm1801 i8 64, label %match.arm1802 i8 65, label %match.arm1803 i8 43, label %match.arm1804 i8 66, label %match.arm1805 i8 67, label %match.arm1806 i8 68, label %match.arm1807 i8 7, label %match.arm1808 i8 8, label %match.arm1809 i8 9, label %match.arm1810 i8 10, label %match.arm1811 i8 11, label %match.arm1812 i8 12, label %match.arm1813 i8 13, label %match.arm1814 i8 15, label %match.arm1815 i8 14, label %match.arm1816 i8 3, label %match.arm1817 i8 4, label %match.arm1818 i8 5, label %match.arm1819 i8 16, label %match.arm1820 i8 17, label %match.arm1821 i8 18, label %match.arm1822 i8 19, label %match.arm1823 i8 20, label %match.arm1824 i8 21, label %match.arm1825 i8 22, label %match.arm1826 i8 23, label %match.arm1827 i8 24, label %match.arm1828 i8 25, label %match.arm1829 i8 26, label %match.arm1830 i8 27, label %match.arm1831 i8 28, label %match.arm1832 i8 29, label %match.arm1833 i8 72, label %match.arm1834 i8 0, label %match.arm1835 i8 1, label %match.arm1836 i8 2, label %match.arm1837 i8 6, label %match.arm1838 i8 69, label %match.arm1839 i8 70, label %match.arm1840 i8 71, label %match.arm1841 ]
+match.arm1769:
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.943, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   store i64 %t7, i64* %t2
-  br label %match.end1757
-match.arm1759:
-  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.942, i64 0, i64 0
+  br label %match.end1768
+match.arm1770:
+  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.944, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   store i64 %t9, i64* %t2
-  br label %match.end1757
-match.arm1760:
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.943, i64 0, i64 0
+  br label %match.end1768
+match.arm1771:
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.945, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %t2
-  br label %match.end1757
-match.arm1761:
-  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.944, i64 0, i64 0
+  br label %match.end1768
+match.arm1772:
+  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.946, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   store i64 %t13, i64* %t2
-  br label %match.end1757
-match.arm1762:
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.945, i64 0, i64 0
+  br label %match.end1768
+match.arm1773:
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.947, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   store i64 %t15, i64* %t2
-  br label %match.end1757
-match.arm1763:
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.946, i64 0, i64 0
+  br label %match.end1768
+match.arm1774:
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.948, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %t2
-  br label %match.end1757
-match.arm1764:
-  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.947, i64 0, i64 0
+  br label %match.end1768
+match.arm1775:
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.949, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   store i64 %t19, i64* %t2
-  br label %match.end1757
-match.arm1765:
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.948, i64 0, i64 0
+  br label %match.end1768
+match.arm1776:
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.950, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   store i64 %t21, i64* %t2
-  br label %match.end1757
-match.arm1766:
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.949, i64 0, i64 0
+  br label %match.end1768
+match.arm1777:
+  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.951, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   store i64 %t23, i64* %t2
-  br label %match.end1757
-match.arm1767:
-  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.950, i64 0, i64 0
+  br label %match.end1768
+match.arm1778:
+  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.952, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   store i64 %t25, i64* %t2
-  br label %match.end1757
-match.arm1768:
-  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.951, i64 0, i64 0
+  br label %match.end1768
+match.arm1779:
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.953, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   store i64 %t27, i64* %t2
-  br label %match.end1757
-match.arm1769:
-  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.952, i64 0, i64 0
+  br label %match.end1768
+match.arm1780:
+  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.954, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   store i64 %t29, i64* %t2
-  br label %match.end1757
-match.arm1770:
-  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.953, i64 0, i64 0
+  br label %match.end1768
+match.arm1781:
+  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.955, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   store i64 %t31, i64* %t2
-  br label %match.end1757
-match.arm1771:
-  %t32 = getelementptr [3 x i8], [3 x i8]* @.str.954, i64 0, i64 0
+  br label %match.end1768
+match.arm1782:
+  %t32 = getelementptr [3 x i8], [3 x i8]* @.str.956, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   store i64 %t33, i64* %t2
-  br label %match.end1757
-match.arm1772:
-  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.955, i64 0, i64 0
+  br label %match.end1768
+match.arm1783:
+  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.957, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   store i64 %t35, i64* %t2
-  br label %match.end1757
-match.arm1773:
-  %t36 = getelementptr [3 x i8], [3 x i8]* @.str.956, i64 0, i64 0
+  br label %match.end1768
+match.arm1784:
+  %t36 = getelementptr [3 x i8], [3 x i8]* @.str.958, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   store i64 %t37, i64* %t2
-  br label %match.end1757
-match.arm1774:
-  %t38 = getelementptr [2 x i8], [2 x i8]* @.str.957, i64 0, i64 0
+  br label %match.end1768
+match.arm1785:
+  %t38 = getelementptr [2 x i8], [2 x i8]* @.str.959, i64 0, i64 0
   %t39 = ptrtoint i8* %t38 to i64
   store i64 %t39, i64* %t2
-  br label %match.end1757
-match.arm1775:
-  %t40 = getelementptr [3 x i8], [3 x i8]* @.str.958, i64 0, i64 0
+  br label %match.end1768
+match.arm1786:
+  %t40 = getelementptr [3 x i8], [3 x i8]* @.str.960, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   store i64 %t41, i64* %t2
-  br label %match.end1757
-match.arm1776:
-  %t42 = getelementptr [3 x i8], [3 x i8]* @.str.959, i64 0, i64 0
+  br label %match.end1768
+match.arm1787:
+  %t42 = getelementptr [3 x i8], [3 x i8]* @.str.961, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   store i64 %t43, i64* %t2
-  br label %match.end1757
-match.arm1777:
-  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.960, i64 0, i64 0
+  br label %match.end1768
+match.arm1788:
+  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.962, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i64
   store i64 %t45, i64* %t2
-  br label %match.end1757
-match.arm1778:
-  %t46 = getelementptr [3 x i8], [3 x i8]* @.str.961, i64 0, i64 0
+  br label %match.end1768
+match.arm1789:
+  %t46 = getelementptr [3 x i8], [3 x i8]* @.str.963, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   store i64 %t47, i64* %t2
-  br label %match.end1757
-match.arm1779:
-  %t48 = getelementptr [3 x i8], [3 x i8]* @.str.962, i64 0, i64 0
+  br label %match.end1768
+match.arm1790:
+  %t48 = getelementptr [3 x i8], [3 x i8]* @.str.964, i64 0, i64 0
   %t49 = ptrtoint i8* %t48 to i64
   store i64 %t49, i64* %t2
-  br label %match.end1757
-match.arm1780:
-  %t50 = getelementptr [3 x i8], [3 x i8]* @.str.963, i64 0, i64 0
+  br label %match.end1768
+match.arm1791:
+  %t50 = getelementptr [3 x i8], [3 x i8]* @.str.965, i64 0, i64 0
   %t51 = ptrtoint i8* %t50 to i64
   store i64 %t51, i64* %t2
-  br label %match.end1757
-match.arm1781:
-  %t52 = getelementptr [3 x i8], [3 x i8]* @.str.964, i64 0, i64 0
+  br label %match.end1768
+match.arm1792:
+  %t52 = getelementptr [3 x i8], [3 x i8]* @.str.966, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   store i64 %t53, i64* %t2
-  br label %match.end1757
-match.arm1782:
-  %t54 = getelementptr [3 x i8], [3 x i8]* @.str.965, i64 0, i64 0
+  br label %match.end1768
+match.arm1793:
+  %t54 = getelementptr [3 x i8], [3 x i8]* @.str.967, i64 0, i64 0
   %t55 = ptrtoint i8* %t54 to i64
   store i64 %t55, i64* %t2
-  br label %match.end1757
-match.arm1783:
-  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.966, i64 0, i64 0
+  br label %match.end1768
+match.arm1794:
+  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.968, i64 0, i64 0
   %t57 = ptrtoint i8* %t56 to i64
   store i64 %t57, i64* %t2
-  br label %match.end1757
-match.arm1784:
-  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.967, i64 0, i64 0
+  br label %match.end1768
+match.arm1795:
+  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.969, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   store i64 %t59, i64* %t2
-  br label %match.end1757
-match.arm1785:
-  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.968, i64 0, i64 0
+  br label %match.end1768
+match.arm1796:
+  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.970, i64 0, i64 0
   %t61 = ptrtoint i8* %t60 to i64
   store i64 %t61, i64* %t2
-  br label %match.end1757
-match.arm1786:
-  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.969, i64 0, i64 0
+  br label %match.end1768
+match.arm1797:
+  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.971, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
   store i64 %t63, i64* %t2
-  br label %match.end1757
-match.arm1787:
-  %t64 = getelementptr [2 x i8], [2 x i8]* @.str.970, i64 0, i64 0
+  br label %match.end1768
+match.arm1798:
+  %t64 = getelementptr [2 x i8], [2 x i8]* @.str.972, i64 0, i64 0
   %t65 = ptrtoint i8* %t64 to i64
   store i64 %t65, i64* %t2
-  br label %match.end1757
-match.arm1788:
-  %t66 = getelementptr [2 x i8], [2 x i8]* @.str.971, i64 0, i64 0
+  br label %match.end1768
+match.arm1799:
+  %t66 = getelementptr [2 x i8], [2 x i8]* @.str.973, i64 0, i64 0
   %t67 = ptrtoint i8* %t66 to i64
   store i64 %t67, i64* %t2
-  br label %match.end1757
-match.arm1789:
-  %t68 = getelementptr [2 x i8], [2 x i8]* @.str.972, i64 0, i64 0
+  br label %match.end1768
+match.arm1800:
+  %t68 = getelementptr [2 x i8], [2 x i8]* @.str.974, i64 0, i64 0
   %t69 = ptrtoint i8* %t68 to i64
   store i64 %t69, i64* %t2
-  br label %match.end1757
-match.arm1790:
-  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.973, i64 0, i64 0
+  br label %match.end1768
+match.arm1801:
+  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.975, i64 0, i64 0
   %t71 = ptrtoint i8* %t70 to i64
   store i64 %t71, i64* %t2
-  br label %match.end1757
-match.arm1791:
-  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.974, i64 0, i64 0
+  br label %match.end1768
+match.arm1802:
+  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.976, i64 0, i64 0
   %t73 = ptrtoint i8* %t72 to i64
   store i64 %t73, i64* %t2
-  br label %match.end1757
-match.arm1792:
-  %t74 = getelementptr [2 x i8], [2 x i8]* @.str.975, i64 0, i64 0
+  br label %match.end1768
+match.arm1803:
+  %t74 = getelementptr [2 x i8], [2 x i8]* @.str.977, i64 0, i64 0
   %t75 = ptrtoint i8* %t74 to i64
   store i64 %t75, i64* %t2
-  br label %match.end1757
-match.arm1793:
-  %t76 = getelementptr [2 x i8], [2 x i8]* @.str.976, i64 0, i64 0
+  br label %match.end1768
+match.arm1804:
+  %t76 = getelementptr [2 x i8], [2 x i8]* @.str.978, i64 0, i64 0
   %t77 = ptrtoint i8* %t76 to i64
   store i64 %t77, i64* %t2
-  br label %match.end1757
-match.arm1794:
-  %t78 = getelementptr [3 x i8], [3 x i8]* @.str.977, i64 0, i64 0
+  br label %match.end1768
+match.arm1805:
+  %t78 = getelementptr [3 x i8], [3 x i8]* @.str.979, i64 0, i64 0
   %t79 = ptrtoint i8* %t78 to i64
   store i64 %t79, i64* %t2
-  br label %match.end1757
-match.arm1795:
-  %t80 = getelementptr [3 x i8], [3 x i8]* @.str.978, i64 0, i64 0
+  br label %match.end1768
+match.arm1806:
+  %t80 = getelementptr [3 x i8], [3 x i8]* @.str.980, i64 0, i64 0
   %t81 = ptrtoint i8* %t80 to i64
   store i64 %t81, i64* %t2
-  br label %match.end1757
-match.arm1796:
-  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.979, i64 0, i64 0
+  br label %match.end1768
+match.arm1807:
+  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.981, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i64
   store i64 %t83, i64* %t2
-  br label %match.end1757
-match.arm1797:
-  %t84 = getelementptr [4 x i8], [4 x i8]* @.str.980, i64 0, i64 0
+  br label %match.end1768
+match.arm1808:
+  %t84 = getelementptr [4 x i8], [4 x i8]* @.str.982, i64 0, i64 0
   %t85 = ptrtoint i8* %t84 to i64
   store i64 %t85, i64* %t2
-  br label %match.end1757
-match.arm1798:
-  %t86 = getelementptr [4 x i8], [4 x i8]* @.str.981, i64 0, i64 0
+  br label %match.end1768
+match.arm1809:
+  %t86 = getelementptr [4 x i8], [4 x i8]* @.str.983, i64 0, i64 0
   %t87 = ptrtoint i8* %t86 to i64
   store i64 %t87, i64* %t2
-  br label %match.end1757
-match.arm1799:
-  %t88 = getelementptr [4 x i8], [4 x i8]* @.str.982, i64 0, i64 0
+  br label %match.end1768
+match.arm1810:
+  %t88 = getelementptr [4 x i8], [4 x i8]* @.str.984, i64 0, i64 0
   %t89 = ptrtoint i8* %t88 to i64
   store i64 %t89, i64* %t2
-  br label %match.end1757
-match.arm1800:
-  %t90 = getelementptr [7 x i8], [7 x i8]* @.str.983, i64 0, i64 0
+  br label %match.end1768
+match.arm1811:
+  %t90 = getelementptr [7 x i8], [7 x i8]* @.str.985, i64 0, i64 0
   %t91 = ptrtoint i8* %t90 to i64
   store i64 %t91, i64* %t2
-  br label %match.end1757
-match.arm1801:
-  %t92 = getelementptr [3 x i8], [3 x i8]* @.str.984, i64 0, i64 0
+  br label %match.end1768
+match.arm1812:
+  %t92 = getelementptr [3 x i8], [3 x i8]* @.str.986, i64 0, i64 0
   %t93 = ptrtoint i8* %t92 to i64
   store i64 %t93, i64* %t2
-  br label %match.end1757
-match.arm1802:
-  %t94 = getelementptr [5 x i8], [5 x i8]* @.str.985, i64 0, i64 0
+  br label %match.end1768
+match.arm1813:
+  %t94 = getelementptr [5 x i8], [5 x i8]* @.str.987, i64 0, i64 0
   %t95 = ptrtoint i8* %t94 to i64
   store i64 %t95, i64* %t2
-  br label %match.end1757
-match.arm1803:
-  %t96 = getelementptr [6 x i8], [6 x i8]* @.str.986, i64 0, i64 0
+  br label %match.end1768
+match.arm1814:
+  %t96 = getelementptr [6 x i8], [6 x i8]* @.str.988, i64 0, i64 0
   %t97 = ptrtoint i8* %t96 to i64
   store i64 %t97, i64* %t2
-  br label %match.end1757
-match.arm1804:
-  %t98 = getelementptr [3 x i8], [3 x i8]* @.str.987, i64 0, i64 0
+  br label %match.end1768
+match.arm1815:
+  %t98 = getelementptr [3 x i8], [3 x i8]* @.str.989, i64 0, i64 0
   %t99 = ptrtoint i8* %t98 to i64
   store i64 %t99, i64* %t2
-  br label %match.end1757
-match.arm1805:
-  %t100 = getelementptr [4 x i8], [4 x i8]* @.str.988, i64 0, i64 0
+  br label %match.end1768
+match.arm1816:
+  %t100 = getelementptr [4 x i8], [4 x i8]* @.str.990, i64 0, i64 0
   %t101 = ptrtoint i8* %t100 to i64
   store i64 %t101, i64* %t2
-  br label %match.end1757
-match.arm1806:
-  %t102 = getelementptr [5 x i8], [5 x i8]* @.str.989, i64 0, i64 0
+  br label %match.end1768
+match.arm1817:
+  %t102 = getelementptr [5 x i8], [5 x i8]* @.str.991, i64 0, i64 0
   %t103 = ptrtoint i8* %t102 to i64
   store i64 %t103, i64* %t2
-  br label %match.end1757
-match.arm1807:
-  %t104 = getelementptr [6 x i8], [6 x i8]* @.str.990, i64 0, i64 0
+  br label %match.end1768
+match.arm1818:
+  %t104 = getelementptr [6 x i8], [6 x i8]* @.str.992, i64 0, i64 0
   %t105 = ptrtoint i8* %t104 to i64
   store i64 %t105, i64* %t2
-  br label %match.end1757
-match.arm1808:
-  %t106 = getelementptr [4 x i8], [4 x i8]* @.str.991, i64 0, i64 0
+  br label %match.end1768
+match.arm1819:
+  %t106 = getelementptr [4 x i8], [4 x i8]* @.str.993, i64 0, i64 0
   %t107 = ptrtoint i8* %t106 to i64
   store i64 %t107, i64* %t2
-  br label %match.end1757
-match.arm1809:
-  %t108 = getelementptr [7 x i8], [7 x i8]* @.str.992, i64 0, i64 0
+  br label %match.end1768
+match.arm1820:
+  %t108 = getelementptr [7 x i8], [7 x i8]* @.str.994, i64 0, i64 0
   %t109 = ptrtoint i8* %t108 to i64
   store i64 %t109, i64* %t2
-  br label %match.end1757
-match.arm1810:
-  %t110 = getelementptr [3 x i8], [3 x i8]* @.str.993, i64 0, i64 0
+  br label %match.end1768
+match.arm1821:
+  %t110 = getelementptr [3 x i8], [3 x i8]* @.str.995, i64 0, i64 0
   %t111 = ptrtoint i8* %t110 to i64
   store i64 %t111, i64* %t2
-  br label %match.end1757
-match.arm1811:
-  %t112 = getelementptr [5 x i8], [5 x i8]* @.str.994, i64 0, i64 0
+  br label %match.end1768
+match.arm1822:
+  %t112 = getelementptr [5 x i8], [5 x i8]* @.str.996, i64 0, i64 0
   %t113 = ptrtoint i8* %t112 to i64
   store i64 %t113, i64* %t2
-  br label %match.end1757
-match.arm1812:
-  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.995, i64 0, i64 0
+  br label %match.end1768
+match.arm1823:
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.997, i64 0, i64 0
   %t115 = ptrtoint i8* %t114 to i64
   store i64 %t115, i64* %t2
-  br label %match.end1757
-match.arm1813:
-  %t116 = getelementptr [6 x i8], [6 x i8]* @.str.996, i64 0, i64 0
+  br label %match.end1768
+match.arm1824:
+  %t116 = getelementptr [6 x i8], [6 x i8]* @.str.998, i64 0, i64 0
   %t117 = ptrtoint i8* %t116 to i64
   store i64 %t117, i64* %t2
-  br label %match.end1757
-match.arm1814:
-  %t118 = getelementptr [5 x i8], [5 x i8]* @.str.997, i64 0, i64 0
+  br label %match.end1768
+match.arm1825:
+  %t118 = getelementptr [5 x i8], [5 x i8]* @.str.999, i64 0, i64 0
   %t119 = ptrtoint i8* %t118 to i64
   store i64 %t119, i64* %t2
-  br label %match.end1757
-match.arm1815:
-  %t120 = getelementptr [4 x i8], [4 x i8]* @.str.998, i64 0, i64 0
+  br label %match.end1768
+match.arm1826:
+  %t120 = getelementptr [4 x i8], [4 x i8]* @.str.1000, i64 0, i64 0
   %t121 = ptrtoint i8* %t120 to i64
   store i64 %t121, i64* %t2
-  br label %match.end1757
-match.arm1816:
-  %t122 = getelementptr [3 x i8], [3 x i8]* @.str.999, i64 0, i64 0
+  br label %match.end1768
+match.arm1827:
+  %t122 = getelementptr [3 x i8], [3 x i8]* @.str.1001, i64 0, i64 0
   %t123 = ptrtoint i8* %t122 to i64
   store i64 %t123, i64* %t2
-  br label %match.end1757
-match.arm1817:
-  %t124 = getelementptr [4 x i8], [4 x i8]* @.str.1000, i64 0, i64 0
+  br label %match.end1768
+match.arm1828:
+  %t124 = getelementptr [4 x i8], [4 x i8]* @.str.1002, i64 0, i64 0
   %t125 = ptrtoint i8* %t124 to i64
   store i64 %t125, i64* %t2
-  br label %match.end1757
-match.arm1818:
-  %t126 = getelementptr [6 x i8], [6 x i8]* @.str.1001, i64 0, i64 0
+  br label %match.end1768
+match.arm1829:
+  %t126 = getelementptr [6 x i8], [6 x i8]* @.str.1003, i64 0, i64 0
   %t127 = ptrtoint i8* %t126 to i64
   store i64 %t127, i64* %t2
-  br label %match.end1757
-match.arm1819:
-  %t128 = getelementptr [6 x i8], [6 x i8]* @.str.1002, i64 0, i64 0
+  br label %match.end1768
+match.arm1830:
+  %t128 = getelementptr [6 x i8], [6 x i8]* @.str.1004, i64 0, i64 0
   %t129 = ptrtoint i8* %t128 to i64
   store i64 %t129, i64* %t2
-  br label %match.end1757
-match.arm1820:
-  %t130 = getelementptr [8 x i8], [8 x i8]* @.str.1003, i64 0, i64 0
+  br label %match.end1768
+match.arm1831:
+  %t130 = getelementptr [8 x i8], [8 x i8]* @.str.1005, i64 0, i64 0
   %t131 = ptrtoint i8* %t130 to i64
   store i64 %t131, i64* %t2
-  br label %match.end1757
-match.arm1821:
-  %t132 = getelementptr [3 x i8], [3 x i8]* @.str.1004, i64 0, i64 0
+  br label %match.end1768
+match.arm1832:
+  %t132 = getelementptr [3 x i8], [3 x i8]* @.str.1006, i64 0, i64 0
   %t133 = ptrtoint i8* %t132 to i64
   store i64 %t133, i64* %t2
-  br label %match.end1757
-match.arm1822:
-  %t134 = getelementptr [6 x i8], [6 x i8]* @.str.1005, i64 0, i64 0
+  br label %match.end1768
+match.arm1833:
+  %t134 = getelementptr [6 x i8], [6 x i8]* @.str.1007, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
   store i64 %t135, i64* %t2
-  br label %match.end1757
-match.arm1823:
-  %t136 = getelementptr [4 x i8], [4 x i8]* @.str.1006, i64 0, i64 0
+  br label %match.end1768
+match.arm1834:
+  %t136 = getelementptr [4 x i8], [4 x i8]* @.str.1008, i64 0, i64 0
   %t137 = ptrtoint i8* %t136 to i64
   store i64 %t137, i64* %t2
-  br label %match.end1757
-match.arm1824:
+  br label %match.end1768
+match.arm1835:
   %t138 = load i64, i64* %v
   %t139 = inttoptr i64 %t1 to [2 x i64]*
   %t140 = getelementptr [2 x i64], [2 x i64]* %t139, i64 0, i64 1
   %t141 = load i64, i64* %t140
   store i64 %t141, i64* %v
-  %t142 = getelementptr [4 x i8], [4 x i8]* @.str.1007, i64 0, i64 0
+  %t142 = getelementptr [4 x i8], [4 x i8]* @.str.1009, i64 0, i64 0
   %t143 = ptrtoint i8* %t142 to i64
   store i64 %t143, i64* %t2
   store i64 %t138, i64* %v
-  br label %match.end1757
-match.arm1825:
+  br label %match.end1768
+match.arm1836:
   %t144 = load i64, i64* %v
   %t145 = inttoptr i64 %t1 to [2 x i64]*
   %t146 = getelementptr [2 x i64], [2 x i64]* %t145, i64 0, i64 1
   %t147 = load i64, i64* %t146
   store i64 %t147, i64* %v
-  %t148 = getelementptr [6 x i8], [6 x i8]* @.str.1008, i64 0, i64 0
+  %t148 = getelementptr [6 x i8], [6 x i8]* @.str.1010, i64 0, i64 0
   %t149 = ptrtoint i8* %t148 to i64
   store i64 %t149, i64* %t2
   store i64 %t144, i64* %v
-  br label %match.end1757
-match.arm1826:
+  br label %match.end1768
+match.arm1837:
   %t150 = load i64, i64* %v
   %t151 = inttoptr i64 %t1 to [2 x i64]*
   %t152 = getelementptr [2 x i64], [2 x i64]* %t151, i64 0, i64 1
   %t153 = load i64, i64* %t152
   store i64 %t153, i64* %v
-  %t154 = getelementptr [7 x i8], [7 x i8]* @.str.1009, i64 0, i64 0
+  %t154 = getelementptr [7 x i8], [7 x i8]* @.str.1011, i64 0, i64 0
   %t155 = ptrtoint i8* %t154 to i64
   store i64 %t155, i64* %t2
   store i64 %t150, i64* %v
-  br label %match.end1757
-match.arm1827:
+  br label %match.end1768
+match.arm1838:
   %t156 = load i64, i64* %v
   %t157 = inttoptr i64 %t1 to [2 x i64]*
   %t158 = getelementptr [2 x i64], [2 x i64]* %t157, i64 0, i64 1
   %t159 = load i64, i64* %t158
   store i64 %t159, i64* %v
-  %t160 = getelementptr [6 x i8], [6 x i8]* @.str.1010, i64 0, i64 0
+  %t160 = getelementptr [6 x i8], [6 x i8]* @.str.1012, i64 0, i64 0
   %t161 = ptrtoint i8* %t160 to i64
   store i64 %t161, i64* %t2
   store i64 %t156, i64* %v
-  br label %match.end1757
-match.arm1828:
+  br label %match.end1768
+match.arm1839:
   %t162 = load i64, i64* %t
   %t163 = inttoptr i64 %t1 to [2 x i64]*
   %t164 = getelementptr [2 x i64], [2 x i64]* %t163, i64 0, i64 1
   %t165 = load i64, i64* %t164
   store i64 %t165, i64* %t
-  %t166 = getelementptr [12 x i8], [12 x i8]* @.str.1011, i64 0, i64 0
+  %t166 = getelementptr [12 x i8], [12 x i8]* @.str.1013, i64 0, i64 0
   %t167 = ptrtoint i8* %t166 to i64
   store i64 %t167, i64* %t2
   store i64 %t162, i64* %t
-  br label %match.end1757
-match.arm1829:
+  br label %match.end1768
+match.arm1840:
   %t168 = load i64, i64* %t
   %t169 = inttoptr i64 %t1 to [2 x i64]*
   %t170 = getelementptr [2 x i64], [2 x i64]* %t169, i64 0, i64 1
   %t171 = load i64, i64* %t170
   store i64 %t171, i64* %t
-  %t172 = getelementptr [11 x i8], [11 x i8]* @.str.1012, i64 0, i64 0
+  %t172 = getelementptr [11 x i8], [11 x i8]* @.str.1014, i64 0, i64 0
   %t173 = ptrtoint i8* %t172 to i64
   store i64 %t173, i64* %t2
   store i64 %t168, i64* %t
-  br label %match.end1757
-match.arm1830:
-  %t174 = getelementptr [8 x i8], [8 x i8]* @.str.1013, i64 0, i64 0
+  br label %match.end1768
+match.arm1841:
+  %t174 = getelementptr [8 x i8], [8 x i8]* @.str.1015, i64 0, i64 0
   %t175 = ptrtoint i8* %t174 to i64
   store i64 %t175, i64* %t2
-  br label %match.end1757
-match.end1757:
+  br label %match.end1768
+match.end1768:
   %t176 = load i64, i64* %t2
   ret i64 %t176
 }
@@ -22806,24 +23013,24 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1014, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1016, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1831
-logic.entry1831:
-  br i1 %t5, label %end1833, label %rhs1832
-rhs1832:
+  br label %logic.entry1842
+logic.entry1842:
+  br i1 %t5, label %end1844, label %rhs1843
+rhs1843:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1015, i64 0, i64 0
+  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1017, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1834
-rhs.exit1834:
-  br label %end1833
-end1833:
-  %t11 = phi i1 [%t5, %logic.entry1831], [%t10, %rhs.exit1834]
+  br label %rhs.exit1845
+rhs.exit1845:
+  br label %end1844
+end1844:
+  %t11 = phi i1 [%t5, %logic.entry1842], [%t10, %rhs.exit1845]
   %t12 = zext i1 %t11 to i64
   ret i64 %t12
 }
@@ -22840,57 +23047,57 @@ entry:
   %t7 = icmp sgt i64 %t4, %t5
   %t6 = zext i1 %t7 to i64
   %t8 = trunc i64 %t6 to i1
-  br i1 %t8, label %then1836, label %else1837
-then1836:
+  br i1 %t8, label %then1847, label %else1848
+then1847:
   %t9 = add i64 0, 0
   ret i64 %t9
-else1837:
-  br label %endif1835
-endif1835:
+else1848:
+  br label %endif1846
+endif1846:
   %t10 = load i64, i64* %self
-  %t11 = getelementptr [2 x i8], [2 x i8]* @.str.1016, i64 0, i64 0
+  %t11 = getelementptr [2 x i8], [2 x i8]* @.str.1018, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
   %t13 = call i64 @Parser__match_kind_check(i64 %t10, i64 %t12)
   %t14 = trunc i64 %t13 to i1
-  br i1 %t14, label %then1839, label %else1840
-then1839:
+  br i1 %t14, label %then1850, label %else1851
+then1850:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1017, i64 0, i64 0
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1019, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__peek_is(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br label %logic.entry1842
-logic.entry1842:
-  br i1 %t19, label %end1844, label %rhs1843
-rhs1843:
+  br label %logic.entry1853
+logic.entry1853:
+  br i1 %t19, label %end1855, label %rhs1854
+rhs1854:
   %t20 = load i64, i64* %self
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1018, i64 0, i64 0
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1020, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i64 @Parser__peek_is(i64 %t20, i64 %t22)
   %t24 = trunc i64 %t23 to i1
-  br label %rhs.exit1845
-rhs.exit1845:
-  br label %end1844
-end1844:
-  %t25 = phi i1 [%t19, %logic.entry1842], [%t24, %rhs.exit1845]
+  br label %rhs.exit1856
+rhs.exit1856:
+  br label %end1855
+end1855:
+  %t25 = phi i1 [%t19, %logic.entry1853], [%t24, %rhs.exit1856]
   %t26 = zext i1 %t25 to i64
   %t27 = trunc i64 %t26 to i1
-  br i1 %t27, label %then1846, label %else1847
-then1846:
+  br i1 %t27, label %then1857, label %else1858
+then1857:
   %t28 = add i64 0, 0
   ret i64 %t28
-else1847:
-  br label %endif1841
-endif1841:
+else1858:
+  br label %endif1852
+endif1852:
   %t29 = load i64, i64* %self
-  %t30 = getelementptr [6 x i8], [6 x i8]* @.str.1019, i64 0, i64 0
+  %t30 = getelementptr [6 x i8], [6 x i8]* @.str.1021, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   %t32 = call i64 @Parser__peek_is(i64 %t29, i64 %t31)
   %t33 = trunc i64 %t32 to i1
-  br label %logic.entry1849
-logic.entry1849:
-  br i1 %t33, label %rhs1850, label %end1851
-rhs1850:
+  br label %logic.entry1860
+logic.entry1860:
+  br i1 %t33, label %rhs1861, label %end1862
+rhs1861:
   %t34 = load i64, i64* %self
   %t35 = load i64, i64* %self
   %t36 = inttoptr i64 %t35 to %Parser*
@@ -22900,60 +23107,60 @@ rhs1850:
   %t40 = add i64 %t38, %t39
   %t41 = call i64 @Parser__is_html_open_at(i64 %t34, i64 %t40)
   %t42 = trunc i64 %t41 to i1
-  br label %rhs.exit1852
-rhs.exit1852:
-  br label %end1851
-end1851:
-  %t43 = phi i1 [%t33, %logic.entry1849], [%t42, %rhs.exit1852]
+  br label %rhs.exit1863
+rhs.exit1863:
+  br label %end1862
+end1862:
+  %t43 = phi i1 [%t33, %logic.entry1860], [%t42, %rhs.exit1863]
   %t44 = zext i1 %t43 to i64
   %t45 = trunc i64 %t44 to i1
-  br i1 %t45, label %then1853, label %else1854
-then1853:
+  br i1 %t45, label %then1864, label %else1865
+then1864:
   %t46 = add i64 0, 0
   ret i64 %t46
-else1854:
-  br label %endif1848
-endif1848:
+else1865:
+  br label %endif1859
+endif1859:
   %t47 = add i64 0, 1
   ret i64 %t47
-else1840:
-  br label %endif1838
-endif1838:
+else1851:
+  br label %endif1849
+endif1849:
   %t48 = load i64, i64* %self
-  %t49 = getelementptr [3 x i8], [3 x i8]* @.str.1020, i64 0, i64 0
+  %t49 = getelementptr [3 x i8], [3 x i8]* @.str.1022, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i64 @Parser__match_kind_check(i64 %t48, i64 %t50)
   %t52 = trunc i64 %t51 to i1
-  br label %logic.entry1855
-logic.entry1855:
-  br i1 %t52, label %end1857, label %rhs1856
-rhs1856:
+  br label %logic.entry1866
+logic.entry1866:
+  br i1 %t52, label %end1868, label %rhs1867
+rhs1867:
   %t53 = load i64, i64* %self
-  %t54 = getelementptr [2 x i8], [2 x i8]* @.str.1021, i64 0, i64 0
+  %t54 = getelementptr [2 x i8], [2 x i8]* @.str.1023, i64 0, i64 0
   %t55 = ptrtoint i8* %t54 to i64
   %t56 = call i64 @Parser__match_kind_check(i64 %t53, i64 %t55)
   %t57 = trunc i64 %t56 to i1
-  br label %rhs.exit1858
-rhs.exit1858:
-  br label %end1857
-end1857:
-  %t58 = phi i1 [%t52, %logic.entry1855], [%t57, %rhs.exit1858]
+  br label %rhs.exit1869
+rhs.exit1869:
+  br label %end1868
+end1868:
+  %t58 = phi i1 [%t52, %logic.entry1866], [%t57, %rhs.exit1869]
   %t59 = zext i1 %t58 to i64
   %t60 = trunc i64 %t59 to i1
-  br label %logic.entry1859
-logic.entry1859:
-  br i1 %t60, label %end1861, label %rhs1860
-rhs1860:
+  br label %logic.entry1870
+logic.entry1870:
+  br i1 %t60, label %end1872, label %rhs1871
+rhs1871:
   %t61 = load i64, i64* %self
-  %t62 = getelementptr [3 x i8], [3 x i8]* @.str.1022, i64 0, i64 0
+  %t62 = getelementptr [3 x i8], [3 x i8]* @.str.1024, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
   %t64 = call i64 @Parser__match_kind_check(i64 %t61, i64 %t63)
   %t65 = trunc i64 %t64 to i1
-  br label %rhs.exit1862
-rhs.exit1862:
-  br label %end1861
-end1861:
-  %t66 = phi i1 [%t60, %logic.entry1859], [%t65, %rhs.exit1862]
+  br label %rhs.exit1873
+rhs.exit1873:
+  br label %end1872
+end1872:
+  %t66 = phi i1 [%t60, %logic.entry1870], [%t65, %rhs.exit1873]
   %t67 = zext i1 %t66 to i64
   ret i64 %t67
 }
@@ -22983,13 +23190,13 @@ entry:
   %t10 = icmp sge i64 %t3, %t8
   %t9 = zext i1 %t10 to i64
   %t11 = trunc i64 %t9 to i1
-  br i1 %t11, label %then1864, label %else1865
-then1864:
+  br i1 %t11, label %then1875, label %else1876
+then1875:
   %t12 = add i64 0, 0
   ret i64 %t12
-else1865:
-  br label %endif1863
-endif1863:
+else1876:
+  br label %endif1874
+endif1874:
   %t13 = load i64, i64* %self
   %t14 = inttoptr i64 %t13 to %Parser*
   %t15 = getelementptr %Parser, %Parser* %t14, i32 0, i32 0
@@ -23008,8 +23215,8 @@ endif1863:
   %t28 = inttoptr i64 %t25 to i64*
   %t29 = load i64, i64* %t28
   %t27 = trunc i64 %t29 to i8
-  switch i8 %t27, label %match.end1866 [ i8 0, label %match.arm1867 ]
-match.arm1867:
+  switch i8 %t27, label %match.end1877 [ i8 0, label %match.arm1878 ]
+match.arm1878:
   %t30 = load i64, i64* %k
   %t31 = load i64, i64* %l
   %t32 = load i64, i64* %c
@@ -23038,8 +23245,8 @@ match.arm1867:
   store i64 %t32, i64* %c
   store i64 %t33, i64* %o
   store i64 %t34, i64* %ln
-  br label %match.end1866
-match.end1866:
+  br label %match.end1877
+match.end1877:
   %t47 = load i64, i64* %t26
   store i64 %t47, i64* %next_kind
   %t48 = load i64, i64* %self
@@ -23047,125 +23254,125 @@ match.end1866:
   %t50 = call i64 @Parser__kind_name(i64 %t48, i64 %t49)
   store i64 %t50, i64* %next_str
   %t51 = load i64, i64* %next_str
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1023, i64 0, i64 0
+  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1025, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @__string_eq(i64 %t51, i64 %t53)
   %t55 = trunc i64 %t54 to i1
-  br label %logic.entry1869
-logic.entry1869:
-  br i1 %t55, label %end1871, label %rhs1870
-rhs1870:
+  br label %logic.entry1880
+logic.entry1880:
+  br i1 %t55, label %end1882, label %rhs1881
+rhs1881:
   %t56 = load i64, i64* %next_str
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1024, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1026, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i64 @__string_eq(i64 %t56, i64 %t58)
   %t60 = trunc i64 %t59 to i1
-  br label %rhs.exit1872
-rhs.exit1872:
-  br label %end1871
-end1871:
-  %t61 = phi i1 [%t55, %logic.entry1869], [%t60, %rhs.exit1872]
+  br label %rhs.exit1883
+rhs.exit1883:
+  br label %end1882
+end1882:
+  %t61 = phi i1 [%t55, %logic.entry1880], [%t60, %rhs.exit1883]
   %t62 = zext i1 %t61 to i64
   %t63 = trunc i64 %t62 to i1
-  br label %logic.entry1873
-logic.entry1873:
-  br i1 %t63, label %end1875, label %rhs1874
-rhs1874:
+  br label %logic.entry1884
+logic.entry1884:
+  br i1 %t63, label %end1886, label %rhs1885
+rhs1885:
   %t64 = load i64, i64* %next_str
-  %t65 = getelementptr [6 x i8], [6 x i8]* @.str.1025, i64 0, i64 0
+  %t65 = getelementptr [6 x i8], [6 x i8]* @.str.1027, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = call i64 @__string_eq(i64 %t64, i64 %t66)
   %t68 = trunc i64 %t67 to i1
-  br label %rhs.exit1876
-rhs.exit1876:
-  br label %end1875
-end1875:
-  %t69 = phi i1 [%t63, %logic.entry1873], [%t68, %rhs.exit1876]
-  %t70 = zext i1 %t69 to i64
-  %t71 = trunc i64 %t70 to i1
-  br label %logic.entry1877
-logic.entry1877:
-  br i1 %t71, label %end1879, label %rhs1878
-rhs1878:
-  %t72 = load i64, i64* %next_str
-  %t73 = getelementptr [2 x i8], [2 x i8]* @.str.1026, i64 0, i64 0
-  %t74 = ptrtoint i8* %t73 to i64
-  %t75 = call i64 @__string_eq(i64 %t72, i64 %t74)
-  %t76 = trunc i64 %t75 to i1
-  br label %rhs.exit1880
-rhs.exit1880:
-  br label %end1879
-end1879:
-  %t77 = phi i1 [%t71, %logic.entry1877], [%t76, %rhs.exit1880]
-  %t78 = zext i1 %t77 to i64
-  %t79 = trunc i64 %t78 to i1
-  br i1 %t79, label %then1881, label %else1882
-then1881:
-  %t80 = add i64 0, 1
-  ret i64 %t80
-else1882:
-  br label %endif1868
-endif1868:
-  %t81 = load i64, i64* %next_str
-  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.1027, i64 0, i64 0
-  %t83 = ptrtoint i8* %t82 to i64
-  %t84 = call i64 @__string_eq(i64 %t81, i64 %t83)
-  %t85 = trunc i64 %t84 to i1
-  br label %logic.entry1884
-logic.entry1884:
-  br i1 %t85, label %end1886, label %rhs1885
-rhs1885:
-  %t86 = load i64, i64* %next_str
-  %t87 = getelementptr [4 x i8], [4 x i8]* @.str.1028, i64 0, i64 0
-  %t88 = ptrtoint i8* %t87 to i64
-  %t89 = call i64 @__string_eq(i64 %t86, i64 %t88)
-  %t90 = trunc i64 %t89 to i1
   br label %rhs.exit1887
 rhs.exit1887:
   br label %end1886
 end1886:
-  %t91 = phi i1 [%t85, %logic.entry1884], [%t90, %rhs.exit1887]
-  %t92 = zext i1 %t91 to i64
-  %t93 = trunc i64 %t92 to i1
+  %t69 = phi i1 [%t63, %logic.entry1884], [%t68, %rhs.exit1887]
+  %t70 = zext i1 %t69 to i64
+  %t71 = trunc i64 %t70 to i1
   br label %logic.entry1888
 logic.entry1888:
-  br i1 %t93, label %end1890, label %rhs1889
+  br i1 %t71, label %end1890, label %rhs1889
 rhs1889:
-  %t94 = load i64, i64* %next_str
-  %t95 = getelementptr [3 x i8], [3 x i8]* @.str.1029, i64 0, i64 0
-  %t96 = ptrtoint i8* %t95 to i64
-  %t97 = call i64 @__string_eq(i64 %t94, i64 %t96)
-  %t98 = trunc i64 %t97 to i1
+  %t72 = load i64, i64* %next_str
+  %t73 = getelementptr [2 x i8], [2 x i8]* @.str.1028, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i64 @__string_eq(i64 %t72, i64 %t74)
+  %t76 = trunc i64 %t75 to i1
   br label %rhs.exit1891
 rhs.exit1891:
   br label %end1890
 end1890:
-  %t99 = phi i1 [%t93, %logic.entry1888], [%t98, %rhs.exit1891]
+  %t77 = phi i1 [%t71, %logic.entry1888], [%t76, %rhs.exit1891]
+  %t78 = zext i1 %t77 to i64
+  %t79 = trunc i64 %t78 to i1
+  br i1 %t79, label %then1892, label %else1893
+then1892:
+  %t80 = add i64 0, 1
+  ret i64 %t80
+else1893:
+  br label %endif1879
+endif1879:
+  %t81 = load i64, i64* %next_str
+  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.1029, i64 0, i64 0
+  %t83 = ptrtoint i8* %t82 to i64
+  %t84 = call i64 @__string_eq(i64 %t81, i64 %t83)
+  %t85 = trunc i64 %t84 to i1
+  br label %logic.entry1895
+logic.entry1895:
+  br i1 %t85, label %end1897, label %rhs1896
+rhs1896:
+  %t86 = load i64, i64* %next_str
+  %t87 = getelementptr [4 x i8], [4 x i8]* @.str.1030, i64 0, i64 0
+  %t88 = ptrtoint i8* %t87 to i64
+  %t89 = call i64 @__string_eq(i64 %t86, i64 %t88)
+  %t90 = trunc i64 %t89 to i1
+  br label %rhs.exit1898
+rhs.exit1898:
+  br label %end1897
+end1897:
+  %t91 = phi i1 [%t85, %logic.entry1895], [%t90, %rhs.exit1898]
+  %t92 = zext i1 %t91 to i64
+  %t93 = trunc i64 %t92 to i1
+  br label %logic.entry1899
+logic.entry1899:
+  br i1 %t93, label %end1901, label %rhs1900
+rhs1900:
+  %t94 = load i64, i64* %next_str
+  %t95 = getelementptr [3 x i8], [3 x i8]* @.str.1031, i64 0, i64 0
+  %t96 = ptrtoint i8* %t95 to i64
+  %t97 = call i64 @__string_eq(i64 %t94, i64 %t96)
+  %t98 = trunc i64 %t97 to i1
+  br label %rhs.exit1902
+rhs.exit1902:
+  br label %end1901
+end1901:
+  %t99 = phi i1 [%t93, %logic.entry1899], [%t98, %rhs.exit1902]
   %t100 = zext i1 %t99 to i64
   %t101 = trunc i64 %t100 to i1
-  br label %logic.entry1892
-logic.entry1892:
-  br i1 %t101, label %end1894, label %rhs1893
-rhs1893:
+  br label %logic.entry1903
+logic.entry1903:
+  br i1 %t101, label %end1905, label %rhs1904
+rhs1904:
   %t102 = load i64, i64* %next_str
-  %t103 = getelementptr [3 x i8], [3 x i8]* @.str.1030, i64 0, i64 0
+  %t103 = getelementptr [3 x i8], [3 x i8]* @.str.1032, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   %t105 = call i64 @__string_eq(i64 %t102, i64 %t104)
   %t106 = trunc i64 %t105 to i1
-  br label %rhs.exit1895
-rhs.exit1895:
-  br label %end1894
-end1894:
-  %t107 = phi i1 [%t101, %logic.entry1892], [%t106, %rhs.exit1895]
+  br label %rhs.exit1906
+rhs.exit1906:
+  br label %end1905
+end1905:
+  %t107 = phi i1 [%t101, %logic.entry1903], [%t106, %rhs.exit1906]
   %t108 = zext i1 %t107 to i64
   %t109 = trunc i64 %t108 to i1
-  br i1 %t109, label %then1896, label %else1897
-then1896:
+  br i1 %t109, label %then1907, label %else1908
+then1907:
   %t110 = add i64 0, 1
   ret i64 %t110
-else1897:
-  br label %endif1883
-endif1883:
+else1908:
+  br label %endif1894
+endif1894:
   %t111 = add i64 0, 0
   ret i64 %t111
 }
@@ -23175,24 +23382,24 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1031, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1033, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1898
-logic.entry1898:
-  br i1 %t5, label %end1900, label %rhs1899
-rhs1899:
+  br label %logic.entry1909
+logic.entry1909:
+  br i1 %t5, label %end1911, label %rhs1910
+rhs1910:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1032, i64 0, i64 0
+  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1034, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1901
-rhs.exit1901:
-  br label %end1900
-end1900:
-  %t11 = phi i1 [%t5, %logic.entry1898], [%t10, %rhs.exit1901]
+  br label %rhs.exit1912
+rhs.exit1912:
+  br label %end1911
+end1911:
+  %t11 = phi i1 [%t5, %logic.entry1909], [%t10, %rhs.exit1912]
   %t12 = zext i1 %t11 to i64
   ret i64 %t12
 }
@@ -23202,24 +23409,24 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1033, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1035, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1902
-logic.entry1902:
-  br i1 %t5, label %end1904, label %rhs1903
-rhs1903:
+  br label %logic.entry1913
+logic.entry1913:
+  br i1 %t5, label %end1915, label %rhs1914
+rhs1914:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1034, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1036, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1905
-rhs.exit1905:
-  br label %end1904
-end1904:
-  %t11 = phi i1 [%t5, %logic.entry1902], [%t10, %rhs.exit1905]
+  br label %rhs.exit1916
+rhs.exit1916:
+  br label %end1915
+end1915:
+  %t11 = phi i1 [%t5, %logic.entry1913], [%t10, %rhs.exit1916]
   %t12 = zext i1 %t11 to i64
   ret i64 %t12
 }
@@ -23229,40 +23436,40 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1035, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1037, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry1906
-logic.entry1906:
-  br i1 %t5, label %end1908, label %rhs1907
-rhs1907:
+  br label %logic.entry1917
+logic.entry1917:
+  br i1 %t5, label %end1919, label %rhs1918
+rhs1918:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1036, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1038, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit1909
-rhs.exit1909:
-  br label %end1908
-end1908:
-  %t11 = phi i1 [%t5, %logic.entry1906], [%t10, %rhs.exit1909]
+  br label %rhs.exit1920
+rhs.exit1920:
+  br label %end1919
+end1919:
+  %t11 = phi i1 [%t5, %logic.entry1917], [%t10, %rhs.exit1920]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br label %logic.entry1910
-logic.entry1910:
-  br i1 %t13, label %end1912, label %rhs1911
-rhs1911:
+  br label %logic.entry1921
+logic.entry1921:
+  br i1 %t13, label %end1923, label %rhs1922
+rhs1922:
   %t14 = load i64, i64* %self
-  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.1037, i64 0, i64 0
+  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.1039, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @Parser__match_kind_check(i64 %t14, i64 %t16)
   %t18 = trunc i64 %t17 to i1
-  br label %rhs.exit1913
-rhs.exit1913:
-  br label %end1912
-end1912:
-  %t19 = phi i1 [%t13, %logic.entry1910], [%t18, %rhs.exit1913]
+  br label %rhs.exit1924
+rhs.exit1924:
+  br label %end1923
+end1923:
+  %t19 = phi i1 [%t13, %logic.entry1921], [%t18, %rhs.exit1924]
   %t20 = zext i1 %t19 to i64
   ret i64 %t20
 }
@@ -23280,93 +23487,93 @@ entry:
   %t6 = inttoptr i64 %t3 to i64*
   %t7 = load i64, i64* %t6
   %t5 = trunc i64 %t7 to i8
-  switch i8 %t5, label %match.arm1931 [ i8 30, label %match.arm1915 i8 31, label %match.arm1916 i8 32, label %match.arm1917 i8 33, label %match.arm1918 i8 34, label %match.arm1919 i8 35, label %match.arm1920 i8 36, label %match.arm1921 i8 37, label %match.arm1922 i8 39, label %match.arm1923 i8 40, label %match.arm1924 i8 42, label %match.arm1925 i8 44, label %match.arm1926 i8 45, label %match.arm1927 i8 46, label %match.arm1928 i8 47, label %match.arm1929 i8 48, label %match.arm1930 ]
-match.arm1915:
-  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.1038, i64 0, i64 0
+  switch i8 %t5, label %match.arm1942 [ i8 30, label %match.arm1926 i8 31, label %match.arm1927 i8 32, label %match.arm1928 i8 33, label %match.arm1929 i8 34, label %match.arm1930 i8 35, label %match.arm1931 i8 36, label %match.arm1932 i8 37, label %match.arm1933 i8 39, label %match.arm1934 i8 40, label %match.arm1935 i8 42, label %match.arm1936 i8 44, label %match.arm1937 i8 45, label %match.arm1938 i8 46, label %match.arm1939 i8 47, label %match.arm1940 i8 48, label %match.arm1941 ]
+match.arm1926:
+  %t8 = getelementptr [2 x i8], [2 x i8]* @.str.1040, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   store i64 %t9, i64* %t4
-  br label %match.end1914
-match.arm1916:
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1039, i64 0, i64 0
+  br label %match.end1925
+match.arm1927:
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1041, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %t4
-  br label %match.end1914
-match.arm1917:
-  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.1040, i64 0, i64 0
+  br label %match.end1925
+match.arm1928:
+  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.1042, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   store i64 %t13, i64* %t4
-  br label %match.end1914
-match.arm1918:
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1041, i64 0, i64 0
+  br label %match.end1925
+match.arm1929:
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1043, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   store i64 %t15, i64* %t4
-  br label %match.end1914
-match.arm1919:
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1042, i64 0, i64 0
+  br label %match.end1925
+match.arm1930:
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1044, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %t4
-  br label %match.end1914
-match.arm1920:
-  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.1043, i64 0, i64 0
+  br label %match.end1925
+match.arm1931:
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.1045, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   store i64 %t19, i64* %t4
-  br label %match.end1914
-match.arm1921:
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1044, i64 0, i64 0
+  br label %match.end1925
+match.arm1932:
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1046, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   store i64 %t21, i64* %t4
-  br label %match.end1914
-match.arm1922:
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.1045, i64 0, i64 0
+  br label %match.end1925
+match.arm1933:
+  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.1047, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   store i64 %t23, i64* %t4
-  br label %match.end1914
-match.arm1923:
-  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.1046, i64 0, i64 0
+  br label %match.end1925
+match.arm1934:
+  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.1048, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   store i64 %t25, i64* %t4
-  br label %match.end1914
-match.arm1924:
-  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.1047, i64 0, i64 0
+  br label %match.end1925
+match.arm1935:
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.1049, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   store i64 %t27, i64* %t4
-  br label %match.end1914
-match.arm1925:
-  %t28 = getelementptr [3 x i8], [3 x i8]* @.str.1048, i64 0, i64 0
+  br label %match.end1925
+match.arm1936:
+  %t28 = getelementptr [3 x i8], [3 x i8]* @.str.1050, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   store i64 %t29, i64* %t4
-  br label %match.end1914
-match.arm1926:
-  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.1049, i64 0, i64 0
+  br label %match.end1925
+match.arm1937:
+  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.1051, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   store i64 %t31, i64* %t4
-  br label %match.end1914
-match.arm1927:
-  %t32 = getelementptr [2 x i8], [2 x i8]* @.str.1050, i64 0, i64 0
+  br label %match.end1925
+match.arm1938:
+  %t32 = getelementptr [2 x i8], [2 x i8]* @.str.1052, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   store i64 %t33, i64* %t4
-  br label %match.end1914
-match.arm1928:
-  %t34 = getelementptr [3 x i8], [3 x i8]* @.str.1051, i64 0, i64 0
+  br label %match.end1925
+match.arm1939:
+  %t34 = getelementptr [3 x i8], [3 x i8]* @.str.1053, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   store i64 %t35, i64* %t4
-  br label %match.end1914
-match.arm1929:
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1052, i64 0, i64 0
+  br label %match.end1925
+match.arm1940:
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1054, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   store i64 %t37, i64* %t4
-  br label %match.end1914
-match.arm1930:
-  %t38 = getelementptr [3 x i8], [3 x i8]* @.str.1053, i64 0, i64 0
+  br label %match.end1925
+match.arm1941:
+  %t38 = getelementptr [3 x i8], [3 x i8]* @.str.1055, i64 0, i64 0
   %t39 = ptrtoint i8* %t38 to i64
   store i64 %t39, i64* %t4
-  br label %match.end1914
-match.arm1931:
-  %t40 = getelementptr [1 x i8], [1 x i8]* @.str.1054, i64 0, i64 0
+  br label %match.end1925
+match.arm1942:
+  %t40 = getelementptr [1 x i8], [1 x i8]* @.str.1056, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   store i64 %t41, i64* %t4
-  br label %match.end1914
-match.end1914:
+  br label %match.end1925
+match.end1925:
   %t42 = load i64, i64* %t4
   ret i64 %t42
 }
@@ -23381,15 +23588,15 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = call i64 @__list_new()
   store i64 %t1, i64* %parts
-  br label %while.cond1932
-while.cond1932:
+  br label %while.cond1943
+while.cond1943:
   %t2 = load i64, i64* %self
-  %t3 = getelementptr [12 x i8], [12 x i8]* @.str.1055, i64 0, i64 0
+  %t3 = getelementptr [12 x i8], [12 x i8]* @.str.1057, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__match_kind_check(i64 %t2, i64 %t4)
   %t6 = trunc i64 %t5 to i1
-  br i1 %t6, label %while.body1933, label %while.end1934
-while.body1933:
+  br i1 %t6, label %while.body1944, label %while.end1945
+while.body1944:
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__current_kind(i64 %t7)
   store i64 %t8, i64* %kind
@@ -23398,8 +23605,8 @@ while.body1933:
   %t12 = inttoptr i64 %t9 to i64*
   %t13 = load i64, i64* %t12
   %t11 = trunc i64 %t13 to i8
-  switch i8 %t11, label %match.arm1937 [ i8 69, label %match.arm1936 ]
-match.arm1936:
+  switch i8 %t11, label %match.arm1948 [ i8 69, label %match.arm1947 ]
+match.arm1947:
   %t14 = load i64, i64* %t
   %t15 = inttoptr i64 %t9 to [2 x i64]*
   %t16 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
@@ -23408,13 +23615,13 @@ match.arm1936:
   %t18 = load i64, i64* %t
   store i64 %t18, i64* %t10
   store i64 %t14, i64* %t
-  br label %match.end1935
-match.arm1937:
-  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1056, i64 0, i64 0
+  br label %match.end1946
+match.arm1948:
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1058, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   store i64 %t20, i64* %t10
-  br label %match.end1935
-match.end1935:
+  br label %match.end1946
+match.end1946:
   %t21 = load i64, i64* %t10
   store i64 %t21, i64* %text
   %t22 = load i64, i64* %self
@@ -23422,24 +23629,24 @@ match.end1935:
   %t24 = load i64, i64* %parts
   %t25 = load i64, i64* %text
   %t26 = call i64 @__list_push(i64 %t24, i64 %t25)
-  br label %while.cond1932
-while.end1934:
+  br label %while.cond1943
+while.end1945:
   %t27 = load i64, i64* %parts
   %t28 = call i64 @__list_length(i64 %t27)
   %t29 = add i64 0, 0
   %t30 = icmp eq i64 %t28, %t29
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then1939, label %else1940
-then1939:
-  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.1057, i64 0, i64 0
+  br i1 %t32, label %then1950, label %else1951
+then1950:
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.1059, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   ret i64 %t34
-else1940:
-  br label %endif1938
-endif1938:
+else1951:
+  br label %endif1949
+endif1949:
   %t35 = load i64, i64* %parts
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1058, i64 0, i64 0
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1060, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @__list_join(i64 %t35, i64 %t37)
   ret i64 %t38
@@ -23455,15 +23662,15 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = call i64 @__list_new()
   store i64 %t1, i64* %parts
-  br label %while.cond1941
-while.cond1941:
+  br label %while.cond1952
+while.cond1952:
   %t2 = load i64, i64* %self
-  %t3 = getelementptr [11 x i8], [11 x i8]* @.str.1059, i64 0, i64 0
+  %t3 = getelementptr [11 x i8], [11 x i8]* @.str.1061, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__match_kind_check(i64 %t2, i64 %t4)
   %t6 = trunc i64 %t5 to i1
-  br i1 %t6, label %while.body1942, label %while.end1943
-while.body1942:
+  br i1 %t6, label %while.body1953, label %while.end1954
+while.body1953:
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__current_kind(i64 %t7)
   store i64 %t8, i64* %kind
@@ -23472,8 +23679,8 @@ while.body1942:
   %t12 = inttoptr i64 %t9 to i64*
   %t13 = load i64, i64* %t12
   %t11 = trunc i64 %t13 to i8
-  switch i8 %t11, label %match.arm1946 [ i8 70, label %match.arm1945 ]
-match.arm1945:
+  switch i8 %t11, label %match.arm1957 [ i8 70, label %match.arm1956 ]
+match.arm1956:
   %t14 = load i64, i64* %t
   %t15 = inttoptr i64 %t9 to [2 x i64]*
   %t16 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
@@ -23482,13 +23689,13 @@ match.arm1945:
   %t18 = load i64, i64* %t
   store i64 %t18, i64* %t10
   store i64 %t14, i64* %t
-  br label %match.end1944
-match.arm1946:
-  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1060, i64 0, i64 0
+  br label %match.end1955
+match.arm1957:
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1062, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   store i64 %t20, i64* %t10
-  br label %match.end1944
-match.end1944:
+  br label %match.end1955
+match.end1955:
   %t21 = load i64, i64* %t10
   store i64 %t21, i64* %text
   %t22 = load i64, i64* %self
@@ -23496,24 +23703,24 @@ match.end1944:
   %t24 = load i64, i64* %parts
   %t25 = load i64, i64* %text
   %t26 = call i64 @__list_push(i64 %t24, i64 %t25)
-  br label %while.cond1941
-while.end1943:
+  br label %while.cond1952
+while.end1954:
   %t27 = load i64, i64* %parts
   %t28 = call i64 @__list_length(i64 %t27)
   %t29 = add i64 0, 0
   %t30 = icmp eq i64 %t28, %t29
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then1948, label %else1949
-then1948:
-  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.1061, i64 0, i64 0
+  br i1 %t32, label %then1959, label %else1960
+then1959:
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.1063, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   ret i64 %t34
-else1949:
-  br label %endif1947
-endif1947:
+else1960:
+  br label %endif1958
+endif1958:
   %t35 = load i64, i64* %parts
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1062, i64 0, i64 0
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1064, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @__list_join(i64 %t35, i64 %t37)
   ret i64 %t38
@@ -23530,45 +23737,45 @@ entry:
   store i64 %t2, i64* %module_doc
   %t3 = call i64 @__list_new()
   store i64 %t3, i64* %stmts
-  br label %while.cond1950
-while.cond1950:
+  br label %while.cond1961
+while.cond1961:
   %t4 = load i64, i64* %self
-  %t5 = getelementptr [4 x i8], [4 x i8]* @.str.1063, i64 0, i64 0
+  %t5 = getelementptr [4 x i8], [4 x i8]* @.str.1065, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @Parser__match_kind_check(i64 %t4, i64 %t6)
   %t8 = xor i64 %t7, 1
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %while.body1951, label %while.end1952
-while.body1951:
-  br label %while.cond1953
-while.cond1953:
+  br i1 %t9, label %while.body1962, label %while.end1963
+while.body1962:
+  br label %while.cond1964
+while.cond1964:
   %t10 = load i64, i64* %self
-  %t11 = getelementptr [2 x i8], [2 x i8]* @.str.1064, i64 0, i64 0
+  %t11 = getelementptr [2 x i8], [2 x i8]* @.str.1066, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
   %t13 = call i64 @Parser__match_kind(i64 %t10, i64 %t12)
   %t14 = trunc i64 %t13 to i1
-  br i1 %t14, label %while.body1954, label %while.end1955
-while.body1954:
-  br label %while.cond1953
-while.end1955:
+  br i1 %t14, label %while.body1965, label %while.end1966
+while.body1965:
+  br label %while.cond1964
+while.end1966:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.1065, i64 0, i64 0
+  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.1067, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__match_kind_check(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then1957, label %else1958
-then1957:
+  br i1 %t19, label %then1968, label %else1969
+then1968:
   %t20 = load i64, i64* %stmts
   ret i64 %t20
-else1958:
-  br label %endif1956
-endif1956:
+else1969:
+  br label %endif1967
+endif1967:
   %t21 = load i64, i64* %stmts
   %t22 = load i64, i64* %self
   %t23 = call i64 @Parser__parse_stmt(i64 %t22)
   %t24 = call i64 @__list_push(i64 %t21, i64 %t23)
-  br label %while.cond1950
-while.end1952:
+  br label %while.cond1961
+while.end1963:
   %t25 = load i64, i64* %stmts
   ret i64 %t25
 }
@@ -23606,29 +23813,29 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__collect_doc_comments(i64 %t1)
   store i64 %t2, i64* %docstring
-  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1066, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1068, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   store i64 %t4, i64* %visibility
   %t5 = load i64, i64* %self
   %t6 = call i64 @Parser__at_visibility_modifier(i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %then1960, label %else1961
-then1960:
+  br i1 %t7, label %then1971, label %else1972
+then1971:
   %t8 = load i64, i64* %self
   %t9 = add i64 0, 0
   %t10 = call i64 @Parser__take_visibility(i64 %t8, i64 %t9)
   store i64 %t10, i64* %visibility
-  br label %endif1959
-else1961:
-  br label %endif1959
-endif1959:
+  br label %endif1970
+else1972:
+  br label %endif1970
+endif1970:
   %t11 = load i64, i64* %self
-  %t12 = getelementptr [5 x i8], [5 x i8]* @.str.1067, i64 0, i64 0
+  %t12 = getelementptr [5 x i8], [5 x i8]* @.str.1069, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   %t14 = call i64 @Parser__is_ident_named(i64 %t11, i64 %t13)
   %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then1963, label %else1964
-then1963:
+  br i1 %t15, label %then1974, label %else1975
+then1974:
   %t16 = load i64, i64* %self
   %t17 = call i64 @Parser__current_span(i64 %t16)
   store i64 %t17, i64* %alias_start
@@ -23641,7 +23848,7 @@ then1963:
   %t23 = call i64 @Parser__expect_ident(i64 %t22)
   store i64 %t23, i64* %alias_name
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1068, i64 0, i64 0
+  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1070, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @Parser__consume(i64 %t24, i64 %t26)
   %t28 = load i64, i64* %self
@@ -23656,7 +23863,7 @@ then1963:
   %t36 = getelementptr [1 x i64], [1 x i64]* %t35, i64 0, i64 0
   store i64 4, i64* %t36
   %t37 = ptrtoint [1 x i64]* %t35 to i64
-  %t38 = getelementptr [12 x i8], [12 x i8]* @.str.1069, i64 0, i64 0
+  %t38 = getelementptr [12 x i8], [12 x i8]* @.str.1071, i64 0, i64 0
   %t39 = ptrtoint i8* %t38 to i64
   %t40 = load i64, i64* %visibility
   %t41 = load i64, i64* %alias_name_span
@@ -23683,16 +23890,16 @@ then1963:
   store i64 %t44, i64* %t54
   %t55 = ptrtoint [8 x i64]* %t46 to i64
   ret i64 %t55
-else1964:
-  br label %endif1962
-endif1962:
+else1975:
+  br label %endif1973
+endif1973:
   %t56 = load i64, i64* %self
-  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.1070, i64 0, i64 0
+  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.1072, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i64 @Parser__is_ident_named(i64 %t56, i64 %t58)
   %t60 = trunc i64 %t59 to i1
-  br i1 %t60, label %then1966, label %else1967
-then1966:
+  br i1 %t60, label %then1977, label %else1978
+then1977:
   %t61 = load i64, i64* %self
   %t62 = call i64 @Parser__current_span(i64 %t61)
   store i64 %t62, i64* %ext_start
@@ -23704,7 +23911,7 @@ then1966:
   %t68 = call i64 @Parser__expect_ident(i64 %t67)
   store i64 %t68, i64* %ext_class
   %t69 = load i64, i64* %self
-  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1071, i64 0, i64 0
+  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1073, i64 0, i64 0
   %t71 = ptrtoint i8* %t70 to i64
   %t72 = call i64 @Parser__consume(i64 %t69, i64 %t71)
   %t73 = load i64, i64* %self
@@ -23714,19 +23921,19 @@ then1966:
   %t76 = call i64 @Parser__expect_ident(i64 %t75)
   store i64 %t76, i64* %ext_method
   %t77 = load i64, i64* %self
-  %t78 = getelementptr [2 x i8], [2 x i8]* @.str.1072, i64 0, i64 0
+  %t78 = getelementptr [2 x i8], [2 x i8]* @.str.1074, i64 0, i64 0
   %t79 = ptrtoint i8* %t78 to i64
   %t80 = call i64 @Parser__consume(i64 %t77, i64 %t79)
   %t81 = call i64 @__list_new()
   store i64 %t81, i64* %ext_params
   %t82 = load i64, i64* %self
-  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.1073, i64 0, i64 0
+  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.1075, i64 0, i64 0
   %t84 = ptrtoint i8* %t83 to i64
   %t85 = call i64 @Parser__match_kind_check(i64 %t82, i64 %t84)
   %t86 = xor i64 %t85, 1
   %t87 = trunc i64 %t86 to i1
-  br i1 %t87, label %then1969, label %else1970
-then1969:
+  br i1 %t87, label %then1980, label %else1981
+then1980:
   %t88 = load i64, i64* %self
   %t89 = call i64 @Parser__ident_span(i64 %t88)
   store i64 %t89, i64* %pname_span
@@ -23734,15 +23941,15 @@ then1969:
   %t91 = call i64 @Parser__expect_ident(i64 %t90)
   store i64 %t91, i64* %pname
   %t92 = load i64, i64* %self
-  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.1074, i64 0, i64 0
+  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.1076, i64 0, i64 0
   %t94 = ptrtoint i8* %t93 to i64
   %t95 = call i64 @Parser__match_kind_check(i64 %t92, i64 %t94)
   %t96 = xor i64 %t95, 1
   %t97 = trunc i64 %t96 to i1
-  br i1 %t97, label %then1972, label %else1973
-then1972:
+  br i1 %t97, label %then1983, label %else1984
+then1983:
   %t98 = load i64, i64* %self
-  %t99 = getelementptr [12 x i8], [12 x i8]* @.str.1075, i64 0, i64 0
+  %t99 = getelementptr [12 x i8], [12 x i8]* @.str.1077, i64 0, i64 0
   %t100 = ptrtoint i8* %t99 to i64
   %t101 = load i64, i64* %pname
   %t102 = inttoptr i64 %t100 to i8*
@@ -23758,7 +23965,7 @@ then1972:
   %t110 = call i64 @__string_intern(i64 %t109)
   %t111 = inttoptr i64 %t110 to i8*
   %t112 = ptrtoint i8* %t111 to i64
-  %t113 = getelementptr [29 x i8], [29 x i8]* @.str.1076, i64 0, i64 0
+  %t113 = getelementptr [29 x i8], [29 x i8]* @.str.1078, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = inttoptr i64 %t112 to i8*
   %t116 = inttoptr i64 %t114 to i8*
@@ -23786,7 +23993,7 @@ then1972:
   %t135 = getelementptr [1 x i64], [1 x i64]* %t134, i64 0, i64 0
   store i64 4, i64* %t135
   %t136 = ptrtoint [1 x i64]* %t134 to i64
-  %t137 = getelementptr [7 x i8], [7 x i8]* @.str.1077, i64 0, i64 0
+  %t137 = getelementptr [7 x i8], [7 x i8]* @.str.1079, i64 0, i64 0
   %t138 = ptrtoint i8* %t137 to i64
   %t139 = load i64, i64* %pname_span
   %t140 = call i8* @__sf_malloc(i64 48)
@@ -23805,10 +24012,10 @@ then1972:
   store i64 %t139, i64* %t147
   %t148 = ptrtoint [6 x i64]* %t141 to i64
   %t149 = call i64 @__list_push(i64 %t127, i64 %t148)
-  br label %endif1971
-else1973:
+  br label %endif1982
+else1984:
   %t150 = load i64, i64* %self
-  %t151 = getelementptr [2 x i8], [2 x i8]* @.str.1078, i64 0, i64 0
+  %t151 = getelementptr [2 x i8], [2 x i8]* @.str.1080, i64 0, i64 0
   %t152 = ptrtoint i8* %t151 to i64
   %t153 = call i64 @Parser__consume(i64 %t150, i64 %t152)
   %t154 = load i64, i64* %self
@@ -23824,7 +24031,7 @@ else1973:
   %t163 = getelementptr [1 x i64], [1 x i64]* %t162, i64 0, i64 0
   store i64 4, i64* %t163
   %t164 = ptrtoint [1 x i64]* %t162 to i64
-  %t165 = getelementptr [7 x i8], [7 x i8]* @.str.1079, i64 0, i64 0
+  %t165 = getelementptr [7 x i8], [7 x i8]* @.str.1081, i64 0, i64 0
   %t166 = ptrtoint i8* %t165 to i64
   %t167 = load i64, i64* %pname_span
   %t168 = call i8* @__sf_malloc(i64 48)
@@ -23843,17 +24050,17 @@ else1973:
   store i64 %t167, i64* %t175
   %t176 = ptrtoint [6 x i64]* %t169 to i64
   %t177 = call i64 @__list_push(i64 %t156, i64 %t176)
-  br label %endif1971
-endif1971:
-  br label %while.cond1974
-while.cond1974:
+  br label %endif1982
+endif1982:
+  br label %while.cond1985
+while.cond1985:
   %t178 = load i64, i64* %self
-  %t179 = getelementptr [2 x i8], [2 x i8]* @.str.1080, i64 0, i64 0
+  %t179 = getelementptr [2 x i8], [2 x i8]* @.str.1082, i64 0, i64 0
   %t180 = ptrtoint i8* %t179 to i64
   %t181 = call i64 @Parser__match_kind(i64 %t178, i64 %t180)
   %t182 = trunc i64 %t181 to i1
-  br i1 %t182, label %while.body1975, label %while.end1976
-while.body1975:
+  br i1 %t182, label %while.body1986, label %while.end1987
+while.body1986:
   %t183 = load i64, i64* %self
   %t184 = call i64 @Parser__ident_span(i64 %t183)
   store i64 %t184, i64* %pname_span
@@ -23861,15 +24068,15 @@ while.body1975:
   %t186 = call i64 @Parser__expect_ident(i64 %t185)
   store i64 %t186, i64* %pname
   %t187 = load i64, i64* %self
-  %t188 = getelementptr [2 x i8], [2 x i8]* @.str.1081, i64 0, i64 0
+  %t188 = getelementptr [2 x i8], [2 x i8]* @.str.1083, i64 0, i64 0
   %t189 = ptrtoint i8* %t188 to i64
   %t190 = call i64 @Parser__match_kind_check(i64 %t187, i64 %t189)
   %t191 = xor i64 %t190, 1
   %t192 = trunc i64 %t191 to i1
-  br i1 %t192, label %then1978, label %else1979
-then1978:
+  br i1 %t192, label %then1989, label %else1990
+then1989:
   %t193 = load i64, i64* %self
-  %t194 = getelementptr [12 x i8], [12 x i8]* @.str.1082, i64 0, i64 0
+  %t194 = getelementptr [12 x i8], [12 x i8]* @.str.1084, i64 0, i64 0
   %t195 = ptrtoint i8* %t194 to i64
   %t196 = load i64, i64* %pname
   %t197 = inttoptr i64 %t195 to i8*
@@ -23885,7 +24092,7 @@ then1978:
   %t205 = call i64 @__string_intern(i64 %t204)
   %t206 = inttoptr i64 %t205 to i8*
   %t207 = ptrtoint i8* %t206 to i64
-  %t208 = getelementptr [29 x i8], [29 x i8]* @.str.1083, i64 0, i64 0
+  %t208 = getelementptr [29 x i8], [29 x i8]* @.str.1085, i64 0, i64 0
   %t209 = ptrtoint i8* %t208 to i64
   %t210 = inttoptr i64 %t207 to i8*
   %t211 = inttoptr i64 %t209 to i8*
@@ -23913,7 +24120,7 @@ then1978:
   %t230 = getelementptr [1 x i64], [1 x i64]* %t229, i64 0, i64 0
   store i64 4, i64* %t230
   %t231 = ptrtoint [1 x i64]* %t229 to i64
-  %t232 = getelementptr [7 x i8], [7 x i8]* @.str.1084, i64 0, i64 0
+  %t232 = getelementptr [7 x i8], [7 x i8]* @.str.1086, i64 0, i64 0
   %t233 = ptrtoint i8* %t232 to i64
   %t234 = load i64, i64* %pname_span
   %t235 = call i8* @__sf_malloc(i64 48)
@@ -23932,10 +24139,10 @@ then1978:
   store i64 %t234, i64* %t242
   %t243 = ptrtoint [6 x i64]* %t236 to i64
   %t244 = call i64 @__list_push(i64 %t222, i64 %t243)
-  br label %endif1977
-else1979:
+  br label %endif1988
+else1990:
   %t245 = load i64, i64* %self
-  %t246 = getelementptr [2 x i8], [2 x i8]* @.str.1085, i64 0, i64 0
+  %t246 = getelementptr [2 x i8], [2 x i8]* @.str.1087, i64 0, i64 0
   %t247 = ptrtoint i8* %t246 to i64
   %t248 = call i64 @Parser__consume(i64 %t245, i64 %t247)
   %t249 = load i64, i64* %self
@@ -23951,7 +24158,7 @@ else1979:
   %t258 = getelementptr [1 x i64], [1 x i64]* %t257, i64 0, i64 0
   store i64 4, i64* %t258
   %t259 = ptrtoint [1 x i64]* %t257 to i64
-  %t260 = getelementptr [7 x i8], [7 x i8]* @.str.1086, i64 0, i64 0
+  %t260 = getelementptr [7 x i8], [7 x i8]* @.str.1088, i64 0, i64 0
   %t261 = ptrtoint i8* %t260 to i64
   %t262 = load i64, i64* %pname_span
   %t263 = call i8* @__sf_malloc(i64 48)
@@ -23970,16 +24177,16 @@ else1979:
   store i64 %t262, i64* %t270
   %t271 = ptrtoint [6 x i64]* %t264 to i64
   %t272 = call i64 @__list_push(i64 %t251, i64 %t271)
-  br label %endif1977
-endif1977:
-  br label %while.cond1974
-while.end1976:
-  br label %endif1968
-else1970:
-  br label %endif1968
-endif1968:
+  br label %endif1988
+endif1988:
+  br label %while.cond1985
+while.end1987:
+  br label %endif1979
+else1981:
+  br label %endif1979
+endif1979:
   %t273 = load i64, i64* %self
-  %t274 = getelementptr [2 x i8], [2 x i8]* @.str.1087, i64 0, i64 0
+  %t274 = getelementptr [2 x i8], [2 x i8]* @.str.1089, i64 0, i64 0
   %t275 = ptrtoint i8* %t274 to i64
   %t276 = call i64 @Parser__consume(i64 %t273, i64 %t275)
   %t277 = call i8* @__sf_malloc(i64 8)
@@ -23989,42 +24196,42 @@ endif1968:
   %t280 = ptrtoint [1 x i64]* %t278 to i64
   store i64 %t280, i64* %ext_ret
   %t281 = load i64, i64* %self
-  %t282 = getelementptr [2 x i8], [2 x i8]* @.str.1088, i64 0, i64 0
+  %t282 = getelementptr [2 x i8], [2 x i8]* @.str.1090, i64 0, i64 0
   %t283 = ptrtoint i8* %t282 to i64
   %t284 = call i64 @Parser__match_kind(i64 %t281, i64 %t283)
   %t285 = trunc i64 %t284 to i1
-  br i1 %t285, label %then1981, label %else1982
-then1981:
+  br i1 %t285, label %then1992, label %else1993
+then1992:
   %t286 = load i64, i64* %self
   %t287 = load i64, i64* %self
   %t288 = call i64 @Parser__parse_type(i64 %t287)
   %t289 = call i64 @Parser__parse_type_ast(i64 %t286, i64 %t288)
   store i64 %t289, i64* %ext_ret
-  br label %endif1980
-else1982:
-  br label %endif1980
-endif1980:
+  br label %endif1991
+else1993:
+  br label %endif1991
+endif1991:
   %t290 = call i64 @__list_new()
   store i64 %t290, i64* %ext_body
   %t291 = load i64, i64* %self
-  %t292 = getelementptr [2 x i8], [2 x i8]* @.str.1089, i64 0, i64 0
+  %t292 = getelementptr [2 x i8], [2 x i8]* @.str.1091, i64 0, i64 0
   %t293 = ptrtoint i8* %t292 to i64
   %t294 = call i64 @Parser__match_kind_check(i64 %t291, i64 %t293)
   %t295 = trunc i64 %t294 to i1
-  br i1 %t295, label %then1984, label %else1985
-then1984:
+  br i1 %t295, label %then1995, label %else1996
+then1995:
   %t296 = load i64, i64* %self
   %t297 = call i64 @Parser__parse_block_stmts(i64 %t296)
   store i64 %t297, i64* %ext_body
-  br label %endif1983
-else1985:
-  br label %endif1983
-endif1983:
+  br label %endif1994
+else1996:
+  br label %endif1994
+endif1994:
   %t298 = load i64, i64* %ext_method
   %t299 = load i64, i64* %ext_params
   %t300 = load i64, i64* %ext_ret
   %t301 = load i64, i64* %ext_body
-  %t302 = getelementptr [9 x i8], [9 x i8]* @.str.1090, i64 0, i64 0
+  %t302 = getelementptr [9 x i8], [9 x i8]* @.str.1092, i64 0, i64 0
   %t303 = ptrtoint i8* %t302 to i64
   %t304 = load i64, i64* %ext_class
   %t305 = inttoptr i64 %t303 to i8*
@@ -24067,63 +24274,63 @@ endif1983:
   store i64 %t320, i64* %t331
   %t332 = ptrtoint [9 x i64]* %t322 to i64
   ret i64 %t332
-else1967:
-  br label %endif1965
-endif1965:
+else1978:
+  br label %endif1976
+endif1976:
   %t333 = load i64, i64* %self
-  %t334 = getelementptr [2 x i8], [2 x i8]* @.str.1091, i64 0, i64 0
+  %t334 = getelementptr [2 x i8], [2 x i8]* @.str.1093, i64 0, i64 0
   %t335 = ptrtoint i8* %t334 to i64
   %t336 = call i64 @Parser__is_ident_named(i64 %t333, i64 %t335)
   %t337 = trunc i64 %t336 to i1
-  br i1 %t337, label %then1987, label %else1988
-then1987:
+  br i1 %t337, label %then1998, label %else1999
+then1998:
   %t338 = load i64, i64* %self
   %t339 = call i64 @Parser__advance(i64 %t338)
   %t340 = load i64, i64* %self
   %t341 = call i64 @Parser__expect_ident(i64 %t340)
   store i64 %t341, i64* %decorator
-  %t342 = getelementptr [1 x i8], [1 x i8]* @.str.1092, i64 0, i64 0
+  %t342 = getelementptr [1 x i8], [1 x i8]* @.str.1094, i64 0, i64 0
   %t343 = ptrtoint i8* %t342 to i64
   store i64 %t343, i64* %annotation
   %t344 = load i64, i64* %decorator
-  %t345 = getelementptr [10 x i8], [10 x i8]* @.str.1093, i64 0, i64 0
+  %t345 = getelementptr [10 x i8], [10 x i8]* @.str.1095, i64 0, i64 0
   %t346 = ptrtoint i8* %t345 to i64
   %t347 = call i64 @__string_eq(i64 %t344, i64 %t346)
   %t348 = trunc i64 %t347 to i1
-  br i1 %t348, label %then1990, label %else1991
-then1990:
-  %t349 = getelementptr [11 x i8], [11 x i8]* @.str.1094, i64 0, i64 0
+  br i1 %t348, label %then2001, label %else2002
+then2001:
+  %t349 = getelementptr [11 x i8], [11 x i8]* @.str.1096, i64 0, i64 0
   %t350 = ptrtoint i8* %t349 to i64
   store i64 %t350, i64* %annotation
-  br label %endif1989
-else1991:
+  br label %endif2000
+else2002:
   %t351 = load i64, i64* %decorator
-  %t352 = getelementptr [7 x i8], [7 x i8]* @.str.1095, i64 0, i64 0
+  %t352 = getelementptr [7 x i8], [7 x i8]* @.str.1097, i64 0, i64 0
   %t353 = ptrtoint i8* %t352 to i64
   %t354 = call i64 @__string_eq(i64 %t351, i64 %t353)
   %t355 = trunc i64 %t354 to i1
-  br i1 %t355, label %then1992, label %else1993
-then1992:
+  br i1 %t355, label %then2003, label %else2004
+then2003:
   %t356 = load i64, i64* %self
-  %t357 = getelementptr [2 x i8], [2 x i8]* @.str.1096, i64 0, i64 0
+  %t357 = getelementptr [2 x i8], [2 x i8]* @.str.1098, i64 0, i64 0
   %t358 = ptrtoint i8* %t357 to i64
   %t359 = call i64 @Parser__consume(i64 %t356, i64 %t358)
   %t360 = load i64, i64* %self
-  %t361 = getelementptr [7 x i8], [7 x i8]* @.str.1097, i64 0, i64 0
+  %t361 = getelementptr [7 x i8], [7 x i8]* @.str.1099, i64 0, i64 0
   %t362 = ptrtoint i8* %t361 to i64
   %t363 = call i64 @Parser__match_kind_check(i64 %t360, i64 %t362)
   %t364 = xor i64 %t363, 1
   %t365 = trunc i64 %t364 to i1
-  br i1 %t365, label %then1995, label %else1996
-then1995:
+  br i1 %t365, label %then2006, label %else2007
+then2006:
   %t366 = load i64, i64* %self
-  %t367 = getelementptr [73 x i8], [73 x i8]* @.str.1098, i64 0, i64 0
+  %t367 = getelementptr [73 x i8], [73 x i8]* @.str.1100, i64 0, i64 0
   %t368 = ptrtoint i8* %t367 to i64
   %t369 = call i64 @Parser__parse_error(i64 %t366, i64 %t368)
-  %t370 = getelementptr [1 x i8], [1 x i8]* @.str.1099, i64 0, i64 0
+  %t370 = getelementptr [1 x i8], [1 x i8]* @.str.1101, i64 0, i64 0
   %t371 = ptrtoint i8* %t370 to i64
   store i64 %t371, i64* %sig
-  %t372 = getelementptr [9 x i8], [9 x i8]* @.str.1100, i64 0, i64 0
+  %t372 = getelementptr [9 x i8], [9 x i8]* @.str.1102, i64 0, i64 0
   %t373 = ptrtoint i8* %t372 to i64
   %t374 = load i64, i64* %sig
   %t375 = inttoptr i64 %t373 to i8*
@@ -24140,8 +24347,8 @@ then1995:
   %t384 = inttoptr i64 %t383 to i8*
   %t385 = ptrtoint i8* %t384 to i64
   store i64 %t385, i64* %annotation
-  br label %endif1994
-else1996:
+  br label %endif2005
+else2007:
   %t386 = load i64, i64* %self
   %t387 = call i64 @Parser__current_kind(i64 %t386)
   store i64 %t387, i64* %kind
@@ -24150,8 +24357,8 @@ else1996:
   %t391 = inttoptr i64 %t388 to i64*
   %t392 = load i64, i64* %t391
   %t390 = trunc i64 %t392 to i8
-  switch i8 %t390, label %match.arm1999 [ i8 2, label %match.arm1998 ]
-match.arm1998:
+  switch i8 %t390, label %match.arm2010 [ i8 2, label %match.arm2009 ]
+match.arm2009:
   %t393 = load i64, i64* %s
   %t394 = inttoptr i64 %t388 to [2 x i64]*
   %t395 = getelementptr [2 x i64], [2 x i64]* %t394, i64 0, i64 1
@@ -24160,22 +24367,22 @@ match.arm1998:
   %t397 = load i64, i64* %s
   store i64 %t397, i64* %t389
   store i64 %t393, i64* %s
-  br label %match.end1997
-match.arm1999:
-  %t398 = getelementptr [1 x i8], [1 x i8]* @.str.1101, i64 0, i64 0
+  br label %match.end2008
+match.arm2010:
+  %t398 = getelementptr [1 x i8], [1 x i8]* @.str.1103, i64 0, i64 0
   %t399 = ptrtoint i8* %t398 to i64
   store i64 %t399, i64* %t389
-  br label %match.end1997
-match.end1997:
+  br label %match.end2008
+match.end2008:
   %t400 = load i64, i64* %t389
   store i64 %t400, i64* %sig
   %t401 = load i64, i64* %self
   %t402 = call i64 @Parser__advance(i64 %t401)
   %t403 = load i64, i64* %self
-  %t404 = getelementptr [2 x i8], [2 x i8]* @.str.1102, i64 0, i64 0
+  %t404 = getelementptr [2 x i8], [2 x i8]* @.str.1104, i64 0, i64 0
   %t405 = ptrtoint i8* %t404 to i64
   %t406 = call i64 @Parser__consume(i64 %t403, i64 %t405)
-  %t407 = getelementptr [9 x i8], [9 x i8]* @.str.1103, i64 0, i64 0
+  %t407 = getelementptr [9 x i8], [9 x i8]* @.str.1105, i64 0, i64 0
   %t408 = ptrtoint i8* %t407 to i64
   %t409 = load i64, i64* %sig
   %t410 = inttoptr i64 %t408 to i8*
@@ -24192,11 +24399,11 @@ match.end1997:
   %t419 = inttoptr i64 %t418 to i8*
   %t420 = ptrtoint i8* %t419 to i64
   store i64 %t420, i64* %annotation
-  br label %endif1994
-endif1994:
-  br label %endif1989
-else1993:
-  %t421 = getelementptr [2 x i8], [2 x i8]* @.str.1104, i64 0, i64 0
+  br label %endif2005
+endif2005:
+  br label %endif2000
+else2004:
+  %t421 = getelementptr [2 x i8], [2 x i8]* @.str.1106, i64 0, i64 0
   %t422 = ptrtoint i8* %t421 to i64
   %t423 = load i64, i64* %decorator
   %t424 = inttoptr i64 %t422 to i8*
@@ -24214,21 +24421,21 @@ else1993:
   %t434 = ptrtoint i8* %t433 to i64
   store i64 %t434, i64* %annotation
   %t435 = load i64, i64* %self
-  %t436 = getelementptr [2 x i8], [2 x i8]* @.str.1105, i64 0, i64 0
+  %t436 = getelementptr [2 x i8], [2 x i8]* @.str.1107, i64 0, i64 0
   %t437 = ptrtoint i8* %t436 to i64
   %t438 = call i64 @Parser__match_kind_check(i64 %t435, i64 %t437)
   %t439 = trunc i64 %t438 to i1
-  br i1 %t439, label %then2001, label %else2002
-then2001:
+  br i1 %t439, label %then2012, label %else2013
+then2012:
   %t440 = load i64, i64* %self
   %t441 = call i64 @Parser__advance(i64 %t440)
   %t442 = load i64, i64* %self
-  %t443 = getelementptr [7 x i8], [7 x i8]* @.str.1106, i64 0, i64 0
+  %t443 = getelementptr [7 x i8], [7 x i8]* @.str.1108, i64 0, i64 0
   %t444 = ptrtoint i8* %t443 to i64
   %t445 = call i64 @Parser__match_kind_check(i64 %t442, i64 %t444)
   %t446 = trunc i64 %t445 to i1
-  br i1 %t446, label %then2004, label %else2005
-then2004:
+  br i1 %t446, label %then2015, label %else2016
+then2015:
   %t447 = load i64, i64* %self
   %t448 = call i64 @Parser__current_kind(i64 %t447)
   store i64 %t448, i64* %darg_kind
@@ -24237,8 +24444,8 @@ then2004:
   %t452 = inttoptr i64 %t449 to i64*
   %t453 = load i64, i64* %t452
   %t451 = trunc i64 %t453 to i8
-  switch i8 %t451, label %match.arm2008 [ i8 2, label %match.arm2007 ]
-match.arm2007:
+  switch i8 %t451, label %match.arm2019 [ i8 2, label %match.arm2018 ]
+match.arm2018:
   %t454 = load i64, i64* %s
   %t455 = inttoptr i64 %t449 to [2 x i64]*
   %t456 = getelementptr [2 x i64], [2 x i64]* %t455, i64 0, i64 1
@@ -24247,19 +24454,19 @@ match.arm2007:
   %t458 = load i64, i64* %s
   store i64 %t458, i64* %t450
   store i64 %t454, i64* %s
-  br label %match.end2006
-match.arm2008:
-  %t459 = getelementptr [1 x i8], [1 x i8]* @.str.1107, i64 0, i64 0
+  br label %match.end2017
+match.arm2019:
+  %t459 = getelementptr [1 x i8], [1 x i8]* @.str.1109, i64 0, i64 0
   %t460 = ptrtoint i8* %t459 to i64
   store i64 %t460, i64* %t450
-  br label %match.end2006
-match.end2006:
+  br label %match.end2017
+match.end2017:
   %t461 = load i64, i64* %t450
   store i64 %t461, i64* %darg
   %t462 = load i64, i64* %self
   %t463 = call i64 @Parser__advance(i64 %t462)
   %t464 = load i64, i64* %annotation
-  %t465 = getelementptr [2 x i8], [2 x i8]* @.str.1108, i64 0, i64 0
+  %t465 = getelementptr [2 x i8], [2 x i8]* @.str.1110, i64 0, i64 0
   %t466 = ptrtoint i8* %t465 to i64
   %t467 = inttoptr i64 %t464 to i8*
   %t468 = inttoptr i64 %t466 to i8*
@@ -24289,34 +24496,34 @@ match.end2006:
   %t488 = inttoptr i64 %t487 to i8*
   %t489 = ptrtoint i8* %t488 to i64
   store i64 %t489, i64* %annotation
-  br label %endif2003
-else2005:
-  br label %endif2003
-endif2003:
+  br label %endif2014
+else2016:
+  br label %endif2014
+endif2014:
   %t490 = load i64, i64* %self
-  %t491 = getelementptr [2 x i8], [2 x i8]* @.str.1109, i64 0, i64 0
+  %t491 = getelementptr [2 x i8], [2 x i8]* @.str.1111, i64 0, i64 0
   %t492 = ptrtoint i8* %t491 to i64
   %t493 = call i64 @Parser__consume(i64 %t490, i64 %t492)
-  br label %endif2000
-else2002:
+  br label %endif2011
+else2013:
+  br label %endif2011
+endif2011:
   br label %endif2000
 endif2000:
-  br label %endif1989
-endif1989:
   %t494 = load i64, i64* %self
   %t495 = call i64 @Parser__at_visibility_modifier(i64 %t494)
   %t496 = trunc i64 %t495 to i1
-  br i1 %t496, label %then2010, label %else2011
-then2010:
+  br i1 %t496, label %then2021, label %else2022
+then2021:
   %t497 = load i64, i64* %visibility
-  %t498 = getelementptr [7 x i8], [7 x i8]* @.str.1110, i64 0, i64 0
+  %t498 = getelementptr [7 x i8], [7 x i8]* @.str.1112, i64 0, i64 0
   %t499 = ptrtoint i8* %t498 to i64
   %t500 = call i64 @__string_ne(i64 %t497, i64 %t499)
   %t501 = trunc i64 %t500 to i1
-  br i1 %t501, label %then2013, label %else2014
-then2013:
+  br i1 %t501, label %then2024, label %else2025
+then2024:
   %t502 = load i64, i64* %self
-  %t503 = getelementptr [26 x i8], [26 x i8]* @.str.1111, i64 0, i64 0
+  %t503 = getelementptr [26 x i8], [26 x i8]* @.str.1113, i64 0, i64 0
   %t504 = ptrtoint i8* %t503 to i64
   %t505 = load i64, i64* %visibility
   %t506 = inttoptr i64 %t504 to i8*
@@ -24332,7 +24539,7 @@ then2013:
   %t514 = call i64 @__string_intern(i64 %t513)
   %t515 = inttoptr i64 %t514 to i8*
   %t516 = ptrtoint i8* %t515 to i64
-  %t517 = getelementptr [29 x i8], [29 x i8]* @.str.1112, i64 0, i64 0
+  %t517 = getelementptr [29 x i8], [29 x i8]* @.str.1114, i64 0, i64 0
   %t518 = ptrtoint i8* %t517 to i64
   %t519 = inttoptr i64 %t516 to i8*
   %t520 = inttoptr i64 %t518 to i8*
@@ -24362,7 +24569,7 @@ then2013:
   %t540 = call i64 @__string_intern(i64 %t539)
   %t541 = inttoptr i64 %t540 to i8*
   %t542 = ptrtoint i8* %t541 to i64
-  %t543 = getelementptr [11 x i8], [11 x i8]* @.str.1113, i64 0, i64 0
+  %t543 = getelementptr [11 x i8], [11 x i8]* @.str.1115, i64 0, i64 0
   %t544 = ptrtoint i8* %t543 to i64
   %t545 = inttoptr i64 %t542 to i8*
   %t546 = inttoptr i64 %t544 to i8*
@@ -24378,157 +24585,157 @@ then2013:
   %t554 = inttoptr i64 %t553 to i8*
   %t555 = ptrtoint i8* %t554 to i64
   %t556 = call i64 @Parser__parse_error(i64 %t502, i64 %t555)
-  br label %endif2012
-else2014:
-  br label %endif2012
-endif2012:
+  br label %endif2023
+else2025:
+  br label %endif2023
+endif2023:
   %t557 = load i64, i64* %self
   %t558 = add i64 0, 0
   %t559 = call i64 @Parser__take_visibility(i64 %t557, i64 %t558)
   store i64 %t559, i64* %visibility
-  br label %endif2009
-else2011:
-  br label %endif2009
-endif2009:
+  br label %endif2020
+else2022:
+  br label %endif2020
+endif2020:
   %t560 = load i64, i64* %self
-  %t561 = getelementptr [6 x i8], [6 x i8]* @.str.1114, i64 0, i64 0
+  %t561 = getelementptr [6 x i8], [6 x i8]* @.str.1116, i64 0, i64 0
   %t562 = ptrtoint i8* %t561 to i64
   %t563 = call i64 @Parser__match_kind_check(i64 %t560, i64 %t562)
   %t564 = trunc i64 %t563 to i1
-  br i1 %t564, label %then2016, label %else2017
-then2016:
+  br i1 %t564, label %then2027, label %else2028
+then2027:
   %t565 = load i64, i64* %self
   %t566 = load i64, i64* %annotation
   %t567 = load i64, i64* %visibility
   %t568 = call i64 @Parser__parse_class_decl_vis(i64 %t565, i64 %t566, i64 %t567)
   ret i64 %t568
-else2017:
-  br label %endif2015
-endif2015:
+else2028:
+  br label %endif2026
+endif2026:
   %t569 = load i64, i64* %self
   %t570 = load i64, i64* %annotation
   %t571 = load i64, i64* %visibility
   %t572 = call i64 @Parser__parse_fun_decl_vis(i64 %t569, i64 %t570, i64 %t571)
   ret i64 %t572
-else1988:
-  br label %endif1986
-endif1986:
+else1999:
+  br label %endif1997
+endif1997:
   %t573 = load i64, i64* %self
-  %t574 = getelementptr [4 x i8], [4 x i8]* @.str.1115, i64 0, i64 0
+  %t574 = getelementptr [4 x i8], [4 x i8]* @.str.1117, i64 0, i64 0
   %t575 = ptrtoint i8* %t574 to i64
   %t576 = call i64 @Parser__match_kind_check(i64 %t573, i64 %t575)
   %t577 = trunc i64 %t576 to i1
-  br i1 %t577, label %then2019, label %else2020
-then2019:
+  br i1 %t577, label %then2030, label %else2031
+then2030:
   %t578 = load i64, i64* %self
   %t579 = load i64, i64* %docstring
   %t580 = load i64, i64* %visibility
   %t581 = call i64 @Parser__parse_var_decl_vis(i64 %t578, i64 %t579, i64 %t580)
   ret i64 %t581
-else2020:
-  br label %endif2018
-endif2018:
+else2031:
+  br label %endif2029
+endif2029:
   %t582 = load i64, i64* %self
-  %t583 = getelementptr [4 x i8], [4 x i8]* @.str.1116, i64 0, i64 0
+  %t583 = getelementptr [4 x i8], [4 x i8]* @.str.1118, i64 0, i64 0
   %t584 = ptrtoint i8* %t583 to i64
   %t585 = call i64 @Parser__match_kind_check(i64 %t582, i64 %t584)
   %t586 = trunc i64 %t585 to i1
-  br i1 %t586, label %then2022, label %else2023
-then2022:
+  br i1 %t586, label %then2033, label %else2034
+then2033:
   %t587 = load i64, i64* %self
   %t588 = load i64, i64* %docstring
   %t589 = load i64, i64* %visibility
   %t590 = call i64 @Parser__parse_var_decl_vis(i64 %t587, i64 %t588, i64 %t589)
   ret i64 %t590
-else2023:
-  br label %endif2021
-endif2021:
+else2034:
+  br label %endif2032
+endif2032:
   %t591 = load i64, i64* %self
-  %t592 = getelementptr [4 x i8], [4 x i8]* @.str.1117, i64 0, i64 0
+  %t592 = getelementptr [4 x i8], [4 x i8]* @.str.1119, i64 0, i64 0
   %t593 = ptrtoint i8* %t592 to i64
   %t594 = call i64 @Parser__match_kind_check(i64 %t591, i64 %t593)
   %t595 = trunc i64 %t594 to i1
-  br label %logic.entry2025
-logic.entry2025:
-  br i1 %t595, label %rhs2026, label %end2027
-rhs2026:
+  br label %logic.entry2036
+logic.entry2036:
+  br i1 %t595, label %rhs2037, label %end2038
+rhs2037:
   %t596 = load i64, i64* %self
-  %t597 = getelementptr [2 x i8], [2 x i8]* @.str.1118, i64 0, i64 0
+  %t597 = getelementptr [2 x i8], [2 x i8]* @.str.1120, i64 0, i64 0
   %t598 = ptrtoint i8* %t597 to i64
   %t599 = call i64 @Parser__peek_is(i64 %t596, i64 %t598)
   %t600 = xor i64 %t599, 1
   %t601 = trunc i64 %t600 to i1
-  br label %rhs.exit2028
-rhs.exit2028:
-  br label %end2027
-end2027:
-  %t602 = phi i1 [%t595, %logic.entry2025], [%t601, %rhs.exit2028]
+  br label %rhs.exit2039
+rhs.exit2039:
+  br label %end2038
+end2038:
+  %t602 = phi i1 [%t595, %logic.entry2036], [%t601, %rhs.exit2039]
   %t603 = zext i1 %t602 to i64
   %t604 = trunc i64 %t603 to i1
-  br i1 %t604, label %then2029, label %else2030
-then2029:
+  br i1 %t604, label %then2040, label %else2041
+then2040:
   %t605 = load i64, i64* %self
   %t606 = load i64, i64* %docstring
   %t607 = load i64, i64* %visibility
   %t608 = call i64 @Parser__parse_fun_decl_vis(i64 %t605, i64 %t606, i64 %t607)
   ret i64 %t608
-else2030:
-  br label %endif2024
-endif2024:
+else2041:
+  br label %endif2035
+endif2035:
   %t609 = load i64, i64* %self
-  %t610 = getelementptr [5 x i8], [5 x i8]* @.str.1119, i64 0, i64 0
+  %t610 = getelementptr [5 x i8], [5 x i8]* @.str.1121, i64 0, i64 0
   %t611 = ptrtoint i8* %t610 to i64
   %t612 = call i64 @Parser__match_kind_check(i64 %t609, i64 %t611)
   %t613 = trunc i64 %t612 to i1
-  br i1 %t613, label %then2032, label %else2033
-then2032:
+  br i1 %t613, label %then2043, label %else2044
+then2043:
   %t614 = load i64, i64* %self
   %t615 = load i64, i64* %docstring
   %t616 = load i64, i64* %visibility
   %t617 = call i64 @Parser__parse_enum_decl_vis(i64 %t614, i64 %t615, i64 %t616)
   ret i64 %t617
-else2033:
-  br label %endif2031
-endif2031:
+else2044:
+  br label %endif2042
+endif2042:
   %t618 = load i64, i64* %self
-  %t619 = getelementptr [6 x i8], [6 x i8]* @.str.1120, i64 0, i64 0
+  %t619 = getelementptr [6 x i8], [6 x i8]* @.str.1122, i64 0, i64 0
   %t620 = ptrtoint i8* %t619 to i64
   %t621 = call i64 @Parser__match_kind_check(i64 %t618, i64 %t620)
   %t622 = trunc i64 %t621 to i1
-  br i1 %t622, label %then2035, label %else2036
-then2035:
+  br i1 %t622, label %then2046, label %else2047
+then2046:
   %t623 = load i64, i64* %self
   %t624 = load i64, i64* %docstring
   %t625 = load i64, i64* %visibility
   %t626 = call i64 @Parser__parse_class_decl_vis(i64 %t623, i64 %t624, i64 %t625)
   ret i64 %t626
-else2036:
-  br label %endif2034
-endif2034:
+else2047:
+  br label %endif2045
+endif2045:
   %t627 = load i64, i64* %self
-  %t628 = getelementptr [10 x i8], [10 x i8]* @.str.1121, i64 0, i64 0
+  %t628 = getelementptr [10 x i8], [10 x i8]* @.str.1123, i64 0, i64 0
   %t629 = ptrtoint i8* %t628 to i64
   %t630 = call i64 @Parser__is_ident_named(i64 %t627, i64 %t629)
   %t631 = trunc i64 %t630 to i1
-  br i1 %t631, label %then2038, label %else2039
-then2038:
+  br i1 %t631, label %then2049, label %else2050
+then2049:
   %t632 = load i64, i64* %self
   %t633 = load i64, i64* %docstring
   %t634 = load i64, i64* %visibility
   %t635 = call i64 @Parser__parse_class_decl_vis(i64 %t632, i64 %t633, i64 %t634)
   ret i64 %t635
-else2039:
-  br label %endif2037
-endif2037:
+else2050:
+  br label %endif2048
+endif2048:
   %t636 = load i64, i64* %self
-  %t637 = getelementptr [6 x i8], [6 x i8]* @.str.1122, i64 0, i64 0
+  %t637 = getelementptr [6 x i8], [6 x i8]* @.str.1124, i64 0, i64 0
   %t638 = ptrtoint i8* %t637 to i64
   %t639 = call i64 @Parser__is_ident_named(i64 %t636, i64 %t638)
   %t640 = trunc i64 %t639 to i1
-  br i1 %t640, label %then2041, label %else2042
-then2041:
+  br i1 %t640, label %then2052, label %else2053
+then2052:
   %t641 = load i64, i64* %self
-  %t642 = getelementptr [8 x i8], [8 x i8]* @.str.1123, i64 0, i64 0
+  %t642 = getelementptr [8 x i8], [8 x i8]* @.str.1125, i64 0, i64 0
   %t643 = ptrtoint i8* %t642 to i64
   %t644 = load i64, i64* %docstring
   %t645 = inttoptr i64 %t643 to i8*
@@ -24547,18 +24754,18 @@ then2041:
   %t656 = load i64, i64* %visibility
   %t657 = call i64 @Parser__parse_class_decl_vis(i64 %t641, i64 %t655, i64 %t656)
   ret i64 %t657
-else2042:
-  br label %endif2040
-endif2040:
+else2053:
+  br label %endif2051
+endif2051:
   %t658 = load i64, i64* %visibility
-  %t659 = getelementptr [7 x i8], [7 x i8]* @.str.1124, i64 0, i64 0
+  %t659 = getelementptr [7 x i8], [7 x i8]* @.str.1126, i64 0, i64 0
   %t660 = ptrtoint i8* %t659 to i64
   %t661 = call i64 @__string_ne(i64 %t658, i64 %t660)
   %t662 = trunc i64 %t661 to i1
-  br i1 %t662, label %then2044, label %else2045
-then2044:
+  br i1 %t662, label %then2055, label %else2056
+then2055:
   %t663 = load i64, i64* %self
-  %t664 = getelementptr [2 x i8], [2 x i8]* @.str.1125, i64 0, i64 0
+  %t664 = getelementptr [2 x i8], [2 x i8]* @.str.1127, i64 0, i64 0
   %t665 = ptrtoint i8* %t664 to i64
   %t666 = load i64, i64* %visibility
   %t667 = inttoptr i64 %t665 to i8*
@@ -24574,7 +24781,7 @@ then2044:
   %t675 = call i64 @__string_intern(i64 %t674)
   %t676 = inttoptr i64 %t675 to i8*
   %t677 = ptrtoint i8* %t676 to i64
-  %t678 = getelementptr [36 x i8], [36 x i8]* @.str.1126, i64 0, i64 0
+  %t678 = getelementptr [36 x i8], [36 x i8]* @.str.1128, i64 0, i64 0
   %t679 = ptrtoint i8* %t678 to i64
   %t680 = inttoptr i64 %t677 to i8*
   %t681 = inttoptr i64 %t679 to i8*
@@ -24590,108 +24797,108 @@ then2044:
   %t689 = inttoptr i64 %t688 to i8*
   %t690 = ptrtoint i8* %t689 to i64
   %t691 = call i64 @Parser__parse_error(i64 %t663, i64 %t690)
-  br label %endif2043
-else2045:
-  br label %endif2043
-endif2043:
+  br label %endif2054
+else2056:
+  br label %endif2054
+endif2054:
   %t692 = load i64, i64* %self
-  %t693 = getelementptr [7 x i8], [7 x i8]* @.str.1127, i64 0, i64 0
+  %t693 = getelementptr [7 x i8], [7 x i8]* @.str.1129, i64 0, i64 0
   %t694 = ptrtoint i8* %t693 to i64
   %t695 = call i64 @Parser__match_kind_check(i64 %t692, i64 %t694)
   %t696 = trunc i64 %t695 to i1
-  br i1 %t696, label %then2047, label %else2048
-then2047:
+  br i1 %t696, label %then2058, label %else2059
+then2058:
   %t697 = load i64, i64* %self
   %t698 = call i64 @Parser__parse_import(i64 %t697)
   ret i64 %t698
-else2048:
-  br label %endif2046
-endif2046:
+else2059:
+  br label %endif2057
+endif2057:
   %t699 = load i64, i64* %self
-  %t700 = getelementptr [7 x i8], [7 x i8]* @.str.1128, i64 0, i64 0
+  %t700 = getelementptr [7 x i8], [7 x i8]* @.str.1130, i64 0, i64 0
   %t701 = ptrtoint i8* %t700 to i64
   %t702 = call i64 @Parser__match_kind_check(i64 %t699, i64 %t701)
   %t703 = trunc i64 %t702 to i1
-  br i1 %t703, label %then2050, label %else2051
-then2050:
+  br i1 %t703, label %then2061, label %else2062
+then2061:
   %t704 = load i64, i64* %self
   %t705 = call i64 @Parser__parse_return(i64 %t704)
   ret i64 %t705
-else2051:
-  br label %endif2049
-endif2049:
+else2062:
+  br label %endif2060
+endif2060:
   %t706 = load i64, i64* %self
-  %t707 = getelementptr [3 x i8], [3 x i8]* @.str.1129, i64 0, i64 0
+  %t707 = getelementptr [3 x i8], [3 x i8]* @.str.1131, i64 0, i64 0
   %t708 = ptrtoint i8* %t707 to i64
   %t709 = call i64 @Parser__match_kind_check(i64 %t706, i64 %t708)
   %t710 = trunc i64 %t709 to i1
-  br i1 %t710, label %then2053, label %else2054
-then2053:
+  br i1 %t710, label %then2064, label %else2065
+then2064:
   %t711 = load i64, i64* %self
   %t712 = call i64 @Parser__parse_if(i64 %t711)
   ret i64 %t712
-else2054:
-  br label %endif2052
-endif2052:
+else2065:
+  br label %endif2063
+endif2063:
   %t713 = load i64, i64* %self
-  %t714 = getelementptr [6 x i8], [6 x i8]* @.str.1130, i64 0, i64 0
+  %t714 = getelementptr [6 x i8], [6 x i8]* @.str.1132, i64 0, i64 0
   %t715 = ptrtoint i8* %t714 to i64
   %t716 = call i64 @Parser__match_kind_check(i64 %t713, i64 %t715)
   %t717 = trunc i64 %t716 to i1
-  br i1 %t717, label %then2056, label %else2057
-then2056:
+  br i1 %t717, label %then2067, label %else2068
+then2067:
   %t718 = load i64, i64* %self
   %t719 = call i64 @Parser__parse_while(i64 %t718)
   ret i64 %t719
-else2057:
-  br label %endif2055
-endif2055:
+else2068:
+  br label %endif2066
+endif2066:
   %t720 = load i64, i64* %self
-  %t721 = getelementptr [4 x i8], [4 x i8]* @.str.1131, i64 0, i64 0
+  %t721 = getelementptr [4 x i8], [4 x i8]* @.str.1133, i64 0, i64 0
   %t722 = ptrtoint i8* %t721 to i64
   %t723 = call i64 @Parser__match_kind_check(i64 %t720, i64 %t722)
   %t724 = trunc i64 %t723 to i1
-  br i1 %t724, label %then2059, label %else2060
-then2059:
+  br i1 %t724, label %then2070, label %else2071
+then2070:
   %t725 = load i64, i64* %self
   %t726 = call i64 @Parser__parse_for(i64 %t725)
   ret i64 %t726
-else2060:
-  br label %endif2058
-endif2058:
+else2071:
+  br label %endif2069
+endif2069:
   %t727 = load i64, i64* %self
-  %t728 = getelementptr [4 x i8], [4 x i8]* @.str.1132, i64 0, i64 0
+  %t728 = getelementptr [4 x i8], [4 x i8]* @.str.1134, i64 0, i64 0
   %t729 = ptrtoint i8* %t728 to i64
   %t730 = call i64 @Parser__match_kind_check(i64 %t727, i64 %t729)
   %t731 = trunc i64 %t730 to i1
-  br i1 %t731, label %then2062, label %else2063
-then2062:
+  br i1 %t731, label %then2073, label %else2074
+then2073:
   %t732 = load i64, i64* %self
   %t733 = call i64 @Parser__parse_try(i64 %t732)
   ret i64 %t733
-else2063:
-  br label %endif2061
-endif2061:
+else2074:
+  br label %endif2072
+endif2072:
   %t734 = load i64, i64* %self
-  %t735 = getelementptr [6 x i8], [6 x i8]* @.str.1133, i64 0, i64 0
+  %t735 = getelementptr [6 x i8], [6 x i8]* @.str.1135, i64 0, i64 0
   %t736 = ptrtoint i8* %t735 to i64
   %t737 = call i64 @Parser__match_kind_check(i64 %t734, i64 %t736)
   %t738 = trunc i64 %t737 to i1
-  br i1 %t738, label %then2065, label %else2066
-then2065:
+  br i1 %t738, label %then2076, label %else2077
+then2076:
   %t739 = load i64, i64* %self
   %t740 = call i64 @Parser__parse_throw(i64 %t739)
   ret i64 %t740
-else2066:
-  br label %endif2064
-endif2064:
+else2077:
+  br label %endif2075
+endif2075:
   %t741 = load i64, i64* %self
-  %t742 = getelementptr [6 x i8], [6 x i8]* @.str.1134, i64 0, i64 0
+  %t742 = getelementptr [6 x i8], [6 x i8]* @.str.1136, i64 0, i64 0
   %t743 = ptrtoint i8* %t742 to i64
   %t744 = call i64 @Parser__is_ident_named(i64 %t741, i64 %t743)
   %t745 = trunc i64 %t744 to i1
-  br i1 %t745, label %then2068, label %else2069
-then2068:
+  br i1 %t745, label %then2079, label %else2080
+then2079:
   %t746 = load i64, i64* %self
   %t747 = call i64 @Parser__advance(i64 %t746)
   %t748 = call i8* @__sf_malloc(i64 8)
@@ -24700,16 +24907,16 @@ then2068:
   store i64 9, i64* %t750
   %t751 = ptrtoint [1 x i64]* %t749 to i64
   ret i64 %t751
-else2069:
-  br label %endif2067
-endif2067:
+else2080:
+  br label %endif2078
+endif2078:
   %t752 = load i64, i64* %self
-  %t753 = getelementptr [9 x i8], [9 x i8]* @.str.1135, i64 0, i64 0
+  %t753 = getelementptr [9 x i8], [9 x i8]* @.str.1137, i64 0, i64 0
   %t754 = ptrtoint i8* %t753 to i64
   %t755 = call i64 @Parser__is_ident_named(i64 %t752, i64 %t754)
   %t756 = trunc i64 %t755 to i1
-  br i1 %t756, label %then2071, label %else2072
-then2071:
+  br i1 %t756, label %then2082, label %else2083
+then2082:
   %t757 = load i64, i64* %self
   %t758 = call i64 @Parser__advance(i64 %t757)
   %t759 = call i8* @__sf_malloc(i64 8)
@@ -24718,58 +24925,58 @@ then2071:
   store i64 10, i64* %t761
   %t762 = ptrtoint [1 x i64]* %t760 to i64
   ret i64 %t762
-else2072:
-  br label %endif2070
-endif2070:
+else2083:
+  br label %endif2081
+endif2081:
   %t763 = load i64, i64* %self
-  %t764 = getelementptr [2 x i8], [2 x i8]* @.str.1136, i64 0, i64 0
+  %t764 = getelementptr [2 x i8], [2 x i8]* @.str.1138, i64 0, i64 0
   %t765 = ptrtoint i8* %t764 to i64
   %t766 = call i64 @Parser__match_kind_check(i64 %t763, i64 %t765)
   %t767 = trunc i64 %t766 to i1
-  br i1 %t767, label %then2074, label %else2075
-then2074:
+  br i1 %t767, label %then2085, label %else2086
+then2085:
   %t768 = load i64, i64* %self
   %t769 = call i64 @Parser__parse_block(i64 %t768)
   ret i64 %t769
-else2075:
-  br label %endif2073
-endif2073:
+else2086:
+  br label %endif2084
+endif2084:
   %t770 = load i64, i64* %self
-  %t771 = getelementptr [6 x i8], [6 x i8]* @.str.1137, i64 0, i64 0
+  %t771 = getelementptr [6 x i8], [6 x i8]* @.str.1139, i64 0, i64 0
   %t772 = ptrtoint i8* %t771 to i64
   %t773 = call i64 @Parser__match_kind_check(i64 %t770, i64 %t772)
   %t774 = trunc i64 %t773 to i1
-  br label %logic.entry2077
-logic.entry2077:
-  br i1 %t774, label %rhs2078, label %end2079
-rhs2078:
+  br label %logic.entry2088
+logic.entry2088:
+  br i1 %t774, label %rhs2089, label %end2090
+rhs2089:
   %t775 = load i64, i64* %self
-  %t776 = getelementptr [2 x i8], [2 x i8]* @.str.1138, i64 0, i64 0
+  %t776 = getelementptr [2 x i8], [2 x i8]* @.str.1140, i64 0, i64 0
   %t777 = ptrtoint i8* %t776 to i64
   %t778 = call i64 @Parser__peek_is(i64 %t775, i64 %t777)
   %t779 = trunc i64 %t778 to i1
-  br label %rhs.exit2080
-rhs.exit2080:
-  br label %end2079
-end2079:
-  %t780 = phi i1 [%t774, %logic.entry2077], [%t779, %rhs.exit2080]
+  br label %rhs.exit2091
+rhs.exit2091:
+  br label %end2090
+end2090:
+  %t780 = phi i1 [%t774, %logic.entry2088], [%t779, %rhs.exit2091]
   %t781 = zext i1 %t780 to i64
   %t782 = trunc i64 %t781 to i1
-  br i1 %t782, label %then2081, label %else2082
-then2081:
+  br i1 %t782, label %then2092, label %else2093
+then2092:
   %t783 = load i64, i64* %self
   %t784 = call i64 @Parser__parse_assign(i64 %t783)
   ret i64 %t784
-else2082:
-  br label %endif2076
-endif2076:
+else2093:
+  br label %endif2087
+endif2087:
   %t785 = load i64, i64* %self
-  %t786 = getelementptr [5 x i8], [5 x i8]* @.str.1139, i64 0, i64 0
+  %t786 = getelementptr [5 x i8], [5 x i8]* @.str.1141, i64 0, i64 0
   %t787 = ptrtoint i8* %t786 to i64
   %t788 = call i64 @Parser__match_kind_check(i64 %t785, i64 %t787)
   %t789 = trunc i64 %t788 to i1
-  br i1 %t789, label %then2084, label %else2085
-then2084:
+  br i1 %t789, label %then2095, label %else2096
+then2095:
   %t790 = load i64, i64* %self
   %t791 = inttoptr i64 %t790 to %Parser*
   %t792 = getelementptr %Parser, %Parser* %t791, i32 0, i32 1
@@ -24791,22 +24998,22 @@ then2084:
   %t805 = icmp eq i64 %t803, %t804
   %t806 = zext i1 %t805 to i64
   %t807 = trunc i64 %t806 to i1
-  br label %logic.entry2087
-logic.entry2087:
-  br i1 %t807, label %rhs2088, label %end2089
-rhs2088:
+  br label %logic.entry2098
+logic.entry2098:
+  br i1 %t807, label %rhs2099, label %end2100
+rhs2099:
   %t808 = load i64, i64* %self
   %t809 = call i64 @Parser__at_expr_continuation(i64 %t808)
   %t810 = trunc i64 %t809 to i1
-  br label %rhs.exit2090
-rhs.exit2090:
-  br label %end2089
-end2089:
-  %t811 = phi i1 [%t807, %logic.entry2087], [%t810, %rhs.exit2090]
+  br label %rhs.exit2101
+rhs.exit2101:
+  br label %end2100
+end2100:
+  %t811 = phi i1 [%t807, %logic.entry2098], [%t810, %rhs.exit2101]
   %t812 = zext i1 %t811 to i64
   %t813 = trunc i64 %t812 to i1
-  br i1 %t813, label %then2091, label %else2092
-then2091:
+  br i1 %t813, label %then2102, label %else2103
+then2102:
   %t814 = load i64, i64* %self
   %t815 = load i64, i64* %this_start
   %t816 = inttoptr i64 %t814 to %Parser*
@@ -24815,14 +25022,14 @@ then2091:
   %t818 = load i64, i64* %self
   %t819 = call i64 @Parser__parse_expr_stmt(i64 %t818)
   ret i64 %t819
-else2092:
-  br label %endif2086
-endif2086:
+else2103:
+  br label %endif2097
+endif2097:
   %t820 = load i64, i64* %this_stmt
   ret i64 %t820
-else2085:
-  br label %endif2083
-endif2083:
+else2096:
+  br label %endif2094
+endif2094:
   %t821 = load i64, i64* %self
   %t822 = call i64 @Parser__parse_expr_stmt(i64 %t821)
   ret i64 %t822
@@ -24840,12 +25047,12 @@ entry:
   %t2 = call i64 @Parser__parse_expr(i64 %t1)
   store i64 %t2, i64* %expr
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1140, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1142, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %then2094, label %else2095
-then2094:
+  br i1 %t7, label %then2105, label %else2106
+then2105:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__parse_expr(i64 %t8)
   store i64 %t9, i64* %value
@@ -24854,14 +25061,14 @@ then2094:
   %t12 = load i64, i64* %value
   %t13 = call i64 @Parser__build_assign(i64 %t10, i64 %t11, i64 %t12)
   ret i64 %t13
-else2095:
-  br label %endif2093
-endif2093:
+else2106:
+  br label %endif2104
+endif2104:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__at_compound_assign_op(i64 %t14)
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then2097, label %else2098
-then2097:
+  br i1 %t16, label %then2108, label %else2109
+then2108:
   %t17 = load i64, i64* %self
   %t18 = call i64 @Parser__compound_assign_base_op(i64 %t17)
   store i64 %t18, i64* %cop
@@ -24876,9 +25083,9 @@ then2097:
   %t26 = load i64, i64* %rhs
   %t27 = call i64 @Parser__build_compound_assign(i64 %t23, i64 %t24, i64 %t25, i64 %t26)
   ret i64 %t27
-else2098:
-  br label %endif2096
-endif2096:
+else2109:
+  br label %endif2107
+endif2107:
   %t28 = load i64, i64* %expr
   %t29 = call i8* @__sf_malloc(i64 16)
   %t30 = bitcast i8* %t29 to [2 x i64]*
@@ -24921,19 +25128,19 @@ entry:
   %t3 = call i64 @Parser__classify_expr_for_assign(i64 %t1, i64 %t2)
   store i64 %t3, i64* %ek
   %t4 = load i64, i64* %ek
-  %t5 = getelementptr [7 x i8], [7 x i8]* @.str.1141, i64 0, i64 0
+  %t5 = getelementptr [7 x i8], [7 x i8]* @.str.1143, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @__string_eq(i64 %t4, i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then2100, label %else2101
-then2100:
+  br i1 %t8, label %then2111, label %else2112
+then2111:
   %t9 = load i64, i64* %target
   %t10 = alloca i64
   %t12 = inttoptr i64 %t9 to i64*
   %t13 = load i64, i64* %t12
   %t11 = trunc i64 %t13 to i8
-  switch i8 %t11, label %match.arm2104 [ i8 11, label %match.arm2103 ]
-match.arm2103:
+  switch i8 %t11, label %match.arm2115 [ i8 11, label %match.arm2114 ]
+match.arm2114:
   %t14 = load i64, i64* %o
   %t15 = load i64, i64* %f
   %t16 = load i64, i64* %__ms
@@ -24952,16 +25159,16 @@ match.arm2103:
   store i64 %t14, i64* %o
   store i64 %t15, i64* %f
   store i64 %t16, i64* %__ms
-  br label %match.end2102
-match.arm2104:
+  br label %match.end2113
+match.arm2115:
   %t25 = call i8* @__sf_malloc(i64 8)
   %t26 = bitcast i8* %t25 to [1 x i64]*
   %t27 = getelementptr [1 x i64], [1 x i64]* %t26, i64 0, i64 0
   store i64 4, i64* %t27
   %t28 = ptrtoint [1 x i64]* %t26 to i64
   store i64 %t28, i64* %t10
-  br label %match.end2102
-match.end2102:
+  br label %match.end2113
+match.end2113:
   %t29 = load i64, i64* %t10
   store i64 %t29, i64* %obj
   %t30 = load i64, i64* %target
@@ -24969,8 +25176,8 @@ match.end2102:
   %t33 = inttoptr i64 %t30 to i64*
   %t34 = load i64, i64* %t33
   %t32 = trunc i64 %t34 to i8
-  switch i8 %t32, label %match.arm2107 [ i8 11, label %match.arm2106 ]
-match.arm2106:
+  switch i8 %t32, label %match.arm2118 [ i8 11, label %match.arm2117 ]
+match.arm2117:
   %t35 = load i64, i64* %o
   %t36 = load i64, i64* %f
   %t37 = load i64, i64* %__ms
@@ -24989,13 +25196,13 @@ match.arm2106:
   store i64 %t35, i64* %o
   store i64 %t36, i64* %f
   store i64 %t37, i64* %__ms
-  br label %match.end2105
-match.arm2107:
-  %t46 = getelementptr [1 x i8], [1 x i8]* @.str.1142, i64 0, i64 0
+  br label %match.end2116
+match.arm2118:
+  %t46 = getelementptr [1 x i8], [1 x i8]* @.str.1144, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   store i64 %t47, i64* %t31
-  br label %match.end2105
-match.end2105:
+  br label %match.end2116
+match.end2116:
   %t48 = load i64, i64* %t31
   store i64 %t48, i64* %field
   %t49 = load i64, i64* %target
@@ -25003,8 +25210,8 @@ match.end2105:
   %t52 = inttoptr i64 %t49 to i64*
   %t53 = load i64, i64* %t52
   %t51 = trunc i64 %t53 to i8
-  switch i8 %t51, label %match.arm2110 [ i8 11, label %match.arm2109 ]
-match.arm2109:
+  switch i8 %t51, label %match.arm2121 [ i8 11, label %match.arm2120 ]
+match.arm2120:
   %t54 = load i64, i64* %o
   %t55 = load i64, i64* %f
   %t56 = load i64, i64* %__ms
@@ -25023,12 +25230,12 @@ match.arm2109:
   store i64 %t54, i64* %o
   store i64 %t55, i64* %f
   store i64 %t56, i64* %__ms
-  br label %match.end2108
-match.arm2110:
+  br label %match.end2119
+match.arm2121:
   %t65 = call i64 @ast_span_none()
   store i64 %t65, i64* %t50
-  br label %match.end2108
-match.end2108:
+  br label %match.end2119
+match.end2119:
   %t66 = load i64, i64* %t50
   store i64 %t66, i64* %fs
   %t67 = load i64, i64* %obj
@@ -25056,23 +25263,23 @@ match.end2108:
   store i64 %t78, i64* %t82
   %t83 = ptrtoint [2 x i64]* %t80 to i64
   ret i64 %t83
-else2101:
-  br label %endif2099
-endif2099:
+else2112:
+  br label %endif2110
+endif2110:
   %t84 = load i64, i64* %ek
-  %t85 = getelementptr [6 x i8], [6 x i8]* @.str.1143, i64 0, i64 0
+  %t85 = getelementptr [6 x i8], [6 x i8]* @.str.1145, i64 0, i64 0
   %t86 = ptrtoint i8* %t85 to i64
   %t87 = call i64 @__string_eq(i64 %t84, i64 %t86)
   %t88 = trunc i64 %t87 to i1
-  br i1 %t88, label %then2112, label %else2113
-then2112:
+  br i1 %t88, label %then2123, label %else2124
+then2123:
   %t89 = load i64, i64* %target
   %t90 = alloca i64
   %t92 = inttoptr i64 %t89 to i64*
   %t93 = load i64, i64* %t92
   %t91 = trunc i64 %t93 to i8
-  switch i8 %t91, label %match.arm2116 [ i8 19, label %match.arm2115 ]
-match.arm2115:
+  switch i8 %t91, label %match.arm2127 [ i8 19, label %match.arm2126 ]
+match.arm2126:
   %t94 = load i64, i64* %o
   %t95 = load i64, i64* %i
   %t96 = inttoptr i64 %t89 to [3 x i64]*
@@ -25086,16 +25293,16 @@ match.arm2115:
   store i64 %t101, i64* %t90
   store i64 %t94, i64* %o
   store i64 %t95, i64* %i
-  br label %match.end2114
-match.arm2116:
+  br label %match.end2125
+match.arm2127:
   %t102 = call i8* @__sf_malloc(i64 8)
   %t103 = bitcast i8* %t102 to [1 x i64]*
   %t104 = getelementptr [1 x i64], [1 x i64]* %t103, i64 0, i64 0
   store i64 4, i64* %t104
   %t105 = ptrtoint [1 x i64]* %t103 to i64
   store i64 %t105, i64* %t90
-  br label %match.end2114
-match.end2114:
+  br label %match.end2125
+match.end2125:
   %t106 = load i64, i64* %t90
   store i64 %t106, i64* %iobj
   %t107 = load i64, i64* %target
@@ -25103,8 +25310,8 @@ match.end2114:
   %t110 = inttoptr i64 %t107 to i64*
   %t111 = load i64, i64* %t110
   %t109 = trunc i64 %t111 to i8
-  switch i8 %t109, label %match.arm2119 [ i8 19, label %match.arm2118 ]
-match.arm2118:
+  switch i8 %t109, label %match.arm2130 [ i8 19, label %match.arm2129 ]
+match.arm2129:
   %t112 = load i64, i64* %o
   %t113 = load i64, i64* %i
   %t114 = inttoptr i64 %t107 to [3 x i64]*
@@ -25118,16 +25325,16 @@ match.arm2118:
   store i64 %t119, i64* %t108
   store i64 %t112, i64* %o
   store i64 %t113, i64* %i
-  br label %match.end2117
-match.arm2119:
+  br label %match.end2128
+match.arm2130:
   %t120 = call i8* @__sf_malloc(i64 8)
   %t121 = bitcast i8* %t120 to [1 x i64]*
   %t122 = getelementptr [1 x i64], [1 x i64]* %t121, i64 0, i64 0
   store i64 4, i64* %t122
   %t123 = ptrtoint [1 x i64]* %t121 to i64
   store i64 %t123, i64* %t108
-  br label %match.end2117
-match.end2117:
+  br label %match.end2128
+match.end2128:
   %t124 = load i64, i64* %t108
   store i64 %t124, i64* %iidx
   %t125 = load i64, i64* %iobj
@@ -25152,23 +25359,23 @@ match.end2117:
   store i64 %t134, i64* %t138
   %t139 = ptrtoint [2 x i64]* %t136 to i64
   ret i64 %t139
-else2113:
-  br label %endif2111
-endif2111:
+else2124:
+  br label %endif2122
+endif2122:
   %t140 = load i64, i64* %ek
-  %t141 = getelementptr [10 x i8], [10 x i8]* @.str.1144, i64 0, i64 0
+  %t141 = getelementptr [10 x i8], [10 x i8]* @.str.1146, i64 0, i64 0
   %t142 = ptrtoint i8* %t141 to i64
   %t143 = call i64 @__string_eq(i64 %t140, i64 %t142)
   %t144 = trunc i64 %t143 to i1
-  br i1 %t144, label %then2121, label %else2122
-then2121:
+  br i1 %t144, label %then2132, label %else2133
+then2132:
   %t145 = load i64, i64* %target
   %t146 = alloca i64
   %t148 = inttoptr i64 %t145 to i64*
   %t149 = load i64, i64* %t148
   %t147 = trunc i64 %t149 to i8
-  switch i8 %t147, label %match.arm2125 [ i8 15, label %match.arm2124 ]
-match.arm2124:
+  switch i8 %t147, label %match.arm2136 [ i8 15, label %match.arm2135 ]
+match.arm2135:
   %t150 = load i64, i64* %o
   %t151 = load i64, i64* %f
   %t152 = load i64, i64* %__gs
@@ -25187,16 +25394,16 @@ match.arm2124:
   store i64 %t150, i64* %o
   store i64 %t151, i64* %f
   store i64 %t152, i64* %__gs
-  br label %match.end2123
-match.arm2125:
+  br label %match.end2134
+match.arm2136:
   %t161 = call i8* @__sf_malloc(i64 8)
   %t162 = bitcast i8* %t161 to [1 x i64]*
   %t163 = getelementptr [1 x i64], [1 x i64]* %t162, i64 0, i64 0
   store i64 4, i64* %t163
   %t164 = ptrtoint [1 x i64]* %t162 to i64
   store i64 %t164, i64* %t146
-  br label %match.end2123
-match.end2123:
+  br label %match.end2134
+match.end2134:
   %t165 = load i64, i64* %t146
   store i64 %t165, i64* %gobj
   %t166 = load i64, i64* %target
@@ -25204,8 +25411,8 @@ match.end2123:
   %t169 = inttoptr i64 %t166 to i64*
   %t170 = load i64, i64* %t169
   %t168 = trunc i64 %t170 to i8
-  switch i8 %t168, label %match.arm2128 [ i8 15, label %match.arm2127 ]
-match.arm2127:
+  switch i8 %t168, label %match.arm2139 [ i8 15, label %match.arm2138 ]
+match.arm2138:
   %t171 = load i64, i64* %o
   %t172 = load i64, i64* %f
   %t173 = load i64, i64* %__gs
@@ -25224,13 +25431,13 @@ match.arm2127:
   store i64 %t171, i64* %o
   store i64 %t172, i64* %f
   store i64 %t173, i64* %__gs
-  br label %match.end2126
-match.arm2128:
-  %t182 = getelementptr [1 x i8], [1 x i8]* @.str.1145, i64 0, i64 0
+  br label %match.end2137
+match.arm2139:
+  %t182 = getelementptr [1 x i8], [1 x i8]* @.str.1147, i64 0, i64 0
   %t183 = ptrtoint i8* %t182 to i64
   store i64 %t183, i64* %t167
-  br label %match.end2126
-match.end2126:
+  br label %match.end2137
+match.end2137:
   %t184 = load i64, i64* %t167
   store i64 %t184, i64* %gfield
   %t185 = load i64, i64* %target
@@ -25238,8 +25445,8 @@ match.end2126:
   %t188 = inttoptr i64 %t185 to i64*
   %t189 = load i64, i64* %t188
   %t187 = trunc i64 %t189 to i8
-  switch i8 %t187, label %match.arm2131 [ i8 15, label %match.arm2130 ]
-match.arm2130:
+  switch i8 %t187, label %match.arm2142 [ i8 15, label %match.arm2141 ]
+match.arm2141:
   %t190 = load i64, i64* %o
   %t191 = load i64, i64* %f
   %t192 = load i64, i64* %__gs
@@ -25258,12 +25465,12 @@ match.arm2130:
   store i64 %t190, i64* %o
   store i64 %t191, i64* %f
   store i64 %t192, i64* %__gs
-  br label %match.end2129
-match.arm2131:
+  br label %match.end2140
+match.arm2142:
   %t201 = call i64 @ast_span_none()
   store i64 %t201, i64* %t186
-  br label %match.end2129
-match.end2129:
+  br label %match.end2140
+match.end2140:
   %t202 = load i64, i64* %t186
   store i64 %t202, i64* %gs
   %t203 = load i64, i64* %gobj
@@ -25291,23 +25498,23 @@ match.end2129:
   store i64 %t214, i64* %t218
   %t219 = ptrtoint [2 x i64]* %t216 to i64
   ret i64 %t219
-else2122:
-  br label %endif2120
-endif2120:
+else2133:
+  br label %endif2131
+endif2131:
   %t220 = load i64, i64* %ek
-  %t221 = getelementptr [9 x i8], [9 x i8]* @.str.1146, i64 0, i64 0
+  %t221 = getelementptr [9 x i8], [9 x i8]* @.str.1148, i64 0, i64 0
   %t222 = ptrtoint i8* %t221 to i64
   %t223 = call i64 @__string_eq(i64 %t220, i64 %t222)
   %t224 = trunc i64 %t223 to i1
-  br i1 %t224, label %then2133, label %else2134
-then2133:
+  br i1 %t224, label %then2144, label %else2145
+then2144:
   %t225 = load i64, i64* %target
   %t226 = alloca i64
   %t228 = inttoptr i64 %t225 to i64*
   %t229 = load i64, i64* %t228
   %t227 = trunc i64 %t229 to i8
-  switch i8 %t227, label %match.arm2137 [ i8 5, label %match.arm2136 ]
-match.arm2136:
+  switch i8 %t227, label %match.arm2148 [ i8 5, label %match.arm2147 ]
+match.arm2147:
   %t230 = load i64, i64* %n
   %t231 = load i64, i64* %__vs
   %t232 = inttoptr i64 %t225 to [3 x i64]*
@@ -25321,13 +25528,13 @@ match.arm2136:
   store i64 %t237, i64* %t226
   store i64 %t230, i64* %n
   store i64 %t231, i64* %__vs
-  br label %match.end2135
-match.arm2137:
-  %t238 = getelementptr [1 x i8], [1 x i8]* @.str.1147, i64 0, i64 0
+  br label %match.end2146
+match.arm2148:
+  %t238 = getelementptr [1 x i8], [1 x i8]* @.str.1149, i64 0, i64 0
   %t239 = ptrtoint i8* %t238 to i64
   store i64 %t239, i64* %t226
-  br label %match.end2135
-match.end2135:
+  br label %match.end2146
+match.end2146:
   %t240 = load i64, i64* %t226
   store i64 %t240, i64* %vname
   %t241 = load i64, i64* %target
@@ -25335,8 +25542,8 @@ match.end2135:
   %t244 = inttoptr i64 %t241 to i64*
   %t245 = load i64, i64* %t244
   %t243 = trunc i64 %t245 to i8
-  switch i8 %t243, label %match.arm2140 [ i8 5, label %match.arm2139 ]
-match.arm2139:
+  switch i8 %t243, label %match.arm2151 [ i8 5, label %match.arm2150 ]
+match.arm2150:
   %t246 = load i64, i64* %n
   %t247 = load i64, i64* %__vs
   %t248 = inttoptr i64 %t241 to [3 x i64]*
@@ -25350,12 +25557,12 @@ match.arm2139:
   store i64 %t253, i64* %t242
   store i64 %t246, i64* %n
   store i64 %t247, i64* %__vs
-  br label %match.end2138
-match.arm2140:
+  br label %match.end2149
+match.arm2151:
   %t254 = call i64 @ast_span_none()
   store i64 %t254, i64* %t242
-  br label %match.end2138
-match.end2138:
+  br label %match.end2149
+match.end2149:
   %t255 = load i64, i64* %t242
   store i64 %t255, i64* %vs
   %t256 = load i64, i64* %vname
@@ -25380,11 +25587,11 @@ match.end2138:
   store i64 %t265, i64* %t269
   %t270 = ptrtoint [2 x i64]* %t267 to i64
   ret i64 %t270
-else2134:
-  br label %endif2132
-endif2132:
+else2145:
+  br label %endif2143
+endif2143:
   %t271 = load i64, i64* %self
-  %t272 = getelementptr [33 x i8], [33 x i8]* @.str.1148, i64 0, i64 0
+  %t272 = getelementptr [33 x i8], [33 x i8]* @.str.1150, i64 0, i64 0
   %t273 = ptrtoint i8* %t272 to i64
   %t274 = call i64 @Parser__parse_error(i64 %t271, i64 %t273)
   %t275 = load i64, i64* %target
@@ -25414,8 +25621,8 @@ entry:
   %t4 = call i64 @Parser__check_compound_assign_target(i64 %t1, i64 %t2, i64 %t3)
   %t5 = xor i64 %t4, 1
   %t6 = trunc i64 %t5 to i1
-  br i1 %t6, label %then2142, label %else2143
-then2142:
+  br i1 %t6, label %then2153, label %else2154
+then2153:
   %t7 = load i64, i64* %target
   %t8 = call i8* @__sf_malloc(i64 16)
   %t9 = bitcast i8* %t8 to [2 x i64]*
@@ -25425,9 +25632,9 @@ then2142:
   store i64 %t7, i64* %t11
   %t12 = ptrtoint [2 x i64]* %t9 to i64
   ret i64 %t12
-else2143:
-  br label %endif2141
-endif2141:
+else2154:
+  br label %endif2152
+endif2152:
   %t13 = load i64, i64* %self
   %t14 = load i64, i64* %target
   %t15 = load i64, i64* %target
@@ -25462,67 +25669,67 @@ entry:
   %t3 = call i64 @Parser__classify_expr_for_assign(i64 %t1, i64 %t2)
   store i64 %t3, i64* %ek
   %t4 = load i64, i64* %ek
-  %t5 = getelementptr [9 x i8], [9 x i8]* @.str.1149, i64 0, i64 0
+  %t5 = getelementptr [9 x i8], [9 x i8]* @.str.1151, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @__string_eq(i64 %t4, i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br label %logic.entry2145
-logic.entry2145:
-  br i1 %t8, label %end2147, label %rhs2146
-rhs2146:
+  br label %logic.entry2156
+logic.entry2156:
+  br i1 %t8, label %end2158, label %rhs2157
+rhs2157:
   %t9 = load i64, i64* %ek
-  %t10 = getelementptr [7 x i8], [7 x i8]* @.str.1150, i64 0, i64 0
+  %t10 = getelementptr [7 x i8], [7 x i8]* @.str.1152, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @__string_eq(i64 %t9, i64 %t11)
   %t13 = trunc i64 %t12 to i1
-  br label %rhs.exit2148
-rhs.exit2148:
-  br label %end2147
-end2147:
-  %t14 = phi i1 [%t8, %logic.entry2145], [%t13, %rhs.exit2148]
+  br label %rhs.exit2159
+rhs.exit2159:
+  br label %end2158
+end2158:
+  %t14 = phi i1 [%t8, %logic.entry2156], [%t13, %rhs.exit2159]
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br label %logic.entry2149
-logic.entry2149:
-  br i1 %t16, label %end2151, label %rhs2150
-rhs2150:
+  br label %logic.entry2160
+logic.entry2160:
+  br i1 %t16, label %end2162, label %rhs2161
+rhs2161:
   %t17 = load i64, i64* %ek
-  %t18 = getelementptr [10 x i8], [10 x i8]* @.str.1151, i64 0, i64 0
+  %t18 = getelementptr [10 x i8], [10 x i8]* @.str.1153, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = call i64 @__string_eq(i64 %t17, i64 %t19)
   %t21 = trunc i64 %t20 to i1
-  br label %rhs.exit2152
-rhs.exit2152:
-  br label %end2151
-end2151:
-  %t22 = phi i1 [%t16, %logic.entry2149], [%t21, %rhs.exit2152]
+  br label %rhs.exit2163
+rhs.exit2163:
+  br label %end2162
+end2162:
+  %t22 = phi i1 [%t16, %logic.entry2160], [%t21, %rhs.exit2163]
   %t23 = zext i1 %t22 to i64
   %t24 = trunc i64 %t23 to i1
-  br label %logic.entry2153
-logic.entry2153:
-  br i1 %t24, label %end2155, label %rhs2154
-rhs2154:
+  br label %logic.entry2164
+logic.entry2164:
+  br i1 %t24, label %end2166, label %rhs2165
+rhs2165:
   %t25 = load i64, i64* %ek
-  %t26 = getelementptr [6 x i8], [6 x i8]* @.str.1152, i64 0, i64 0
+  %t26 = getelementptr [6 x i8], [6 x i8]* @.str.1154, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   %t28 = call i64 @__string_eq(i64 %t25, i64 %t27)
   %t29 = trunc i64 %t28 to i1
-  br label %rhs.exit2156
-rhs.exit2156:
-  br label %end2155
-end2155:
-  %t30 = phi i1 [%t24, %logic.entry2153], [%t29, %rhs.exit2156]
+  br label %rhs.exit2167
+rhs.exit2167:
+  br label %end2166
+end2166:
+  %t30 = phi i1 [%t24, %logic.entry2164], [%t29, %rhs.exit2167]
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then2157, label %else2158
-then2157:
+  br i1 %t32, label %then2168, label %else2169
+then2168:
   %t33 = add i64 0, 1
   ret i64 %t33
-else2158:
-  br label %endif2144
-endif2144:
+else2169:
+  br label %endif2155
+endif2155:
   %t34 = load i64, i64* %self
-  %t35 = getelementptr [19 x i8], [19 x i8]* @.str.1153, i64 0, i64 0
+  %t35 = getelementptr [19 x i8], [19 x i8]* @.str.1155, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = load i64, i64* %op
   %t38 = inttoptr i64 %t36 to i8*
@@ -25538,7 +25745,7 @@ endif2144:
   %t46 = call i64 @__string_intern(i64 %t45)
   %t47 = inttoptr i64 %t46 to i8*
   %t48 = ptrtoint i8* %t47 to i64
-  %t49 = getelementptr [59 x i8], [59 x i8]* @.str.1154, i64 0, i64 0
+  %t49 = getelementptr [59 x i8], [59 x i8]* @.str.1156, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = inttoptr i64 %t48 to i8*
   %t52 = inttoptr i64 %t50 to i8*
@@ -25563,72 +25770,72 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1155, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1157, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry2159
-logic.entry2159:
-  br i1 %t5, label %end2161, label %rhs2160
-rhs2160:
+  br label %logic.entry2170
+logic.entry2170:
+  br i1 %t5, label %end2172, label %rhs2171
+rhs2171:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1156, i64 0, i64 0
+  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1158, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit2162
-rhs.exit2162:
-  br label %end2161
-end2161:
-  %t11 = phi i1 [%t5, %logic.entry2159], [%t10, %rhs.exit2162]
+  br label %rhs.exit2173
+rhs.exit2173:
+  br label %end2172
+end2172:
+  %t11 = phi i1 [%t5, %logic.entry2170], [%t10, %rhs.exit2173]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br label %logic.entry2163
-logic.entry2163:
-  br i1 %t13, label %end2165, label %rhs2164
-rhs2164:
+  br label %logic.entry2174
+logic.entry2174:
+  br i1 %t13, label %end2176, label %rhs2175
+rhs2175:
   %t14 = load i64, i64* %self
-  %t15 = getelementptr [3 x i8], [3 x i8]* @.str.1157, i64 0, i64 0
+  %t15 = getelementptr [3 x i8], [3 x i8]* @.str.1159, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @Parser__match_kind_check(i64 %t14, i64 %t16)
   %t18 = trunc i64 %t17 to i1
-  br label %rhs.exit2166
-rhs.exit2166:
-  br label %end2165
-end2165:
-  %t19 = phi i1 [%t13, %logic.entry2163], [%t18, %rhs.exit2166]
+  br label %rhs.exit2177
+rhs.exit2177:
+  br label %end2176
+end2176:
+  %t19 = phi i1 [%t13, %logic.entry2174], [%t18, %rhs.exit2177]
   %t20 = zext i1 %t19 to i64
   %t21 = trunc i64 %t20 to i1
-  br label %logic.entry2167
-logic.entry2167:
-  br i1 %t21, label %end2169, label %rhs2168
-rhs2168:
+  br label %logic.entry2178
+logic.entry2178:
+  br i1 %t21, label %end2180, label %rhs2179
+rhs2179:
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.1158, i64 0, i64 0
+  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.1160, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__match_kind_check(i64 %t22, i64 %t24)
   %t26 = trunc i64 %t25 to i1
-  br label %rhs.exit2170
-rhs.exit2170:
-  br label %end2169
-end2169:
-  %t27 = phi i1 [%t21, %logic.entry2167], [%t26, %rhs.exit2170]
+  br label %rhs.exit2181
+rhs.exit2181:
+  br label %end2180
+end2180:
+  %t27 = phi i1 [%t21, %logic.entry2178], [%t26, %rhs.exit2181]
   %t28 = zext i1 %t27 to i64
   %t29 = trunc i64 %t28 to i1
-  br label %logic.entry2171
-logic.entry2171:
-  br i1 %t29, label %end2173, label %rhs2172
-rhs2172:
+  br label %logic.entry2182
+logic.entry2182:
+  br i1 %t29, label %end2184, label %rhs2183
+rhs2183:
   %t30 = load i64, i64* %self
-  %t31 = getelementptr [3 x i8], [3 x i8]* @.str.1159, i64 0, i64 0
+  %t31 = getelementptr [3 x i8], [3 x i8]* @.str.1161, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = call i64 @Parser__match_kind_check(i64 %t30, i64 %t32)
   %t34 = trunc i64 %t33 to i1
-  br label %rhs.exit2174
-rhs.exit2174:
-  br label %end2173
-end2173:
-  %t35 = phi i1 [%t29, %logic.entry2171], [%t34, %rhs.exit2174]
+  br label %rhs.exit2185
+rhs.exit2185:
+  br label %end2184
+end2184:
+  %t35 = phi i1 [%t29, %logic.entry2182], [%t34, %rhs.exit2185]
   %t36 = zext i1 %t35 to i64
   ret i64 %t36
 }
@@ -25638,71 +25845,71 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1160, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1162, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then2176, label %else2177
-then2176:
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1161, i64 0, i64 0
+  br i1 %t5, label %then2187, label %else2188
+then2187:
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1163, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   ret i64 %t7
-else2177:
-  br label %endif2175
-endif2175:
+else2188:
+  br label %endif2186
+endif2186:
   %t8 = load i64, i64* %self
-  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.1162, i64 0, i64 0
+  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.1164, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i64
   %t11 = call i64 @Parser__match_kind_check(i64 %t8, i64 %t10)
   %t12 = trunc i64 %t11 to i1
-  br i1 %t12, label %then2179, label %else2180
-then2179:
-  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1163, i64 0, i64 0
+  br i1 %t12, label %then2190, label %else2191
+then2190:
+  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1165, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   ret i64 %t14
-else2180:
-  br label %endif2178
-endif2178:
+else2191:
+  br label %endif2189
+endif2189:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [3 x i8], [3 x i8]* @.str.1164, i64 0, i64 0
+  %t16 = getelementptr [3 x i8], [3 x i8]* @.str.1166, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__match_kind_check(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then2182, label %else2183
-then2182:
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1165, i64 0, i64 0
+  br i1 %t19, label %then2193, label %else2194
+then2193:
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1167, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   ret i64 %t21
-else2183:
-  br label %endif2181
-endif2181:
+else2194:
+  br label %endif2192
+endif2192:
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.1166, i64 0, i64 0
+  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.1168, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__match_kind_check(i64 %t22, i64 %t24)
   %t26 = trunc i64 %t25 to i1
-  br i1 %t26, label %then2185, label %else2186
-then2185:
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1167, i64 0, i64 0
+  br i1 %t26, label %then2196, label %else2197
+then2196:
+  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1169, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   ret i64 %t28
-else2186:
-  br label %endif2184
-endif2184:
+else2197:
+  br label %endif2195
+endif2195:
   %t29 = load i64, i64* %self
-  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.1168, i64 0, i64 0
+  %t30 = getelementptr [3 x i8], [3 x i8]* @.str.1170, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   %t32 = call i64 @Parser__match_kind_check(i64 %t29, i64 %t31)
   %t33 = trunc i64 %t32 to i1
-  br i1 %t33, label %then2188, label %else2189
-then2188:
-  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.1169, i64 0, i64 0
+  br i1 %t33, label %then2199, label %else2200
+then2199:
+  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.1171, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   ret i64 %t35
-else2189:
-  br label %endif2187
-endif2187:
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1170, i64 0, i64 0
+else2200:
+  br label %endif2198
+endif2198:
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1172, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   ret i64 %t37
 }
@@ -25714,160 +25921,160 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__at_compound_assign_op(i64 %t1)
   %t3 = trunc i64 %t2 to i1
-  br i1 %t3, label %then2191, label %else2192
-then2191:
+  br i1 %t3, label %then2202, label %else2203
+then2202:
   %t4 = add i64 0, 1
   ret i64 %t4
-else2192:
-  br label %endif2190
-endif2190:
+else2203:
+  br label %endif2201
+endif2201:
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [3 x i8], [3 x i8]* @.str.1171, i64 0, i64 0
+  %t6 = getelementptr [3 x i8], [3 x i8]* @.str.1173, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__match_kind_check(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br label %logic.entry2194
-logic.entry2194:
-  br i1 %t9, label %end2196, label %rhs2195
-rhs2195:
+  br label %logic.entry2205
+logic.entry2205:
+  br i1 %t9, label %end2207, label %rhs2206
+rhs2206:
   %t10 = load i64, i64* %self
-  %t11 = getelementptr [3 x i8], [3 x i8]* @.str.1172, i64 0, i64 0
+  %t11 = getelementptr [3 x i8], [3 x i8]* @.str.1174, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
   %t13 = call i64 @Parser__match_kind_check(i64 %t10, i64 %t12)
   %t14 = trunc i64 %t13 to i1
-  br label %rhs.exit2197
-rhs.exit2197:
-  br label %end2196
-end2196:
-  %t15 = phi i1 [%t9, %logic.entry2194], [%t14, %rhs.exit2197]
+  br label %rhs.exit2208
+rhs.exit2208:
+  br label %end2207
+end2207:
+  %t15 = phi i1 [%t9, %logic.entry2205], [%t14, %rhs.exit2208]
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then2198, label %else2199
-then2198:
+  br i1 %t17, label %then2209, label %else2210
+then2209:
   %t18 = add i64 0, 1
   ret i64 %t18
-else2199:
-  br label %endif2193
-endif2193:
+else2210:
+  br label %endif2204
+endif2204:
   %t19 = load i64, i64* %self
   %t20 = call i64 @Parser__is_term_op(i64 %t19)
   %t21 = trunc i64 %t20 to i1
-  br i1 %t21, label %then2201, label %else2202
-then2201:
+  br i1 %t21, label %then2212, label %else2213
+then2212:
   %t22 = add i64 0, 1
   ret i64 %t22
-else2202:
-  br label %endif2200
-endif2200:
+else2213:
+  br label %endif2211
+endif2211:
   %t23 = load i64, i64* %self
   %t24 = call i64 @Parser__is_factor_op(i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then2204, label %else2205
-then2204:
+  br i1 %t25, label %then2215, label %else2216
+then2215:
   %t26 = add i64 0, 1
   ret i64 %t26
-else2205:
-  br label %endif2203
-endif2203:
+else2216:
+  br label %endif2214
+endif2214:
   %t27 = load i64, i64* %self
   %t28 = call i64 @Parser__is_shift_op(i64 %t27)
   %t29 = trunc i64 %t28 to i1
-  br i1 %t29, label %then2207, label %else2208
-then2207:
+  br i1 %t29, label %then2218, label %else2219
+then2218:
   %t30 = add i64 0, 1
   ret i64 %t30
-else2208:
-  br label %endif2206
-endif2206:
+else2219:
+  br label %endif2217
+endif2217:
   %t31 = load i64, i64* %self
   %t32 = call i64 @Parser__is_equality_op(i64 %t31)
   %t33 = trunc i64 %t32 to i1
-  br i1 %t33, label %then2210, label %else2211
-then2210:
+  br i1 %t33, label %then2221, label %else2222
+then2221:
   %t34 = add i64 0, 1
   ret i64 %t34
-else2211:
-  br label %endif2209
-endif2209:
+else2222:
+  br label %endif2220
+endif2220:
   %t35 = load i64, i64* %self
   %t36 = call i64 @Parser__is_comparison_op(i64 %t35)
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then2213, label %else2214
-then2213:
+  br i1 %t37, label %then2224, label %else2225
+then2224:
   %t38 = add i64 0, 1
   ret i64 %t38
-else2214:
-  br label %endif2212
-endif2212:
+else2225:
+  br label %endif2223
+endif2223:
   %t39 = load i64, i64* %self
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1173, i64 0, i64 0
+  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1175, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @Parser__match_kind_check(i64 %t39, i64 %t41)
   %t43 = trunc i64 %t42 to i1
-  br i1 %t43, label %then2216, label %else2217
-then2216:
+  br i1 %t43, label %then2227, label %else2228
+then2227:
   %t44 = add i64 0, 1
   ret i64 %t44
-else2217:
-  br label %endif2215
-endif2215:
+else2228:
+  br label %endif2226
+endif2226:
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.1174, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.1176, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__match_kind_check(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then2219, label %else2220
-then2219:
+  br i1 %t49, label %then2230, label %else2231
+then2230:
   %t50 = add i64 0, 1
   ret i64 %t50
-else2220:
-  br label %endif2218
-endif2218:
+else2231:
+  br label %endif2229
+endif2229:
   %t51 = load i64, i64* %self
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1175, i64 0, i64 0
+  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1177, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @Parser__match_kind_check(i64 %t51, i64 %t53)
   %t55 = trunc i64 %t54 to i1
-  br i1 %t55, label %then2222, label %else2223
-then2222:
+  br i1 %t55, label %then2233, label %else2234
+then2233:
   %t56 = add i64 0, 1
   ret i64 %t56
-else2223:
-  br label %endif2221
-endif2221:
+else2234:
+  br label %endif2232
+endif2232:
   %t57 = load i64, i64* %self
-  %t58 = getelementptr [4 x i8], [4 x i8]* @.str.1176, i64 0, i64 0
+  %t58 = getelementptr [4 x i8], [4 x i8]* @.str.1178, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   %t60 = call i64 @Parser__match_kind_check(i64 %t57, i64 %t59)
   %t61 = trunc i64 %t60 to i1
-  br i1 %t61, label %then2225, label %else2226
-then2225:
+  br i1 %t61, label %then2236, label %else2237
+then2236:
   %t62 = add i64 0, 1
   ret i64 %t62
-else2226:
-  br label %endif2224
-endif2224:
+else2237:
+  br label %endif2235
+endif2235:
   %t63 = load i64, i64* %self
-  %t64 = getelementptr [3 x i8], [3 x i8]* @.str.1177, i64 0, i64 0
+  %t64 = getelementptr [3 x i8], [3 x i8]* @.str.1179, i64 0, i64 0
   %t65 = ptrtoint i8* %t64 to i64
   %t66 = call i64 @Parser__match_kind_check(i64 %t63, i64 %t65)
   %t67 = trunc i64 %t66 to i1
-  br i1 %t67, label %then2228, label %else2229
-then2228:
+  br i1 %t67, label %then2239, label %else2240
+then2239:
   %t68 = add i64 0, 1
   ret i64 %t68
-else2229:
-  br label %endif2227
-endif2227:
+else2240:
+  br label %endif2238
+endif2238:
   %t69 = load i64, i64* %self
-  %t70 = getelementptr [3 x i8], [3 x i8]* @.str.1178, i64 0, i64 0
+  %t70 = getelementptr [3 x i8], [3 x i8]* @.str.1180, i64 0, i64 0
   %t71 = ptrtoint i8* %t70 to i64
   %t72 = call i64 @Parser__match_kind_check(i64 %t69, i64 %t71)
   %t73 = trunc i64 %t72 to i1
-  br label %logic.entry2231
-logic.entry2231:
-  br i1 %t73, label %rhs2232, label %end2233
-rhs2232:
+  br label %logic.entry2242
+logic.entry2242:
+  br i1 %t73, label %rhs2243, label %end2244
+rhs2243:
   %t74 = load i64, i64* %self
   %t75 = call i64 @Parser__current_line_num(i64 %t74)
   %t76 = load i64, i64* %self
@@ -25875,20 +26082,20 @@ rhs2232:
   %t78 = icmp eq i64 %t75, %t77
   %t79 = zext i1 %t78 to i64
   %t80 = trunc i64 %t79 to i1
-  br label %rhs.exit2234
-rhs.exit2234:
-  br label %end2233
-end2233:
-  %t81 = phi i1 [%t73, %logic.entry2231], [%t80, %rhs.exit2234]
+  br label %rhs.exit2245
+rhs.exit2245:
+  br label %end2244
+end2244:
+  %t81 = phi i1 [%t73, %logic.entry2242], [%t80, %rhs.exit2245]
   %t82 = zext i1 %t81 to i64
   %t83 = trunc i64 %t82 to i1
-  br i1 %t83, label %then2235, label %else2236
-then2235:
+  br i1 %t83, label %then2246, label %else2247
+then2246:
   %t84 = add i64 0, 1
   ret i64 %t84
-else2236:
-  br label %endif2230
-endif2230:
+else2247:
+  br label %endif2241
+endif2241:
   %t85 = add i64 0, 0
   ret i64 %t85
 }
@@ -25911,8 +26118,8 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.arm2242 [ i8 11, label %match.arm2238 i8 15, label %match.arm2239 i8 19, label %match.arm2240 i8 5, label %match.arm2241 ]
-match.arm2238:
+  switch i8 %t3, label %match.arm2253 [ i8 11, label %match.arm2249 i8 15, label %match.arm2250 i8 19, label %match.arm2251 i8 5, label %match.arm2252 ]
+match.arm2249:
   %t6 = load i64, i64* %o
   %t7 = load i64, i64* %f
   %t8 = load i64, i64* %__ms
@@ -25926,14 +26133,14 @@ match.arm2238:
   %t14 = getelementptr [4 x i64], [4 x i64]* %t9, i64 0, i64 3
   %t15 = load i64, i64* %t14
   store i64 %t15, i64* %__ms
-  %t16 = getelementptr [7 x i8], [7 x i8]* @.str.1179, i64 0, i64 0
+  %t16 = getelementptr [7 x i8], [7 x i8]* @.str.1181, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %t2
   store i64 %t6, i64* %o
   store i64 %t7, i64* %f
   store i64 %t8, i64* %__ms
-  br label %match.end2237
-match.arm2239:
+  br label %match.end2248
+match.arm2250:
   %t18 = load i64, i64* %o
   %t19 = load i64, i64* %f
   %t20 = load i64, i64* %__gs
@@ -25947,14 +26154,14 @@ match.arm2239:
   %t26 = getelementptr [4 x i64], [4 x i64]* %t21, i64 0, i64 3
   %t27 = load i64, i64* %t26
   store i64 %t27, i64* %__gs
-  %t28 = getelementptr [10 x i8], [10 x i8]* @.str.1180, i64 0, i64 0
+  %t28 = getelementptr [10 x i8], [10 x i8]* @.str.1182, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   store i64 %t29, i64* %t2
   store i64 %t18, i64* %o
   store i64 %t19, i64* %f
   store i64 %t20, i64* %__gs
-  br label %match.end2237
-match.arm2240:
+  br label %match.end2248
+match.arm2251:
   %t30 = load i64, i64* %o
   %t31 = load i64, i64* %i
   %t32 = inttoptr i64 %t1 to [3 x i64]*
@@ -25964,13 +26171,13 @@ match.arm2240:
   %t35 = getelementptr [3 x i64], [3 x i64]* %t32, i64 0, i64 2
   %t36 = load i64, i64* %t35
   store i64 %t36, i64* %i
-  %t37 = getelementptr [6 x i8], [6 x i8]* @.str.1181, i64 0, i64 0
+  %t37 = getelementptr [6 x i8], [6 x i8]* @.str.1183, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
   store i64 %t38, i64* %t2
   store i64 %t30, i64* %o
   store i64 %t31, i64* %i
-  br label %match.end2237
-match.arm2241:
+  br label %match.end2248
+match.arm2252:
   %t39 = load i64, i64* %n
   %t40 = load i64, i64* %__vs
   %t41 = inttoptr i64 %t1 to [3 x i64]*
@@ -25980,18 +26187,18 @@ match.arm2241:
   %t44 = getelementptr [3 x i64], [3 x i64]* %t41, i64 0, i64 2
   %t45 = load i64, i64* %t44
   store i64 %t45, i64* %__vs
-  %t46 = getelementptr [9 x i8], [9 x i8]* @.str.1182, i64 0, i64 0
+  %t46 = getelementptr [9 x i8], [9 x i8]* @.str.1184, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   store i64 %t47, i64* %t2
   store i64 %t39, i64* %n
   store i64 %t40, i64* %__vs
-  br label %match.end2237
-match.arm2242:
-  %t48 = getelementptr [6 x i8], [6 x i8]* @.str.1183, i64 0, i64 0
+  br label %match.end2248
+match.arm2253:
+  %t48 = getelementptr [6 x i8], [6 x i8]* @.str.1185, i64 0, i64 0
   %t49 = ptrtoint i8* %t48 to i64
   store i64 %t49, i64* %t2
-  br label %match.end2237
-match.end2237:
+  br label %match.end2248
+match.end2248:
   %t50 = load i64, i64* %t2
   ret i64 %t50
 }
@@ -26023,13 +26230,13 @@ entry:
   %t13 = icmp sge i64 %t6, %t11
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %then2244, label %else2245
-then2244:
+  br i1 %t14, label %then2255, label %else2256
+then2255:
   %t15 = add i64 0, 0
   ret i64 %t15
-else2245:
-  br label %endif2243
-endif2243:
+else2256:
+  br label %endif2254
+endif2254:
   %t16 = load i64, i64* %self
   %t17 = inttoptr i64 %t16 to %Parser*
   %t18 = getelementptr %Parser, %Parser* %t17, i32 0, i32 0
@@ -26051,8 +26258,8 @@ endif2243:
   %t34 = inttoptr i64 %t31 to i64*
   %t35 = load i64, i64* %t34
   %t33 = trunc i64 %t35 to i8
-  switch i8 %t33, label %match.end2246 [ i8 0, label %match.arm2247 ]
-match.arm2247:
+  switch i8 %t33, label %match.end2257 [ i8 0, label %match.arm2258 ]
+match.arm2258:
   %t36 = load i64, i64* %k
   %t37 = load i64, i64* %l
   %t38 = load i64, i64* %c
@@ -26081,8 +26288,8 @@ match.arm2247:
   store i64 %t38, i64* %c
   store i64 %t39, i64* %o
   store i64 %t40, i64* %ln
-  br label %match.end2246
-match.end2246:
+  br label %match.end2257
+match.end2257:
   %t53 = load i64, i64* %t32
   store i64 %t53, i64* %next_kind
   %t54 = load i64, i64* %self
@@ -26101,28 +26308,28 @@ entry:
   %arg_val = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1184, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1186, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry2249
-logic.entry2249:
-  br i1 %t5, label %rhs2250, label %end2251
-rhs2250:
+  br label %logic.entry2260
+logic.entry2260:
+  br i1 %t5, label %rhs2261, label %end2262
+rhs2261:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1185, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1187, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__peek_is(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit2252
-rhs.exit2252:
-  br label %end2251
-end2251:
-  %t11 = phi i1 [%t5, %logic.entry2249], [%t10, %rhs.exit2252]
+  br label %rhs.exit2263
+rhs.exit2263:
+  br label %end2262
+end2262:
+  %t11 = phi i1 [%t5, %logic.entry2260], [%t10, %rhs.exit2263]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then2253, label %else2254
-then2253:
+  br i1 %t13, label %then2264, label %else2265
+then2264:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__ident_span(i64 %t14)
   store i64 %t15, i64* %arg_span
@@ -26149,9 +26356,9 @@ then2253:
   store i64 %t24, i64* %t30
   %t31 = ptrtoint [4 x i64]* %t26 to i64
   ret i64 %t31
-else2254:
-  br label %endif2248
-endif2248:
+else2265:
+  br label %endif2259
+endif2259:
   %t32 = load i64, i64* %self
   %t33 = call i64 @Parser__parse_expr(i64 %t32)
   ret i64 %t33
@@ -26171,7 +26378,7 @@ entry:
   %t4 = call i64 @Parser__expect_ident(i64 %t3)
   store i64 %t4, i64* %name
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1186, i64 0, i64 0
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1188, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__consume(i64 %t5, i64 %t7)
   %t9 = load i64, i64* %self
@@ -26206,7 +26413,7 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1187, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1189, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__parse_var_decl_with_doc(i64 %t1, i64 %t3)
   ret i64 %t4
@@ -26220,7 +26427,7 @@ entry:
   store i64 %docstring.arg, i64* %docstring
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %docstring
-  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1188, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1190, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__parse_var_decl_vis(i64 %t1, i64 %t2, i64 %t4)
   ret i64 %t5
@@ -26248,31 +26455,31 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__advance(i64 %t3)
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1189, i64 0, i64 0
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1191, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__match_kind_check(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then2256, label %else2257
-then2256:
+  br i1 %t9, label %then2267, label %else2268
+then2267:
   %t10 = load i64, i64* %self
   %t11 = call i64 @Parser__parse_destructure(i64 %t10)
   ret i64 %t11
-else2257:
-  br label %endif2255
-endif2255:
+else2268:
+  br label %endif2266
+endif2266:
   %t12 = load i64, i64* %self
-  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1190, i64 0, i64 0
+  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1192, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @Parser__match_kind_check(i64 %t12, i64 %t14)
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then2259, label %else2260
-then2259:
+  br i1 %t16, label %then2270, label %else2271
+then2270:
   %t17 = load i64, i64* %self
   %t18 = call i64 @Parser__parse_tuple_destructure(i64 %t17)
   ret i64 %t18
-else2260:
-  br label %endif2258
-endif2258:
+else2271:
+  br label %endif2269
+endif2269:
   %t19 = load i64, i64* %self
   %t20 = call i64 @Parser__ident_span(i64 %t19)
   store i64 %t20, i64* %name_span
@@ -26281,15 +26488,15 @@ endif2258:
   store i64 %t22, i64* %name
   %t23 = add i64 0, 0
   store i64 %t23, i64* %was_qualified
-  br label %while.cond2261
-while.cond2261:
+  br label %while.cond2272
+while.cond2272:
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1191, i64 0, i64 0
+  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1193, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @Parser__match_kind_check(i64 %t24, i64 %t26)
   %t28 = trunc i64 %t27 to i1
-  br i1 %t28, label %while.body2262, label %while.end2263
-while.body2262:
+  br i1 %t28, label %while.body2273, label %while.end2274
+while.body2273:
   %t29 = load i64, i64* %self
   %t30 = call i64 @Parser__advance(i64 %t29)
   %t31 = load i64, i64* %self
@@ -26300,85 +26507,85 @@ while.body2262:
   store i64 %t34, i64* %name
   %t35 = add i64 0, 1
   store i64 %t35, i64* %was_qualified
-  br label %while.cond2261
-while.end2263:
+  br label %while.cond2272
+while.end2274:
   %t36 = load i64, i64* %was_qualified
   %t37 = trunc i64 %t36 to i1
-  br label %logic.entry2265
-logic.entry2265:
-  br i1 %t37, label %rhs2266, label %end2267
-rhs2266:
+  br label %logic.entry2276
+logic.entry2276:
+  br i1 %t37, label %rhs2277, label %end2278
+rhs2277:
   %t38 = load i64, i64* %self
-  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.1192, i64 0, i64 0
+  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.1194, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = call i64 @Parser__match_kind_check(i64 %t38, i64 %t40)
   %t42 = xor i64 %t41, 1
   %t43 = trunc i64 %t42 to i1
-  br label %rhs.exit2268
-rhs.exit2268:
-  br label %end2267
-end2267:
-  %t44 = phi i1 [%t37, %logic.entry2265], [%t43, %rhs.exit2268]
+  br label %rhs.exit2279
+rhs.exit2279:
+  br label %end2278
+end2278:
+  %t44 = phi i1 [%t37, %logic.entry2276], [%t43, %rhs.exit2279]
   %t45 = zext i1 %t44 to i64
   %t46 = trunc i64 %t45 to i1
-  br i1 %t46, label %then2269, label %else2270
-then2269:
+  br i1 %t46, label %then2280, label %else2281
+then2280:
   %t47 = load i64, i64* %self
-  %t48 = getelementptr [88 x i8], [88 x i8]* @.str.1193, i64 0, i64 0
+  %t48 = getelementptr [88 x i8], [88 x i8]* @.str.1195, i64 0, i64 0
   %t49 = ptrtoint i8* %t48 to i64
   %t50 = call i64 @Parser__parse_error(i64 %t47, i64 %t49)
-  br label %endif2264
-else2270:
-  br label %endif2264
-endif2264:
+  br label %endif2275
+else2281:
+  br label %endif2275
+endif2275:
   %t51 = load i64, i64* %self
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1194, i64 0, i64 0
+  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1196, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @Parser__match_kind_check(i64 %t51, i64 %t53)
   %t55 = trunc i64 %t54 to i1
-  br i1 %t55, label %then2272, label %else2273
-then2272:
+  br i1 %t55, label %then2283, label %else2284
+then2283:
   %t56 = load i64, i64* %self
   %t57 = call i64 @Parser__advance(i64 %t56)
   %t58 = call i64 @__list_new()
   store i64 %t58, i64* %bindings
   %t59 = load i64, i64* %self
-  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1195, i64 0, i64 0
+  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1197, i64 0, i64 0
   %t61 = ptrtoint i8* %t60 to i64
   %t62 = call i64 @Parser__match_kind_check(i64 %t59, i64 %t61)
   %t63 = xor i64 %t62, 1
   %t64 = trunc i64 %t63 to i1
-  br i1 %t64, label %then2275, label %else2276
-then2275:
+  br i1 %t64, label %then2286, label %else2287
+then2286:
   %t65 = load i64, i64* %bindings
   %t66 = load i64, i64* %self
   %t67 = call i64 @Parser__expect_ident(i64 %t66)
   %t68 = call i64 @__list_push(i64 %t65, i64 %t67)
-  br label %while.cond2277
-while.cond2277:
+  br label %while.cond2288
+while.cond2288:
   %t69 = load i64, i64* %self
-  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1196, i64 0, i64 0
+  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1198, i64 0, i64 0
   %t71 = ptrtoint i8* %t70 to i64
   %t72 = call i64 @Parser__match_kind(i64 %t69, i64 %t71)
   %t73 = trunc i64 %t72 to i1
-  br i1 %t73, label %while.body2278, label %while.end2279
-while.body2278:
+  br i1 %t73, label %while.body2289, label %while.end2290
+while.body2289:
   %t74 = load i64, i64* %bindings
   %t75 = load i64, i64* %self
   %t76 = call i64 @Parser__expect_ident(i64 %t75)
   %t77 = call i64 @__list_push(i64 %t74, i64 %t76)
-  br label %while.cond2277
-while.end2279:
-  br label %endif2274
-else2276:
-  br label %endif2274
-endif2274:
+  br label %while.cond2288
+while.end2290:
+  br label %endif2285
+else2287:
+  br label %endif2285
+endif2285:
   %t78 = load i64, i64* %self
-  %t79 = getelementptr [2 x i8], [2 x i8]* @.str.1197, i64 0, i64 0
+  %t79 = getelementptr [2 x i8], [2 x i8]* @.str.1199, i64 0, i64 0
   %t80 = ptrtoint i8* %t79 to i64
   %t81 = call i64 @Parser__consume(i64 %t78, i64 %t80)
   %t82 = load i64, i64* %self
-  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.1198, i64 0, i64 0
+  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.1200, i64 0, i64 0
   %t84 = ptrtoint i8* %t83 to i64
   %t85 = call i64 @Parser__consume(i64 %t82, i64 %t84)
   %t86 = load i64, i64* %self
@@ -26406,9 +26613,9 @@ endif2274:
   store i64 %t96, i64* %t101
   %t102 = ptrtoint [3 x i64]* %t98 to i64
   ret i64 %t102
-else2273:
-  br label %endif2271
-endif2271:
+else2284:
+  br label %endif2282
+endif2282:
   %t103 = call i8* @__sf_malloc(i64 8)
   %t104 = bitcast i8* %t103 to [1 x i64]*
   %t105 = getelementptr [1 x i64], [1 x i64]* %t104, i64 0, i64 0
@@ -26416,23 +26623,23 @@ endif2271:
   %t106 = ptrtoint [1 x i64]* %t104 to i64
   store i64 %t106, i64* %type_ann
   %t107 = load i64, i64* %self
-  %t108 = getelementptr [2 x i8], [2 x i8]* @.str.1199, i64 0, i64 0
+  %t108 = getelementptr [2 x i8], [2 x i8]* @.str.1201, i64 0, i64 0
   %t109 = ptrtoint i8* %t108 to i64
   %t110 = call i64 @Parser__match_kind(i64 %t107, i64 %t109)
   %t111 = trunc i64 %t110 to i1
-  br i1 %t111, label %then2281, label %else2282
-then2281:
+  br i1 %t111, label %then2292, label %else2293
+then2292:
   %t112 = load i64, i64* %self
   %t113 = load i64, i64* %self
   %t114 = call i64 @Parser__parse_type(i64 %t113)
   %t115 = call i64 @Parser__parse_type_ast(i64 %t112, i64 %t114)
   store i64 %t115, i64* %type_ann
-  br label %endif2280
-else2282:
-  br label %endif2280
-endif2280:
+  br label %endif2291
+else2293:
+  br label %endif2291
+endif2291:
   %t116 = load i64, i64* %self
-  %t117 = getelementptr [2 x i8], [2 x i8]* @.str.1200, i64 0, i64 0
+  %t117 = getelementptr [2 x i8], [2 x i8]* @.str.1202, i64 0, i64 0
   %t118 = ptrtoint i8* %t117 to i64
   %t119 = call i64 @Parser__consume(i64 %t116, i64 %t118)
   %t120 = load i64, i64* %self
@@ -26480,74 +26687,74 @@ entry:
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = call i64 @__list_new()
   store i64 %t3, i64* %names
-  %t4 = getelementptr [1 x i8], [1 x i8]* @.str.1201, i64 0, i64 0
+  %t4 = getelementptr [1 x i8], [1 x i8]* @.str.1203, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   store i64 %t5, i64* %rest_name
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1202, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1204, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = xor i64 %t9, 1
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then2284, label %else2285
-then2284:
+  br i1 %t11, label %then2295, label %else2296
+then2295:
   %t12 = load i64, i64* %self
-  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1203, i64 0, i64 0
+  %t13 = getelementptr [2 x i8], [2 x i8]* @.str.1205, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @Parser__match_kind(i64 %t12, i64 %t14)
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then2287, label %else2288
-then2287:
+  br i1 %t16, label %then2298, label %else2299
+then2298:
   %t17 = load i64, i64* %self
   %t18 = call i64 @Parser__expect_ident(i64 %t17)
   store i64 %t18, i64* %rest_name
-  br label %endif2286
-else2288:
+  br label %endif2297
+else2299:
   %t19 = load i64, i64* %names
   %t20 = load i64, i64* %self
   %t21 = call i64 @Parser__expect_ident(i64 %t20)
   %t22 = call i64 @__list_push(i64 %t19, i64 %t21)
-  br label %endif2286
-endif2286:
-  br label %while.cond2289
-while.cond2289:
+  br label %endif2297
+endif2297:
+  br label %while.cond2300
+while.cond2300:
   %t23 = load i64, i64* %self
-  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1204, i64 0, i64 0
+  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1206, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = call i64 @Parser__match_kind(i64 %t23, i64 %t25)
   %t27 = trunc i64 %t26 to i1
-  br i1 %t27, label %while.body2290, label %while.end2291
-while.body2290:
+  br i1 %t27, label %while.body2301, label %while.end2302
+while.body2301:
   %t28 = load i64, i64* %self
-  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.1205, i64 0, i64 0
+  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.1207, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i64 @Parser__match_kind(i64 %t28, i64 %t30)
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %then2293, label %else2294
-then2293:
+  br i1 %t32, label %then2304, label %else2305
+then2304:
   %t33 = load i64, i64* %self
   %t34 = call i64 @Parser__expect_ident(i64 %t33)
   store i64 %t34, i64* %rest_name
-  br label %endif2292
-else2294:
+  br label %endif2303
+else2305:
   %t35 = load i64, i64* %names
   %t36 = load i64, i64* %self
   %t37 = call i64 @Parser__expect_ident(i64 %t36)
   %t38 = call i64 @__list_push(i64 %t35, i64 %t37)
-  br label %endif2292
-endif2292:
-  br label %while.cond2289
-while.end2291:
-  br label %endif2283
-else2285:
-  br label %endif2283
-endif2283:
+  br label %endif2303
+endif2303:
+  br label %while.cond2300
+while.end2302:
+  br label %endif2294
+else2296:
+  br label %endif2294
+endif2294:
   %t39 = load i64, i64* %self
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1206, i64 0, i64 0
+  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1208, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @Parser__consume(i64 %t39, i64 %t41)
   %t43 = load i64, i64* %self
-  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.1207, i64 0, i64 0
+  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.1209, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i64
   %t46 = call i64 @Parser__consume(i64 %t43, i64 %t45)
   %t47 = load i64, i64* %self
@@ -26592,42 +26799,42 @@ entry:
   %t3 = call i64 @__list_new()
   store i64 %t3, i64* %names
   %t4 = load i64, i64* %self
-  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.1208, i64 0, i64 0
+  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.1210, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @Parser__match_kind_check(i64 %t4, i64 %t6)
   %t8 = xor i64 %t7, 1
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then2296, label %else2297
-then2296:
+  br i1 %t9, label %then2307, label %else2308
+then2307:
   %t10 = load i64, i64* %names
   %t11 = load i64, i64* %self
   %t12 = call i64 @Parser__expect_ident(i64 %t11)
   %t13 = call i64 @__list_push(i64 %t10, i64 %t12)
-  br label %while.cond2298
-while.cond2298:
+  br label %while.cond2309
+while.cond2309:
   %t14 = load i64, i64* %self
-  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.1209, i64 0, i64 0
+  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.1211, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @Parser__match_kind(i64 %t14, i64 %t16)
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %while.body2299, label %while.end2300
-while.body2299:
+  br i1 %t18, label %while.body2310, label %while.end2311
+while.body2310:
   %t19 = load i64, i64* %names
   %t20 = load i64, i64* %self
   %t21 = call i64 @Parser__expect_ident(i64 %t20)
   %t22 = call i64 @__list_push(i64 %t19, i64 %t21)
-  br label %while.cond2298
-while.end2300:
-  br label %endif2295
-else2297:
-  br label %endif2295
-endif2295:
+  br label %while.cond2309
+while.end2311:
+  br label %endif2306
+else2308:
+  br label %endif2306
+endif2306:
   %t23 = load i64, i64* %self
-  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1210, i64 0, i64 0
+  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1212, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = call i64 @Parser__consume(i64 %t23, i64 %t25)
   %t27 = load i64, i64* %self
-  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.1211, i64 0, i64 0
+  %t28 = getelementptr [2 x i8], [2 x i8]* @.str.1213, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   %t30 = call i64 @Parser__consume(i64 %t27, i64 %t29)
   %t31 = load i64, i64* %self
@@ -26635,7 +26842,7 @@ endif2295:
   store i64 %t32, i64* %init
   %t33 = call i64 @__list_new()
   store i64 %t33, i64* %stmts
-  %t34 = getelementptr [11 x i8], [11 x i8]* @.str.1212, i64 0, i64 0
+  %t34 = getelementptr [11 x i8], [11 x i8]* @.str.1214, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   store i64 %t35, i64* %tmp_name
   %t36 = load i64, i64* %stmts
@@ -26646,9 +26853,9 @@ endif2295:
   store i64 12, i64* %t40
   %t41 = ptrtoint [1 x i64]* %t39 to i64
   %t42 = load i64, i64* %init
-  %t43 = getelementptr [1 x i8], [1 x i8]* @.str.1213, i64 0, i64 0
+  %t43 = getelementptr [1 x i8], [1 x i8]* @.str.1215, i64 0, i64 0
   %t44 = ptrtoint i8* %t43 to i64
-  %t45 = getelementptr [7 x i8], [7 x i8]* @.str.1214, i64 0, i64 0
+  %t45 = getelementptr [7 x i8], [7 x i8]* @.str.1216, i64 0, i64 0
   %t46 = ptrtoint i8* %t45 to i64
   %t47 = call i64 @ast_span_none()
   %t48 = call i64 @ast_span_none()
@@ -26674,16 +26881,16 @@ endif2295:
   %t60 = call i64 @__list_push(i64 %t36, i64 %t59)
   %t61 = add i64 0, 0
   store i64 %t61, i64* %i
-  br label %while.cond2301
-while.cond2301:
+  br label %while.cond2312
+while.cond2312:
   %t62 = load i64, i64* %i
   %t63 = load i64, i64* %names
   %t64 = call i64 @__list_length(i64 %t63)
   %t66 = icmp slt i64 %t62, %t64
   %t65 = zext i1 %t66 to i64
   %t67 = trunc i64 %t65 to i1
-  br i1 %t67, label %while.body2302, label %while.end2303
-while.body2302:
+  br i1 %t67, label %while.body2313, label %while.end2314
+while.body2313:
   %t68 = load i64, i64* %tmp_name
   %t69 = call i64 @ast_span_none()
   %t70 = call i8* @__sf_malloc(i64 24)
@@ -26727,9 +26934,9 @@ while.body2302:
   store i64 12, i64* %t98
   %t99 = ptrtoint [1 x i64]* %t97 to i64
   %t100 = load i64, i64* %idx_expr
-  %t101 = getelementptr [1 x i8], [1 x i8]* @.str.1215, i64 0, i64 0
+  %t101 = getelementptr [1 x i8], [1 x i8]* @.str.1217, i64 0, i64 0
   %t102 = ptrtoint i8* %t101 to i64
-  %t103 = getelementptr [7 x i8], [7 x i8]* @.str.1216, i64 0, i64 0
+  %t103 = getelementptr [7 x i8], [7 x i8]* @.str.1218, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   %t105 = call i64 @ast_span_none()
   %t106 = call i64 @ast_span_none()
@@ -26757,8 +26964,8 @@ while.body2302:
   %t120 = add i64 0, 1
   %t121 = add i64 %t119, %t120
   store i64 %t121, i64* %i
-  br label %while.cond2301
-while.end2303:
+  br label %while.cond2312
+while.end2314:
   %t122 = load i64, i64* %stmts
   %t123 = call i8* @__sf_malloc(i64 16)
   %t124 = bitcast i8* %t123 to [2 x i64]*
@@ -26775,7 +26982,7 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1217, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1219, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__parse_fun_decl_with_doc(i64 %t1, i64 %t3)
   ret i64 %t4
@@ -26789,7 +26996,7 @@ entry:
   store i64 %docstring.arg, i64* %docstring
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %docstring
-  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1218, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1220, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__parse_fun_decl_vis(i64 %t1, i64 %t2, i64 %t4)
   ret i64 %t5
@@ -26847,67 +27054,67 @@ entry:
   %t8 = call i64 @Parser__expect_ident(i64 %t7)
   store i64 %t8, i64* %name
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1219, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1221, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__match_kind_check(i64 %t9, i64 %t11)
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then2305, label %else2306
-then2305:
+  br i1 %t13, label %then2316, label %else2317
+then2316:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__advance(i64 %t14)
-  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.1220, i64 0, i64 0
+  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.1222, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   store i64 %t17, i64* %generic_str
   %t18 = add i64 0, 1
   store i64 %t18, i64* %depth
-  br label %while.cond2307
-while.cond2307:
+  br label %while.cond2318
+while.cond2318:
   %t19 = load i64, i64* %depth
   %t20 = add i64 0, 0
   %t22 = icmp sgt i64 %t19, %t20
   %t21 = zext i1 %t22 to i64
   %t23 = trunc i64 %t21 to i1
-  br label %logic.entry2310
-logic.entry2310:
-  br i1 %t23, label %rhs2311, label %end2312
-rhs2311:
+  br label %logic.entry2321
+logic.entry2321:
+  br i1 %t23, label %rhs2322, label %end2323
+rhs2322:
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.1221, i64 0, i64 0
+  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.1223, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @Parser__match_kind_check(i64 %t24, i64 %t26)
   %t28 = xor i64 %t27, 1
   %t29 = trunc i64 %t28 to i1
-  br label %rhs.exit2313
-rhs.exit2313:
-  br label %end2312
-end2312:
-  %t30 = phi i1 [%t23, %logic.entry2310], [%t29, %rhs.exit2313]
+  br label %rhs.exit2324
+rhs.exit2324:
+  br label %end2323
+end2323:
+  %t30 = phi i1 [%t23, %logic.entry2321], [%t29, %rhs.exit2324]
   %t31 = zext i1 %t30 to i64
   %t32 = trunc i64 %t31 to i1
-  br i1 %t32, label %while.body2308, label %while.end2309
-while.body2308:
+  br i1 %t32, label %while.body2319, label %while.end2320
+while.body2319:
   %t33 = load i64, i64* %self
-  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.1222, i64 0, i64 0
+  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.1224, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @Parser__match_kind_check(i64 %t33, i64 %t35)
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then2315, label %else2316
-then2315:
+  br i1 %t37, label %then2326, label %else2327
+then2326:
   %t38 = load i64, i64* %depth
   %t39 = add i64 0, 1
   %t40 = add i64 %t38, %t39
   store i64 %t40, i64* %depth
   %t41 = load i64, i64* %self
   %t42 = call i64 @Parser__advance(i64 %t41)
-  br label %endif2314
-else2316:
+  br label %endif2325
+else2327:
   %t43 = load i64, i64* %self
-  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.1223, i64 0, i64 0
+  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.1225, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i64
   %t46 = call i64 @Parser__match_kind_check(i64 %t43, i64 %t45)
   %t47 = trunc i64 %t46 to i1
-  br i1 %t47, label %then2317, label %else2318
-then2317:
+  br i1 %t47, label %then2328, label %else2329
+then2328:
   %t48 = load i64, i64* %depth
   %t49 = add i64 0, 1
   %t50 = sub i64 %t48, %t49
@@ -26917,10 +27124,10 @@ then2317:
   %t54 = icmp sgt i64 %t51, %t52
   %t53 = zext i1 %t54 to i64
   %t55 = trunc i64 %t53 to i1
-  br i1 %t55, label %then2320, label %else2321
-then2320:
+  br i1 %t55, label %then2331, label %else2332
+then2331:
   %t56 = load i64, i64* %generic_str
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1224, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1226, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = inttoptr i64 %t56 to i8*
   %t60 = inttoptr i64 %t58 to i8*
@@ -26936,21 +27143,21 @@ then2320:
   %t68 = inttoptr i64 %t67 to i8*
   %t69 = ptrtoint i8* %t68 to i64
   store i64 %t69, i64* %generic_str
-  br label %endif2319
-else2321:
-  br label %endif2319
-endif2319:
+  br label %endif2330
+else2332:
+  br label %endif2330
+endif2330:
   %t70 = load i64, i64* %self
   %t71 = call i64 @Parser__advance(i64 %t70)
-  br label %endif2314
-else2318:
+  br label %endif2325
+else2329:
   %t72 = load i64, i64* %self
-  %t73 = getelementptr [3 x i8], [3 x i8]* @.str.1225, i64 0, i64 0
+  %t73 = getelementptr [3 x i8], [3 x i8]* @.str.1227, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   %t75 = call i64 @Parser__match_kind_check(i64 %t72, i64 %t74)
   %t76 = trunc i64 %t75 to i1
-  br i1 %t76, label %then2322, label %else2323
-then2322:
+  br i1 %t76, label %then2333, label %else2334
+then2333:
   %t77 = load i64, i64* %depth
   %t78 = add i64 0, 2
   %t79 = sub i64 %t77, %t78
@@ -26960,10 +27167,10 @@ then2322:
   %t83 = icmp sgt i64 %t80, %t81
   %t82 = zext i1 %t83 to i64
   %t84 = trunc i64 %t82 to i1
-  br i1 %t84, label %then2325, label %else2326
-then2325:
+  br i1 %t84, label %then2336, label %else2337
+then2336:
   %t85 = load i64, i64* %generic_str
-  %t86 = getelementptr [3 x i8], [3 x i8]* @.str.1226, i64 0, i64 0
+  %t86 = getelementptr [3 x i8], [3 x i8]* @.str.1228, i64 0, i64 0
   %t87 = ptrtoint i8* %t86 to i64
   %t88 = inttoptr i64 %t85 to i8*
   %t89 = inttoptr i64 %t87 to i8*
@@ -26979,30 +27186,30 @@ then2325:
   %t97 = inttoptr i64 %t96 to i8*
   %t98 = ptrtoint i8* %t97 to i64
   store i64 %t98, i64* %generic_str
-  br label %endif2324
-else2326:
-  br label %endif2324
-endif2324:
+  br label %endif2335
+else2337:
+  br label %endif2335
+endif2335:
   %t99 = load i64, i64* %self
   %t100 = call i64 @Parser__advance(i64 %t99)
-  br label %endif2314
-else2323:
+  br label %endif2325
+else2334:
   %t101 = load i64, i64* %self
-  %t102 = getelementptr [2 x i8], [2 x i8]* @.str.1227, i64 0, i64 0
+  %t102 = getelementptr [2 x i8], [2 x i8]* @.str.1229, i64 0, i64 0
   %t103 = ptrtoint i8* %t102 to i64
   %t104 = call i64 @Parser__match_kind_check(i64 %t101, i64 %t103)
   %t105 = trunc i64 %t104 to i1
-  br i1 %t105, label %then2327, label %else2328
-then2327:
+  br i1 %t105, label %then2338, label %else2339
+then2338:
   %t106 = load i64, i64* %depth
   %t107 = add i64 0, 1
   %t108 = icmp eq i64 %t106, %t107
   %t109 = zext i1 %t108 to i64
   %t110 = trunc i64 %t109 to i1
-  br i1 %t110, label %then2330, label %else2331
-then2330:
+  br i1 %t110, label %then2341, label %else2342
+then2341:
   %t111 = load i64, i64* %generic_str
-  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.1228, i64 0, i64 0
+  %t112 = getelementptr [2 x i8], [2 x i8]* @.str.1230, i64 0, i64 0
   %t113 = ptrtoint i8* %t112 to i64
   %t114 = inttoptr i64 %t111 to i8*
   %t115 = inttoptr i64 %t113 to i8*
@@ -27018,23 +27225,23 @@ then2330:
   %t123 = inttoptr i64 %t122 to i8*
   %t124 = ptrtoint i8* %t123 to i64
   store i64 %t124, i64* %generic_str
-  br label %endif2329
-else2331:
-  br label %endif2329
-endif2329:
+  br label %endif2340
+else2342:
+  br label %endif2340
+endif2340:
   %t125 = load i64, i64* %self
   %t126 = call i64 @Parser__advance(i64 %t125)
-  br label %endif2314
-else2328:
+  br label %endif2325
+else2339:
   %t127 = load i64, i64* %self
-  %t128 = getelementptr [2 x i8], [2 x i8]* @.str.1229, i64 0, i64 0
+  %t128 = getelementptr [2 x i8], [2 x i8]* @.str.1231, i64 0, i64 0
   %t129 = ptrtoint i8* %t128 to i64
   %t130 = call i64 @Parser__match_kind_check(i64 %t127, i64 %t129)
   %t131 = trunc i64 %t130 to i1
-  br i1 %t131, label %then2332, label %else2333
-then2332:
+  br i1 %t131, label %then2343, label %else2344
+then2343:
   %t132 = load i64, i64* %generic_str
-  %t133 = getelementptr [2 x i8], [2 x i8]* @.str.1230, i64 0, i64 0
+  %t133 = getelementptr [2 x i8], [2 x i8]* @.str.1232, i64 0, i64 0
   %t134 = ptrtoint i8* %t133 to i64
   %t135 = inttoptr i64 %t132 to i8*
   %t136 = inttoptr i64 %t134 to i8*
@@ -27052,17 +27259,17 @@ then2332:
   store i64 %t145, i64* %generic_str
   %t146 = load i64, i64* %self
   %t147 = call i64 @Parser__advance(i64 %t146)
-  br label %endif2314
-else2333:
+  br label %endif2325
+else2344:
   %t148 = load i64, i64* %self
-  %t149 = getelementptr [2 x i8], [2 x i8]* @.str.1231, i64 0, i64 0
+  %t149 = getelementptr [2 x i8], [2 x i8]* @.str.1233, i64 0, i64 0
   %t150 = ptrtoint i8* %t149 to i64
   %t151 = call i64 @Parser__match_kind_check(i64 %t148, i64 %t150)
   %t152 = trunc i64 %t151 to i1
-  br i1 %t152, label %then2334, label %else2335
-then2334:
+  br i1 %t152, label %then2345, label %else2346
+then2345:
   %t153 = load i64, i64* %generic_str
-  %t154 = getelementptr [2 x i8], [2 x i8]* @.str.1232, i64 0, i64 0
+  %t154 = getelementptr [2 x i8], [2 x i8]* @.str.1234, i64 0, i64 0
   %t155 = ptrtoint i8* %t154 to i64
   %t156 = inttoptr i64 %t153 to i8*
   %t157 = inttoptr i64 %t155 to i8*
@@ -27080,15 +27287,15 @@ then2334:
   store i64 %t166, i64* %generic_str
   %t167 = load i64, i64* %self
   %t168 = call i64 @Parser__advance(i64 %t167)
-  br label %endif2314
-else2335:
+  br label %endif2325
+else2346:
   %t169 = load i64, i64* %self
-  %t170 = getelementptr [6 x i8], [6 x i8]* @.str.1233, i64 0, i64 0
+  %t170 = getelementptr [6 x i8], [6 x i8]* @.str.1235, i64 0, i64 0
   %t171 = ptrtoint i8* %t170 to i64
   %t172 = call i64 @Parser__match_kind_check(i64 %t169, i64 %t171)
   %t173 = trunc i64 %t172 to i1
-  br i1 %t173, label %then2336, label %else2337
-then2336:
+  br i1 %t173, label %then2347, label %else2348
+then2347:
   %t174 = load i64, i64* %self
   %t175 = call i64 @Parser__expect_ident(i64 %t174)
   store i64 %t175, i64* %part
@@ -27108,14 +27315,14 @@ then2336:
   %t187 = inttoptr i64 %t186 to i8*
   %t188 = ptrtoint i8* %t187 to i64
   store i64 %t188, i64* %generic_str
-  br label %endif2314
-else2337:
+  br label %endif2325
+else2348:
   %t189 = load i64, i64* %self
   %t190 = call i64 @Parser__advance(i64 %t189)
-  br label %endif2314
-endif2314:
-  br label %while.cond2307
-while.end2309:
+  br label %endif2325
+endif2325:
+  br label %while.cond2318
+while.end2320:
   %t191 = load i64, i64* %generic_str
   %t192 = inttoptr i64 %t191 to i8*
   %t193 = call i64 @strlen(i8* %t192)
@@ -27123,9 +27330,9 @@ while.end2309:
   %t196 = icmp sgt i64 %t193, %t194
   %t195 = zext i1 %t196 to i64
   %t197 = trunc i64 %t195 to i1
-  br i1 %t197, label %then2339, label %else2340
-then2339:
-  %t198 = getelementptr [10 x i8], [10 x i8]* @.str.1234, i64 0, i64 0
+  br i1 %t197, label %then2350, label %else2351
+then2350:
+  %t198 = getelementptr [10 x i8], [10 x i8]* @.str.1236, i64 0, i64 0
   %t199 = ptrtoint i8* %t198 to i64
   %t200 = load i64, i64* %generic_str
   %t201 = inttoptr i64 %t199 to i8*
@@ -27141,7 +27348,7 @@ then2339:
   %t209 = call i64 @__string_intern(i64 %t208)
   %t210 = inttoptr i64 %t209 to i8*
   %t211 = ptrtoint i8* %t210 to i64
-  %t212 = getelementptr [2 x i8], [2 x i8]* @.str.1235, i64 0, i64 0
+  %t212 = getelementptr [2 x i8], [2 x i8]* @.str.1237, i64 0, i64 0
   %t213 = ptrtoint i8* %t212 to i64
   %t214 = inttoptr i64 %t211 to i8*
   %t215 = inttoptr i64 %t213 to i8*
@@ -27171,19 +27378,19 @@ then2339:
   %t235 = inttoptr i64 %t234 to i8*
   %t236 = ptrtoint i8* %t235 to i64
   store i64 %t236, i64* %docstring
-  br label %endif2338
-else2340:
-  br label %endif2338
-endif2338:
-  br label %endif2304
-else2306:
-  br label %endif2304
-endif2304:
+  br label %endif2349
+else2351:
+  br label %endif2349
+endif2349:
+  br label %endif2315
+else2317:
+  br label %endif2315
+endif2315:
   %t237 = call i64 @__list_new()
   store i64 %t237, i64* %type_param_names
   %t238 = load i64, i64* %docstring
   %t239 = inttoptr i64 %t238 to i8*
-  %t240 = getelementptr [10 x i8], [10 x i8]* @.str.1236, i64 0, i64 0
+  %t240 = getelementptr [10 x i8], [10 x i8]* @.str.1238, i64 0, i64 0
   %t241 = ptrtoint i8* %t240 to i64
   %t242 = inttoptr i64 %t241 to i8*
   %t243 = call i64 @strlen(i8* %t242)
@@ -27191,14 +27398,14 @@ endif2304:
   %t245 = icmp eq i32 %t244, 0
   %t246 = zext i1 %t245 to i64
   %t247 = trunc i64 %t246 to i1
-  br i1 %t247, label %then2342, label %else2343
-then2342:
+  br i1 %t247, label %then2353, label %else2354
+then2353:
   %t248 = load i64, i64* %docstring
-  %t249 = getelementptr [2 x i8], [2 x i8]* @.str.1237, i64 0, i64 0
+  %t249 = getelementptr [2 x i8], [2 x i8]* @.str.1239, i64 0, i64 0
   %t250 = ptrtoint i8* %t249 to i64
   %t251 = call i64 @rt_str_index_of(i64 %t248, i64 %t250)
   store i64 %t251, i64* %nl_pos
-  %t252 = getelementptr [1 x i8], [1 x i8]* @.str.1238, i64 0, i64 0
+  %t252 = getelementptr [1 x i8], [1 x i8]* @.str.1240, i64 0, i64 0
   %t253 = ptrtoint i8* %t252 to i64
   store i64 %t253, i64* %gstr
   %t254 = load i64, i64* %nl_pos
@@ -27206,8 +27413,8 @@ then2342:
   %t257 = icmp sge i64 %t254, %t255
   %t256 = zext i1 %t257 to i64
   %t258 = trunc i64 %t256 to i1
-  br i1 %t258, label %then2345, label %else2346
-then2345:
+  br i1 %t258, label %then2356, label %else2357
+then2356:
   %t259 = load i64, i64* %docstring
   %t260 = inttoptr i64 %t259 to i8*
   %t261 = add i64 0, 9
@@ -27221,8 +27428,8 @@ then2345:
   store i8 0, i8* %t267
   %t268 = ptrtoint i8* %t265 to i64
   store i64 %t268, i64* %gstr
-  br label %endif2344
-else2346:
+  br label %endif2355
+else2357:
   %t269 = load i64, i64* %docstring
   %t270 = inttoptr i64 %t269 to i8*
   %t271 = add i64 0, 9
@@ -27238,25 +27445,25 @@ else2346:
   store i8 0, i8* %t279
   %t280 = ptrtoint i8* %t277 to i64
   store i64 %t280, i64* %gstr
-  br label %endif2344
-endif2344:
+  br label %endif2355
+endif2355:
   %t281 = load i64, i64* %gstr
-  %t282 = getelementptr [2 x i8], [2 x i8]* @.str.1239, i64 0, i64 0
+  %t282 = getelementptr [2 x i8], [2 x i8]* @.str.1241, i64 0, i64 0
   %t283 = ptrtoint i8* %t282 to i64
   %t284 = call i64 @__str_split(i64 %t281, i64 %t283)
   store i64 %t284, i64* %gparts
   %t285 = add i64 0, 0
   store i64 %t285, i64* %gi
-  br label %while.cond2347
-while.cond2347:
+  br label %while.cond2358
+while.cond2358:
   %t286 = load i64, i64* %gi
   %t287 = load i64, i64* %gparts
   %t288 = call i64 @__list_length(i64 %t287)
   %t290 = icmp slt i64 %t286, %t288
   %t289 = zext i1 %t290 to i64
   %t291 = trunc i64 %t289 to i1
-  br i1 %t291, label %while.body2348, label %while.end2349
-while.body2348:
+  br i1 %t291, label %while.body2359, label %while.end2360
+while.body2359:
   %t292 = load i64, i64* %gparts
   %t293 = load i64, i64* %gi
   %t294 = icmp slt i64 %t293, 0
@@ -27266,7 +27473,7 @@ while.body2348:
   %t298 = call i64 @__list_get(i64 %t292, i64 %t297)
   store i64 %t298, i64* %gp
   %t299 = load i64, i64* %gp
-  %t300 = getelementptr [2 x i8], [2 x i8]* @.str.1240, i64 0, i64 0
+  %t300 = getelementptr [2 x i8], [2 x i8]* @.str.1242, i64 0, i64 0
   %t301 = ptrtoint i8* %t300 to i64
   %t302 = call i64 @rt_str_index_of(i64 %t299, i64 %t301)
   store i64 %t302, i64* %gc_pos
@@ -27275,8 +27482,8 @@ while.body2348:
   %t306 = icmp sge i64 %t303, %t304
   %t305 = zext i1 %t306 to i64
   %t307 = trunc i64 %t305 to i1
-  br i1 %t307, label %then2351, label %else2352
-then2351:
+  br i1 %t307, label %then2362, label %else2363
+then2362:
   %t308 = load i64, i64* %type_param_names
   %t309 = load i64, i64* %gp
   %t310 = inttoptr i64 %t309 to i8*
@@ -27291,25 +27498,25 @@ then2351:
   store i8 0, i8* %t317
   %t318 = ptrtoint i8* %t315 to i64
   %t319 = call i64 @__list_push(i64 %t308, i64 %t318)
-  br label %endif2350
-else2352:
+  br label %endif2361
+else2363:
   %t320 = load i64, i64* %type_param_names
   %t321 = load i64, i64* %gp
   %t322 = call i64 @__list_push(i64 %t320, i64 %t321)
-  br label %endif2350
-endif2350:
+  br label %endif2361
+endif2361:
   %t323 = load i64, i64* %gi
   %t324 = add i64 0, 1
   %t325 = add i64 %t323, %t324
   store i64 %t325, i64* %gi
-  br label %while.cond2347
-while.end2349:
-  br label %endif2341
-else2343:
-  br label %endif2341
-endif2341:
+  br label %while.cond2358
+while.end2360:
+  br label %endif2352
+else2354:
+  br label %endif2352
+endif2352:
   %t326 = load i64, i64* %self
-  %t327 = getelementptr [2 x i8], [2 x i8]* @.str.1241, i64 0, i64 0
+  %t327 = getelementptr [2 x i8], [2 x i8]* @.str.1243, i64 0, i64 0
   %t328 = ptrtoint i8* %t327 to i64
   %t329 = call i64 @Parser__consume(i64 %t326, i64 %t328)
   %t330 = call i64 @__list_new()
@@ -27319,13 +27526,13 @@ endif2341:
   %t332 = add i64 0, 0
   store i64 %t332, i64* %param_idx
   %t333 = load i64, i64* %self
-  %t334 = getelementptr [2 x i8], [2 x i8]* @.str.1242, i64 0, i64 0
+  %t334 = getelementptr [2 x i8], [2 x i8]* @.str.1244, i64 0, i64 0
   %t335 = ptrtoint i8* %t334 to i64
   %t336 = call i64 @Parser__match_kind_check(i64 %t333, i64 %t335)
   %t337 = xor i64 %t336, 1
   %t338 = trunc i64 %t337 to i1
-  br i1 %t338, label %then2354, label %else2355
-then2354:
+  br i1 %t338, label %then2365, label %else2366
+then2365:
   %t339 = load i64, i64* %self
   %t340 = load i64, i64* %params
   %t341 = load i64, i64* %pattern_prepend
@@ -27335,15 +27542,15 @@ then2354:
   %t345 = add i64 0, 1
   %t346 = add i64 %t344, %t345
   store i64 %t346, i64* %param_idx
-  br label %while.cond2356
-while.cond2356:
+  br label %while.cond2367
+while.cond2367:
   %t347 = load i64, i64* %self
-  %t348 = getelementptr [2 x i8], [2 x i8]* @.str.1243, i64 0, i64 0
+  %t348 = getelementptr [2 x i8], [2 x i8]* @.str.1245, i64 0, i64 0
   %t349 = ptrtoint i8* %t348 to i64
   %t350 = call i64 @Parser__match_kind(i64 %t347, i64 %t349)
   %t351 = trunc i64 %t350 to i1
-  br i1 %t351, label %while.body2357, label %while.end2358
-while.body2357:
+  br i1 %t351, label %while.body2368, label %while.end2369
+while.body2368:
   %t352 = load i64, i64* %self
   %t353 = load i64, i64* %params
   %t354 = load i64, i64* %pattern_prepend
@@ -27353,14 +27560,14 @@ while.body2357:
   %t358 = add i64 0, 1
   %t359 = add i64 %t357, %t358
   store i64 %t359, i64* %param_idx
-  br label %while.cond2356
-while.end2358:
-  br label %endif2353
-else2355:
-  br label %endif2353
-endif2353:
+  br label %while.cond2367
+while.end2369:
+  br label %endif2364
+else2366:
+  br label %endif2364
+endif2364:
   %t360 = load i64, i64* %self
-  %t361 = getelementptr [2 x i8], [2 x i8]* @.str.1244, i64 0, i64 0
+  %t361 = getelementptr [2 x i8], [2 x i8]* @.str.1246, i64 0, i64 0
   %t362 = ptrtoint i8* %t361 to i64
   %t363 = call i64 @Parser__consume(i64 %t360, i64 %t362)
   %t364 = call i8* @__sf_malloc(i64 8)
@@ -27370,41 +27577,41 @@ endif2353:
   %t367 = ptrtoint [1 x i64]* %t365 to i64
   store i64 %t367, i64* %ret_type
   %t368 = load i64, i64* %self
-  %t369 = getelementptr [2 x i8], [2 x i8]* @.str.1245, i64 0, i64 0
+  %t369 = getelementptr [2 x i8], [2 x i8]* @.str.1247, i64 0, i64 0
   %t370 = ptrtoint i8* %t369 to i64
   %t371 = call i64 @Parser__match_kind(i64 %t368, i64 %t370)
   %t372 = trunc i64 %t371 to i1
-  br i1 %t372, label %then2360, label %else2361
-then2360:
+  br i1 %t372, label %then2371, label %else2372
+then2371:
   %t373 = load i64, i64* %self
   %t374 = load i64, i64* %self
   %t375 = call i64 @Parser__parse_type(i64 %t374)
   %t376 = call i64 @Parser__parse_type_ast(i64 %t373, i64 %t375)
   store i64 %t376, i64* %ret_type
-  br label %endif2359
-else2361:
-  br label %endif2359
-endif2359:
+  br label %endif2370
+else2372:
+  br label %endif2370
+endif2370:
   %t377 = load i64, i64* %type_param_names
   %t378 = call i64 @__list_length(i64 %t377)
   %t379 = add i64 0, 0
   %t381 = icmp sgt i64 %t378, %t379
   %t380 = zext i1 %t381 to i64
   %t382 = trunc i64 %t380 to i1
-  br i1 %t382, label %then2363, label %else2364
-then2363:
+  br i1 %t382, label %then2374, label %else2375
+then2374:
   %t383 = add i64 0, 0
   store i64 %t383, i64* %epi
-  br label %while.cond2365
-while.cond2365:
+  br label %while.cond2376
+while.cond2376:
   %t384 = load i64, i64* %epi
   %t385 = load i64, i64* %params
   %t386 = call i64 @__list_length(i64 %t385)
   %t388 = icmp slt i64 %t384, %t386
   %t387 = zext i1 %t388 to i64
   %t389 = trunc i64 %t387 to i1
-  br i1 %t389, label %while.body2366, label %while.end2367
-while.body2366:
+  br i1 %t389, label %while.body2377, label %while.end2378
+while.body2377:
   %t390 = load i64, i64* %params
   %t391 = load i64, i64* %epi
   %t392 = icmp slt i64 %t391, 0
@@ -27418,8 +27625,8 @@ while.body2366:
   %t400 = inttoptr i64 %t397 to i64*
   %t401 = load i64, i64* %t400
   %t399 = trunc i64 %t401 to i8
-  switch i8 %t399, label %match.end2368 [ i8 0, label %match.arm2369 ]
-match.arm2369:
+  switch i8 %t399, label %match.end2379 [ i8 0, label %match.arm2380 ]
+match.arm2380:
   %t402 = load i64, i64* %n
   %t403 = load i64, i64* %t
   %t404 = load i64, i64* %d
@@ -27448,8 +27655,8 @@ match.arm2369:
   store i64 %t404, i64* %d
   store i64 %t405, i64* %p_vis
   store i64 %t406, i64* %__ns
-  br label %match.end2368
-match.end2368:
+  br label %match.end2379
+match.end2379:
   %t419 = load i64, i64* %t398
   store i64 %t419, i64* %ep_name
   %t420 = load i64, i64* %ep
@@ -27457,8 +27664,8 @@ match.end2368:
   %t423 = inttoptr i64 %t420 to i64*
   %t424 = load i64, i64* %t423
   %t422 = trunc i64 %t424 to i8
-  switch i8 %t422, label %match.end2370 [ i8 0, label %match.arm2371 ]
-match.arm2371:
+  switch i8 %t422, label %match.end2381 [ i8 0, label %match.arm2382 ]
+match.arm2382:
   %t425 = load i64, i64* %n
   %t426 = load i64, i64* %t
   %t427 = load i64, i64* %d
@@ -27487,8 +27694,8 @@ match.arm2371:
   store i64 %t427, i64* %d
   store i64 %t428, i64* %p_vis
   store i64 %t429, i64* %__ns
-  br label %match.end2370
-match.end2370:
+  br label %match.end2381
+match.end2381:
   %t442 = load i64, i64* %t421
   store i64 %t442, i64* %ep_type
   %t443 = load i64, i64* %ep
@@ -27496,8 +27703,8 @@ match.end2370:
   %t446 = inttoptr i64 %t443 to i64*
   %t447 = load i64, i64* %t446
   %t445 = trunc i64 %t447 to i8
-  switch i8 %t445, label %match.end2372 [ i8 0, label %match.arm2373 ]
-match.arm2373:
+  switch i8 %t445, label %match.end2383 [ i8 0, label %match.arm2384 ]
+match.arm2384:
   %t448 = load i64, i64* %n
   %t449 = load i64, i64* %t
   %t450 = load i64, i64* %d
@@ -27526,8 +27733,8 @@ match.arm2373:
   store i64 %t450, i64* %d
   store i64 %t451, i64* %p_vis
   store i64 %t452, i64* %__ns
-  br label %match.end2372
-match.end2372:
+  br label %match.end2383
+match.end2383:
   %t465 = load i64, i64* %t444
   store i64 %t465, i64* %ep_default
   %t466 = load i64, i64* %self
@@ -27539,27 +27746,27 @@ match.end2372:
   %t471 = call i64 @__list_length(i64 %t469)
   %t472 = alloca i64
   store i64 0, i64* %t472
-  br label %contains.loop2375
-contains.loop2375:
+  br label %contains.loop2386
+contains.loop2386:
   %t473 = load i64, i64* %t472
   %t474 = icmp slt i64 %t473, %t471
-  br i1 %t474, label %contains.body2376, label %contains.done2379
-contains.body2376:
+  br i1 %t474, label %contains.body2387, label %contains.done2390
+contains.body2387:
   %t475 = call i64 @__list_get(i64 %t469, i64 %t473)
   %t476 = call i64 @__string_eq(i64 %t475, i64 %t470)
   %t477 = icmp ne i64 %t476, 0
-  br i1 %t477, label %contains.found2377, label %contains.next2378
-contains.next2378:
+  br i1 %t477, label %contains.found2388, label %contains.next2389
+contains.next2389:
   %t478 = add i64 %t473, 1
   store i64 %t478, i64* %t472
-  br label %contains.loop2375
-contains.found2377:
-  br label %contains.done2379
-contains.done2379:
-  %t479 = phi i64 [1, %contains.found2377], [0, %contains.loop2375]
+  br label %contains.loop2386
+contains.found2388:
+  br label %contains.done2390
+contains.done2390:
+  %t479 = phi i64 [1, %contains.found2388], [0, %contains.loop2386]
   %t480 = trunc i64 %t479 to i1
-  br i1 %t480, label %then2380, label %else2381
-then2380:
+  br i1 %t480, label %then2391, label %else2392
+then2391:
   %t481 = load i64, i64* %params
   %t482 = load i64, i64* %epi
   %t483 = load i64, i64* %ep_name
@@ -27569,7 +27776,7 @@ then2380:
   store i64 5, i64* %t486
   %t487 = ptrtoint [1 x i64]* %t485 to i64
   %t488 = load i64, i64* %ep_default
-  %t489 = getelementptr [7 x i8], [7 x i8]* @.str.1246, i64 0, i64 0
+  %t489 = getelementptr [7 x i8], [7 x i8]* @.str.1248, i64 0, i64 0
   %t490 = ptrtoint i8* %t489 to i64
   %t491 = call i64 @ast_span_none()
   %t492 = call i8* @__sf_malloc(i64 48)
@@ -27588,16 +27795,16 @@ then2380:
   store i64 %t491, i64* %t499
   %t500 = ptrtoint [6 x i64]* %t493 to i64
   %t501 = call i64 @__list_set(i64 %t481, i64 %t482, i64 %t500)
-  br label %endif2374
-else2381:
-  br label %endif2374
-endif2374:
+  br label %endif2385
+else2392:
+  br label %endif2385
+endif2385:
   %t502 = load i64, i64* %epi
   %t503 = add i64 0, 1
   %t504 = add i64 %t502, %t503
   store i64 %t504, i64* %epi
-  br label %while.cond2365
-while.end2367:
+  br label %while.cond2376
+while.end2378:
   %t505 = load i64, i64* %type_param_names
   %t506 = load i64, i64* %self
   %t507 = load i64, i64* %ret_type
@@ -27605,44 +27812,44 @@ while.end2367:
   %t509 = call i64 @__list_length(i64 %t505)
   %t510 = alloca i64
   store i64 0, i64* %t510
-  br label %contains.loop2383
-contains.loop2383:
+  br label %contains.loop2394
+contains.loop2394:
   %t511 = load i64, i64* %t510
   %t512 = icmp slt i64 %t511, %t509
-  br i1 %t512, label %contains.body2384, label %contains.done2387
-contains.body2384:
+  br i1 %t512, label %contains.body2395, label %contains.done2398
+contains.body2395:
   %t513 = call i64 @__list_get(i64 %t505, i64 %t511)
   %t514 = call i64 @__string_eq(i64 %t513, i64 %t508)
   %t515 = icmp ne i64 %t514, 0
-  br i1 %t515, label %contains.found2385, label %contains.next2386
-contains.next2386:
+  br i1 %t515, label %contains.found2396, label %contains.next2397
+contains.next2397:
   %t516 = add i64 %t511, 1
   store i64 %t516, i64* %t510
-  br label %contains.loop2383
-contains.found2385:
-  br label %contains.done2387
-contains.done2387:
-  %t517 = phi i64 [1, %contains.found2385], [0, %contains.loop2383]
+  br label %contains.loop2394
+contains.found2396:
+  br label %contains.done2398
+contains.done2398:
+  %t517 = phi i64 [1, %contains.found2396], [0, %contains.loop2394]
   %t518 = trunc i64 %t517 to i1
-  br i1 %t518, label %then2388, label %else2389
-then2388:
-  br label %endif2382
-else2389:
-  br label %endif2382
-endif2382:
-  br label %endif2362
-else2364:
-  br label %endif2362
-endif2362:
+  br i1 %t518, label %then2399, label %else2400
+then2399:
+  br label %endif2393
+else2400:
+  br label %endif2393
+endif2393:
+  br label %endif2373
+else2375:
+  br label %endif2373
+endif2373:
   %t519 = call i64 @__list_new()
   store i64 %t519, i64* %v_body
   %t520 = load i64, i64* %self
-  %t521 = getelementptr [2 x i8], [2 x i8]* @.str.1247, i64 0, i64 0
+  %t521 = getelementptr [2 x i8], [2 x i8]* @.str.1249, i64 0, i64 0
   %t522 = ptrtoint i8* %t521 to i64
   %t523 = call i64 @Parser__match_kind(i64 %t520, i64 %t522)
   %t524 = trunc i64 %t523 to i1
-  br i1 %t524, label %then2391, label %else2392
-then2391:
+  br i1 %t524, label %then2402, label %else2403
+then2402:
   %t525 = load i64, i64* %self
   %t526 = call i64 @Parser__parse_expr(i64 %t525)
   store i64 %t526, i64* %expr
@@ -27657,44 +27864,44 @@ then2391:
   %t533 = ptrtoint [2 x i64]* %t530 to i64
   %t534 = call i64 @__list_push(i64 %t527, i64 %t533)
   store i64 %t527, i64* %v_body
-  br label %endif2390
-else2392:
+  br label %endif2401
+else2403:
   %t535 = load i64, i64* %self
-  %t536 = getelementptr [2 x i8], [2 x i8]* @.str.1248, i64 0, i64 0
+  %t536 = getelementptr [2 x i8], [2 x i8]* @.str.1250, i64 0, i64 0
   %t537 = ptrtoint i8* %t536 to i64
   %t538 = call i64 @Parser__match_kind_check(i64 %t535, i64 %t537)
   %t539 = trunc i64 %t538 to i1
-  br i1 %t539, label %then2393, label %else2394
-then2393:
+  br i1 %t539, label %then2404, label %else2405
+then2404:
   %t540 = load i64, i64* %self
   %t541 = call i64 @Parser__parse_block_stmts(i64 %t540)
   store i64 %t541, i64* %v_body
-  br label %endif2390
-else2394:
-  br label %endif2390
-endif2390:
+  br label %endif2401
+else2405:
+  br label %endif2401
+endif2401:
   %t542 = load i64, i64* %pattern_prepend
   %t543 = call i64 @__list_length(i64 %t542)
   %t544 = add i64 0, 0
   %t546 = icmp sgt i64 %t543, %t544
   %t545 = zext i1 %t546 to i64
   %t547 = trunc i64 %t545 to i1
-  br i1 %t547, label %then2396, label %else2397
-then2396:
+  br i1 %t547, label %then2407, label %else2408
+then2407:
   %t548 = call i64 @__list_new()
   store i64 %t548, i64* %new_body
   %t549 = add i64 0, 0
   store i64 %t549, i64* %ppi
-  br label %while.cond2398
-while.cond2398:
+  br label %while.cond2409
+while.cond2409:
   %t550 = load i64, i64* %ppi
   %t551 = load i64, i64* %pattern_prepend
   %t552 = call i64 @__list_length(i64 %t551)
   %t554 = icmp slt i64 %t550, %t552
   %t553 = zext i1 %t554 to i64
   %t555 = trunc i64 %t553 to i1
-  br i1 %t555, label %while.body2399, label %while.end2400
-while.body2399:
+  br i1 %t555, label %while.body2410, label %while.end2411
+while.body2410:
   %t556 = load i64, i64* %new_body
   %t557 = load i64, i64* %pattern_prepend
   %t558 = load i64, i64* %ppi
@@ -27708,20 +27915,20 @@ while.body2399:
   %t566 = add i64 0, 1
   %t567 = add i64 %t565, %t566
   store i64 %t567, i64* %ppi
-  br label %while.cond2398
-while.end2400:
+  br label %while.cond2409
+while.end2411:
   %t568 = add i64 0, 0
   store i64 %t568, i64* %ppi
-  br label %while.cond2401
-while.cond2401:
+  br label %while.cond2412
+while.cond2412:
   %t569 = load i64, i64* %ppi
   %t570 = load i64, i64* %v_body
   %t571 = call i64 @__list_length(i64 %t570)
   %t573 = icmp slt i64 %t569, %t571
   %t572 = zext i1 %t573 to i64
   %t574 = trunc i64 %t572 to i1
-  br i1 %t574, label %while.body2402, label %while.end2403
-while.body2402:
+  br i1 %t574, label %while.body2413, label %while.end2414
+while.body2413:
   %t575 = load i64, i64* %new_body
   %t576 = load i64, i64* %v_body
   %t577 = load i64, i64* %ppi
@@ -27735,14 +27942,14 @@ while.body2402:
   %t585 = add i64 0, 1
   %t586 = add i64 %t584, %t585
   store i64 %t586, i64* %ppi
-  br label %while.cond2401
-while.end2403:
+  br label %while.cond2412
+while.end2414:
   %t587 = load i64, i64* %new_body
   store i64 %t587, i64* %v_body
-  br label %endif2395
-else2397:
-  br label %endif2395
-endif2395:
+  br label %endif2406
+else2408:
+  br label %endif2406
+endif2406:
   %t588 = load i64, i64* %name
   %t589 = load i64, i64* %params
   %t590 = load i64, i64* %ret_type
@@ -27800,59 +28007,59 @@ entry:
   %t4 = call i64 @Parser__expect_ident(i64 %t3)
   store i64 %t4, i64* %pname
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1249, i64 0, i64 0
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1251, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__match_kind_check(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then2405, label %else2406
-then2405:
+  br i1 %t9, label %then2416, label %else2417
+then2416:
   %t10 = load i64, i64* %self
   %t11 = call i64 @Parser__advance(i64 %t10)
   %t12 = call i64 @__list_new()
   store i64 %t12, i64* %pb
   %t13 = load i64, i64* %self
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1250, i64 0, i64 0
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1252, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = call i64 @Parser__match_kind_check(i64 %t13, i64 %t15)
   %t17 = xor i64 %t16, 1
   %t18 = trunc i64 %t17 to i1
-  br i1 %t18, label %then2408, label %else2409
-then2408:
+  br i1 %t18, label %then2419, label %else2420
+then2419:
   %t19 = load i64, i64* %pb
   %t20 = load i64, i64* %self
   %t21 = call i64 @Parser__expect_ident(i64 %t20)
   %t22 = call i64 @__list_push(i64 %t19, i64 %t21)
-  br label %while.cond2410
-while.cond2410:
+  br label %while.cond2421
+while.cond2421:
   %t23 = load i64, i64* %self
-  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1251, i64 0, i64 0
+  %t24 = getelementptr [2 x i8], [2 x i8]* @.str.1253, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = call i64 @Parser__match_kind(i64 %t23, i64 %t25)
   %t27 = trunc i64 %t26 to i1
-  br i1 %t27, label %while.body2411, label %while.end2412
-while.body2411:
+  br i1 %t27, label %while.body2422, label %while.end2423
+while.body2422:
   %t28 = load i64, i64* %pb
   %t29 = load i64, i64* %self
   %t30 = call i64 @Parser__expect_ident(i64 %t29)
   %t31 = call i64 @__list_push(i64 %t28, i64 %t30)
-  br label %while.cond2410
-while.end2412:
-  br label %endif2407
-else2409:
-  br label %endif2407
-endif2407:
+  br label %while.cond2421
+while.end2423:
+  br label %endif2418
+else2420:
+  br label %endif2418
+endif2418:
   %t32 = load i64, i64* %self
-  %t33 = getelementptr [2 x i8], [2 x i8]* @.str.1252, i64 0, i64 0
+  %t33 = getelementptr [2 x i8], [2 x i8]* @.str.1254, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i64 @Parser__consume(i64 %t32, i64 %t34)
   %t36 = load i64, i64* %self
-  %t37 = getelementptr [2 x i8], [2 x i8]* @.str.1253, i64 0, i64 0
+  %t37 = getelementptr [2 x i8], [2 x i8]* @.str.1255, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
   %t39 = call i64 @Parser__consume(i64 %t36, i64 %t38)
   %t40 = load i64, i64* %self
   %t41 = call i64 @Parser__parse_type(i64 %t40)
   store i64 %t41, i64* %ptype
-  %t42 = getelementptr [4 x i8], [4 x i8]* @.str.1254, i64 0, i64 0
+  %t42 = getelementptr [4 x i8], [4 x i8]* @.str.1256, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = load i64, i64* %idx
   %t45 = call i64 @__int_to_string(i64 %t44)
@@ -27881,7 +28088,7 @@ endif2407:
   %t65 = getelementptr [1 x i64], [1 x i64]* %t64, i64 0, i64 0
   store i64 4, i64* %t65
   %t66 = ptrtoint [1 x i64]* %t64 to i64
-  %t67 = getelementptr [7 x i8], [7 x i8]* @.str.1255, i64 0, i64 0
+  %t67 = getelementptr [7 x i8], [7 x i8]* @.str.1257, i64 0, i64 0
   %t68 = ptrtoint i8* %t67 to i64
   %t69 = call i64 @ast_span_none()
   %t70 = call i8* @__sf_malloc(i64 48)
@@ -27933,23 +28140,23 @@ endif2407:
   store i64 %t96, i64* %t101
   %t102 = ptrtoint [3 x i64]* %t98 to i64
   %t103 = call i64 @__list_push(i64 %t80, i64 %t102)
-  br label %endif2404
-else2406:
+  br label %endif2415
+else2417:
   %t104 = load i64, i64* %pname
-  %t105 = getelementptr [2 x i8], [2 x i8]* @.str.1256, i64 0, i64 0
+  %t105 = getelementptr [2 x i8], [2 x i8]* @.str.1258, i64 0, i64 0
   %t106 = ptrtoint i8* %t105 to i64
   %t107 = call i64 @__string_eq(i64 %t104, i64 %t106)
   %t108 = trunc i64 %t107 to i1
-  br i1 %t108, label %then2413, label %else2414
-then2413:
+  br i1 %t108, label %then2424, label %else2425
+then2424:
   %t109 = load i64, i64* %self
-  %t110 = getelementptr [2 x i8], [2 x i8]* @.str.1257, i64 0, i64 0
+  %t110 = getelementptr [2 x i8], [2 x i8]* @.str.1259, i64 0, i64 0
   %t111 = ptrtoint i8* %t110 to i64
   %t112 = call i64 @Parser__consume(i64 %t109, i64 %t111)
   %t113 = load i64, i64* %self
   %t114 = call i64 @Parser__parse_type(i64 %t113)
   store i64 %t114, i64* %ptype
-  %t115 = getelementptr [4 x i8], [4 x i8]* @.str.1258, i64 0, i64 0
+  %t115 = getelementptr [4 x i8], [4 x i8]* @.str.1260, i64 0, i64 0
   %t116 = ptrtoint i8* %t115 to i64
   %t117 = load i64, i64* %idx
   %t118 = call i64 @__int_to_string(i64 %t117)
@@ -27978,7 +28185,7 @@ then2413:
   %t138 = getelementptr [1 x i64], [1 x i64]* %t137, i64 0, i64 0
   store i64 4, i64* %t138
   %t139 = ptrtoint [1 x i64]* %t137 to i64
-  %t140 = getelementptr [7 x i8], [7 x i8]* @.str.1259, i64 0, i64 0
+  %t140 = getelementptr [7 x i8], [7 x i8]* @.str.1261, i64 0, i64 0
   %t141 = ptrtoint i8* %t140 to i64
   %t142 = call i64 @ast_span_none()
   %t143 = call i8* @__sf_malloc(i64 48)
@@ -27997,18 +28204,18 @@ then2413:
   store i64 %t142, i64* %t150
   %t151 = ptrtoint [6 x i64]* %t144 to i64
   %t152 = call i64 @__list_push(i64 %t131, i64 %t151)
-  br label %endif2404
-else2414:
+  br label %endif2415
+else2425:
   %t153 = load i64, i64* %self
-  %t154 = getelementptr [2 x i8], [2 x i8]* @.str.1260, i64 0, i64 0
+  %t154 = getelementptr [2 x i8], [2 x i8]* @.str.1262, i64 0, i64 0
   %t155 = ptrtoint i8* %t154 to i64
   %t156 = call i64 @Parser__match_kind_check(i64 %t153, i64 %t155)
   %t157 = xor i64 %t156, 1
   %t158 = trunc i64 %t157 to i1
-  br i1 %t158, label %then2415, label %else2416
-then2415:
+  br i1 %t158, label %then2426, label %else2427
+then2426:
   %t159 = load i64, i64* %self
-  %t160 = getelementptr [12 x i8], [12 x i8]* @.str.1261, i64 0, i64 0
+  %t160 = getelementptr [12 x i8], [12 x i8]* @.str.1263, i64 0, i64 0
   %t161 = ptrtoint i8* %t160 to i64
   %t162 = load i64, i64* %pname
   %t163 = inttoptr i64 %t161 to i8*
@@ -28024,7 +28231,7 @@ then2415:
   %t171 = call i64 @__string_intern(i64 %t170)
   %t172 = inttoptr i64 %t171 to i8*
   %t173 = ptrtoint i8* %t172 to i64
-  %t174 = getelementptr [29 x i8], [29 x i8]* @.str.1262, i64 0, i64 0
+  %t174 = getelementptr [29 x i8], [29 x i8]* @.str.1264, i64 0, i64 0
   %t175 = ptrtoint i8* %t174 to i64
   %t176 = inttoptr i64 %t173 to i8*
   %t177 = inttoptr i64 %t175 to i8*
@@ -28052,7 +28259,7 @@ then2415:
   %t196 = getelementptr [1 x i64], [1 x i64]* %t195, i64 0, i64 0
   store i64 4, i64* %t196
   %t197 = ptrtoint [1 x i64]* %t195 to i64
-  %t198 = getelementptr [7 x i8], [7 x i8]* @.str.1263, i64 0, i64 0
+  %t198 = getelementptr [7 x i8], [7 x i8]* @.str.1265, i64 0, i64 0
   %t199 = ptrtoint i8* %t198 to i64
   %t200 = load i64, i64* %pname_span
   %t201 = call i8* @__sf_malloc(i64 48)
@@ -28071,10 +28278,10 @@ then2415:
   store i64 %t200, i64* %t208
   %t209 = ptrtoint [6 x i64]* %t202 to i64
   %t210 = call i64 @__list_push(i64 %t188, i64 %t209)
-  br label %endif2404
-else2416:
+  br label %endif2415
+else2427:
   %t211 = load i64, i64* %self
-  %t212 = getelementptr [2 x i8], [2 x i8]* @.str.1264, i64 0, i64 0
+  %t212 = getelementptr [2 x i8], [2 x i8]* @.str.1266, i64 0, i64 0
   %t213 = ptrtoint i8* %t212 to i64
   %t214 = call i64 @Parser__consume(i64 %t211, i64 %t213)
   %t215 = load i64, i64* %self
@@ -28087,26 +28294,26 @@ else2416:
   %t220 = ptrtoint [1 x i64]* %t218 to i64
   store i64 %t220, i64* %pdefault
   %t221 = load i64, i64* %self
-  %t222 = getelementptr [2 x i8], [2 x i8]* @.str.1265, i64 0, i64 0
+  %t222 = getelementptr [2 x i8], [2 x i8]* @.str.1267, i64 0, i64 0
   %t223 = ptrtoint i8* %t222 to i64
   %t224 = call i64 @Parser__match_kind(i64 %t221, i64 %t223)
   %t225 = trunc i64 %t224 to i1
-  br i1 %t225, label %then2418, label %else2419
-then2418:
+  br i1 %t225, label %then2429, label %else2430
+then2429:
   %t226 = load i64, i64* %self
   %t227 = call i64 @Parser__parse_expr(i64 %t226)
   store i64 %t227, i64* %pdefault
-  br label %endif2417
-else2419:
-  br label %endif2417
-endif2417:
+  br label %endif2428
+else2430:
+  br label %endif2428
+endif2428:
   %t228 = load i64, i64* %params
   %t229 = load i64, i64* %pname
   %t230 = load i64, i64* %self
   %t231 = load i64, i64* %ptype
   %t232 = call i64 @Parser__parse_type_ast(i64 %t230, i64 %t231)
   %t233 = load i64, i64* %pdefault
-  %t234 = getelementptr [7 x i8], [7 x i8]* @.str.1266, i64 0, i64 0
+  %t234 = getelementptr [7 x i8], [7 x i8]* @.str.1268, i64 0, i64 0
   %t235 = ptrtoint i8* %t234 to i64
   %t236 = load i64, i64* %pname_span
   %t237 = call i8* @__sf_malloc(i64 48)
@@ -28125,8 +28332,8 @@ endif2417:
   store i64 %t236, i64* %t244
   %t245 = ptrtoint [6 x i64]* %t238 to i64
   %t246 = call i64 @__list_push(i64 %t228, i64 %t245)
-  br label %endif2404
-endif2404:
+  br label %endif2415
+endif2415:
   ret i64 0
 }
 
@@ -28135,7 +28342,7 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1267, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1269, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__parse_enum_decl_with_doc(i64 %t1, i64 %t3)
   ret i64 %t4
@@ -28149,7 +28356,7 @@ entry:
   store i64 %docstring.arg, i64* %docstring
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %docstring
-  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1268, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1270, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__parse_enum_decl_vis(i64 %t1, i64 %t2, i64 %t4)
   ret i64 %t5
@@ -28189,211 +28396,211 @@ entry:
   %t8 = call i64 @Parser__expect_ident(i64 %t7)
   store i64 %t8, i64* %name
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1269, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1271, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__match_kind_check(i64 %t9, i64 %t11)
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then2421, label %else2422
-then2421:
+  br i1 %t13, label %then2432, label %else2433
+then2432:
   %t14 = load i64, i64* %self
   %t15 = call i64 @Parser__advance(i64 %t14)
   %t16 = add i64 0, 1
   store i64 %t16, i64* %depth
-  br label %while.cond2423
-while.cond2423:
+  br label %while.cond2434
+while.cond2434:
   %t17 = load i64, i64* %depth
   %t18 = add i64 0, 0
   %t20 = icmp sgt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br label %logic.entry2426
-logic.entry2426:
-  br i1 %t21, label %rhs2427, label %end2428
-rhs2427:
+  br label %logic.entry2437
+logic.entry2437:
+  br i1 %t21, label %rhs2438, label %end2439
+rhs2438:
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [4 x i8], [4 x i8]* @.str.1270, i64 0, i64 0
+  %t23 = getelementptr [4 x i8], [4 x i8]* @.str.1272, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__match_kind_check(i64 %t22, i64 %t24)
   %t26 = xor i64 %t25, 1
   %t27 = trunc i64 %t26 to i1
-  br label %rhs.exit2429
-rhs.exit2429:
-  br label %end2428
-end2428:
-  %t28 = phi i1 [%t21, %logic.entry2426], [%t27, %rhs.exit2429]
+  br label %rhs.exit2440
+rhs.exit2440:
+  br label %end2439
+end2439:
+  %t28 = phi i1 [%t21, %logic.entry2437], [%t27, %rhs.exit2440]
   %t29 = zext i1 %t28 to i64
   %t30 = trunc i64 %t29 to i1
-  br i1 %t30, label %while.body2424, label %while.end2425
-while.body2424:
+  br i1 %t30, label %while.body2435, label %while.end2436
+while.body2435:
   %t31 = load i64, i64* %self
-  %t32 = getelementptr [2 x i8], [2 x i8]* @.str.1271, i64 0, i64 0
+  %t32 = getelementptr [2 x i8], [2 x i8]* @.str.1273, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   %t34 = call i64 @Parser__match_kind_check(i64 %t31, i64 %t33)
   %t35 = trunc i64 %t34 to i1
-  br i1 %t35, label %then2431, label %else2432
-then2431:
+  br i1 %t35, label %then2442, label %else2443
+then2442:
   %t36 = load i64, i64* %depth
   %t37 = add i64 0, 1
   %t38 = add i64 %t36, %t37
   store i64 %t38, i64* %depth
-  br label %endif2430
-else2432:
+  br label %endif2441
+else2443:
   %t39 = load i64, i64* %self
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1272, i64 0, i64 0
+  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1274, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @Parser__match_kind_check(i64 %t39, i64 %t41)
   %t43 = trunc i64 %t42 to i1
-  br i1 %t43, label %then2433, label %else2434
-then2433:
+  br i1 %t43, label %then2444, label %else2445
+then2444:
   %t44 = load i64, i64* %depth
   %t45 = add i64 0, 1
   %t46 = sub i64 %t44, %t45
   store i64 %t46, i64* %depth
-  br label %endif2430
-else2434:
+  br label %endif2441
+else2445:
   %t47 = load i64, i64* %self
-  %t48 = getelementptr [3 x i8], [3 x i8]* @.str.1273, i64 0, i64 0
+  %t48 = getelementptr [3 x i8], [3 x i8]* @.str.1275, i64 0, i64 0
   %t49 = ptrtoint i8* %t48 to i64
   %t50 = call i64 @Parser__match_kind_check(i64 %t47, i64 %t49)
   %t51 = trunc i64 %t50 to i1
-  br i1 %t51, label %then2435, label %else2436
-then2435:
+  br i1 %t51, label %then2446, label %else2447
+then2446:
   %t52 = load i64, i64* %depth
   %t53 = add i64 0, 2
   %t54 = sub i64 %t52, %t53
   store i64 %t54, i64* %depth
-  br label %endif2430
-else2436:
-  br label %endif2430
-endif2430:
+  br label %endif2441
+else2447:
+  br label %endif2441
+endif2441:
   %t55 = load i64, i64* %self
   %t56 = call i64 @Parser__advance(i64 %t55)
-  br label %while.cond2423
-while.end2425:
-  br label %endif2420
-else2422:
-  br label %endif2420
-endif2420:
+  br label %while.cond2434
+while.end2436:
+  br label %endif2431
+else2433:
+  br label %endif2431
+endif2431:
   %t57 = load i64, i64* %self
-  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.1274, i64 0, i64 0
+  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.1276, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   %t60 = call i64 @Parser__consume(i64 %t57, i64 %t59)
   %t61 = call i64 @__list_new()
   store i64 %t61, i64* %variants
-  br label %while.cond2437
-while.cond2437:
+  br label %while.cond2448
+while.cond2448:
   %t62 = load i64, i64* %self
-  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.1275, i64 0, i64 0
+  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.1277, i64 0, i64 0
   %t64 = ptrtoint i8* %t63 to i64
   %t65 = call i64 @Parser__match_kind_check(i64 %t62, i64 %t64)
   %t66 = xor i64 %t65, 1
   %t67 = trunc i64 %t66 to i1
-  br label %logic.entry2440
-logic.entry2440:
-  br i1 %t67, label %rhs2441, label %end2442
-rhs2441:
+  br label %logic.entry2451
+logic.entry2451:
+  br i1 %t67, label %rhs2452, label %end2453
+rhs2452:
   %t68 = load i64, i64* %self
-  %t69 = getelementptr [4 x i8], [4 x i8]* @.str.1276, i64 0, i64 0
+  %t69 = getelementptr [4 x i8], [4 x i8]* @.str.1278, i64 0, i64 0
   %t70 = ptrtoint i8* %t69 to i64
   %t71 = call i64 @Parser__match_kind_check(i64 %t68, i64 %t70)
   %t72 = xor i64 %t71, 1
   %t73 = trunc i64 %t72 to i1
-  br label %rhs.exit2443
-rhs.exit2443:
-  br label %end2442
-end2442:
-  %t74 = phi i1 [%t67, %logic.entry2440], [%t73, %rhs.exit2443]
+  br label %rhs.exit2454
+rhs.exit2454:
+  br label %end2453
+end2453:
+  %t74 = phi i1 [%t67, %logic.entry2451], [%t73, %rhs.exit2454]
   %t75 = zext i1 %t74 to i64
   %t76 = trunc i64 %t75 to i1
-  br i1 %t76, label %while.body2438, label %while.end2439
-while.body2438:
+  br i1 %t76, label %while.body2449, label %while.end2450
+while.body2449:
   %t77 = load i64, i64* %self
   %t78 = call i64 @Parser__collect_doc_comments(i64 %t77)
   %t79 = load i64, i64* %self
-  %t80 = getelementptr [2 x i8], [2 x i8]* @.str.1277, i64 0, i64 0
+  %t80 = getelementptr [2 x i8], [2 x i8]* @.str.1279, i64 0, i64 0
   %t81 = ptrtoint i8* %t80 to i64
   %t82 = call i64 @Parser__match_kind_check(i64 %t79, i64 %t81)
   %t83 = trunc i64 %t82 to i1
-  br label %logic.entry2445
-logic.entry2445:
-  br i1 %t83, label %end2447, label %rhs2446
-rhs2446:
+  br label %logic.entry2456
+logic.entry2456:
+  br i1 %t83, label %end2458, label %rhs2457
+rhs2457:
   %t84 = load i64, i64* %self
-  %t85 = getelementptr [4 x i8], [4 x i8]* @.str.1278, i64 0, i64 0
+  %t85 = getelementptr [4 x i8], [4 x i8]* @.str.1280, i64 0, i64 0
   %t86 = ptrtoint i8* %t85 to i64
   %t87 = call i64 @Parser__match_kind_check(i64 %t84, i64 %t86)
   %t88 = trunc i64 %t87 to i1
-  br label %rhs.exit2448
-rhs.exit2448:
-  br label %end2447
-end2447:
-  %t89 = phi i1 [%t83, %logic.entry2445], [%t88, %rhs.exit2448]
-  %t90 = zext i1 %t89 to i64
-  %t91 = trunc i64 %t90 to i1
-  br i1 %t91, label %then2449, label %else2450
-then2449:
-  br label %while.end2439
-else2450:
-  br label %endif2444
-endif2444:
-  %t92 = load i64, i64* %self
-  %t93 = call i64 @Parser__peek_ident(i64 %t92)
-  store i64 %t93, i64* %vis_word
-  %t94 = load i64, i64* %vis_word
-  %t95 = getelementptr [8 x i8], [8 x i8]* @.str.1279, i64 0, i64 0
-  %t96 = ptrtoint i8* %t95 to i64
-  %t97 = call i64 @__string_eq(i64 %t94, i64 %t96)
-  %t98 = trunc i64 %t97 to i1
-  br label %logic.entry2452
-logic.entry2452:
-  br i1 %t98, label %end2454, label %rhs2453
-rhs2453:
-  %t99 = load i64, i64* %vis_word
-  %t100 = getelementptr [7 x i8], [7 x i8]* @.str.1280, i64 0, i64 0
-  %t101 = ptrtoint i8* %t100 to i64
-  %t102 = call i64 @__string_eq(i64 %t99, i64 %t101)
-  %t103 = trunc i64 %t102 to i1
-  br label %rhs.exit2455
-rhs.exit2455:
-  br label %end2454
-end2454:
-  %t104 = phi i1 [%t98, %logic.entry2452], [%t103, %rhs.exit2455]
-  %t105 = zext i1 %t104 to i64
-  %t106 = trunc i64 %t105 to i1
-  br label %logic.entry2456
-logic.entry2456:
-  br i1 %t106, label %end2458, label %rhs2457
-rhs2457:
-  %t107 = load i64, i64* %vis_word
-  %t108 = getelementptr [9 x i8], [9 x i8]* @.str.1281, i64 0, i64 0
-  %t109 = ptrtoint i8* %t108 to i64
-  %t110 = call i64 @__string_eq(i64 %t107, i64 %t109)
-  %t111 = trunc i64 %t110 to i1
   br label %rhs.exit2459
 rhs.exit2459:
   br label %end2458
 end2458:
-  %t112 = phi i1 [%t106, %logic.entry2456], [%t111, %rhs.exit2459]
+  %t89 = phi i1 [%t83, %logic.entry2456], [%t88, %rhs.exit2459]
+  %t90 = zext i1 %t89 to i64
+  %t91 = trunc i64 %t90 to i1
+  br i1 %t91, label %then2460, label %else2461
+then2460:
+  br label %while.end2450
+else2461:
+  br label %endif2455
+endif2455:
+  %t92 = load i64, i64* %self
+  %t93 = call i64 @Parser__peek_ident(i64 %t92)
+  store i64 %t93, i64* %vis_word
+  %t94 = load i64, i64* %vis_word
+  %t95 = getelementptr [8 x i8], [8 x i8]* @.str.1281, i64 0, i64 0
+  %t96 = ptrtoint i8* %t95 to i64
+  %t97 = call i64 @__string_eq(i64 %t94, i64 %t96)
+  %t98 = trunc i64 %t97 to i1
+  br label %logic.entry2463
+logic.entry2463:
+  br i1 %t98, label %end2465, label %rhs2464
+rhs2464:
+  %t99 = load i64, i64* %vis_word
+  %t100 = getelementptr [7 x i8], [7 x i8]* @.str.1282, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = call i64 @__string_eq(i64 %t99, i64 %t101)
+  %t103 = trunc i64 %t102 to i1
+  br label %rhs.exit2466
+rhs.exit2466:
+  br label %end2465
+end2465:
+  %t104 = phi i1 [%t98, %logic.entry2463], [%t103, %rhs.exit2466]
+  %t105 = zext i1 %t104 to i64
+  %t106 = trunc i64 %t105 to i1
+  br label %logic.entry2467
+logic.entry2467:
+  br i1 %t106, label %end2469, label %rhs2468
+rhs2468:
+  %t107 = load i64, i64* %vis_word
+  %t108 = getelementptr [9 x i8], [9 x i8]* @.str.1283, i64 0, i64 0
+  %t109 = ptrtoint i8* %t108 to i64
+  %t110 = call i64 @__string_eq(i64 %t107, i64 %t109)
+  %t111 = trunc i64 %t110 to i1
+  br label %rhs.exit2470
+rhs.exit2470:
+  br label %end2469
+end2469:
+  %t112 = phi i1 [%t106, %logic.entry2467], [%t111, %rhs.exit2470]
   %t113 = zext i1 %t112 to i64
   %t114 = trunc i64 %t113 to i1
-  br label %logic.entry2460
-logic.entry2460:
-  br i1 %t114, label %end2462, label %rhs2461
-rhs2461:
+  br label %logic.entry2471
+logic.entry2471:
+  br i1 %t114, label %end2473, label %rhs2472
+rhs2472:
   %t115 = load i64, i64* %vis_word
-  %t116 = getelementptr [10 x i8], [10 x i8]* @.str.1282, i64 0, i64 0
+  %t116 = getelementptr [10 x i8], [10 x i8]* @.str.1284, i64 0, i64 0
   %t117 = ptrtoint i8* %t116 to i64
   %t118 = call i64 @__string_eq(i64 %t115, i64 %t117)
   %t119 = trunc i64 %t118 to i1
-  br label %rhs.exit2463
-rhs.exit2463:
-  br label %end2462
-end2462:
-  %t120 = phi i1 [%t114, %logic.entry2460], [%t119, %rhs.exit2463]
+  br label %rhs.exit2474
+rhs.exit2474:
+  br label %end2473
+end2473:
+  %t120 = phi i1 [%t114, %logic.entry2471], [%t119, %rhs.exit2474]
   %t121 = zext i1 %t120 to i64
   %t122 = trunc i64 %t121 to i1
-  br i1 %t122, label %then2464, label %else2465
-then2464:
+  br i1 %t122, label %then2475, label %else2476
+then2475:
   %t123 = load i64, i64* %self
   %t124 = call i64 @Parser__peek_ident_next(i64 %t123)
   store i64 %t124, i64* %after_vis
@@ -28404,10 +28611,10 @@ then2464:
   %t130 = icmp sgt i64 %t127, %t128
   %t129 = zext i1 %t130 to i64
   %t131 = trunc i64 %t129 to i1
-  br i1 %t131, label %then2467, label %else2468
-then2467:
+  br i1 %t131, label %then2478, label %else2479
+then2478:
   %t132 = load i64, i64* %self
-  %t133 = getelementptr [71 x i8], [71 x i8]* @.str.1283, i64 0, i64 0
+  %t133 = getelementptr [71 x i8], [71 x i8]* @.str.1285, i64 0, i64 0
   %t134 = ptrtoint i8* %t133 to i64
   %t135 = load i64, i64* %name
   %t136 = inttoptr i64 %t134 to i8*
@@ -28423,7 +28630,7 @@ then2467:
   %t144 = call i64 @__string_intern(i64 %t143)
   %t145 = inttoptr i64 %t144 to i8*
   %t146 = ptrtoint i8* %t145 to i64
-  %t147 = getelementptr [10 x i8], [10 x i8]* @.str.1284, i64 0, i64 0
+  %t147 = getelementptr [10 x i8], [10 x i8]* @.str.1286, i64 0, i64 0
   %t148 = ptrtoint i8* %t147 to i64
   %t149 = inttoptr i64 %t146 to i8*
   %t150 = inttoptr i64 %t148 to i8*
@@ -28441,85 +28648,85 @@ then2467:
   %t160 = call i64 @Parser__parse_error(i64 %t132, i64 %t159)
   %t161 = load i64, i64* %self
   %t162 = call i64 @Parser__advance(i64 %t161)
-  br label %endif2466
-else2468:
-  br label %endif2466
-endif2466:
-  br label %endif2451
-else2465:
-  br label %endif2451
-endif2451:
+  br label %endif2477
+else2479:
+  br label %endif2477
+endif2477:
+  br label %endif2462
+else2476:
+  br label %endif2462
+endif2462:
   %t163 = load i64, i64* %self
   %t164 = call i64 @Parser__ident_span(i64 %t163)
   store i64 %t164, i64* %vname_span
   %t165 = load i64, i64* %self
   %t166 = call i64 @Parser__expect_ident(i64 %t165)
   store i64 %t166, i64* %vname
-  %t167 = getelementptr [1 x i8], [1 x i8]* @.str.1285, i64 0, i64 0
+  %t167 = getelementptr [1 x i8], [1 x i8]* @.str.1287, i64 0, i64 0
   %t168 = ptrtoint i8* %t167 to i64
   store i64 %t168, i64* %fields
   %t169 = load i64, i64* %self
-  %t170 = getelementptr [2 x i8], [2 x i8]* @.str.1286, i64 0, i64 0
+  %t170 = getelementptr [2 x i8], [2 x i8]* @.str.1288, i64 0, i64 0
   %t171 = ptrtoint i8* %t170 to i64
   %t172 = call i64 @Parser__match_kind(i64 %t169, i64 %t171)
   %t173 = trunc i64 %t172 to i1
-  br i1 %t173, label %then2470, label %else2471
-then2470:
+  br i1 %t173, label %then2481, label %else2482
+then2481:
   %t174 = call i64 @StringBuilder()
   store i64 %t174, i64* %fields_sb
   %t175 = add i64 0, 1
   store i64 %t175, i64* %first
-  br label %while.cond2472
-while.cond2472:
+  br label %while.cond2483
+while.cond2483:
   %t176 = load i64, i64* %self
-  %t177 = getelementptr [2 x i8], [2 x i8]* @.str.1287, i64 0, i64 0
+  %t177 = getelementptr [2 x i8], [2 x i8]* @.str.1289, i64 0, i64 0
   %t178 = ptrtoint i8* %t177 to i64
   %t179 = call i64 @Parser__match_kind_check(i64 %t176, i64 %t178)
   %t180 = xor i64 %t179, 1
   %t181 = trunc i64 %t180 to i1
-  br label %logic.entry2475
-logic.entry2475:
-  br i1 %t181, label %rhs2476, label %end2477
-rhs2476:
+  br label %logic.entry2486
+logic.entry2486:
+  br i1 %t181, label %rhs2487, label %end2488
+rhs2487:
   %t182 = load i64, i64* %self
-  %t183 = getelementptr [4 x i8], [4 x i8]* @.str.1288, i64 0, i64 0
+  %t183 = getelementptr [4 x i8], [4 x i8]* @.str.1290, i64 0, i64 0
   %t184 = ptrtoint i8* %t183 to i64
   %t185 = call i64 @Parser__match_kind_check(i64 %t182, i64 %t184)
   %t186 = xor i64 %t185, 1
   %t187 = trunc i64 %t186 to i1
-  br label %rhs.exit2478
-rhs.exit2478:
-  br label %end2477
-end2477:
-  %t188 = phi i1 [%t181, %logic.entry2475], [%t187, %rhs.exit2478]
+  br label %rhs.exit2489
+rhs.exit2489:
+  br label %end2488
+end2488:
+  %t188 = phi i1 [%t181, %logic.entry2486], [%t187, %rhs.exit2489]
   %t189 = zext i1 %t188 to i64
   %t190 = trunc i64 %t189 to i1
-  br i1 %t190, label %while.body2473, label %while.end2474
-while.body2473:
+  br i1 %t190, label %while.body2484, label %while.end2485
+while.body2484:
   %t191 = load i64, i64* %first
   %t192 = xor i64 %t191, 1
   %t193 = trunc i64 %t192 to i1
-  br i1 %t193, label %then2480, label %else2481
-then2480:
+  br i1 %t193, label %then2491, label %else2492
+then2491:
   %t194 = load i64, i64* %fields_sb
-  %t195 = getelementptr [2 x i8], [2 x i8]* @.str.1289, i64 0, i64 0
+  %t195 = getelementptr [2 x i8], [2 x i8]* @.str.1291, i64 0, i64 0
   %t196 = ptrtoint i8* %t195 to i64
   %t197 = inttoptr i64 %t196 to i8*
   %t198 = ptrtoint i8* %t197 to i64
   %t199 = call i64 @__sb_append(i64 %t194, i64 %t198)
   %t200 = load i64, i64* %self
-  %t201 = getelementptr [2 x i8], [2 x i8]* @.str.1290, i64 0, i64 0
+  %t201 = getelementptr [2 x i8], [2 x i8]* @.str.1292, i64 0, i64 0
   %t202 = ptrtoint i8* %t201 to i64
   %t203 = call i64 @Parser__consume(i64 %t200, i64 %t202)
-  br label %endif2479
-else2481:
-  br label %endif2479
-endif2479:
+  br label %endif2490
+else2492:
+  br label %endif2490
+endif2490:
   %t204 = load i64, i64* %self
   %t205 = call i64 @Parser__expect_ident(i64 %t204)
   store i64 %t205, i64* %fname
   %t206 = load i64, i64* %self
-  %t207 = getelementptr [2 x i8], [2 x i8]* @.str.1291, i64 0, i64 0
+  %t207 = getelementptr [2 x i8], [2 x i8]* @.str.1293, i64 0, i64 0
   %t208 = ptrtoint i8* %t207 to i64
   %t209 = call i64 @Parser__consume(i64 %t206, i64 %t208)
   %t210 = load i64, i64* %self
@@ -28531,7 +28738,7 @@ endif2479:
   %t215 = ptrtoint i8* %t214 to i64
   %t216 = call i64 @__sb_append(i64 %t212, i64 %t215)
   %t217 = load i64, i64* %fields_sb
-  %t218 = getelementptr [2 x i8], [2 x i8]* @.str.1292, i64 0, i64 0
+  %t218 = getelementptr [2 x i8], [2 x i8]* @.str.1294, i64 0, i64 0
   %t219 = ptrtoint i8* %t218 to i64
   %t220 = inttoptr i64 %t219 to i8*
   %t221 = ptrtoint i8* %t220 to i64
@@ -28543,20 +28750,20 @@ endif2479:
   %t227 = call i64 @__sb_append(i64 %t223, i64 %t226)
   %t228 = add i64 0, 0
   store i64 %t228, i64* %first
-  br label %while.cond2472
-while.end2474:
+  br label %while.cond2483
+while.end2485:
   %t229 = load i64, i64* %self
-  %t230 = getelementptr [2 x i8], [2 x i8]* @.str.1293, i64 0, i64 0
+  %t230 = getelementptr [2 x i8], [2 x i8]* @.str.1295, i64 0, i64 0
   %t231 = ptrtoint i8* %t230 to i64
   %t232 = call i64 @Parser__consume(i64 %t229, i64 %t231)
   %t233 = load i64, i64* %fields_sb
   %t234 = call i64 @__sb_to_string(i64 %t233)
   %t235 = call i64 @__rt_tag_ptr(i64 %t234)
   store i64 %t235, i64* %fields
-  br label %endif2469
-else2471:
-  br label %endif2469
-endif2469:
+  br label %endif2480
+else2482:
+  br label %endif2480
+endif2480:
   %t236 = load i64, i64* %variants
   %t237 = load i64, i64* %vname
   %t238 = load i64, i64* %fields
@@ -28574,13 +28781,13 @@ endif2469:
   %t246 = ptrtoint [4 x i64]* %t241 to i64
   %t247 = call i64 @__list_push(i64 %t236, i64 %t246)
   %t248 = load i64, i64* %self
-  %t249 = getelementptr [2 x i8], [2 x i8]* @.str.1294, i64 0, i64 0
+  %t249 = getelementptr [2 x i8], [2 x i8]* @.str.1296, i64 0, i64 0
   %t250 = ptrtoint i8* %t249 to i64
   %t251 = call i64 @Parser__match_kind(i64 %t248, i64 %t250)
-  br label %while.cond2437
-while.end2439:
+  br label %while.cond2448
+while.end2450:
   %t252 = load i64, i64* %self
-  %t253 = getelementptr [2 x i8], [2 x i8]* @.str.1295, i64 0, i64 0
+  %t253 = getelementptr [2 x i8], [2 x i8]* @.str.1297, i64 0, i64 0
   %t254 = ptrtoint i8* %t253 to i64
   %t255 = call i64 @Parser__consume(i64 %t252, i64 %t254)
   %t256 = load i64, i64* %name
@@ -28631,7 +28838,7 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__advance(i64 %t3)
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1296, i64 0, i64 0
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.1298, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__consume(i64 %t5, i64 %t7)
   %t9 = load i64, i64* %self
@@ -28641,12 +28848,12 @@ entry:
   %t12 = call i64 @Parser__expect_ident(i64 %t11)
   store i64 %t12, i64* %field
   %t13 = load i64, i64* %self
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1297, i64 0, i64 0
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1299, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = call i64 @Parser__match_kind(i64 %t13, i64 %t15)
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then2483, label %else2484
-then2483:
+  br i1 %t17, label %then2494, label %else2495
+then2494:
   %t18 = load i64, i64* %self
   %t19 = call i64 @Parser__parse_expr(i64 %t18)
   store i64 %t19, i64* %value
@@ -28679,9 +28886,9 @@ then2483:
   store i64 %t34, i64* %t38
   %t39 = ptrtoint [2 x i64]* %t36 to i64
   ret i64 %t39
-else2484:
-  br label %endif2482
-endif2482:
+else2495:
+  br label %endif2493
+endif2493:
   %t40 = call i8* @__sf_malloc(i64 8)
   %t41 = bitcast i8* %t40 to [1 x i64]*
   %t42 = getelementptr [1 x i64], [1 x i64]* %t41, i64 0, i64 0
@@ -28703,56 +28910,56 @@ endif2482:
   store i64 %t52, i64* %expr
   %t53 = add i64 0, 0
   store i64 %t53, i64* %chained
-  br label %while.cond2485
-while.cond2485:
+  br label %while.cond2496
+while.cond2496:
   %t54 = load i64, i64* %self
-  %t55 = getelementptr [2 x i8], [2 x i8]* @.str.1298, i64 0, i64 0
+  %t55 = getelementptr [2 x i8], [2 x i8]* @.str.1300, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   %t57 = call i64 @Parser__match_kind_check(i64 %t54, i64 %t56)
   %t58 = trunc i64 %t57 to i1
-  br label %logic.entry2488
-logic.entry2488:
-  br i1 %t58, label %end2490, label %rhs2489
-rhs2489:
+  br label %logic.entry2499
+logic.entry2499:
+  br i1 %t58, label %end2501, label %rhs2500
+rhs2500:
   %t59 = load i64, i64* %self
-  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1299, i64 0, i64 0
+  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1301, i64 0, i64 0
   %t61 = ptrtoint i8* %t60 to i64
   %t62 = call i64 @Parser__match_kind_check(i64 %t59, i64 %t61)
   %t63 = trunc i64 %t62 to i1
-  br label %rhs.exit2491
-rhs.exit2491:
-  br label %end2490
-end2490:
-  %t64 = phi i1 [%t58, %logic.entry2488], [%t63, %rhs.exit2491]
+  br label %rhs.exit2502
+rhs.exit2502:
+  br label %end2501
+end2501:
+  %t64 = phi i1 [%t58, %logic.entry2499], [%t63, %rhs.exit2502]
   %t65 = zext i1 %t64 to i64
   %t66 = trunc i64 %t65 to i1
-  br i1 %t66, label %while.body2486, label %while.end2487
-while.body2486:
+  br i1 %t66, label %while.body2497, label %while.end2498
+while.body2497:
   %t67 = add i64 0, 1
   store i64 %t67, i64* %chained
   %t68 = load i64, i64* %self
-  %t69 = getelementptr [2 x i8], [2 x i8]* @.str.1300, i64 0, i64 0
+  %t69 = getelementptr [2 x i8], [2 x i8]* @.str.1302, i64 0, i64 0
   %t70 = ptrtoint i8* %t69 to i64
   %t71 = call i64 @Parser__match_kind_check(i64 %t68, i64 %t70)
   %t72 = trunc i64 %t71 to i1
-  br i1 %t72, label %then2493, label %else2494
-then2493:
+  br i1 %t72, label %then2504, label %else2505
+then2504:
   %t73 = load i64, i64* %self
   %t74 = call i64 @Parser__advance(i64 %t73)
   %t75 = load i64, i64* %self
   %t76 = call i64 @Parser__parse_expr(i64 %t75)
   store i64 %t76, i64* %idx
   %t77 = load i64, i64* %self
-  %t78 = getelementptr [2 x i8], [2 x i8]* @.str.1301, i64 0, i64 0
+  %t78 = getelementptr [2 x i8], [2 x i8]* @.str.1303, i64 0, i64 0
   %t79 = ptrtoint i8* %t78 to i64
   %t80 = call i64 @Parser__consume(i64 %t77, i64 %t79)
   %t81 = load i64, i64* %self
-  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.1302, i64 0, i64 0
+  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.1304, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i64
   %t84 = call i64 @Parser__match_kind(i64 %t81, i64 %t83)
   %t85 = trunc i64 %t84 to i1
-  br i1 %t85, label %then2496, label %else2497
-then2496:
+  br i1 %t85, label %then2507, label %else2508
+then2507:
   %t86 = load i64, i64* %self
   %t87 = call i64 @Parser__parse_expr(i64 %t86)
   store i64 %t87, i64* %value
@@ -28778,9 +28985,9 @@ then2496:
   store i64 %t97, i64* %t101
   %t102 = ptrtoint [2 x i64]* %t99 to i64
   ret i64 %t102
-else2497:
-  br label %endif2495
-endif2495:
+else2508:
+  br label %endif2506
+endif2506:
   %t103 = load i64, i64* %expr
   %t104 = load i64, i64* %idx
   %t105 = call i8* @__sf_malloc(i64 24)
@@ -28793,8 +29000,8 @@ endif2495:
   store i64 %t104, i64* %t109
   %t110 = ptrtoint [3 x i64]* %t106 to i64
   store i64 %t110, i64* %expr
-  br label %endif2492
-else2494:
+  br label %endif2503
+else2505:
   %t111 = load i64, i64* %self
   %t112 = call i64 @Parser__advance(i64 %t111)
   %t113 = load i64, i64* %self
@@ -28804,47 +29011,47 @@ else2494:
   %t116 = call i64 @Parser__expect_ident(i64 %t115)
   store i64 %t116, i64* %next_field
   %t117 = load i64, i64* %self
-  %t118 = getelementptr [2 x i8], [2 x i8]* @.str.1303, i64 0, i64 0
+  %t118 = getelementptr [2 x i8], [2 x i8]* @.str.1305, i64 0, i64 0
   %t119 = ptrtoint i8* %t118 to i64
   %t120 = call i64 @Parser__match_kind(i64 %t117, i64 %t119)
   %t121 = trunc i64 %t120 to i1
-  br i1 %t121, label %then2499, label %else2500
-then2499:
+  br i1 %t121, label %then2510, label %else2511
+then2510:
   %t122 = call i64 @__list_new()
   store i64 %t122, i64* %args
   %t123 = load i64, i64* %self
-  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.1304, i64 0, i64 0
+  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.1306, i64 0, i64 0
   %t125 = ptrtoint i8* %t124 to i64
   %t126 = call i64 @Parser__match_kind_check(i64 %t123, i64 %t125)
   %t127 = xor i64 %t126, 1
   %t128 = trunc i64 %t127 to i1
-  br i1 %t128, label %then2502, label %else2503
-then2502:
+  br i1 %t128, label %then2513, label %else2514
+then2513:
   %t129 = load i64, i64* %args
   %t130 = load i64, i64* %self
   %t131 = call i64 @Parser__parse_call_arg(i64 %t130)
   %t132 = call i64 @__list_push(i64 %t129, i64 %t131)
-  br label %while.cond2504
-while.cond2504:
+  br label %while.cond2515
+while.cond2515:
   %t133 = load i64, i64* %self
-  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1305, i64 0, i64 0
+  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1307, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
   %t136 = call i64 @Parser__match_kind(i64 %t133, i64 %t135)
   %t137 = trunc i64 %t136 to i1
-  br i1 %t137, label %while.body2505, label %while.end2506
-while.body2505:
+  br i1 %t137, label %while.body2516, label %while.end2517
+while.body2516:
   %t138 = load i64, i64* %args
   %t139 = load i64, i64* %self
   %t140 = call i64 @Parser__parse_call_arg(i64 %t139)
   %t141 = call i64 @__list_push(i64 %t138, i64 %t140)
-  br label %while.cond2504
-while.end2506:
-  br label %endif2501
-else2503:
-  br label %endif2501
-endif2501:
+  br label %while.cond2515
+while.end2517:
+  br label %endif2512
+else2514:
+  br label %endif2512
+endif2512:
   %t142 = load i64, i64* %self
-  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.1306, i64 0, i64 0
+  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.1308, i64 0, i64 0
   %t144 = ptrtoint i8* %t143 to i64
   %t145 = call i64 @Parser__consume(i64 %t142, i64 %t144)
   %t146 = load i64, i64* %expr
@@ -28865,15 +29072,15 @@ endif2501:
   store i64 %t149, i64* %t156
   %t157 = ptrtoint [5 x i64]* %t151 to i64
   store i64 %t157, i64* %expr
-  br label %endif2498
-else2500:
+  br label %endif2509
+else2511:
   %t158 = load i64, i64* %self
-  %t159 = getelementptr [2 x i8], [2 x i8]* @.str.1307, i64 0, i64 0
+  %t159 = getelementptr [2 x i8], [2 x i8]* @.str.1309, i64 0, i64 0
   %t160 = ptrtoint i8* %t159 to i64
   %t161 = call i64 @Parser__match_kind(i64 %t158, i64 %t160)
   %t162 = trunc i64 %t161 to i1
-  br i1 %t162, label %then2507, label %else2508
-then2507:
+  br i1 %t162, label %then2518, label %else2519
+then2518:
   %t163 = load i64, i64* %self
   %t164 = call i64 @Parser__parse_expr(i64 %t163)
   store i64 %t164, i64* %value
@@ -28902,7 +29109,7 @@ then2507:
   store i64 %t176, i64* %t180
   %t181 = ptrtoint [2 x i64]* %t178 to i64
   ret i64 %t181
-else2508:
+else2519:
   %t182 = load i64, i64* %expr
   %t183 = load i64, i64* %next_field
   %t184 = load i64, i64* %next_span
@@ -28918,60 +29125,60 @@ else2508:
   store i64 %t184, i64* %t190
   %t191 = ptrtoint [4 x i64]* %t186 to i64
   store i64 %t191, i64* %expr
-  br label %endif2498
-endif2498:
-  br label %endif2492
-endif2492:
-  br label %while.cond2485
-while.end2487:
+  br label %endif2509
+endif2509:
+  br label %endif2503
+endif2503:
+  br label %while.cond2496
+while.end2498:
   %t192 = load i64, i64* %self
-  %t193 = getelementptr [2 x i8], [2 x i8]* @.str.1308, i64 0, i64 0
+  %t193 = getelementptr [2 x i8], [2 x i8]* @.str.1310, i64 0, i64 0
   %t194 = ptrtoint i8* %t193 to i64
   %t195 = call i64 @Parser__match_kind(i64 %t192, i64 %t194)
   %t196 = trunc i64 %t195 to i1
-  br i1 %t196, label %then2510, label %else2511
-then2510:
+  br i1 %t196, label %then2521, label %else2522
+then2521:
   %t197 = call i64 @__list_new()
   store i64 %t197, i64* %args
   %t198 = load i64, i64* %self
-  %t199 = getelementptr [2 x i8], [2 x i8]* @.str.1309, i64 0, i64 0
+  %t199 = getelementptr [2 x i8], [2 x i8]* @.str.1311, i64 0, i64 0
   %t200 = ptrtoint i8* %t199 to i64
   %t201 = call i64 @Parser__match_kind_check(i64 %t198, i64 %t200)
   %t202 = xor i64 %t201, 1
   %t203 = trunc i64 %t202 to i1
-  br i1 %t203, label %then2513, label %else2514
-then2513:
+  br i1 %t203, label %then2524, label %else2525
+then2524:
   %t204 = load i64, i64* %args
   %t205 = load i64, i64* %self
   %t206 = call i64 @Parser__parse_call_arg(i64 %t205)
   %t207 = call i64 @__list_push(i64 %t204, i64 %t206)
-  br label %while.cond2515
-while.cond2515:
+  br label %while.cond2526
+while.cond2526:
   %t208 = load i64, i64* %self
-  %t209 = getelementptr [2 x i8], [2 x i8]* @.str.1310, i64 0, i64 0
+  %t209 = getelementptr [2 x i8], [2 x i8]* @.str.1312, i64 0, i64 0
   %t210 = ptrtoint i8* %t209 to i64
   %t211 = call i64 @Parser__match_kind(i64 %t208, i64 %t210)
   %t212 = trunc i64 %t211 to i1
-  br i1 %t212, label %while.body2516, label %while.end2517
-while.body2516:
+  br i1 %t212, label %while.body2527, label %while.end2528
+while.body2527:
   %t213 = load i64, i64* %args
   %t214 = load i64, i64* %self
   %t215 = call i64 @Parser__parse_call_arg(i64 %t214)
   %t216 = call i64 @__list_push(i64 %t213, i64 %t215)
-  br label %while.cond2515
-while.end2517:
-  br label %endif2512
-else2514:
-  br label %endif2512
-endif2512:
+  br label %while.cond2526
+while.end2528:
+  br label %endif2523
+else2525:
+  br label %endif2523
+endif2523:
   %t217 = load i64, i64* %self
-  %t218 = getelementptr [2 x i8], [2 x i8]* @.str.1311, i64 0, i64 0
+  %t218 = getelementptr [2 x i8], [2 x i8]* @.str.1313, i64 0, i64 0
   %t219 = ptrtoint i8* %t218 to i64
   %t220 = call i64 @Parser__consume(i64 %t217, i64 %t219)
   %t221 = load i64, i64* %chained
   %t222 = trunc i64 %t221 to i1
-  br i1 %t222, label %then2519, label %else2520
-then2519:
+  br i1 %t222, label %then2530, label %else2531
+then2530:
   %t223 = load i64, i64* %expr
   %t224 = load i64, i64* %args
   %t225 = load i64, i64* %self
@@ -28996,9 +29203,9 @@ then2519:
   store i64 %t234, i64* %t238
   %t239 = ptrtoint [2 x i64]* %t236 to i64
   ret i64 %t239
-else2520:
-  br label %endif2518
-endif2518:
+else2531:
+  br label %endif2529
+endif2529:
   %t240 = call i8* @__sf_malloc(i64 8)
   %t241 = bitcast i8* %t240 to [1 x i64]*
   %t242 = getelementptr [1 x i64], [1 x i64]* %t241, i64 0, i64 0
@@ -29028,9 +29235,9 @@ endif2518:
   store i64 %t254, i64* %t258
   %t259 = ptrtoint [2 x i64]* %t256 to i64
   ret i64 %t259
-else2511:
-  br label %endif2509
-endif2509:
+else2522:
+  br label %endif2520
+endif2520:
   %t260 = load i64, i64* %expr
   %t261 = call i8* @__sf_malloc(i64 16)
   %t262 = bitcast i8* %t261 to [2 x i64]*
@@ -29072,15 +29279,15 @@ entry:
   store i64 %t6, i64* %t11
   %t12 = ptrtoint [3 x i64]* %t8 to i64
   store i64 %t12, i64* %expr
-  br label %while.cond2521
-while.cond2521:
+  br label %while.cond2532
+while.cond2532:
   %t13 = load i64, i64* %self
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1312, i64 0, i64 0
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1314, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = call i64 @Parser__match_kind_check(i64 %t13, i64 %t15)
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %while.body2522, label %while.end2523
-while.body2522:
+  br i1 %t17, label %while.body2533, label %while.end2534
+while.body2533:
   %t18 = load i64, i64* %self
   %t19 = call i64 @Parser__advance(i64 %t18)
   %t20 = load i64, i64* %self
@@ -29090,53 +29297,53 @@ while.body2522:
   %t23 = call i64 @Parser__expect_ident(i64 %t22)
   store i64 %t23, i64* %field
   %t24 = load i64, i64* %self
-  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1313, i64 0, i64 0
+  %t25 = getelementptr [2 x i8], [2 x i8]* @.str.1315, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @Parser__match_kind_check(i64 %t24, i64 %t26)
   %t28 = trunc i64 %t27 to i1
-  br i1 %t28, label %then2525, label %else2526
-then2525:
+  br i1 %t28, label %then2536, label %else2537
+then2536:
   %t29 = load i64, i64* %self
   %t30 = call i64 @Parser__advance(i64 %t29)
   %t31 = call i64 @__list_new()
   store i64 %t31, i64* %args
   %t32 = load i64, i64* %self
-  %t33 = getelementptr [2 x i8], [2 x i8]* @.str.1314, i64 0, i64 0
+  %t33 = getelementptr [2 x i8], [2 x i8]* @.str.1316, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i64 @Parser__match_kind_check(i64 %t32, i64 %t34)
   %t36 = xor i64 %t35, 1
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then2528, label %else2529
-then2528:
+  br i1 %t37, label %then2539, label %else2540
+then2539:
   %t38 = load i64, i64* %args
   %t39 = load i64, i64* %self
   %t40 = call i64 @Parser__parse_call_arg(i64 %t39)
   %t41 = call i64 @__list_push(i64 %t38, i64 %t40)
-  br label %while.cond2530
-while.cond2530:
+  br label %while.cond2541
+while.cond2541:
   %t42 = load i64, i64* %self
-  %t43 = getelementptr [2 x i8], [2 x i8]* @.str.1315, i64 0, i64 0
+  %t43 = getelementptr [2 x i8], [2 x i8]* @.str.1317, i64 0, i64 0
   %t44 = ptrtoint i8* %t43 to i64
   %t45 = call i64 @Parser__match_kind(i64 %t42, i64 %t44)
   %t46 = trunc i64 %t45 to i1
-  br i1 %t46, label %while.body2531, label %while.end2532
-while.body2531:
+  br i1 %t46, label %while.body2542, label %while.end2543
+while.body2542:
   %t47 = load i64, i64* %args
   %t48 = load i64, i64* %self
   %t49 = call i64 @Parser__parse_call_arg(i64 %t48)
   %t50 = call i64 @__list_push(i64 %t47, i64 %t49)
-  br label %while.cond2530
-while.end2532:
+  br label %while.cond2541
+while.end2543:
   %t51 = load i64, i64* %self
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1316, i64 0, i64 0
+  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.1318, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @Parser__consume(i64 %t51, i64 %t53)
-  br label %endif2527
-else2529:
+  br label %endif2538
+else2540:
   %t55 = load i64, i64* %self
   %t56 = call i64 @Parser__advance(i64 %t55)
-  br label %endif2527
-endif2527:
+  br label %endif2538
+endif2538:
   %t57 = load i64, i64* %expr
   %t58 = load i64, i64* %field
   %t59 = load i64, i64* %args
@@ -29155,15 +29362,15 @@ endif2527:
   store i64 %t60, i64* %t67
   %t68 = ptrtoint [5 x i64]* %t62 to i64
   store i64 %t68, i64* %expr
-  br label %endif2524
-else2526:
+  br label %endif2535
+else2537:
   %t69 = load i64, i64* %self
-  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1317, i64 0, i64 0
+  %t70 = getelementptr [2 x i8], [2 x i8]* @.str.1319, i64 0, i64 0
   %t71 = ptrtoint i8* %t70 to i64
   %t72 = call i64 @Parser__match_kind(i64 %t69, i64 %t71)
   %t73 = trunc i64 %t72 to i1
-  br i1 %t73, label %then2533, label %else2534
-then2533:
+  br i1 %t73, label %then2544, label %else2545
+then2544:
   %t74 = load i64, i64* %self
   %t75 = call i64 @Parser__parse_expr(i64 %t74)
   store i64 %t75, i64* %value
@@ -29192,7 +29399,7 @@ then2533:
   store i64 %t87, i64* %t91
   %t92 = ptrtoint [2 x i64]* %t89 to i64
   ret i64 %t92
-else2534:
+else2545:
   %t93 = load i64, i64* %expr
   %t94 = load i64, i64* %field
   %t95 = load i64, i64* %field_span
@@ -29208,33 +29415,33 @@ else2534:
   store i64 %t95, i64* %t101
   %t102 = ptrtoint [4 x i64]* %t97 to i64
   store i64 %t102, i64* %expr
-  br label %endif2524
-endif2524:
-  br label %while.cond2521
-while.end2523:
+  br label %endif2535
+endif2535:
+  br label %while.cond2532
+while.end2534:
   %t103 = load i64, i64* %self
-  %t104 = getelementptr [2 x i8], [2 x i8]* @.str.1318, i64 0, i64 0
+  %t104 = getelementptr [2 x i8], [2 x i8]* @.str.1320, i64 0, i64 0
   %t105 = ptrtoint i8* %t104 to i64
   %t106 = call i64 @Parser__match_kind_check(i64 %t103, i64 %t105)
   %t107 = trunc i64 %t106 to i1
-  br i1 %t107, label %then2536, label %else2537
-then2536:
+  br i1 %t107, label %then2547, label %else2548
+then2547:
   %t108 = load i64, i64* %self
   %t109 = call i64 @Parser__advance(i64 %t108)
   %t110 = load i64, i64* %self
   %t111 = call i64 @Parser__parse_expr(i64 %t110)
   store i64 %t111, i64* %idx
   %t112 = load i64, i64* %self
-  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.1319, i64 0, i64 0
+  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.1321, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = call i64 @Parser__consume(i64 %t112, i64 %t114)
   %t116 = load i64, i64* %self
-  %t117 = getelementptr [2 x i8], [2 x i8]* @.str.1320, i64 0, i64 0
+  %t117 = getelementptr [2 x i8], [2 x i8]* @.str.1322, i64 0, i64 0
   %t118 = ptrtoint i8* %t117 to i64
   %t119 = call i64 @Parser__match_kind(i64 %t116, i64 %t118)
   %t120 = trunc i64 %t119 to i1
-  br i1 %t120, label %then2539, label %else2540
-then2539:
+  br i1 %t120, label %then2550, label %else2551
+then2550:
   %t121 = load i64, i64* %self
   %t122 = call i64 @Parser__parse_expr(i64 %t121)
   store i64 %t122, i64* %value
@@ -29260,9 +29467,9 @@ then2539:
   store i64 %t132, i64* %t136
   %t137 = ptrtoint [2 x i64]* %t134 to i64
   ret i64 %t137
-else2540:
-  br label %endif2538
-endif2538:
+else2551:
+  br label %endif2549
+endif2549:
   %t138 = load i64, i64* %expr
   %t139 = load i64, i64* %idx
   %t140 = call i8* @__sf_malloc(i64 24)
@@ -29275,10 +29482,10 @@ endif2538:
   store i64 %t139, i64* %t144
   %t145 = ptrtoint [3 x i64]* %t141 to i64
   store i64 %t145, i64* %expr
-  br label %endif2535
-else2537:
-  br label %endif2535
-endif2535:
+  br label %endif2546
+else2548:
+  br label %endif2546
+endif2546:
   %t146 = load i64, i64* %expr
   %t147 = call i8* @__sf_malloc(i64 16)
   %t148 = bitcast i8* %t147 to [2 x i64]*
@@ -29295,7 +29502,7 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1321, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.1323, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__parse_class_decl_with_doc(i64 %t1, i64 %t3)
   ret i64 %t4
@@ -29309,7 +29516,7 @@ entry:
   store i64 %docstring.arg, i64* %docstring
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %docstring
-  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1322, i64 0, i64 0
+  %t3 = getelementptr [7 x i8], [7 x i8]* @.str.1324, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__parse_class_decl_vis(i64 %t1, i64 %t2, i64 %t4)
   ret i64 %t5
@@ -29352,37 +29559,37 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__current_span(i64 %t1)
   store i64 %t2, i64* %decl_start
-  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1323, i64 0, i64 0
+  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1325, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   store i64 %t4, i64* %introducer
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [10 x i8], [10 x i8]* @.str.1324, i64 0, i64 0
+  %t6 = getelementptr [10 x i8], [10 x i8]* @.str.1326, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__is_ident_named(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then2542, label %else2543
-then2542:
-  %t10 = getelementptr [10 x i8], [10 x i8]* @.str.1325, i64 0, i64 0
+  br i1 %t9, label %then2553, label %else2554
+then2553:
+  %t10 = getelementptr [10 x i8], [10 x i8]* @.str.1327, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %introducer
-  br label %endif2541
-else2543:
-  br label %endif2541
-endif2541:
+  br label %endif2552
+else2554:
+  br label %endif2552
+endif2552:
   %t12 = load i64, i64* %self
-  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.1326, i64 0, i64 0
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.1328, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @Parser__is_ident_named(i64 %t12, i64 %t14)
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then2545, label %else2546
-then2545:
-  %t17 = getelementptr [6 x i8], [6 x i8]* @.str.1327, i64 0, i64 0
+  br i1 %t16, label %then2556, label %else2557
+then2556:
+  %t17 = getelementptr [6 x i8], [6 x i8]* @.str.1329, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   store i64 %t18, i64* %introducer
-  br label %endif2544
-else2546:
-  br label %endif2544
-endif2544:
+  br label %endif2555
+else2557:
+  br label %endif2555
+endif2555:
   %t19 = load i64, i64* %self
   %t20 = call i64 @Parser__advance(i64 %t19)
   %t21 = load i64, i64* %self
@@ -29394,96 +29601,96 @@ endif2544:
   %t25 = call i64 @__list_new()
   store i64 %t25, i64* %type_params
   %t26 = load i64, i64* %self
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1328, i64 0, i64 0
+  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1330, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   %t29 = call i64 @Parser__match_kind_check(i64 %t26, i64 %t28)
   %t30 = trunc i64 %t29 to i1
-  br i1 %t30, label %then2548, label %else2549
-then2548:
+  br i1 %t30, label %then2559, label %else2560
+then2559:
   %t31 = load i64, i64* %self
   %t32 = call i64 @Parser__advance(i64 %t31)
   %t33 = add i64 0, 1
   store i64 %t33, i64* %depth
-  br label %while.cond2550
-while.cond2550:
+  br label %while.cond2561
+while.cond2561:
   %t34 = load i64, i64* %depth
   %t35 = add i64 0, 0
   %t37 = icmp sgt i64 %t34, %t35
   %t36 = zext i1 %t37 to i64
   %t38 = trunc i64 %t36 to i1
-  br label %logic.entry2553
-logic.entry2553:
-  br i1 %t38, label %rhs2554, label %end2555
-rhs2554:
+  br label %logic.entry2564
+logic.entry2564:
+  br i1 %t38, label %rhs2565, label %end2566
+rhs2565:
   %t39 = load i64, i64* %self
-  %t40 = getelementptr [4 x i8], [4 x i8]* @.str.1329, i64 0, i64 0
+  %t40 = getelementptr [4 x i8], [4 x i8]* @.str.1331, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @Parser__match_kind_check(i64 %t39, i64 %t41)
   %t43 = xor i64 %t42, 1
   %t44 = trunc i64 %t43 to i1
-  br label %rhs.exit2556
-rhs.exit2556:
-  br label %end2555
-end2555:
-  %t45 = phi i1 [%t38, %logic.entry2553], [%t44, %rhs.exit2556]
+  br label %rhs.exit2567
+rhs.exit2567:
+  br label %end2566
+end2566:
+  %t45 = phi i1 [%t38, %logic.entry2564], [%t44, %rhs.exit2567]
   %t46 = zext i1 %t45 to i64
   %t47 = trunc i64 %t46 to i1
-  br i1 %t47, label %while.body2551, label %while.end2552
-while.body2551:
+  br i1 %t47, label %while.body2562, label %while.end2563
+while.body2562:
   %t48 = load i64, i64* %self
-  %t49 = getelementptr [2 x i8], [2 x i8]* @.str.1330, i64 0, i64 0
+  %t49 = getelementptr [2 x i8], [2 x i8]* @.str.1332, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i64 @Parser__match_kind_check(i64 %t48, i64 %t50)
   %t52 = trunc i64 %t51 to i1
-  br i1 %t52, label %then2558, label %else2559
-then2558:
+  br i1 %t52, label %then2569, label %else2570
+then2569:
   %t53 = load i64, i64* %depth
   %t54 = add i64 0, 1
   %t55 = add i64 %t53, %t54
   store i64 %t55, i64* %depth
-  br label %endif2557
-else2559:
+  br label %endif2568
+else2570:
   %t56 = load i64, i64* %self
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1331, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1333, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i64 @Parser__match_kind_check(i64 %t56, i64 %t58)
   %t60 = trunc i64 %t59 to i1
-  br i1 %t60, label %then2560, label %else2561
-then2560:
+  br i1 %t60, label %then2571, label %else2572
+then2571:
   %t61 = load i64, i64* %depth
   %t62 = add i64 0, 1
   %t63 = sub i64 %t61, %t62
   store i64 %t63, i64* %depth
-  br label %endif2557
-else2561:
+  br label %endif2568
+else2572:
   %t64 = load i64, i64* %self
-  %t65 = getelementptr [3 x i8], [3 x i8]* @.str.1332, i64 0, i64 0
+  %t65 = getelementptr [3 x i8], [3 x i8]* @.str.1334, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = call i64 @Parser__match_kind_check(i64 %t64, i64 %t66)
   %t68 = trunc i64 %t67 to i1
-  br i1 %t68, label %then2562, label %else2563
-then2562:
+  br i1 %t68, label %then2573, label %else2574
+then2573:
   %t69 = load i64, i64* %depth
   %t70 = add i64 0, 2
   %t71 = sub i64 %t69, %t70
   store i64 %t71, i64* %depth
-  br label %endif2557
-else2563:
+  br label %endif2568
+else2574:
   %t72 = load i64, i64* %depth
   %t73 = add i64 0, 1
   %t74 = icmp eq i64 %t72, %t73
   %t75 = zext i1 %t74 to i64
   %t76 = trunc i64 %t75 to i1
-  br i1 %t76, label %then2564, label %else2565
-then2564:
+  br i1 %t76, label %then2575, label %else2576
+then2575:
   %t77 = load i64, i64* %self
   %t78 = call i64 @Parser__current_kind(i64 %t77)
   %t79 = alloca i64
   %t81 = inttoptr i64 %t78 to i64*
   %t82 = load i64, i64* %t81
   %t80 = trunc i64 %t82 to i8
-  switch i8 %t80, label %match.arm2568 [ i8 6, label %match.arm2567 ]
-match.arm2567:
+  switch i8 %t80, label %match.arm2579 [ i8 6, label %match.arm2578 ]
+match.arm2578:
   %t83 = load i64, i64* %n
   %t84 = inttoptr i64 %t78 to [2 x i64]*
   %t85 = getelementptr [2 x i64], [2 x i64]* %t84, i64 0, i64 1
@@ -29492,13 +29699,13 @@ match.arm2567:
   %t87 = load i64, i64* %n
   store i64 %t87, i64* %t79
   store i64 %t83, i64* %n
-  br label %match.end2566
-match.arm2568:
-  %t88 = getelementptr [1 x i8], [1 x i8]* @.str.1333, i64 0, i64 0
+  br label %match.end2577
+match.arm2579:
+  %t88 = getelementptr [1 x i8], [1 x i8]* @.str.1335, i64 0, i64 0
   %t89 = ptrtoint i8* %t88 to i64
   store i64 %t89, i64* %t79
-  br label %match.end2566
-match.end2566:
+  br label %match.end2577
+match.end2577:
   %t90 = load i64, i64* %t79
   store i64 %t90, i64* %tp_name
   %t91 = load i64, i64* %tp_name
@@ -29508,63 +29715,63 @@ match.end2566:
   %t96 = icmp sgt i64 %t93, %t94
   %t95 = zext i1 %t96 to i64
   %t97 = trunc i64 %t95 to i1
-  br i1 %t97, label %then2570, label %else2571
-then2570:
+  br i1 %t97, label %then2581, label %else2582
+then2581:
   %t98 = load i64, i64* %type_params
   %t99 = load i64, i64* %tp_name
   %t100 = call i64 @__list_push(i64 %t98, i64 %t99)
-  br label %endif2569
-else2571:
-  br label %endif2569
-endif2569:
-  br label %endif2557
-else2565:
-  br label %endif2557
-endif2557:
+  br label %endif2580
+else2582:
+  br label %endif2580
+endif2580:
+  br label %endif2568
+else2576:
+  br label %endif2568
+endif2568:
   %t101 = load i64, i64* %self
   %t102 = call i64 @Parser__advance(i64 %t101)
-  br label %while.cond2550
-while.end2552:
-  br label %endif2547
-else2549:
-  br label %endif2547
-endif2547:
+  br label %while.cond2561
+while.end2563:
+  br label %endif2558
+else2560:
+  br label %endif2558
+endif2558:
   %t103 = call i64 @__list_new()
   store i64 %t103, i64* %parents
   %t104 = load i64, i64* %self
-  %t105 = getelementptr [8 x i8], [8 x i8]* @.str.1334, i64 0, i64 0
+  %t105 = getelementptr [8 x i8], [8 x i8]* @.str.1336, i64 0, i64 0
   %t106 = ptrtoint i8* %t105 to i64
   %t107 = call i64 @Parser__is_ident_named(i64 %t104, i64 %t106)
   %t108 = trunc i64 %t107 to i1
-  br i1 %t108, label %then2573, label %else2574
-then2573:
+  br i1 %t108, label %then2584, label %else2585
+then2584:
   %t109 = load i64, i64* %self
   %t110 = call i64 @Parser__advance(i64 %t109)
   %t111 = load i64, i64* %parents
   %t112 = load i64, i64* %self
   %t113 = call i64 @Parser__expect_ident(i64 %t112)
   %t114 = call i64 @__list_push(i64 %t111, i64 %t113)
-  br label %while.cond2575
-while.cond2575:
+  br label %while.cond2586
+while.cond2586:
   %t115 = load i64, i64* %self
-  %t116 = getelementptr [2 x i8], [2 x i8]* @.str.1335, i64 0, i64 0
+  %t116 = getelementptr [2 x i8], [2 x i8]* @.str.1337, i64 0, i64 0
   %t117 = ptrtoint i8* %t116 to i64
   %t118 = call i64 @Parser__match_kind(i64 %t115, i64 %t117)
   %t119 = trunc i64 %t118 to i1
-  br i1 %t119, label %while.body2576, label %while.end2577
-while.body2576:
+  br i1 %t119, label %while.body2587, label %while.end2588
+while.body2587:
   %t120 = load i64, i64* %parents
   %t121 = load i64, i64* %self
   %t122 = call i64 @Parser__expect_ident(i64 %t121)
   %t123 = call i64 @__list_push(i64 %t120, i64 %t122)
-  br label %while.cond2575
-while.end2577:
-  br label %endif2572
-else2574:
-  br label %endif2572
-endif2572:
+  br label %while.cond2586
+while.end2588:
+  br label %endif2583
+else2585:
+  br label %endif2583
+endif2583:
   %t124 = load i64, i64* %self
-  %t125 = getelementptr [2 x i8], [2 x i8]* @.str.1336, i64 0, i64 0
+  %t125 = getelementptr [2 x i8], [2 x i8]* @.str.1338, i64 0, i64 0
   %t126 = ptrtoint i8* %t125 to i64
   %t127 = call i64 @Parser__consume(i64 %t124, i64 %t126)
   %t128 = call i64 @__list_new()
@@ -29573,124 +29780,124 @@ endif2572:
   store i64 %t129, i64* %methods
   %t130 = call i64 @__list_new()
   store i64 %t130, i64* %field_defaults
-  br label %while.cond2578
-while.cond2578:
+  br label %while.cond2589
+while.cond2589:
   %t131 = load i64, i64* %self
-  %t132 = getelementptr [2 x i8], [2 x i8]* @.str.1337, i64 0, i64 0
+  %t132 = getelementptr [2 x i8], [2 x i8]* @.str.1339, i64 0, i64 0
   %t133 = ptrtoint i8* %t132 to i64
   %t134 = call i64 @Parser__match_kind_check(i64 %t131, i64 %t133)
   %t135 = xor i64 %t134, 1
   %t136 = trunc i64 %t135 to i1
-  br label %logic.entry2581
-logic.entry2581:
-  br i1 %t136, label %rhs2582, label %end2583
-rhs2582:
+  br label %logic.entry2592
+logic.entry2592:
+  br i1 %t136, label %rhs2593, label %end2594
+rhs2593:
   %t137 = load i64, i64* %self
-  %t138 = getelementptr [4 x i8], [4 x i8]* @.str.1338, i64 0, i64 0
+  %t138 = getelementptr [4 x i8], [4 x i8]* @.str.1340, i64 0, i64 0
   %t139 = ptrtoint i8* %t138 to i64
   %t140 = call i64 @Parser__match_kind_check(i64 %t137, i64 %t139)
   %t141 = xor i64 %t140, 1
   %t142 = trunc i64 %t141 to i1
-  br label %rhs.exit2584
-rhs.exit2584:
-  br label %end2583
-end2583:
-  %t143 = phi i1 [%t136, %logic.entry2581], [%t142, %rhs.exit2584]
+  br label %rhs.exit2595
+rhs.exit2595:
+  br label %end2594
+end2594:
+  %t143 = phi i1 [%t136, %logic.entry2592], [%t142, %rhs.exit2595]
   %t144 = zext i1 %t143 to i64
   %t145 = trunc i64 %t144 to i1
-  br i1 %t145, label %while.body2579, label %while.end2580
-while.body2579:
-  br label %while.cond2585
-while.cond2585:
+  br i1 %t145, label %while.body2590, label %while.end2591
+while.body2590:
+  br label %while.cond2596
+while.cond2596:
   %t146 = load i64, i64* %self
-  %t147 = getelementptr [2 x i8], [2 x i8]* @.str.1339, i64 0, i64 0
+  %t147 = getelementptr [2 x i8], [2 x i8]* @.str.1341, i64 0, i64 0
   %t148 = ptrtoint i8* %t147 to i64
   %t149 = call i64 @Parser__match_kind(i64 %t146, i64 %t148)
   %t150 = trunc i64 %t149 to i1
-  br i1 %t150, label %while.body2586, label %while.end2587
-while.body2586:
-  br label %while.cond2585
-while.end2587:
+  br i1 %t150, label %while.body2597, label %while.end2598
+while.body2597:
+  br label %while.cond2596
+while.end2598:
   %t151 = load i64, i64* %self
-  %t152 = getelementptr [2 x i8], [2 x i8]* @.str.1340, i64 0, i64 0
+  %t152 = getelementptr [2 x i8], [2 x i8]* @.str.1342, i64 0, i64 0
   %t153 = ptrtoint i8* %t152 to i64
   %t154 = call i64 @Parser__match_kind_check(i64 %t151, i64 %t153)
   %t155 = trunc i64 %t154 to i1
-  br label %logic.entry2589
-logic.entry2589:
-  br i1 %t155, label %end2591, label %rhs2590
-rhs2590:
+  br label %logic.entry2600
+logic.entry2600:
+  br i1 %t155, label %end2602, label %rhs2601
+rhs2601:
   %t156 = load i64, i64* %self
-  %t157 = getelementptr [4 x i8], [4 x i8]* @.str.1341, i64 0, i64 0
+  %t157 = getelementptr [4 x i8], [4 x i8]* @.str.1343, i64 0, i64 0
   %t158 = ptrtoint i8* %t157 to i64
   %t159 = call i64 @Parser__match_kind_check(i64 %t156, i64 %t158)
   %t160 = trunc i64 %t159 to i1
-  br label %rhs.exit2592
-rhs.exit2592:
-  br label %end2591
-end2591:
-  %t161 = phi i1 [%t155, %logic.entry2589], [%t160, %rhs.exit2592]
+  br label %rhs.exit2603
+rhs.exit2603:
+  br label %end2602
+end2602:
+  %t161 = phi i1 [%t155, %logic.entry2600], [%t160, %rhs.exit2603]
   %t162 = zext i1 %t161 to i64
   %t163 = trunc i64 %t162 to i1
-  br i1 %t163, label %then2593, label %else2594
-then2593:
-  br label %while.end2580
-else2594:
-  br label %endif2588
-endif2588:
+  br i1 %t163, label %then2604, label %else2605
+then2604:
+  br label %while.end2591
+else2605:
+  br label %endif2599
+endif2599:
   %t164 = load i64, i64* %self
   %t165 = call i64 @Parser__collect_doc_comments(i64 %t164)
   store i64 %t165, i64* %member_doc
   %t166 = load i64, i64* %self
-  %t167 = getelementptr [2 x i8], [2 x i8]* @.str.1342, i64 0, i64 0
+  %t167 = getelementptr [2 x i8], [2 x i8]* @.str.1344, i64 0, i64 0
   %t168 = ptrtoint i8* %t167 to i64
   %t169 = call i64 @Parser__match_kind_check(i64 %t166, i64 %t168)
   %t170 = trunc i64 %t169 to i1
-  br label %logic.entry2596
-logic.entry2596:
-  br i1 %t170, label %end2598, label %rhs2597
-rhs2597:
+  br label %logic.entry2607
+logic.entry2607:
+  br i1 %t170, label %end2609, label %rhs2608
+rhs2608:
   %t171 = load i64, i64* %self
-  %t172 = getelementptr [4 x i8], [4 x i8]* @.str.1343, i64 0, i64 0
+  %t172 = getelementptr [4 x i8], [4 x i8]* @.str.1345, i64 0, i64 0
   %t173 = ptrtoint i8* %t172 to i64
   %t174 = call i64 @Parser__match_kind_check(i64 %t171, i64 %t173)
   %t175 = trunc i64 %t174 to i1
-  br label %rhs.exit2599
-rhs.exit2599:
-  br label %end2598
-end2598:
-  %t176 = phi i1 [%t170, %logic.entry2596], [%t175, %rhs.exit2599]
+  br label %rhs.exit2610
+rhs.exit2610:
+  br label %end2609
+end2609:
+  %t176 = phi i1 [%t170, %logic.entry2607], [%t175, %rhs.exit2610]
   %t177 = zext i1 %t176 to i64
   %t178 = trunc i64 %t177 to i1
-  br i1 %t178, label %then2600, label %else2601
-then2600:
-  br label %while.end2580
-else2601:
-  br label %endif2595
-endif2595:
-  %t179 = getelementptr [7 x i8], [7 x i8]* @.str.1344, i64 0, i64 0
+  br i1 %t178, label %then2611, label %else2612
+then2611:
+  br label %while.end2591
+else2612:
+  br label %endif2606
+endif2606:
+  %t179 = getelementptr [7 x i8], [7 x i8]* @.str.1346, i64 0, i64 0
   %t180 = ptrtoint i8* %t179 to i64
   store i64 %t180, i64* %member_vis
   %t181 = load i64, i64* %self
   %t182 = call i64 @Parser__at_visibility_modifier(i64 %t181)
   %t183 = trunc i64 %t182 to i1
-  br i1 %t183, label %then2603, label %else2604
-then2603:
+  br i1 %t183, label %then2614, label %else2615
+then2614:
   %t184 = load i64, i64* %self
   %t185 = add i64 0, 1
   %t186 = call i64 @Parser__take_visibility(i64 %t184, i64 %t185)
   store i64 %t186, i64* %member_vis
-  br label %endif2602
-else2604:
-  br label %endif2602
-endif2602:
+  br label %endif2613
+else2615:
+  br label %endif2613
+endif2613:
   %t187 = load i64, i64* %self
-  %t188 = getelementptr [4 x i8], [4 x i8]* @.str.1345, i64 0, i64 0
+  %t188 = getelementptr [4 x i8], [4 x i8]* @.str.1347, i64 0, i64 0
   %t189 = ptrtoint i8* %t188 to i64
   %t190 = call i64 @Parser__match_kind_check(i64 %t187, i64 %t189)
   %t191 = trunc i64 %t190 to i1
-  br i1 %t191, label %then2606, label %else2607
-then2606:
+  br i1 %t191, label %then2617, label %else2618
+then2617:
   %t192 = load i64, i64* %self
   %t193 = call i64 @Parser__advance(i64 %t192)
   %t194 = load i64, i64* %self
@@ -29699,131 +29906,131 @@ then2606:
   %t196 = load i64, i64* %self
   %t197 = call i64 @Parser__expect_ident(i64 %t196)
   store i64 %t197, i64* %fname
-  %t198 = getelementptr [4 x i8], [4 x i8]* @.str.1346, i64 0, i64 0
+  %t198 = getelementptr [4 x i8], [4 x i8]* @.str.1348, i64 0, i64 0
   %t199 = ptrtoint i8* %t198 to i64
   store i64 %t199, i64* %ftype
   %t200 = load i64, i64* %self
-  %t201 = getelementptr [2 x i8], [2 x i8]* @.str.1347, i64 0, i64 0
+  %t201 = getelementptr [2 x i8], [2 x i8]* @.str.1349, i64 0, i64 0
   %t202 = ptrtoint i8* %t201 to i64
   %t203 = call i64 @Parser__match_kind(i64 %t200, i64 %t202)
   %t204 = trunc i64 %t203 to i1
-  br i1 %t204, label %then2609, label %else2610
-then2609:
+  br i1 %t204, label %then2620, label %else2621
+then2620:
   %t205 = load i64, i64* %self
   %t206 = call i64 @Parser__parse_type(i64 %t205)
   store i64 %t206, i64* %ftype
-  br label %endif2608
-else2610:
-  br label %endif2608
-endif2608:
+  br label %endif2619
+else2621:
+  br label %endif2619
+endif2619:
   %t207 = load i64, i64* %self
-  %t208 = getelementptr [2 x i8], [2 x i8]* @.str.1348, i64 0, i64 0
+  %t208 = getelementptr [2 x i8], [2 x i8]* @.str.1350, i64 0, i64 0
   %t209 = ptrtoint i8* %t208 to i64
   %t210 = call i64 @Parser__match_kind(i64 %t207, i64 %t209)
   %t211 = trunc i64 %t210 to i1
-  br i1 %t211, label %then2612, label %else2613
-then2612:
+  br i1 %t211, label %then2623, label %else2624
+then2623:
   %t212 = load i64, i64* %self
   %t213 = call i64 @Parser__parse_expr(i64 %t212)
   store i64 %t213, i64* %default_val
   %t214 = load i64, i64* %ftype
-  %t215 = getelementptr [4 x i8], [4 x i8]* @.str.1349, i64 0, i64 0
+  %t215 = getelementptr [4 x i8], [4 x i8]* @.str.1351, i64 0, i64 0
   %t216 = ptrtoint i8* %t215 to i64
   %t217 = call i64 @__string_eq(i64 %t214, i64 %t216)
   %t218 = trunc i64 %t217 to i1
-  br i1 %t218, label %then2615, label %else2616
-then2615:
+  br i1 %t218, label %then2626, label %else2627
+then2626:
   %t219 = load i64, i64* %default_val
   %t220 = alloca i64
   %t222 = inttoptr i64 %t219 to i64*
   %t223 = load i64, i64* %t222
   %t221 = trunc i64 %t223 to i8
-  switch i8 %t221, label %match.arm2624 [ i8 3, label %match.arm2618 i8 0, label %match.arm2619 i8 1, label %match.arm2620 i8 2, label %match.arm2621 i8 4, label %match.arm2622 i8 18, label %match.arm2623 ]
-match.arm2618:
+  switch i8 %t221, label %match.arm2635 [ i8 3, label %match.arm2629 i8 0, label %match.arm2630 i8 1, label %match.arm2631 i8 2, label %match.arm2632 i8 4, label %match.arm2633 i8 18, label %match.arm2634 ]
+match.arm2629:
   %t224 = load i64, i64* %s
   %t225 = inttoptr i64 %t219 to [2 x i64]*
   %t226 = getelementptr [2 x i64], [2 x i64]* %t225, i64 0, i64 1
   %t227 = load i64, i64* %t226
   store i64 %t227, i64* %s
-  %t228 = getelementptr [7 x i8], [7 x i8]* @.str.1350, i64 0, i64 0
+  %t228 = getelementptr [7 x i8], [7 x i8]* @.str.1352, i64 0, i64 0
   %t229 = ptrtoint i8* %t228 to i64
   store i64 %t229, i64* %t220
   store i64 %t224, i64* %s
-  br label %match.end2617
-match.arm2619:
+  br label %match.end2628
+match.arm2630:
   %t230 = load i64, i64* %v
   %t231 = inttoptr i64 %t219 to [2 x i64]*
   %t232 = getelementptr [2 x i64], [2 x i64]* %t231, i64 0, i64 1
   %t233 = load i64, i64* %t232
   store i64 %t233, i64* %v
-  %t234 = getelementptr [4 x i8], [4 x i8]* @.str.1351, i64 0, i64 0
+  %t234 = getelementptr [4 x i8], [4 x i8]* @.str.1353, i64 0, i64 0
   %t235 = ptrtoint i8* %t234 to i64
   store i64 %t235, i64* %t220
   store i64 %t230, i64* %v
-  br label %match.end2617
-match.arm2620:
+  br label %match.end2628
+match.arm2631:
   %t236 = load i64, i64* %v
   %t237 = inttoptr i64 %t219 to [2 x i64]*
   %t238 = getelementptr [2 x i64], [2 x i64]* %t237, i64 0, i64 1
   %t239 = load i64, i64* %t238
   store i64 %t239, i64* %v
-  %t240 = getelementptr [6 x i8], [6 x i8]* @.str.1352, i64 0, i64 0
+  %t240 = getelementptr [6 x i8], [6 x i8]* @.str.1354, i64 0, i64 0
   %t241 = ptrtoint i8* %t240 to i64
   store i64 %t241, i64* %t220
   store i64 %t236, i64* %v
-  br label %match.end2617
-match.arm2621:
+  br label %match.end2628
+match.arm2632:
   %t242 = load i64, i64* %v
   %t243 = inttoptr i64 %t219 to [2 x i64]*
   %t244 = getelementptr [2 x i64], [2 x i64]* %t243, i64 0, i64 1
   %t245 = load i64, i64* %t244
   store i64 %t245, i64* %v
-  %t246 = getelementptr [5 x i8], [5 x i8]* @.str.1353, i64 0, i64 0
+  %t246 = getelementptr [5 x i8], [5 x i8]* @.str.1355, i64 0, i64 0
   %t247 = ptrtoint i8* %t246 to i64
   store i64 %t247, i64* %t220
   store i64 %t242, i64* %v
-  br label %match.end2617
-match.arm2622:
-  %t248 = getelementptr [4 x i8], [4 x i8]* @.str.1354, i64 0, i64 0
+  br label %match.end2628
+match.arm2633:
+  %t248 = getelementptr [4 x i8], [4 x i8]* @.str.1356, i64 0, i64 0
   %t249 = ptrtoint i8* %t248 to i64
   store i64 %t249, i64* %t220
-  br label %match.end2617
-match.arm2623:
+  br label %match.end2628
+match.arm2634:
   %t250 = load i64, i64* %e
   %t251 = inttoptr i64 %t219 to [2 x i64]*
   %t252 = getelementptr [2 x i64], [2 x i64]* %t251, i64 0, i64 1
   %t253 = load i64, i64* %t252
   store i64 %t253, i64* %e
-  %t254 = getelementptr [5 x i8], [5 x i8]* @.str.1355, i64 0, i64 0
+  %t254 = getelementptr [5 x i8], [5 x i8]* @.str.1357, i64 0, i64 0
   %t255 = ptrtoint i8* %t254 to i64
   store i64 %t255, i64* %t220
   store i64 %t250, i64* %e
-  br label %match.end2617
-match.arm2624:
-  %t256 = getelementptr [4 x i8], [4 x i8]* @.str.1356, i64 0, i64 0
+  br label %match.end2628
+match.arm2635:
+  %t256 = getelementptr [4 x i8], [4 x i8]* @.str.1358, i64 0, i64 0
   %t257 = ptrtoint i8* %t256 to i64
   store i64 %t257, i64* %t220
-  br label %match.end2617
-match.end2617:
+  br label %match.end2628
+match.end2628:
   %t258 = load i64, i64* %t220
   store i64 %t258, i64* %ek
   %t259 = load i64, i64* %ek
-  %t260 = getelementptr [4 x i8], [4 x i8]* @.str.1357, i64 0, i64 0
+  %t260 = getelementptr [4 x i8], [4 x i8]* @.str.1359, i64 0, i64 0
   %t261 = ptrtoint i8* %t260 to i64
   %t262 = call i64 @__string_ne(i64 %t259, i64 %t261)
   %t263 = trunc i64 %t262 to i1
-  br i1 %t263, label %then2626, label %else2627
-then2626:
+  br i1 %t263, label %then2637, label %else2638
+then2637:
   %t264 = load i64, i64* %ek
   store i64 %t264, i64* %ftype
+  br label %endif2636
+else2638:
+  br label %endif2636
+endif2636:
   br label %endif2625
 else2627:
   br label %endif2625
 endif2625:
-  br label %endif2614
-else2616:
-  br label %endif2614
-endif2614:
   %t265 = load i64, i64* %field_defaults
   %t266 = call i8* @__sf_malloc(i64 8)
   %t267 = bitcast i8* %t266 to [1 x i64]*
@@ -29854,10 +30061,10 @@ endif2614:
   store i64 %t280, i64* %t284
   %t285 = ptrtoint [2 x i64]* %t282 to i64
   %t286 = call i64 @__list_push(i64 %t265, i64 %t285)
-  br label %endif2611
-else2613:
-  br label %endif2611
-endif2611:
+  br label %endif2622
+else2624:
+  br label %endif2622
+endif2622:
   %t287 = load i64, i64* %fields
   %t288 = load i64, i64* %fname
   %t289 = load i64, i64* %self
@@ -29886,21 +30093,21 @@ endif2611:
   store i64 %t297, i64* %t305
   %t306 = ptrtoint [6 x i64]* %t299 to i64
   %t307 = call i64 @__list_push(i64 %t287, i64 %t306)
-  br label %endif2605
-else2607:
+  br label %endif2616
+else2618:
   %t308 = load i64, i64* %self
-  %t309 = getelementptr [2 x i8], [2 x i8]* @.str.1358, i64 0, i64 0
+  %t309 = getelementptr [2 x i8], [2 x i8]* @.str.1360, i64 0, i64 0
   %t310 = ptrtoint i8* %t309 to i64
   %t311 = call i64 @Parser__is_ident_named(i64 %t308, i64 %t310)
   %t312 = trunc i64 %t311 to i1
-  br i1 %t312, label %then2628, label %else2629
-then2628:
+  br i1 %t312, label %then2639, label %else2640
+then2639:
   %t313 = load i64, i64* %self
   %t314 = call i64 @Parser__advance(i64 %t313)
   %t315 = load i64, i64* %self
   %t316 = call i64 @Parser__expect_ident(i64 %t315)
   store i64 %t316, i64* %method_decorator
-  %t317 = getelementptr [2 x i8], [2 x i8]* @.str.1359, i64 0, i64 0
+  %t317 = getelementptr [2 x i8], [2 x i8]* @.str.1361, i64 0, i64 0
   %t318 = ptrtoint i8* %t317 to i64
   %t319 = load i64, i64* %method_decorator
   %t320 = inttoptr i64 %t318 to i8*
@@ -29918,21 +30125,21 @@ then2628:
   %t330 = ptrtoint i8* %t329 to i64
   store i64 %t330, i64* %method_annotation
   %t331 = load i64, i64* %self
-  %t332 = getelementptr [2 x i8], [2 x i8]* @.str.1360, i64 0, i64 0
+  %t332 = getelementptr [2 x i8], [2 x i8]* @.str.1362, i64 0, i64 0
   %t333 = ptrtoint i8* %t332 to i64
   %t334 = call i64 @Parser__match_kind_check(i64 %t331, i64 %t333)
   %t335 = trunc i64 %t334 to i1
-  br i1 %t335, label %then2631, label %else2632
-then2631:
+  br i1 %t335, label %then2642, label %else2643
+then2642:
   %t336 = load i64, i64* %self
   %t337 = call i64 @Parser__advance(i64 %t336)
   %t338 = load i64, i64* %self
-  %t339 = getelementptr [7 x i8], [7 x i8]* @.str.1361, i64 0, i64 0
+  %t339 = getelementptr [7 x i8], [7 x i8]* @.str.1363, i64 0, i64 0
   %t340 = ptrtoint i8* %t339 to i64
   %t341 = call i64 @Parser__match_kind_check(i64 %t338, i64 %t340)
   %t342 = trunc i64 %t341 to i1
-  br i1 %t342, label %then2634, label %else2635
-then2634:
+  br i1 %t342, label %then2645, label %else2646
+then2645:
   %t343 = load i64, i64* %self
   %t344 = call i64 @Parser__current_kind(i64 %t343)
   store i64 %t344, i64* %mdarg_kind
@@ -29941,8 +30148,8 @@ then2634:
   %t348 = inttoptr i64 %t345 to i64*
   %t349 = load i64, i64* %t348
   %t347 = trunc i64 %t349 to i8
-  switch i8 %t347, label %match.arm2638 [ i8 2, label %match.arm2637 ]
-match.arm2637:
+  switch i8 %t347, label %match.arm2649 [ i8 2, label %match.arm2648 ]
+match.arm2648:
   %t350 = load i64, i64* %s
   %t351 = inttoptr i64 %t345 to [2 x i64]*
   %t352 = getelementptr [2 x i64], [2 x i64]* %t351, i64 0, i64 1
@@ -29951,19 +30158,19 @@ match.arm2637:
   %t354 = load i64, i64* %s
   store i64 %t354, i64* %t346
   store i64 %t350, i64* %s
-  br label %match.end2636
-match.arm2638:
-  %t355 = getelementptr [1 x i8], [1 x i8]* @.str.1362, i64 0, i64 0
+  br label %match.end2647
+match.arm2649:
+  %t355 = getelementptr [1 x i8], [1 x i8]* @.str.1364, i64 0, i64 0
   %t356 = ptrtoint i8* %t355 to i64
   store i64 %t356, i64* %t346
-  br label %match.end2636
-match.end2636:
+  br label %match.end2647
+match.end2647:
   %t357 = load i64, i64* %t346
   store i64 %t357, i64* %mdarg
   %t358 = load i64, i64* %self
   %t359 = call i64 @Parser__advance(i64 %t358)
   %t360 = load i64, i64* %method_annotation
-  %t361 = getelementptr [2 x i8], [2 x i8]* @.str.1363, i64 0, i64 0
+  %t361 = getelementptr [2 x i8], [2 x i8]* @.str.1365, i64 0, i64 0
   %t362 = ptrtoint i8* %t361 to i64
   %t363 = inttoptr i64 %t360 to i8*
   %t364 = inttoptr i64 %t362 to i8*
@@ -29993,54 +30200,54 @@ match.end2636:
   %t384 = inttoptr i64 %t383 to i8*
   %t385 = ptrtoint i8* %t384 to i64
   store i64 %t385, i64* %method_annotation
-  br label %endif2633
-else2635:
-  br label %endif2633
-endif2633:
+  br label %endif2644
+else2646:
+  br label %endif2644
+endif2644:
   %t386 = load i64, i64* %self
-  %t387 = getelementptr [2 x i8], [2 x i8]* @.str.1364, i64 0, i64 0
+  %t387 = getelementptr [2 x i8], [2 x i8]* @.str.1366, i64 0, i64 0
   %t388 = ptrtoint i8* %t387 to i64
   %t389 = call i64 @Parser__consume(i64 %t386, i64 %t388)
-  br label %endif2630
-else2632:
-  br label %endif2630
-endif2630:
+  br label %endif2641
+else2643:
+  br label %endif2641
+endif2641:
   %t390 = load i64, i64* %self
-  %t391 = getelementptr [4 x i8], [4 x i8]* @.str.1365, i64 0, i64 0
+  %t391 = getelementptr [4 x i8], [4 x i8]* @.str.1367, i64 0, i64 0
   %t392 = ptrtoint i8* %t391 to i64
   %t393 = call i64 @Parser__match_kind_check(i64 %t390, i64 %t392)
   %t394 = trunc i64 %t393 to i1
-  br i1 %t394, label %then2640, label %else2641
-then2640:
+  br i1 %t394, label %then2651, label %else2652
+then2651:
   %t395 = load i64, i64* %methods
   %t396 = load i64, i64* %self
   %t397 = load i64, i64* %method_annotation
   %t398 = load i64, i64* %member_vis
   %t399 = call i64 @Parser__parse_fun_decl_vis(i64 %t396, i64 %t397, i64 %t398)
   %t400 = call i64 @__list_push(i64 %t395, i64 %t399)
-  br label %endif2639
-else2641:
-  br label %endif2639
-endif2639:
-  br label %endif2605
-else2629:
+  br label %endif2650
+else2652:
+  br label %endif2650
+endif2650:
+  br label %endif2616
+else2640:
   %t401 = load i64, i64* %self
-  %t402 = getelementptr [4 x i8], [4 x i8]* @.str.1366, i64 0, i64 0
+  %t402 = getelementptr [4 x i8], [4 x i8]* @.str.1368, i64 0, i64 0
   %t403 = ptrtoint i8* %t402 to i64
   %t404 = call i64 @Parser__match_kind_check(i64 %t401, i64 %t403)
   %t405 = trunc i64 %t404 to i1
-  br i1 %t405, label %then2642, label %else2643
-then2642:
+  br i1 %t405, label %then2653, label %else2654
+then2653:
   %t406 = load i64, i64* %methods
   %t407 = load i64, i64* %self
   %t408 = load i64, i64* %member_doc
   %t409 = load i64, i64* %member_vis
   %t410 = call i64 @Parser__parse_fun_decl_vis(i64 %t407, i64 %t408, i64 %t409)
   %t411 = call i64 @__list_push(i64 %t406, i64 %t410)
-  br label %endif2605
-else2643:
+  br label %endif2616
+else2654:
   %t412 = load i64, i64* %self
-  %t413 = getelementptr [13 x i8], [13 x i8]* @.str.1367, i64 0, i64 0
+  %t413 = getelementptr [13 x i8], [13 x i8]* @.str.1369, i64 0, i64 0
   %t414 = ptrtoint i8* %t413 to i64
   %t415 = load i64, i64* %self
   %t416 = call i64 @Parser__current_member_desc(i64 %t415)
@@ -30057,7 +30264,7 @@ else2643:
   %t425 = call i64 @__string_intern(i64 %t424)
   %t426 = inttoptr i64 %t425 to i8*
   %t427 = ptrtoint i8* %t426 to i64
-  %t428 = getelementptr [25 x i8], [25 x i8]* @.str.1368, i64 0, i64 0
+  %t428 = getelementptr [25 x i8], [25 x i8]* @.str.1370, i64 0, i64 0
   %t429 = ptrtoint i8* %t428 to i64
   %t430 = inttoptr i64 %t427 to i8*
   %t431 = inttoptr i64 %t429 to i8*
@@ -30086,7 +30293,7 @@ else2643:
   %t450 = call i64 @__string_intern(i64 %t449)
   %t451 = inttoptr i64 %t450 to i8*
   %t452 = ptrtoint i8* %t451 to i64
-  %t453 = getelementptr [32 x i8], [32 x i8]* @.str.1369, i64 0, i64 0
+  %t453 = getelementptr [32 x i8], [32 x i8]* @.str.1371, i64 0, i64 0
   %t454 = ptrtoint i8* %t453 to i64
   %t455 = inttoptr i64 %t452 to i8*
   %t456 = inttoptr i64 %t454 to i8*
@@ -30104,77 +30311,77 @@ else2643:
   %t466 = call i64 @Parser__parse_error(i64 %t412, i64 %t465)
   %t467 = load i64, i64* %self
   %t468 = call i64 @Parser__advance(i64 %t467)
-  br label %while.cond2644
-while.cond2644:
+  br label %while.cond2655
+while.cond2655:
   %t469 = load i64, i64* %self
-  %t470 = getelementptr [4 x i8], [4 x i8]* @.str.1370, i64 0, i64 0
+  %t470 = getelementptr [4 x i8], [4 x i8]* @.str.1372, i64 0, i64 0
   %t471 = ptrtoint i8* %t470 to i64
   %t472 = call i64 @Parser__match_kind_check(i64 %t469, i64 %t471)
   %t473 = xor i64 %t472, 1
   %t474 = trunc i64 %t473 to i1
-  br label %logic.entry2647
-logic.entry2647:
-  br i1 %t474, label %rhs2648, label %end2649
-rhs2648:
+  br label %logic.entry2658
+logic.entry2658:
+  br i1 %t474, label %rhs2659, label %end2660
+rhs2659:
   %t475 = load i64, i64* %self
-  %t476 = getelementptr [4 x i8], [4 x i8]* @.str.1371, i64 0, i64 0
+  %t476 = getelementptr [4 x i8], [4 x i8]* @.str.1373, i64 0, i64 0
   %t477 = ptrtoint i8* %t476 to i64
   %t478 = call i64 @Parser__match_kind_check(i64 %t475, i64 %t477)
   %t479 = xor i64 %t478, 1
   %t480 = trunc i64 %t479 to i1
-  br label %rhs.exit2650
-rhs.exit2650:
-  br label %end2649
-end2649:
-  %t481 = phi i1 [%t474, %logic.entry2647], [%t480, %rhs.exit2650]
+  br label %rhs.exit2661
+rhs.exit2661:
+  br label %end2660
+end2660:
+  %t481 = phi i1 [%t474, %logic.entry2658], [%t480, %rhs.exit2661]
   %t482 = zext i1 %t481 to i64
   %t483 = trunc i64 %t482 to i1
-  br label %logic.entry2651
-logic.entry2651:
-  br i1 %t483, label %rhs2652, label %end2653
-rhs2652:
+  br label %logic.entry2662
+logic.entry2662:
+  br i1 %t483, label %rhs2663, label %end2664
+rhs2663:
   %t484 = load i64, i64* %self
-  %t485 = getelementptr [2 x i8], [2 x i8]* @.str.1372, i64 0, i64 0
+  %t485 = getelementptr [2 x i8], [2 x i8]* @.str.1374, i64 0, i64 0
   %t486 = ptrtoint i8* %t485 to i64
   %t487 = call i64 @Parser__match_kind_check(i64 %t484, i64 %t486)
   %t488 = xor i64 %t487, 1
   %t489 = trunc i64 %t488 to i1
-  br label %rhs.exit2654
-rhs.exit2654:
-  br label %end2653
-end2653:
-  %t490 = phi i1 [%t483, %logic.entry2651], [%t489, %rhs.exit2654]
+  br label %rhs.exit2665
+rhs.exit2665:
+  br label %end2664
+end2664:
+  %t490 = phi i1 [%t483, %logic.entry2662], [%t489, %rhs.exit2665]
   %t491 = zext i1 %t490 to i64
   %t492 = trunc i64 %t491 to i1
-  br label %logic.entry2655
-logic.entry2655:
-  br i1 %t492, label %rhs2656, label %end2657
-rhs2656:
+  br label %logic.entry2666
+logic.entry2666:
+  br i1 %t492, label %rhs2667, label %end2668
+rhs2667:
   %t493 = load i64, i64* %self
-  %t494 = getelementptr [4 x i8], [4 x i8]* @.str.1373, i64 0, i64 0
+  %t494 = getelementptr [4 x i8], [4 x i8]* @.str.1375, i64 0, i64 0
   %t495 = ptrtoint i8* %t494 to i64
   %t496 = call i64 @Parser__match_kind_check(i64 %t493, i64 %t495)
   %t497 = xor i64 %t496, 1
   %t498 = trunc i64 %t497 to i1
-  br label %rhs.exit2658
-rhs.exit2658:
-  br label %end2657
-end2657:
-  %t499 = phi i1 [%t492, %logic.entry2655], [%t498, %rhs.exit2658]
+  br label %rhs.exit2669
+rhs.exit2669:
+  br label %end2668
+end2668:
+  %t499 = phi i1 [%t492, %logic.entry2666], [%t498, %rhs.exit2669]
   %t500 = zext i1 %t499 to i64
   %t501 = trunc i64 %t500 to i1
-  br i1 %t501, label %while.body2645, label %while.end2646
-while.body2645:
+  br i1 %t501, label %while.body2656, label %while.end2657
+while.body2656:
   %t502 = load i64, i64* %self
   %t503 = call i64 @Parser__advance(i64 %t502)
-  br label %while.cond2644
-while.end2646:
-  br label %endif2605
-endif2605:
-  br label %while.cond2578
-while.end2580:
+  br label %while.cond2655
+while.end2657:
+  br label %endif2616
+endif2616:
+  br label %while.cond2589
+while.end2591:
   %t504 = load i64, i64* %self
-  %t505 = getelementptr [2 x i8], [2 x i8]* @.str.1374, i64 0, i64 0
+  %t505 = getelementptr [2 x i8], [2 x i8]* @.str.1376, i64 0, i64 0
   %t506 = ptrtoint i8* %t505 to i64
   %t507 = call i64 @Parser__consume(i64 %t504, i64 %t506)
   %t508 = load i64, i64* %field_defaults
@@ -30183,16 +30390,16 @@ while.end2580:
   %t512 = icmp sgt i64 %t509, %t510
   %t511 = zext i1 %t512 to i64
   %t513 = trunc i64 %t511 to i1
-  br i1 %t513, label %then2660, label %else2661
-then2660:
+  br i1 %t513, label %then2671, label %else2672
+then2671:
   %t514 = load i64, i64* %self
   %t515 = load i64, i64* %methods
   %t516 = load i64, i64* %field_defaults
   %t517 = call i64 @Parser__inject_field_defaults(i64 %t514, i64 %t515, i64 %t516)
-  br label %endif2659
-else2661:
-  br label %endif2659
-endif2659:
+  br label %endif2670
+else2672:
+  br label %endif2670
+endif2670:
   %t518 = load i64, i64* %name
   %t519 = load i64, i64* %type_params
   %t520 = load i64, i64* %parents
@@ -30260,16 +30467,16 @@ entry:
   store i64 %defaults.arg, i64* %defaults
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond2662
-while.cond2662:
+  br label %while.cond2673
+while.cond2673:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %methods
   %t4 = call i64 @__list_length(i64 %t3)
   %t6 = icmp slt i64 %t2, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %while.body2663, label %while.end2664
-while.body2663:
+  br i1 %t7, label %while.body2674, label %while.end2675
+while.body2674:
   %t8 = load i64, i64* %methods
   %t9 = load i64, i64* %i
   %t10 = icmp slt i64 %t9, 0
@@ -30281,8 +30488,8 @@ while.body2663:
   %t17 = inttoptr i64 %t14 to i64*
   %t18 = load i64, i64* %t17
   %t16 = trunc i64 %t18 to i8
-  switch i8 %t16, label %match.arm2667 [ i8 2, label %match.arm2666 ]
-match.arm2666:
+  switch i8 %t16, label %match.arm2678 [ i8 2, label %match.arm2677 ]
+match.arm2677:
   %t19 = load i64, i64* %n
   %t20 = load i64, i64* %p
   %t21 = load i64, i64* %r
@@ -30326,22 +30533,22 @@ match.arm2666:
   store i64 %t24, i64* %f_vis
   store i64 %t25, i64* %__ns
   store i64 %t26, i64* %__fs
-  br label %match.end2665
-match.arm2667:
-  %t45 = getelementptr [1 x i8], [1 x i8]* @.str.1375, i64 0, i64 0
+  br label %match.end2676
+match.arm2678:
+  %t45 = getelementptr [1 x i8], [1 x i8]* @.str.1377, i64 0, i64 0
   %t46 = ptrtoint i8* %t45 to i64
   store i64 %t46, i64* %t15
-  br label %match.end2665
-match.end2665:
+  br label %match.end2676
+match.end2676:
   %t47 = load i64, i64* %t15
   store i64 %t47, i64* %mname
   %t48 = load i64, i64* %mname
-  %t49 = getelementptr [5 x i8], [5 x i8]* @.str.1376, i64 0, i64 0
+  %t49 = getelementptr [5 x i8], [5 x i8]* @.str.1378, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i64 @__string_eq(i64 %t48, i64 %t50)
   %t52 = trunc i64 %t51 to i1
-  br i1 %t52, label %then2669, label %else2670
-then2669:
+  br i1 %t52, label %then2680, label %else2681
+then2680:
   %t53 = load i64, i64* %methods
   %t54 = load i64, i64* %i
   %t55 = icmp slt i64 %t54, 0
@@ -30353,8 +30560,8 @@ then2669:
   %t62 = inttoptr i64 %t59 to i64*
   %t63 = load i64, i64* %t62
   %t61 = trunc i64 %t63 to i8
-  switch i8 %t61, label %match.arm2673 [ i8 2, label %match.arm2672 ]
-match.arm2672:
+  switch i8 %t61, label %match.arm2684 [ i8 2, label %match.arm2683 ]
+match.arm2683:
   %t64 = load i64, i64* %n
   %t65 = load i64, i64* %p
   %t66 = load i64, i64* %r
@@ -30398,12 +30605,12 @@ match.arm2672:
   store i64 %t69, i64* %f_vis
   store i64 %t70, i64* %__ns
   store i64 %t71, i64* %__fs
-  br label %match.end2671
-match.arm2673:
+  br label %match.end2682
+match.arm2684:
   %t90 = call i64 @__list_new()
   store i64 %t90, i64* %t60
-  br label %match.end2671
-match.end2671:
+  br label %match.end2682
+match.end2682:
   %t91 = load i64, i64* %t60
   store i64 %t91, i64* %mbody
   %t92 = load i64, i64* %methods
@@ -30417,8 +30624,8 @@ match.end2671:
   %t101 = inttoptr i64 %t98 to i64*
   %t102 = load i64, i64* %t101
   %t100 = trunc i64 %t102 to i8
-  switch i8 %t100, label %match.arm2676 [ i8 2, label %match.arm2675 ]
-match.arm2675:
+  switch i8 %t100, label %match.arm2687 [ i8 2, label %match.arm2686 ]
+match.arm2686:
   %t103 = load i64, i64* %n
   %t104 = load i64, i64* %p
   %t105 = load i64, i64* %r
@@ -30462,12 +30669,12 @@ match.arm2675:
   store i64 %t108, i64* %f_vis
   store i64 %t109, i64* %__ns
   store i64 %t110, i64* %__fs
-  br label %match.end2674
-match.arm2676:
+  br label %match.end2685
+match.arm2687:
   %t129 = call i64 @__list_new()
   store i64 %t129, i64* %t99
-  br label %match.end2674
-match.end2674:
+  br label %match.end2685
+match.end2685:
   %t130 = load i64, i64* %t99
   store i64 %t130, i64* %mparams
   %t131 = load i64, i64* %methods
@@ -30481,8 +30688,8 @@ match.end2674:
   %t140 = inttoptr i64 %t137 to i64*
   %t141 = load i64, i64* %t140
   %t139 = trunc i64 %t141 to i8
-  switch i8 %t139, label %match.arm2679 [ i8 2, label %match.arm2678 ]
-match.arm2678:
+  switch i8 %t139, label %match.arm2690 [ i8 2, label %match.arm2689 ]
+match.arm2689:
   %t142 = load i64, i64* %n
   %t143 = load i64, i64* %p
   %t144 = load i64, i64* %r
@@ -30526,16 +30733,16 @@ match.arm2678:
   store i64 %t147, i64* %f_vis
   store i64 %t148, i64* %__ns
   store i64 %t149, i64* %__fs
-  br label %match.end2677
-match.arm2679:
+  br label %match.end2688
+match.arm2690:
   %t168 = call i8* @__sf_malloc(i64 8)
   %t169 = bitcast i8* %t168 to [1 x i64]*
   %t170 = getelementptr [1 x i64], [1 x i64]* %t169, i64 0, i64 0
   store i64 12, i64* %t170
   %t171 = ptrtoint [1 x i64]* %t169 to i64
   store i64 %t171, i64* %t138
-  br label %match.end2677
-match.end2677:
+  br label %match.end2688
+match.end2688:
   %t172 = load i64, i64* %t138
   store i64 %t172, i64* %mret
   %t173 = load i64, i64* %methods
@@ -30549,8 +30756,8 @@ match.end2677:
   %t182 = inttoptr i64 %t179 to i64*
   %t183 = load i64, i64* %t182
   %t181 = trunc i64 %t183 to i8
-  switch i8 %t181, label %match.arm2682 [ i8 2, label %match.arm2681 ]
-match.arm2681:
+  switch i8 %t181, label %match.arm2693 [ i8 2, label %match.arm2692 ]
+match.arm2692:
   %t184 = load i64, i64* %n
   %t185 = load i64, i64* %p
   %t186 = load i64, i64* %r
@@ -30594,29 +30801,29 @@ match.arm2681:
   store i64 %t189, i64* %f_vis
   store i64 %t190, i64* %__ns
   store i64 %t191, i64* %__fs
-  br label %match.end2680
-match.arm2682:
-  %t210 = getelementptr [7 x i8], [7 x i8]* @.str.1377, i64 0, i64 0
+  br label %match.end2691
+match.arm2693:
+  %t210 = getelementptr [7 x i8], [7 x i8]* @.str.1379, i64 0, i64 0
   %t211 = ptrtoint i8* %t210 to i64
   store i64 %t211, i64* %t180
-  br label %match.end2680
-match.end2680:
+  br label %match.end2691
+match.end2691:
   %t212 = load i64, i64* %t180
   store i64 %t212, i64* %mvis
   %t213 = call i64 @__list_new()
   store i64 %t213, i64* %new_body
   %t214 = add i64 0, 0
   store i64 %t214, i64* %di
-  br label %while.cond2683
-while.cond2683:
+  br label %while.cond2694
+while.cond2694:
   %t215 = load i64, i64* %di
   %t216 = load i64, i64* %defaults
   %t217 = call i64 @__list_length(i64 %t216)
   %t219 = icmp slt i64 %t215, %t217
   %t218 = zext i1 %t219 to i64
   %t220 = trunc i64 %t218 to i1
-  br i1 %t220, label %while.body2684, label %while.end2685
-while.body2684:
+  br i1 %t220, label %while.body2695, label %while.end2696
+while.body2695:
   %t221 = load i64, i64* %new_body
   %t222 = load i64, i64* %defaults
   %t223 = load i64, i64* %di
@@ -30630,20 +30837,20 @@ while.body2684:
   %t231 = add i64 0, 1
   %t232 = add i64 %t230, %t231
   store i64 %t232, i64* %di
-  br label %while.cond2683
-while.end2685:
+  br label %while.cond2694
+while.end2696:
   %t233 = add i64 0, 0
   store i64 %t233, i64* %bi
-  br label %while.cond2686
-while.cond2686:
+  br label %while.cond2697
+while.cond2697:
   %t234 = load i64, i64* %bi
   %t235 = load i64, i64* %mbody
   %t236 = call i64 @__list_length(i64 %t235)
   %t238 = icmp slt i64 %t234, %t236
   %t237 = zext i1 %t238 to i64
   %t239 = trunc i64 %t237 to i1
-  br i1 %t239, label %while.body2687, label %while.end2688
-while.body2687:
+  br i1 %t239, label %while.body2698, label %while.end2699
+while.body2698:
   %t240 = load i64, i64* %new_body
   %t241 = load i64, i64* %mbody
   %t242 = load i64, i64* %bi
@@ -30657,16 +30864,16 @@ while.body2687:
   %t250 = add i64 0, 1
   %t251 = add i64 %t249, %t250
   store i64 %t251, i64* %bi
-  br label %while.cond2686
-while.end2688:
+  br label %while.cond2697
+while.end2699:
   %t252 = load i64, i64* %methods
   %t253 = load i64, i64* %i
-  %t254 = getelementptr [5 x i8], [5 x i8]* @.str.1378, i64 0, i64 0
+  %t254 = getelementptr [5 x i8], [5 x i8]* @.str.1380, i64 0, i64 0
   %t255 = ptrtoint i8* %t254 to i64
   %t256 = load i64, i64* %mparams
   %t257 = load i64, i64* %mret
   %t258 = load i64, i64* %new_body
-  %t259 = getelementptr [1 x i8], [1 x i8]* @.str.1379, i64 0, i64 0
+  %t259 = getelementptr [1 x i8], [1 x i8]* @.str.1381, i64 0, i64 0
   %t260 = ptrtoint i8* %t259 to i64
   %t261 = load i64, i64* %mvis
   %t262 = call i64 @ast_span_none()
@@ -30694,17 +30901,17 @@ while.end2688:
   %t275 = ptrtoint [9 x i64]* %t265 to i64
   %t276 = call i64 @__list_set(i64 %t252, i64 %t253, i64 %t275)
   ret i64 0
-else2670:
-  br label %endif2668
-endif2668:
+else2681:
+  br label %endif2679
+endif2679:
   %t277 = load i64, i64* %i
   %t278 = add i64 0, 1
   %t279 = add i64 %t277, %t278
   store i64 %t279, i64* %i
-  br label %while.cond2662
-while.end2664:
+  br label %while.cond2673
+while.end2675:
   %t280 = load i64, i64* %methods
-  %t281 = getelementptr [5 x i8], [5 x i8]* @.str.1380, i64 0, i64 0
+  %t281 = getelementptr [5 x i8], [5 x i8]* @.str.1382, i64 0, i64 0
   %t282 = ptrtoint i8* %t281 to i64
   %t283 = call i64 @__list_new()
   %t284 = call i8* @__sf_malloc(i64 8)
@@ -30713,9 +30920,9 @@ while.end2664:
   store i64 4, i64* %t286
   %t287 = ptrtoint [1 x i64]* %t285 to i64
   %t288 = load i64, i64* %defaults
-  %t289 = getelementptr [1 x i8], [1 x i8]* @.str.1381, i64 0, i64 0
+  %t289 = getelementptr [1 x i8], [1 x i8]* @.str.1383, i64 0, i64 0
   %t290 = ptrtoint i8* %t289 to i64
-  %t291 = getelementptr [7 x i8], [7 x i8]* @.str.1382, i64 0, i64 0
+  %t291 = getelementptr [7 x i8], [7 x i8]* @.str.1384, i64 0, i64 0
   %t292 = ptrtoint i8* %t291 to i64
   %t293 = call i64 @ast_span_none()
   %t294 = call i64 @ast_span_none()
@@ -30756,12 +30963,12 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1383, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1385, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br i1 %t7, label %then2690, label %else2691
-then2690:
+  br i1 %t7, label %then2701, label %else2702
+then2701:
   %t8 = load i64, i64* %self
   %t9 = call i64 @Parser__advance(i64 %t8)
   %t10 = call i64 @__list_new()
@@ -30770,48 +30977,48 @@ then2690:
   %t12 = load i64, i64* %self
   %t13 = call i64 @Parser__expect_ident(i64 %t12)
   %t14 = call i64 @__list_push(i64 %t11, i64 %t13)
-  br label %while.cond2692
-while.cond2692:
+  br label %while.cond2703
+while.cond2703:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1384, i64 0, i64 0
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1386, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__match_kind(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %while.body2693, label %while.end2694
-while.body2693:
+  br i1 %t19, label %while.body2704, label %while.end2705
+while.body2704:
   %t20 = load i64, i64* %self
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1385, i64 0, i64 0
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1387, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i64 @Parser__match_kind_check(i64 %t20, i64 %t22)
   %t24 = trunc i64 %t23 to i1
-  br i1 %t24, label %then2696, label %else2697
-then2696:
-  br label %while.end2694
-else2697:
-  br label %endif2695
-endif2695:
+  br i1 %t24, label %then2707, label %else2708
+then2707:
+  br label %while.end2705
+else2708:
+  br label %endif2706
+endif2706:
   %t25 = load i64, i64* %names
   %t26 = load i64, i64* %self
   %t27 = call i64 @Parser__expect_ident(i64 %t26)
   %t28 = call i64 @__list_push(i64 %t25, i64 %t27)
-  br label %while.cond2692
-while.end2694:
+  br label %while.cond2703
+while.end2705:
   %t29 = load i64, i64* %self
-  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.1386, i64 0, i64 0
+  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.1388, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   %t32 = call i64 @Parser__consume(i64 %t29, i64 %t31)
   %t33 = load i64, i64* %self
-  %t34 = getelementptr [5 x i8], [5 x i8]* @.str.1387, i64 0, i64 0
+  %t34 = getelementptr [5 x i8], [5 x i8]* @.str.1389, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @Parser__is_ident_named(i64 %t33, i64 %t35)
   %t37 = xor i64 %t36, 1
   %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then2699, label %else2700
-then2699:
+  br i1 %t38, label %then2710, label %else2711
+then2710:
   %t39 = load i64, i64* %self
   %t40 = load i64, i64* %self
   %t41 = call i64 @Parser__current_span(i64 %t40)
-  %t42 = getelementptr [54 x i8], [54 x i8]* @.str.1388, i64 0, i64 0
+  %t42 = getelementptr [54 x i8], [54 x i8]* @.str.1390, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = load i64, i64* %self
   %t45 = call i64 @Parser__current_token_str(i64 %t44)
@@ -30828,7 +31035,7 @@ then2699:
   %t54 = call i64 @__string_intern(i64 %t53)
   %t55 = inttoptr i64 %t54 to i8*
   %t56 = ptrtoint i8* %t55 to i64
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1389, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1391, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = inttoptr i64 %t56 to i8*
   %t60 = inttoptr i64 %t58 to i8*
@@ -30844,10 +31051,10 @@ then2699:
   %t68 = inttoptr i64 %t67 to i8*
   %t69 = ptrtoint i8* %t68 to i64
   %t70 = call i64 @Parser__parse_error_at(i64 %t39, i64 %t41, i64 %t69)
-  br label %endif2698
-else2700:
-  br label %endif2698
-endif2698:
+  br label %endif2709
+else2711:
+  br label %endif2709
+endif2709:
   %t71 = load i64, i64* %self
   %t72 = call i64 @Parser__advance(i64 %t71)
   %t73 = load i64, i64* %self
@@ -30858,8 +31065,8 @@ endif2698:
   %t78 = inttoptr i64 %t75 to i64*
   %t79 = load i64, i64* %t78
   %t77 = trunc i64 %t79 to i8
-  switch i8 %t77, label %match.arm2703 [ i8 2, label %match.arm2702 ]
-match.arm2702:
+  switch i8 %t77, label %match.arm2714 [ i8 2, label %match.arm2713 ]
+match.arm2713:
   %t80 = load i64, i64* %s
   %t81 = inttoptr i64 %t75 to [2 x i64]*
   %t82 = getelementptr [2 x i64], [2 x i64]* %t81, i64 0, i64 1
@@ -30868,13 +31075,13 @@ match.arm2702:
   %t84 = load i64, i64* %s
   store i64 %t84, i64* %t76
   store i64 %t80, i64* %s
-  br label %match.end2701
-match.arm2703:
-  %t85 = getelementptr [1 x i8], [1 x i8]* @.str.1390, i64 0, i64 0
+  br label %match.end2712
+match.arm2714:
+  %t85 = getelementptr [1 x i8], [1 x i8]* @.str.1392, i64 0, i64 0
   %t86 = ptrtoint i8* %t85 to i64
   store i64 %t86, i64* %t76
-  br label %match.end2701
-match.end2701:
+  br label %match.end2712
+match.end2712:
   %t87 = load i64, i64* %t76
   store i64 %t87, i64* %path
   %t88 = load i64, i64* %path
@@ -30884,12 +31091,12 @@ match.end2701:
   %t92 = icmp eq i64 %t90, %t91
   %t93 = zext i1 %t92 to i64
   %t94 = trunc i64 %t93 to i1
-  br i1 %t94, label %then2705, label %else2706
-then2705:
+  br i1 %t94, label %then2716, label %else2717
+then2716:
   %t95 = load i64, i64* %self
   %t96 = load i64, i64* %self
   %t97 = call i64 @Parser__current_span(i64 %t96)
-  %t98 = getelementptr [56 x i8], [56 x i8]* @.str.1391, i64 0, i64 0
+  %t98 = getelementptr [56 x i8], [56 x i8]* @.str.1393, i64 0, i64 0
   %t99 = ptrtoint i8* %t98 to i64
   %t100 = load i64, i64* %self
   %t101 = call i64 @Parser__current_token_str(i64 %t100)
@@ -30906,7 +31113,7 @@ then2705:
   %t110 = call i64 @__string_intern(i64 %t109)
   %t111 = inttoptr i64 %t110 to i8*
   %t112 = ptrtoint i8* %t111 to i64
-  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.1392, i64 0, i64 0
+  %t113 = getelementptr [2 x i8], [2 x i8]* @.str.1394, i64 0, i64 0
   %t114 = ptrtoint i8* %t113 to i64
   %t115 = inttoptr i64 %t112 to i8*
   %t116 = inttoptr i64 %t114 to i8*
@@ -30922,10 +31129,10 @@ then2705:
   %t124 = inttoptr i64 %t123 to i8*
   %t125 = ptrtoint i8* %t124 to i64
   %t126 = call i64 @Parser__parse_error_at(i64 %t95, i64 %t97, i64 %t125)
-  br label %endif2704
-else2706:
-  br label %endif2704
-endif2704:
+  br label %endif2715
+else2717:
+  br label %endif2715
+endif2715:
   %t127 = load i64, i64* %self
   %t128 = call i64 @Parser__advance(i64 %t127)
   %t129 = call i8* @__sf_malloc(i64 8)
@@ -30941,9 +31148,9 @@ endif2704:
   store i64 %t132, i64* %t136
   %t137 = ptrtoint [2 x i64]* %t134 to i64
   ret i64 %t137
-else2691:
-  br label %endif2689
-endif2689:
+else2702:
+  br label %endif2700
+endif2700:
   %t138 = load i64, i64* %self
   %t139 = call i64 @Parser__current_kind(i64 %t138)
   store i64 %t139, i64* %kind
@@ -30952,8 +31159,8 @@ endif2689:
   %t143 = inttoptr i64 %t140 to i64*
   %t144 = load i64, i64* %t143
   %t142 = trunc i64 %t144 to i8
-  switch i8 %t142, label %match.arm2709 [ i8 2, label %match.arm2708 ]
-match.arm2708:
+  switch i8 %t142, label %match.arm2720 [ i8 2, label %match.arm2719 ]
+match.arm2719:
   %t145 = load i64, i64* %s
   %t146 = inttoptr i64 %t140 to [2 x i64]*
   %t147 = getelementptr [2 x i64], [2 x i64]* %t146, i64 0, i64 1
@@ -30962,13 +31169,13 @@ match.arm2708:
   %t149 = load i64, i64* %s
   store i64 %t149, i64* %t141
   store i64 %t145, i64* %s
-  br label %match.end2707
-match.arm2709:
-  %t150 = getelementptr [1 x i8], [1 x i8]* @.str.1393, i64 0, i64 0
+  br label %match.end2718
+match.arm2720:
+  %t150 = getelementptr [1 x i8], [1 x i8]* @.str.1395, i64 0, i64 0
   %t151 = ptrtoint i8* %t150 to i64
   store i64 %t151, i64* %t141
-  br label %match.end2707
-match.end2707:
+  br label %match.end2718
+match.end2718:
   %t152 = load i64, i64* %t141
   store i64 %t152, i64* %path
   %t153 = load i64, i64* %path
@@ -30978,12 +31185,12 @@ match.end2707:
   %t157 = icmp eq i64 %t155, %t156
   %t158 = zext i1 %t157 to i64
   %t159 = trunc i64 %t158 to i1
-  br i1 %t159, label %then2711, label %else2712
-then2711:
+  br i1 %t159, label %then2722, label %else2723
+then2722:
   %t160 = load i64, i64* %self
   %t161 = load i64, i64* %self
   %t162 = call i64 @Parser__current_span(i64 %t161)
-  %t163 = getelementptr [58 x i8], [58 x i8]* @.str.1394, i64 0, i64 0
+  %t163 = getelementptr [58 x i8], [58 x i8]* @.str.1396, i64 0, i64 0
   %t164 = ptrtoint i8* %t163 to i64
   %t165 = load i64, i64* %self
   %t166 = call i64 @Parser__current_token_str(i64 %t165)
@@ -31000,7 +31207,7 @@ then2711:
   %t175 = call i64 @__string_intern(i64 %t174)
   %t176 = inttoptr i64 %t175 to i8*
   %t177 = ptrtoint i8* %t176 to i64
-  %t178 = getelementptr [2 x i8], [2 x i8]* @.str.1395, i64 0, i64 0
+  %t178 = getelementptr [2 x i8], [2 x i8]* @.str.1397, i64 0, i64 0
   %t179 = ptrtoint i8* %t178 to i64
   %t180 = inttoptr i64 %t177 to i8*
   %t181 = inttoptr i64 %t179 to i8*
@@ -31016,35 +31223,35 @@ then2711:
   %t189 = inttoptr i64 %t188 to i8*
   %t190 = ptrtoint i8* %t189 to i64
   %t191 = call i64 @Parser__parse_error_at(i64 %t160, i64 %t162, i64 %t190)
-  br label %endif2710
-else2712:
-  br label %endif2710
-endif2710:
+  br label %endif2721
+else2723:
+  br label %endif2721
+endif2721:
   %t192 = load i64, i64* %self
   %t193 = call i64 @Parser__advance(i64 %t192)
   %t194 = load i64, i64* %self
-  %t195 = getelementptr [3 x i8], [3 x i8]* @.str.1396, i64 0, i64 0
+  %t195 = getelementptr [3 x i8], [3 x i8]* @.str.1398, i64 0, i64 0
   %t196 = ptrtoint i8* %t195 to i64
   %t197 = call i64 @Parser__match_kind_check(i64 %t194, i64 %t196)
   %t198 = trunc i64 %t197 to i1
-  br label %logic.entry2714
-logic.entry2714:
-  br i1 %t198, label %end2716, label %rhs2715
-rhs2715:
+  br label %logic.entry2725
+logic.entry2725:
+  br i1 %t198, label %end2727, label %rhs2726
+rhs2726:
   %t199 = load i64, i64* %self
-  %t200 = getelementptr [3 x i8], [3 x i8]* @.str.1397, i64 0, i64 0
+  %t200 = getelementptr [3 x i8], [3 x i8]* @.str.1399, i64 0, i64 0
   %t201 = ptrtoint i8* %t200 to i64
   %t202 = call i64 @Parser__is_ident_named(i64 %t199, i64 %t201)
   %t203 = trunc i64 %t202 to i1
-  br label %rhs.exit2717
-rhs.exit2717:
-  br label %end2716
-end2716:
-  %t204 = phi i1 [%t198, %logic.entry2714], [%t203, %rhs.exit2717]
+  br label %rhs.exit2728
+rhs.exit2728:
+  br label %end2727
+end2727:
+  %t204 = phi i1 [%t198, %logic.entry2725], [%t203, %rhs.exit2728]
   %t205 = zext i1 %t204 to i64
   %t206 = trunc i64 %t205 to i1
-  br i1 %t206, label %then2718, label %else2719
-then2718:
+  br i1 %t206, label %then2729, label %else2730
+then2729:
   %t207 = load i64, i64* %self
   %t208 = call i64 @Parser__advance(i64 %t207)
   %t209 = load i64, i64* %self
@@ -31063,9 +31270,9 @@ then2718:
   store i64 %t214, i64* %t218
   %t219 = ptrtoint [2 x i64]* %t216 to i64
   ret i64 %t219
-else2719:
-  br label %endif2713
-endif2713:
+else2730:
+  br label %endif2724
+endif2724:
   %t220 = call i8* @__sf_malloc(i64 8)
   %t221 = bitcast i8* %t220 to [1 x i64]*
   %t222 = getelementptr [1 x i64], [1 x i64]* %t221, i64 0, i64 0
@@ -31089,44 +31296,44 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1398, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1400, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__match_kind_check(i64 %t3, i64 %t5)
   %t7 = trunc i64 %t6 to i1
-  br label %logic.entry2721
-logic.entry2721:
-  br i1 %t7, label %end2723, label %rhs2722
-rhs2722:
+  br label %logic.entry2732
+logic.entry2732:
+  br i1 %t7, label %end2734, label %rhs2733
+rhs2733:
   %t8 = load i64, i64* %self
-  %t9 = getelementptr [4 x i8], [4 x i8]* @.str.1399, i64 0, i64 0
+  %t9 = getelementptr [4 x i8], [4 x i8]* @.str.1401, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i64
   %t11 = call i64 @Parser__match_kind_check(i64 %t8, i64 %t10)
   %t12 = trunc i64 %t11 to i1
-  br label %rhs.exit2724
-rhs.exit2724:
-  br label %end2723
-end2723:
-  %t13 = phi i1 [%t7, %logic.entry2721], [%t12, %rhs.exit2724]
+  br label %rhs.exit2735
+rhs.exit2735:
+  br label %end2734
+end2734:
+  %t13 = phi i1 [%t7, %logic.entry2732], [%t12, %rhs.exit2735]
   %t14 = zext i1 %t13 to i64
   %t15 = trunc i64 %t14 to i1
-  br label %logic.entry2725
-logic.entry2725:
-  br i1 %t15, label %end2727, label %rhs2726
-rhs2726:
+  br label %logic.entry2736
+logic.entry2736:
+  br i1 %t15, label %end2738, label %rhs2737
+rhs2737:
   %t16 = load i64, i64* %self
-  %t17 = getelementptr [2 x i8], [2 x i8]* @.str.1400, i64 0, i64 0
+  %t17 = getelementptr [2 x i8], [2 x i8]* @.str.1402, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @Parser__match_kind_check(i64 %t16, i64 %t18)
   %t20 = trunc i64 %t19 to i1
-  br label %rhs.exit2728
-rhs.exit2728:
-  br label %end2727
-end2727:
-  %t21 = phi i1 [%t15, %logic.entry2725], [%t20, %rhs.exit2728]
+  br label %rhs.exit2739
+rhs.exit2739:
+  br label %end2738
+end2738:
+  %t21 = phi i1 [%t15, %logic.entry2736], [%t20, %rhs.exit2739]
   %t22 = zext i1 %t21 to i64
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then2729, label %else2730
-then2729:
+  br i1 %t23, label %then2740, label %else2741
+then2740:
   %t24 = call i8* @__sf_malloc(i64 8)
   %t25 = bitcast i8* %t24 to [1 x i64]*
   %t26 = getelementptr [1 x i64], [1 x i64]* %t25, i64 0, i64 0
@@ -31140,9 +31347,9 @@ then2729:
   store i64 %t27, i64* %t31
   %t32 = ptrtoint [2 x i64]* %t29 to i64
   ret i64 %t32
-else2730:
-  br label %endif2720
-endif2720:
+else2741:
+  br label %endif2731
+endif2731:
   %t33 = load i64, i64* %self
   %t34 = call i64 @Parser__current_line_num(i64 %t33)
   %t35 = load i64, i64* %self
@@ -31150,8 +31357,8 @@ endif2720:
   %t38 = icmp sgt i64 %t34, %t36
   %t37 = zext i1 %t38 to i64
   %t39 = trunc i64 %t37 to i1
-  br i1 %t39, label %then2732, label %else2733
-then2732:
+  br i1 %t39, label %then2743, label %else2744
+then2743:
   %t40 = call i8* @__sf_malloc(i64 8)
   %t41 = bitcast i8* %t40 to [1 x i64]*
   %t42 = getelementptr [1 x i64], [1 x i64]* %t41, i64 0, i64 0
@@ -31165,9 +31372,9 @@ then2732:
   store i64 %t43, i64* %t47
   %t48 = ptrtoint [2 x i64]* %t45 to i64
   ret i64 %t48
-else2733:
-  br label %endif2731
-endif2731:
+else2744:
+  br label %endif2742
+endif2742:
   %t49 = load i64, i64* %self
   %t50 = call i64 @Parser__parse_expr(i64 %t49)
   store i64 %t50, i64* %value
@@ -31192,14 +31399,14 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1401, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1403, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__parse_expr(i64 %t7)
   store i64 %t8, i64* %cond
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1402, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1404, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__consume(i64 %t9, i64 %t11)
   %t13 = load i64, i64* %self
@@ -31208,35 +31415,35 @@ entry:
   %t15 = call i64 @__list_new()
   store i64 %t15, i64* %else_branch
   %t16 = load i64, i64* %self
-  %t17 = getelementptr [5 x i8], [5 x i8]* @.str.1403, i64 0, i64 0
+  %t17 = getelementptr [5 x i8], [5 x i8]* @.str.1405, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @Parser__match_kind(i64 %t16, i64 %t18)
   %t20 = trunc i64 %t19 to i1
-  br i1 %t20, label %then2735, label %else2736
-then2735:
+  br i1 %t20, label %then2746, label %else2747
+then2746:
   %t21 = load i64, i64* %self
-  %t22 = getelementptr [3 x i8], [3 x i8]* @.str.1404, i64 0, i64 0
+  %t22 = getelementptr [3 x i8], [3 x i8]* @.str.1406, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   %t24 = call i64 @Parser__match_kind_check(i64 %t21, i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %then2738, label %else2739
-then2738:
+  br i1 %t25, label %then2749, label %else2750
+then2749:
   %t26 = call i64 @__list_new()
   %t27 = load i64, i64* %self
   %t28 = call i64 @Parser__parse_if(i64 %t27)
   %t29 = call i64 @__list_push(i64 %t26, i64 %t28)
   store i64 %t26, i64* %else_branch
-  br label %endif2737
-else2739:
+  br label %endif2748
+else2750:
   %t30 = load i64, i64* %self
   %t31 = call i64 @Parser__parse_body(i64 %t30)
   store i64 %t31, i64* %else_branch
-  br label %endif2737
-endif2737:
-  br label %endif2734
-else2736:
-  br label %endif2734
-endif2734:
+  br label %endif2748
+endif2748:
+  br label %endif2745
+else2747:
+  br label %endif2745
+endif2745:
   %t32 = load i64, i64* %cond
   %t33 = load i64, i64* %then_branch
   %t34 = load i64, i64* %else_branch
@@ -31259,18 +31466,18 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1405, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1407, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then2741, label %else2742
-then2741:
+  br i1 %t5, label %then2752, label %else2753
+then2752:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__parse_block_stmts(i64 %t6)
   ret i64 %t7
-else2742:
-  br label %endif2740
-endif2740:
+else2753:
+  br label %endif2751
+endif2751:
   %t8 = call i64 @__list_new()
   %t9 = load i64, i64* %self
   %t10 = call i64 @Parser__parse_stmt(i64 %t9)
@@ -31287,14 +31494,14 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1406, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1408, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
   %t8 = call i64 @Parser__parse_expr(i64 %t7)
   store i64 %t8, i64* %cond
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1407, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1409, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__consume(i64 %t9, i64 %t11)
   %t13 = load i64, i64* %self
@@ -31339,16 +31546,16 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__advance(i64 %t1)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1408, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1410, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
-  %t8 = getelementptr [4 x i8], [4 x i8]* @.str.1409, i64 0, i64 0
+  %t8 = getelementptr [4 x i8], [4 x i8]* @.str.1411, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i64 @Parser__match_kind_check(i64 %t7, i64 %t9)
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then2744, label %else2745
-then2744:
+  br i1 %t11, label %then2755, label %else2756
+then2755:
   %t12 = load i64, i64* %self
   %t13 = call i64 @Parser__advance(i64 %t12)
   %t14 = load i64, i64* %self
@@ -31361,23 +31568,23 @@ then2744:
   %t19 = ptrtoint [1 x i64]* %t17 to i64
   store i64 %t19, i64* %vtype
   %t20 = load i64, i64* %self
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1410, i64 0, i64 0
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1412, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i64 @Parser__match_kind(i64 %t20, i64 %t22)
   %t24 = trunc i64 %t23 to i1
-  br i1 %t24, label %then2747, label %else2748
-then2747:
+  br i1 %t24, label %then2758, label %else2759
+then2758:
   %t25 = load i64, i64* %self
   %t26 = load i64, i64* %self
   %t27 = call i64 @Parser__parse_type(i64 %t26)
   %t28 = call i64 @Parser__parse_type_ast(i64 %t25, i64 %t27)
   store i64 %t28, i64* %vtype
-  br label %endif2746
-else2748:
-  br label %endif2746
-endif2746:
+  br label %endif2757
+else2759:
+  br label %endif2757
+endif2757:
   %t29 = load i64, i64* %self
-  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.1411, i64 0, i64 0
+  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.1413, i64 0, i64 0
   %t31 = ptrtoint i8* %t30 to i64
   %t32 = call i64 @Parser__consume(i64 %t29, i64 %t31)
   %t33 = load i64, i64* %self
@@ -31386,9 +31593,9 @@ endif2746:
   %t35 = load i64, i64* %name
   %t36 = load i64, i64* %vtype
   %t37 = load i64, i64* %init_expr
-  %t38 = getelementptr [1 x i8], [1 x i8]* @.str.1412, i64 0, i64 0
+  %t38 = getelementptr [1 x i8], [1 x i8]* @.str.1414, i64 0, i64 0
   %t39 = ptrtoint i8* %t38 to i64
-  %t40 = getelementptr [7 x i8], [7 x i8]* @.str.1413, i64 0, i64 0
+  %t40 = getelementptr [7 x i8], [7 x i8]* @.str.1415, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @ast_span_none()
   %t43 = call i64 @ast_span_none()
@@ -31413,21 +31620,21 @@ endif2746:
   %t54 = ptrtoint [8 x i64]* %t45 to i64
   store i64 %t54, i64* %init
   %t55 = load i64, i64* %self
-  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.1414, i64 0, i64 0
+  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.1416, i64 0, i64 0
   %t57 = ptrtoint i8* %t56 to i64
   %t58 = call i64 @Parser__consume(i64 %t55, i64 %t57)
   %t59 = load i64, i64* %self
   %t60 = call i64 @Parser__parse_expr(i64 %t59)
   store i64 %t60, i64* %cond
   %t61 = load i64, i64* %self
-  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.1415, i64 0, i64 0
+  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.1417, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
   %t64 = call i64 @Parser__consume(i64 %t61, i64 %t63)
   %t65 = load i64, i64* %self
   %t66 = call i64 @Parser__parse_expr_stmt(i64 %t65)
   store i64 %t66, i64* %update
   %t67 = load i64, i64* %self
-  %t68 = getelementptr [2 x i8], [2 x i8]* @.str.1416, i64 0, i64 0
+  %t68 = getelementptr [2 x i8], [2 x i8]* @.str.1418, i64 0, i64 0
   %t69 = ptrtoint i8* %t68 to i64
   %t70 = call i64 @Parser__consume(i64 %t67, i64 %t69)
   %t71 = load i64, i64* %self
@@ -31463,64 +31670,64 @@ endif2746:
   store i64 %t90, i64* %t94
   %t95 = ptrtoint [2 x i64]* %t92 to i64
   ret i64 %t95
-else2745:
-  br label %endif2743
-endif2743:
+else2756:
+  br label %endif2754
+endif2754:
   %t96 = load i64, i64* %self
-  %t97 = getelementptr [2 x i8], [2 x i8]* @.str.1417, i64 0, i64 0
+  %t97 = getelementptr [2 x i8], [2 x i8]* @.str.1419, i64 0, i64 0
   %t98 = ptrtoint i8* %t97 to i64
   %t99 = call i64 @Parser__match_kind_check(i64 %t96, i64 %t98)
   %t100 = trunc i64 %t99 to i1
-  br i1 %t100, label %then2750, label %else2751
-then2750:
+  br i1 %t100, label %then2761, label %else2762
+then2761:
   %t101 = load i64, i64* %self
   %t102 = call i64 @Parser__advance(i64 %t101)
   %t103 = call i64 @__list_new()
   store i64 %t103, i64* %pat_names
   %t104 = load i64, i64* %self
-  %t105 = getelementptr [2 x i8], [2 x i8]* @.str.1418, i64 0, i64 0
+  %t105 = getelementptr [2 x i8], [2 x i8]* @.str.1420, i64 0, i64 0
   %t106 = ptrtoint i8* %t105 to i64
   %t107 = call i64 @Parser__match_kind_check(i64 %t104, i64 %t106)
   %t108 = xor i64 %t107, 1
   %t109 = trunc i64 %t108 to i1
-  br i1 %t109, label %then2753, label %else2754
-then2753:
+  br i1 %t109, label %then2764, label %else2765
+then2764:
   %t110 = load i64, i64* %pat_names
   %t111 = load i64, i64* %self
   %t112 = call i64 @Parser__expect_ident(i64 %t111)
   %t113 = call i64 @__list_push(i64 %t110, i64 %t112)
-  br label %while.cond2755
-while.cond2755:
+  br label %while.cond2766
+while.cond2766:
   %t114 = load i64, i64* %self
-  %t115 = getelementptr [2 x i8], [2 x i8]* @.str.1419, i64 0, i64 0
+  %t115 = getelementptr [2 x i8], [2 x i8]* @.str.1421, i64 0, i64 0
   %t116 = ptrtoint i8* %t115 to i64
   %t117 = call i64 @Parser__match_kind(i64 %t114, i64 %t116)
   %t118 = trunc i64 %t117 to i1
-  br i1 %t118, label %while.body2756, label %while.end2757
-while.body2756:
+  br i1 %t118, label %while.body2767, label %while.end2768
+while.body2767:
   %t119 = load i64, i64* %pat_names
   %t120 = load i64, i64* %self
   %t121 = call i64 @Parser__expect_ident(i64 %t120)
   %t122 = call i64 @__list_push(i64 %t119, i64 %t121)
-  br label %while.cond2755
-while.end2757:
-  br label %endif2752
-else2754:
-  br label %endif2752
-endif2752:
+  br label %while.cond2766
+while.end2768:
+  br label %endif2763
+else2765:
+  br label %endif2763
+endif2763:
   %t123 = load i64, i64* %self
-  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.1420, i64 0, i64 0
+  %t124 = getelementptr [2 x i8], [2 x i8]* @.str.1422, i64 0, i64 0
   %t125 = ptrtoint i8* %t124 to i64
   %t126 = call i64 @Parser__consume(i64 %t123, i64 %t125)
   %t127 = load i64, i64* %self
-  %t128 = getelementptr [3 x i8], [3 x i8]* @.str.1421, i64 0, i64 0
+  %t128 = getelementptr [3 x i8], [3 x i8]* @.str.1423, i64 0, i64 0
   %t129 = ptrtoint i8* %t128 to i64
   %t130 = call i64 @Parser__consume(i64 %t127, i64 %t129)
   %t131 = load i64, i64* %self
   %t132 = call i64 @Parser__parse_expr(i64 %t131)
   store i64 %t132, i64* %pat_iter
   %t133 = load i64, i64* %self
-  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1422, i64 0, i64 0
+  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1424, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
   %t136 = call i64 @Parser__consume(i64 %t133, i64 %t135)
   %t137 = load i64, i64* %self
@@ -31530,16 +31737,16 @@ endif2752:
   store i64 %t139, i64* %desugar_body
   %t140 = add i64 0, 0
   store i64 %t140, i64* %pdi
-  br label %while.cond2758
-while.cond2758:
+  br label %while.cond2769
+while.cond2769:
   %t141 = load i64, i64* %pdi
   %t142 = load i64, i64* %pat_names
   %t143 = call i64 @__list_length(i64 %t142)
   %t145 = icmp slt i64 %t141, %t143
   %t144 = zext i1 %t145 to i64
   %t146 = trunc i64 %t144 to i1
-  br i1 %t146, label %while.body2759, label %while.end2760
-while.body2759:
+  br i1 %t146, label %while.body2770, label %while.end2771
+while.body2770:
   %t147 = load i64, i64* %desugar_body
   %t148 = load i64, i64* %pat_names
   %t149 = load i64, i64* %pdi
@@ -31553,7 +31760,7 @@ while.body2759:
   %t157 = getelementptr [1 x i64], [1 x i64]* %t156, i64 0, i64 0
   store i64 12, i64* %t157
   %t158 = ptrtoint [1 x i64]* %t156 to i64
-  %t159 = getelementptr [11 x i8], [11 x i8]* @.str.1423, i64 0, i64 0
+  %t159 = getelementptr [11 x i8], [11 x i8]* @.str.1425, i64 0, i64 0
   %t160 = ptrtoint i8* %t159 to i64
   %t161 = call i64 @ast_span_none()
   %t162 = call i8* @__sf_malloc(i64 24)
@@ -31582,9 +31789,9 @@ while.body2759:
   %t178 = getelementptr [3 x i64], [3 x i64]* %t175, i64 0, i64 2
   store i64 %t173, i64* %t178
   %t179 = ptrtoint [3 x i64]* %t175 to i64
-  %t180 = getelementptr [1 x i8], [1 x i8]* @.str.1424, i64 0, i64 0
+  %t180 = getelementptr [1 x i8], [1 x i8]* @.str.1426, i64 0, i64 0
   %t181 = ptrtoint i8* %t180 to i64
-  %t182 = getelementptr [7 x i8], [7 x i8]* @.str.1425, i64 0, i64 0
+  %t182 = getelementptr [7 x i8], [7 x i8]* @.str.1427, i64 0, i64 0
   %t183 = ptrtoint i8* %t182 to i64
   %t184 = call i64 @ast_span_none()
   %t185 = call i64 @ast_span_none()
@@ -31612,20 +31819,20 @@ while.body2759:
   %t199 = add i64 0, 1
   %t200 = add i64 %t198, %t199
   store i64 %t200, i64* %pdi
-  br label %while.cond2758
-while.end2760:
+  br label %while.cond2769
+while.end2771:
   %t201 = add i64 0, 0
   store i64 %t201, i64* %pdi
-  br label %while.cond2761
-while.cond2761:
+  br label %while.cond2772
+while.cond2772:
   %t202 = load i64, i64* %pdi
   %t203 = load i64, i64* %pat_body
   %t204 = call i64 @__list_length(i64 %t203)
   %t206 = icmp slt i64 %t202, %t204
   %t205 = zext i1 %t206 to i64
   %t207 = trunc i64 %t205 to i1
-  br i1 %t207, label %while.body2762, label %while.end2763
-while.body2762:
+  br i1 %t207, label %while.body2773, label %while.end2774
+while.body2773:
   %t208 = load i64, i64* %desugar_body
   %t209 = load i64, i64* %pat_body
   %t210 = load i64, i64* %pdi
@@ -31639,76 +31846,76 @@ while.body2762:
   %t218 = add i64 0, 1
   %t219 = add i64 %t217, %t218
   store i64 %t219, i64* %pdi
-  br label %while.cond2761
-while.end2763:
+  br label %while.cond2772
+while.end2774:
   %t220 = load i64, i64* %self
-  %t221 = getelementptr [11 x i8], [11 x i8]* @.str.1426, i64 0, i64 0
+  %t221 = getelementptr [11 x i8], [11 x i8]* @.str.1428, i64 0, i64 0
   %t222 = ptrtoint i8* %t221 to i64
   %t223 = load i64, i64* %pat_iter
   %t224 = load i64, i64* %desugar_body
   %t225 = call i64 @Parser__desugar_for_in(i64 %t220, i64 %t222, i64 %t223, i64 %t224)
   ret i64 %t225
-else2751:
-  br label %endif2749
-endif2749:
+else2762:
+  br label %endif2760
+endif2760:
   %t226 = load i64, i64* %self
   %t227 = call i64 @Parser__expect_ident(i64 %t226)
   store i64 %t227, i64* %name
   %t228 = load i64, i64* %self
-  %t229 = getelementptr [2 x i8], [2 x i8]* @.str.1427, i64 0, i64 0
+  %t229 = getelementptr [2 x i8], [2 x i8]* @.str.1429, i64 0, i64 0
   %t230 = ptrtoint i8* %t229 to i64
   %t231 = call i64 @Parser__match_kind_check(i64 %t228, i64 %t230)
   %t232 = trunc i64 %t231 to i1
-  br i1 %t232, label %then2765, label %else2766
-then2765:
+  br i1 %t232, label %then2776, label %else2777
+then2776:
   %t233 = load i64, i64* %self
   %t234 = call i64 @Parser__advance(i64 %t233)
   %t235 = call i64 @__list_new()
   store i64 %t235, i64* %vp_bindings
   %t236 = load i64, i64* %self
-  %t237 = getelementptr [2 x i8], [2 x i8]* @.str.1428, i64 0, i64 0
+  %t237 = getelementptr [2 x i8], [2 x i8]* @.str.1430, i64 0, i64 0
   %t238 = ptrtoint i8* %t237 to i64
   %t239 = call i64 @Parser__match_kind_check(i64 %t236, i64 %t238)
   %t240 = xor i64 %t239, 1
   %t241 = trunc i64 %t240 to i1
-  br i1 %t241, label %then2768, label %else2769
-then2768:
+  br i1 %t241, label %then2779, label %else2780
+then2779:
   %t242 = load i64, i64* %vp_bindings
   %t243 = load i64, i64* %self
   %t244 = call i64 @Parser__expect_ident(i64 %t243)
   %t245 = call i64 @__list_push(i64 %t242, i64 %t244)
-  br label %while.cond2770
-while.cond2770:
+  br label %while.cond2781
+while.cond2781:
   %t246 = load i64, i64* %self
-  %t247 = getelementptr [2 x i8], [2 x i8]* @.str.1429, i64 0, i64 0
+  %t247 = getelementptr [2 x i8], [2 x i8]* @.str.1431, i64 0, i64 0
   %t248 = ptrtoint i8* %t247 to i64
   %t249 = call i64 @Parser__match_kind(i64 %t246, i64 %t248)
   %t250 = trunc i64 %t249 to i1
-  br i1 %t250, label %while.body2771, label %while.end2772
-while.body2771:
+  br i1 %t250, label %while.body2782, label %while.end2783
+while.body2782:
   %t251 = load i64, i64* %vp_bindings
   %t252 = load i64, i64* %self
   %t253 = call i64 @Parser__expect_ident(i64 %t252)
   %t254 = call i64 @__list_push(i64 %t251, i64 %t253)
-  br label %while.cond2770
-while.end2772:
-  br label %endif2767
-else2769:
-  br label %endif2767
-endif2767:
+  br label %while.cond2781
+while.end2783:
+  br label %endif2778
+else2780:
+  br label %endif2778
+endif2778:
   %t255 = load i64, i64* %self
-  %t256 = getelementptr [2 x i8], [2 x i8]* @.str.1430, i64 0, i64 0
+  %t256 = getelementptr [2 x i8], [2 x i8]* @.str.1432, i64 0, i64 0
   %t257 = ptrtoint i8* %t256 to i64
   %t258 = call i64 @Parser__consume(i64 %t255, i64 %t257)
   %t259 = load i64, i64* %self
-  %t260 = getelementptr [3 x i8], [3 x i8]* @.str.1431, i64 0, i64 0
+  %t260 = getelementptr [3 x i8], [3 x i8]* @.str.1433, i64 0, i64 0
   %t261 = ptrtoint i8* %t260 to i64
   %t262 = call i64 @Parser__consume(i64 %t259, i64 %t261)
   %t263 = load i64, i64* %self
   %t264 = call i64 @Parser__parse_expr(i64 %t263)
   store i64 %t264, i64* %vp_iter
   %t265 = load i64, i64* %self
-  %t266 = getelementptr [2 x i8], [2 x i8]* @.str.1432, i64 0, i64 0
+  %t266 = getelementptr [2 x i8], [2 x i8]* @.str.1434, i64 0, i64 0
   %t267 = ptrtoint i8* %t266 to i64
   %t268 = call i64 @Parser__consume(i64 %t265, i64 %t267)
   %t269 = load i64, i64* %self
@@ -31728,7 +31935,7 @@ endif2767:
   %t279 = getelementptr [3 x i64], [3 x i64]* %t276, i64 0, i64 2
   store i64 %t274, i64* %t279
   %t280 = ptrtoint [3 x i64]* %t276 to i64
-  %t281 = getelementptr [11 x i8], [11 x i8]* @.str.1433, i64 0, i64 0
+  %t281 = getelementptr [11 x i8], [11 x i8]* @.str.1435, i64 0, i64 0
   %t282 = ptrtoint i8* %t281 to i64
   %t283 = call i64 @ast_span_none()
   %t284 = call i8* @__sf_malloc(i64 24)
@@ -31752,16 +31959,16 @@ endif2767:
   %t296 = call i64 @__list_push(i64 %t272, i64 %t295)
   %t297 = add i64 0, 0
   store i64 %t297, i64* %vpi
-  br label %while.cond2773
-while.cond2773:
+  br label %while.cond2784
+while.cond2784:
   %t298 = load i64, i64* %vpi
   %t299 = load i64, i64* %vp_body
   %t300 = call i64 @__list_length(i64 %t299)
   %t302 = icmp slt i64 %t298, %t300
   %t301 = zext i1 %t302 to i64
   %t303 = trunc i64 %t301 to i1
-  br i1 %t303, label %while.body2774, label %while.end2775
-while.body2774:
+  br i1 %t303, label %while.body2785, label %while.end2786
+while.body2785:
   %t304 = load i64, i64* %vp_desugar
   %t305 = load i64, i64* %vp_body
   %t306 = load i64, i64* %vpi
@@ -31775,32 +31982,32 @@ while.body2774:
   %t314 = add i64 0, 1
   %t315 = add i64 %t313, %t314
   store i64 %t315, i64* %vpi
-  br label %while.cond2773
-while.end2775:
+  br label %while.cond2784
+while.end2786:
   %t316 = load i64, i64* %self
-  %t317 = getelementptr [11 x i8], [11 x i8]* @.str.1434, i64 0, i64 0
+  %t317 = getelementptr [11 x i8], [11 x i8]* @.str.1436, i64 0, i64 0
   %t318 = ptrtoint i8* %t317 to i64
   %t319 = load i64, i64* %vp_iter
   %t320 = load i64, i64* %vp_desugar
   %t321 = call i64 @Parser__desugar_for_in(i64 %t316, i64 %t318, i64 %t319, i64 %t320)
   ret i64 %t321
-else2766:
-  br label %endif2764
-endif2764:
+else2777:
+  br label %endif2775
+endif2775:
   %t322 = load i64, i64* %self
-  %t323 = getelementptr [3 x i8], [3 x i8]* @.str.1435, i64 0, i64 0
+  %t323 = getelementptr [3 x i8], [3 x i8]* @.str.1437, i64 0, i64 0
   %t324 = ptrtoint i8* %t323 to i64
   %t325 = call i64 @Parser__match_kind(i64 %t322, i64 %t324)
   %t326 = trunc i64 %t325 to i1
-  br i1 %t326, label %then2777, label %else2778
-then2777:
+  br i1 %t326, label %then2788, label %else2789
+then2788:
   %t327 = load i64, i64* %self
   %t328 = load i64, i64* %name
   %t329 = call i64 @Parser__parse_for_in(i64 %t327, i64 %t328)
   ret i64 %t329
-else2778:
-  br label %endif2776
-endif2776:
+else2789:
+  br label %endif2787
+endif2787:
   %t330 = call i8* @__sf_malloc(i64 8)
   %t331 = bitcast i8* %t330 to [1 x i64]*
   %t332 = getelementptr [1 x i64], [1 x i64]* %t331, i64 0, i64 0
@@ -31808,23 +32015,23 @@ endif2776:
   %t333 = ptrtoint [1 x i64]* %t331 to i64
   store i64 %t333, i64* %vtype
   %t334 = load i64, i64* %self
-  %t335 = getelementptr [2 x i8], [2 x i8]* @.str.1436, i64 0, i64 0
+  %t335 = getelementptr [2 x i8], [2 x i8]* @.str.1438, i64 0, i64 0
   %t336 = ptrtoint i8* %t335 to i64
   %t337 = call i64 @Parser__match_kind(i64 %t334, i64 %t336)
   %t338 = trunc i64 %t337 to i1
-  br i1 %t338, label %then2780, label %else2781
-then2780:
+  br i1 %t338, label %then2791, label %else2792
+then2791:
   %t339 = load i64, i64* %self
   %t340 = load i64, i64* %self
   %t341 = call i64 @Parser__parse_type(i64 %t340)
   %t342 = call i64 @Parser__parse_type_ast(i64 %t339, i64 %t341)
   store i64 %t342, i64* %vtype
-  br label %endif2779
-else2781:
-  br label %endif2779
-endif2779:
+  br label %endif2790
+else2792:
+  br label %endif2790
+endif2790:
   %t343 = load i64, i64* %self
-  %t344 = getelementptr [2 x i8], [2 x i8]* @.str.1437, i64 0, i64 0
+  %t344 = getelementptr [2 x i8], [2 x i8]* @.str.1439, i64 0, i64 0
   %t345 = ptrtoint i8* %t344 to i64
   %t346 = call i64 @Parser__consume(i64 %t343, i64 %t345)
   %t347 = load i64, i64* %self
@@ -31833,9 +32040,9 @@ endif2779:
   %t349 = load i64, i64* %name
   %t350 = load i64, i64* %vtype
   %t351 = load i64, i64* %init_expr
-  %t352 = getelementptr [1 x i8], [1 x i8]* @.str.1438, i64 0, i64 0
+  %t352 = getelementptr [1 x i8], [1 x i8]* @.str.1440, i64 0, i64 0
   %t353 = ptrtoint i8* %t352 to i64
-  %t354 = getelementptr [7 x i8], [7 x i8]* @.str.1439, i64 0, i64 0
+  %t354 = getelementptr [7 x i8], [7 x i8]* @.str.1441, i64 0, i64 0
   %t355 = ptrtoint i8* %t354 to i64
   %t356 = call i64 @ast_span_none()
   %t357 = call i64 @ast_span_none()
@@ -31860,21 +32067,21 @@ endif2779:
   %t368 = ptrtoint [8 x i64]* %t359 to i64
   store i64 %t368, i64* %init
   %t369 = load i64, i64* %self
-  %t370 = getelementptr [2 x i8], [2 x i8]* @.str.1440, i64 0, i64 0
+  %t370 = getelementptr [2 x i8], [2 x i8]* @.str.1442, i64 0, i64 0
   %t371 = ptrtoint i8* %t370 to i64
   %t372 = call i64 @Parser__consume(i64 %t369, i64 %t371)
   %t373 = load i64, i64* %self
   %t374 = call i64 @Parser__parse_expr(i64 %t373)
   store i64 %t374, i64* %cond
   %t375 = load i64, i64* %self
-  %t376 = getelementptr [2 x i8], [2 x i8]* @.str.1441, i64 0, i64 0
+  %t376 = getelementptr [2 x i8], [2 x i8]* @.str.1443, i64 0, i64 0
   %t377 = ptrtoint i8* %t376 to i64
   %t378 = call i64 @Parser__consume(i64 %t375, i64 %t377)
   %t379 = load i64, i64* %self
   %t380 = call i64 @Parser__parse_expr_stmt(i64 %t379)
   store i64 %t380, i64* %update
   %t381 = load i64, i64* %self
-  %t382 = getelementptr [2 x i8], [2 x i8]* @.str.1442, i64 0, i64 0
+  %t382 = getelementptr [2 x i8], [2 x i8]* @.str.1444, i64 0, i64 0
   %t383 = ptrtoint i8* %t382 to i64
   %t384 = call i64 @Parser__consume(i64 %t381, i64 %t383)
   %t385 = load i64, i64* %self
@@ -31924,7 +32131,7 @@ entry:
   %t2 = call i64 @Parser__parse_expr(i64 %t1)
   store i64 %t2, i64* %iter_expr
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1443, i64 0, i64 0
+  %t4 = getelementptr [2 x i8], [2 x i8]* @.str.1445, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = call i64 @Parser__consume(i64 %t3, i64 %t5)
   %t7 = load i64, i64* %self
@@ -31962,7 +32169,7 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = call i64 @Parser__next_for_uid(i64 %t1)
   store i64 %t2, i64* %uid
-  %t3 = getelementptr [10 x i8], [10 x i8]* @.str.1444, i64 0, i64 0
+  %t3 = getelementptr [10 x i8], [10 x i8]* @.str.1446, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = load i64, i64* %uid
   %t6 = inttoptr i64 %t4 to i8*
@@ -31979,7 +32186,7 @@ entry:
   %t15 = inttoptr i64 %t14 to i8*
   %t16 = ptrtoint i8* %t15 to i64
   store i64 %t16, i64* %list_var
-  %t17 = getelementptr [8 x i8], [8 x i8]* @.str.1445, i64 0, i64 0
+  %t17 = getelementptr [8 x i8], [8 x i8]* @.str.1447, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = load i64, i64* %uid
   %t20 = inttoptr i64 %t18 to i8*
@@ -32003,9 +32210,9 @@ entry:
   store i64 12, i64* %t34
   %t35 = ptrtoint [1 x i64]* %t33 to i64
   %t36 = load i64, i64* %iter_expr
-  %t37 = getelementptr [1 x i8], [1 x i8]* @.str.1446, i64 0, i64 0
+  %t37 = getelementptr [1 x i8], [1 x i8]* @.str.1448, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
-  %t39 = getelementptr [7 x i8], [7 x i8]* @.str.1447, i64 0, i64 0
+  %t39 = getelementptr [7 x i8], [7 x i8]* @.str.1449, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = call i64 @ast_span_none()
   %t42 = call i64 @ast_span_none()
@@ -32043,9 +32250,9 @@ entry:
   %t63 = getelementptr [2 x i64], [2 x i64]* %t61, i64 0, i64 1
   store i64 %t59, i64* %t63
   %t64 = ptrtoint [2 x i64]* %t61 to i64
-  %t65 = getelementptr [1 x i8], [1 x i8]* @.str.1448, i64 0, i64 0
+  %t65 = getelementptr [1 x i8], [1 x i8]* @.str.1450, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
-  %t67 = getelementptr [7 x i8], [7 x i8]* @.str.1449, i64 0, i64 0
+  %t67 = getelementptr [7 x i8], [7 x i8]* @.str.1451, i64 0, i64 0
   %t68 = ptrtoint i8* %t67 to i64
   %t69 = call i64 @ast_span_none()
   %t70 = call i64 @ast_span_none()
@@ -32080,7 +32287,7 @@ entry:
   %t88 = getelementptr [3 x i64], [3 x i64]* %t85, i64 0, i64 2
   store i64 %t83, i64* %t88
   %t89 = ptrtoint [3 x i64]* %t85 to i64
-  %t90 = getelementptr [2 x i8], [2 x i8]* @.str.1450, i64 0, i64 0
+  %t90 = getelementptr [2 x i8], [2 x i8]* @.str.1452, i64 0, i64 0
   %t91 = ptrtoint i8* %t90 to i64
   %t92 = load i64, i64* %list_var
   %t93 = call i64 @ast_span_none()
@@ -32093,7 +32300,7 @@ entry:
   %t98 = getelementptr [3 x i64], [3 x i64]* %t95, i64 0, i64 2
   store i64 %t93, i64* %t98
   %t99 = ptrtoint [3 x i64]* %t95 to i64
-  %t100 = getelementptr [7 x i8], [7 x i8]* @.str.1451, i64 0, i64 0
+  %t100 = getelementptr [7 x i8], [7 x i8]* @.str.1453, i64 0, i64 0
   %t101 = ptrtoint i8* %t100 to i64
   %t102 = call i64 @__list_new()
   %t103 = call i64 @ast_span_none()
@@ -32139,7 +32346,7 @@ entry:
   %t130 = getelementptr [3 x i64], [3 x i64]* %t127, i64 0, i64 2
   store i64 %t125, i64* %t130
   %t131 = ptrtoint [3 x i64]* %t127 to i64
-  %t132 = getelementptr [11 x i8], [11 x i8]* @.str.1452, i64 0, i64 0
+  %t132 = getelementptr [11 x i8], [11 x i8]* @.str.1454, i64 0, i64 0
   %t133 = ptrtoint i8* %t132 to i64
   %t134 = call i64 @__list_new()
   %t135 = load i64, i64* %idx_var
@@ -32168,9 +32375,9 @@ entry:
   %t151 = getelementptr [5 x i64], [5 x i64]* %t146, i64 0, i64 4
   store i64 %t144, i64* %t151
   %t152 = ptrtoint [5 x i64]* %t146 to i64
-  %t153 = getelementptr [1 x i8], [1 x i8]* @.str.1453, i64 0, i64 0
+  %t153 = getelementptr [1 x i8], [1 x i8]* @.str.1455, i64 0, i64 0
   %t154 = ptrtoint i8* %t153 to i64
-  %t155 = getelementptr [7 x i8], [7 x i8]* @.str.1454, i64 0, i64 0
+  %t155 = getelementptr [7 x i8], [7 x i8]* @.str.1456, i64 0, i64 0
   %t156 = ptrtoint i8* %t155 to i64
   %t157 = call i64 @ast_span_none()
   %t158 = call i64 @ast_span_none()
@@ -32206,7 +32413,7 @@ entry:
   %t177 = getelementptr [3 x i64], [3 x i64]* %t174, i64 0, i64 2
   store i64 %t172, i64* %t177
   %t178 = ptrtoint [3 x i64]* %t174 to i64
-  %t179 = getelementptr [2 x i8], [2 x i8]* @.str.1455, i64 0, i64 0
+  %t179 = getelementptr [2 x i8], [2 x i8]* @.str.1457, i64 0, i64 0
   %t180 = ptrtoint i8* %t179 to i64
   %t181 = add i64 0, 1
   %t182 = call i8* @__sf_malloc(i64 16)
@@ -32257,16 +32464,16 @@ entry:
   %t213 = call i64 @__list_push(i64 %t211, i64 %t212)
   %t214 = add i64 0, 0
   store i64 %t214, i64* %bi
-  br label %while.cond2782
-while.cond2782:
+  br label %while.cond2793
+while.cond2793:
   %t215 = load i64, i64* %bi
   %t216 = load i64, i64* %v_body
   %t217 = call i64 @__list_length(i64 %t216)
   %t219 = icmp slt i64 %t215, %t217
   %t218 = zext i1 %t219 to i64
   %t220 = trunc i64 %t218 to i1
-  br i1 %t220, label %while.body2783, label %while.end2784
-while.body2783:
+  br i1 %t220, label %while.body2794, label %while.end2795
+while.body2794:
   %t221 = load i64, i64* %while_body
   %t222 = load i64, i64* %v_body
   %t223 = load i64, i64* %bi
@@ -32280,8 +32487,8 @@ while.body2783:
   %t231 = add i64 0, 1
   %t232 = add i64 %t230, %t231
   store i64 %t232, i64* %bi
-  br label %while.cond2782
-while.end2784:
+  br label %while.cond2793
+while.end2795:
   %t233 = call i64 @__list_new()
   store i64 %t233, i64* %stmts
   %t234 = load i64, i64* %stmts
@@ -32328,18 +32535,18 @@ entry:
   %t4 = call i64 @Parser__parse_block_stmts(i64 %t3)
   store i64 %t4, i64* %try_body
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [6 x i8], [6 x i8]* @.str.1456, i64 0, i64 0
+  %t6 = getelementptr [6 x i8], [6 x i8]* @.str.1458, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__consume(i64 %t5, i64 %t7)
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1457, i64 0, i64 0
+  %t10 = getelementptr [2 x i8], [2 x i8]* @.str.1459, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @Parser__consume(i64 %t9, i64 %t11)
   %t13 = load i64, i64* %self
   %t14 = call i64 @Parser__expect_ident(i64 %t13)
   store i64 %t14, i64* %catch_name
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1458, i64 0, i64 0
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1460, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__consume(i64 %t15, i64 %t17)
   %t19 = load i64, i64* %self
@@ -32348,19 +32555,19 @@ entry:
   %t21 = call i64 @__list_new()
   store i64 %t21, i64* %finally_body
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [8 x i8], [8 x i8]* @.str.1459, i64 0, i64 0
+  %t23 = getelementptr [8 x i8], [8 x i8]* @.str.1461, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__match_kind(i64 %t22, i64 %t24)
   %t26 = trunc i64 %t25 to i1
-  br i1 %t26, label %then2786, label %else2787
-then2786:
+  br i1 %t26, label %then2797, label %else2798
+then2797:
   %t27 = load i64, i64* %self
   %t28 = call i64 @Parser__parse_block_stmts(i64 %t27)
   store i64 %t28, i64* %finally_body
-  br label %endif2785
-else2787:
-  br label %endif2785
-endif2785:
+  br label %endif2796
+else2798:
+  br label %endif2796
+endif2796:
   %t29 = load i64, i64* %try_body
   %t30 = load i64, i64* %catch_name
   %t31 = load i64, i64* %catch_body
@@ -32409,114 +32616,114 @@ entry:
   %str_expr = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1460, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1462, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__consume(i64 %t1, i64 %t3)
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [6 x i8], [6 x i8]* @.str.1461, i64 0, i64 0
+  %t6 = getelementptr [6 x i8], [6 x i8]* @.str.1463, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__match_kind_check(i64 %t5, i64 %t7)
   %t9 = trunc i64 %t8 to i1
-  br i1 %t9, label %then2789, label %else2790
-then2789:
+  br i1 %t9, label %then2800, label %else2801
+then2800:
   %t10 = load i64, i64* %self
-  %t11 = getelementptr [3 x i8], [3 x i8]* @.str.1462, i64 0, i64 0
+  %t11 = getelementptr [3 x i8], [3 x i8]* @.str.1464, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
   %t13 = call i64 @Parser__peek_is(i64 %t10, i64 %t12)
   %t14 = trunc i64 %t13 to i1
-  br label %logic.entry2792
-logic.entry2792:
-  br i1 %t14, label %end2794, label %rhs2793
-rhs2793:
+  br label %logic.entry2803
+logic.entry2803:
+  br i1 %t14, label %end2805, label %rhs2804
+rhs2804:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1463, i64 0, i64 0
+  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.1465, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__peek_is(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br label %rhs.exit2795
-rhs.exit2795:
-  br label %end2794
-end2794:
-  %t20 = phi i1 [%t14, %logic.entry2792], [%t19, %rhs.exit2795]
+  br label %rhs.exit2806
+rhs.exit2806:
+  br label %end2805
+end2805:
+  %t20 = phi i1 [%t14, %logic.entry2803], [%t19, %rhs.exit2806]
   %t21 = zext i1 %t20 to i64
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %then2796, label %else2797
-then2796:
+  br i1 %t22, label %then2807, label %else2808
+then2807:
   %t23 = load i64, i64* %self
   %t24 = call i64 @Parser__parse_trailing_closure_with_params(i64 %t23)
   ret i64 %t24
-else2797:
-  br label %endif2791
-endif2791:
-  br label %endif2788
-else2790:
-  br label %endif2788
-endif2788:
+else2808:
+  br label %endif2802
+endif2802:
+  br label %endif2799
+else2801:
+  br label %endif2799
+endif2799:
   %t25 = call i64 @__list_new()
   store i64 %t25, i64* %v_body
-  br label %while.cond2798
-while.cond2798:
+  br label %while.cond2809
+while.cond2809:
   %t26 = load i64, i64* %self
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1464, i64 0, i64 0
+  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1466, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   %t29 = call i64 @Parser__match_kind_check(i64 %t26, i64 %t28)
   %t30 = xor i64 %t29, 1
   %t31 = trunc i64 %t30 to i1
-  br label %logic.entry2801
-logic.entry2801:
-  br i1 %t31, label %rhs2802, label %end2803
-rhs2802:
+  br label %logic.entry2812
+logic.entry2812:
+  br i1 %t31, label %rhs2813, label %end2814
+rhs2813:
   %t32 = load i64, i64* %self
-  %t33 = getelementptr [4 x i8], [4 x i8]* @.str.1465, i64 0, i64 0
+  %t33 = getelementptr [4 x i8], [4 x i8]* @.str.1467, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i64 @Parser__match_kind_check(i64 %t32, i64 %t34)
   %t36 = xor i64 %t35, 1
   %t37 = trunc i64 %t36 to i1
-  br label %rhs.exit2804
-rhs.exit2804:
-  br label %end2803
-end2803:
-  %t38 = phi i1 [%t31, %logic.entry2801], [%t37, %rhs.exit2804]
+  br label %rhs.exit2815
+rhs.exit2815:
+  br label %end2814
+end2814:
+  %t38 = phi i1 [%t31, %logic.entry2812], [%t37, %rhs.exit2815]
   %t39 = zext i1 %t38 to i64
   %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %while.body2799, label %while.end2800
-while.body2799:
-  br label %while.cond2805
-while.cond2805:
+  br i1 %t40, label %while.body2810, label %while.end2811
+while.body2810:
+  br label %while.cond2816
+while.cond2816:
   %t41 = load i64, i64* %self
-  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.1466, i64 0, i64 0
+  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.1468, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = call i64 @Parser__match_kind(i64 %t41, i64 %t43)
   %t45 = trunc i64 %t44 to i1
-  br i1 %t45, label %while.body2806, label %while.end2807
-while.body2806:
-  br label %while.cond2805
-while.end2807:
+  br i1 %t45, label %while.body2817, label %while.end2818
+while.body2817:
+  br label %while.cond2816
+while.end2818:
   %t46 = load i64, i64* %self
-  %t47 = getelementptr [2 x i8], [2 x i8]* @.str.1467, i64 0, i64 0
+  %t47 = getelementptr [2 x i8], [2 x i8]* @.str.1469, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
   %t49 = call i64 @Parser__match_kind_check(i64 %t46, i64 %t48)
   %t50 = trunc i64 %t49 to i1
-  br label %logic.entry2809
-logic.entry2809:
-  br i1 %t50, label %end2811, label %rhs2810
-rhs2810:
+  br label %logic.entry2820
+logic.entry2820:
+  br i1 %t50, label %end2822, label %rhs2821
+rhs2821:
   %t51 = load i64, i64* %self
-  %t52 = getelementptr [4 x i8], [4 x i8]* @.str.1468, i64 0, i64 0
+  %t52 = getelementptr [4 x i8], [4 x i8]* @.str.1470, i64 0, i64 0
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @Parser__match_kind_check(i64 %t51, i64 %t53)
   %t55 = trunc i64 %t54 to i1
-  br label %rhs.exit2812
-rhs.exit2812:
-  br label %end2811
-end2811:
-  %t56 = phi i1 [%t50, %logic.entry2809], [%t55, %rhs.exit2812]
+  br label %rhs.exit2823
+rhs.exit2823:
+  br label %end2822
+end2822:
+  %t56 = phi i1 [%t50, %logic.entry2820], [%t55, %rhs.exit2823]
   %t57 = zext i1 %t56 to i64
   %t58 = trunc i64 %t57 to i1
-  br i1 %t58, label %then2813, label %else2814
-then2813:
+  br i1 %t58, label %then2824, label %else2825
+then2824:
   %t59 = load i64, i64* %self
-  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1469, i64 0, i64 0
+  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.1471, i64 0, i64 0
   %t61 = ptrtoint i8* %t60 to i64
   %t62 = call i64 @Parser__consume(i64 %t59, i64 %t61)
   %t63 = call i64 @__list_new()
@@ -32538,21 +32745,21 @@ then2813:
   store i64 %t68, i64* %t74
   %t75 = ptrtoint [4 x i64]* %t70 to i64
   ret i64 %t75
-else2814:
-  br label %endif2808
-endif2808:
+else2825:
+  br label %endif2819
+endif2819:
   %t76 = load i64, i64* %self
-  %t77 = getelementptr [7 x i8], [7 x i8]* @.str.1470, i64 0, i64 0
+  %t77 = getelementptr [7 x i8], [7 x i8]* @.str.1472, i64 0, i64 0
   %t78 = ptrtoint i8* %t77 to i64
   %t79 = call i64 @Parser__match_kind_check(i64 %t76, i64 %t78)
   %t80 = trunc i64 %t79 to i1
-  br i1 %t80, label %then2816, label %else2817
-then2816:
+  br i1 %t80, label %then2827, label %else2828
+then2827:
   %t81 = load i64, i64* %self
   %t82 = call i64 @Parser__parse_expr(i64 %t81)
   store i64 %t82, i64* %str_expr
   %t83 = load i64, i64* %v_body
-  %t84 = getelementptr [5 x i8], [5 x i8]* @.str.1471, i64 0, i64 0
+  %t84 = getelementptr [5 x i8], [5 x i8]* @.str.1473, i64 0, i64 0
   %t85 = ptrtoint i8* %t84 to i64
   %t86 = call i64 @ast_span_none()
   %t87 = call i8* @__sf_malloc(i64 24)
@@ -32587,18 +32794,18 @@ then2816:
   store i64 %t103, i64* %t107
   %t108 = ptrtoint [2 x i64]* %t105 to i64
   %t109 = call i64 @__list_push(i64 %t83, i64 %t108)
-  br label %endif2815
-else2817:
+  br label %endif2826
+else2828:
   %t110 = load i64, i64* %v_body
   %t111 = load i64, i64* %self
   %t112 = call i64 @Parser__parse_stmt(i64 %t111)
   %t113 = call i64 @__list_push(i64 %t110, i64 %t112)
-  br label %endif2815
-endif2815:
-  br label %while.cond2798
-while.end2800:
+  br label %endif2826
+endif2826:
+  br label %while.cond2809
+while.end2811:
   %t114 = load i64, i64* %self
-  %t115 = getelementptr [2 x i8], [2 x i8]* @.str.1472, i64 0, i64 0
+  %t115 = getelementptr [2 x i8], [2 x i8]* @.str.1474, i64 0, i64 0
   %t116 = ptrtoint i8* %t115 to i64
   %t117 = call i64 @Parser__consume(i64 %t114, i64 %t116)
   %t118 = call i64 @__list_new()
@@ -32634,100 +32841,100 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__expect_ident(i64 %t3)
   %t5 = call i64 @__list_push(i64 %t2, i64 %t4)
-  br label %while.cond2818
-while.cond2818:
+  br label %while.cond2829
+while.cond2829:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1473, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1475, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br i1 %t10, label %while.body2819, label %while.end2820
-while.body2819:
+  br i1 %t10, label %while.body2830, label %while.end2831
+while.body2830:
   %t11 = load i64, i64* %param_names
   %t12 = load i64, i64* %self
   %t13 = call i64 @Parser__expect_ident(i64 %t12)
   %t14 = call i64 @__list_push(i64 %t11, i64 %t13)
-  br label %while.cond2818
-while.end2820:
+  br label %while.cond2829
+while.end2831:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [3 x i8], [3 x i8]* @.str.1474, i64 0, i64 0
+  %t16 = getelementptr [3 x i8], [3 x i8]* @.str.1476, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__consume(i64 %t15, i64 %t17)
   %t19 = call i64 @__list_new()
   store i64 %t19, i64* %v_body
-  br label %while.cond2821
-while.cond2821:
+  br label %while.cond2832
+while.cond2832:
   %t20 = load i64, i64* %self
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1475, i64 0, i64 0
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.1477, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i64 @Parser__match_kind_check(i64 %t20, i64 %t22)
   %t24 = xor i64 %t23, 1
   %t25 = trunc i64 %t24 to i1
-  br label %logic.entry2824
-logic.entry2824:
-  br i1 %t25, label %rhs2825, label %end2826
-rhs2825:
+  br label %logic.entry2835
+logic.entry2835:
+  br i1 %t25, label %rhs2836, label %end2837
+rhs2836:
   %t26 = load i64, i64* %self
-  %t27 = getelementptr [4 x i8], [4 x i8]* @.str.1476, i64 0, i64 0
+  %t27 = getelementptr [4 x i8], [4 x i8]* @.str.1478, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   %t29 = call i64 @Parser__match_kind_check(i64 %t26, i64 %t28)
   %t30 = xor i64 %t29, 1
   %t31 = trunc i64 %t30 to i1
-  br label %rhs.exit2827
-rhs.exit2827:
-  br label %end2826
-end2826:
-  %t32 = phi i1 [%t25, %logic.entry2824], [%t31, %rhs.exit2827]
+  br label %rhs.exit2838
+rhs.exit2838:
+  br label %end2837
+end2837:
+  %t32 = phi i1 [%t25, %logic.entry2835], [%t31, %rhs.exit2838]
   %t33 = zext i1 %t32 to i64
   %t34 = trunc i64 %t33 to i1
-  br i1 %t34, label %while.body2822, label %while.end2823
-while.body2822:
-  br label %while.cond2828
-while.cond2828:
+  br i1 %t34, label %while.body2833, label %while.end2834
+while.body2833:
+  br label %while.cond2839
+while.cond2839:
   %t35 = load i64, i64* %self
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1477, i64 0, i64 0
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.1479, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @Parser__match_kind(i64 %t35, i64 %t37)
   %t39 = trunc i64 %t38 to i1
-  br i1 %t39, label %while.body2829, label %while.end2830
-while.body2829:
-  br label %while.cond2828
-while.end2830:
+  br i1 %t39, label %while.body2840, label %while.end2841
+while.body2840:
+  br label %while.cond2839
+while.end2841:
   %t40 = load i64, i64* %self
-  %t41 = getelementptr [2 x i8], [2 x i8]* @.str.1478, i64 0, i64 0
+  %t41 = getelementptr [2 x i8], [2 x i8]* @.str.1480, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = call i64 @Parser__match_kind_check(i64 %t40, i64 %t42)
   %t44 = trunc i64 %t43 to i1
-  br label %logic.entry2832
-logic.entry2832:
-  br i1 %t44, label %end2834, label %rhs2833
-rhs2833:
+  br label %logic.entry2843
+logic.entry2843:
+  br i1 %t44, label %end2845, label %rhs2844
+rhs2844:
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.1479, i64 0, i64 0
+  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.1481, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__match_kind_check(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br label %rhs.exit2835
-rhs.exit2835:
-  br label %end2834
-end2834:
-  %t50 = phi i1 [%t44, %logic.entry2832], [%t49, %rhs.exit2835]
+  br label %rhs.exit2846
+rhs.exit2846:
+  br label %end2845
+end2845:
+  %t50 = phi i1 [%t44, %logic.entry2843], [%t49, %rhs.exit2846]
   %t51 = zext i1 %t50 to i64
   %t52 = trunc i64 %t51 to i1
-  br i1 %t52, label %then2836, label %else2837
-then2836:
-  br label %while.end2823
-else2837:
-  br label %endif2831
-endif2831:
+  br i1 %t52, label %then2847, label %else2848
+then2847:
+  br label %while.end2834
+else2848:
+  br label %endif2842
+endif2842:
   %t53 = load i64, i64* %v_body
   %t54 = load i64, i64* %self
   %t55 = call i64 @Parser__parse_stmt(i64 %t54)
   %t56 = call i64 @__list_push(i64 %t53, i64 %t55)
-  br label %while.cond2821
-while.end2823:
+  br label %while.cond2832
+while.end2834:
   %t57 = load i64, i64* %self
-  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.1480, i64 0, i64 0
+  %t58 = getelementptr [2 x i8], [2 x i8]* @.str.1482, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   %t60 = call i64 @Parser__consume(i64 %t57, i64 %t59)
   %t61 = load i64, i64* %self
@@ -32751,16 +32958,16 @@ entry:
   store i64 %t1, i64* %params
   %t2 = add i64 0, 0
   store i64 %t2, i64* %i
-  br label %while.cond2838
-while.cond2838:
+  br label %while.cond2849
+while.cond2849:
   %t3 = load i64, i64* %i
   %t4 = load i64, i64* %names
   %t5 = call i64 @__list_length(i64 %t4)
   %t7 = icmp slt i64 %t3, %t5
   %t6 = zext i1 %t7 to i64
   %t8 = trunc i64 %t6 to i1
-  br i1 %t8, label %while.body2839, label %while.end2840
-while.body2839:
+  br i1 %t8, label %while.body2850, label %while.end2851
+while.body2850:
   %t9 = load i64, i64* %params
   %t10 = load i64, i64* %names
   %t11 = load i64, i64* %i
@@ -32779,7 +32986,7 @@ while.body2839:
   %t23 = getelementptr [1 x i64], [1 x i64]* %t22, i64 0, i64 0
   store i64 4, i64* %t23
   %t24 = ptrtoint [1 x i64]* %t22 to i64
-  %t25 = getelementptr [7 x i8], [7 x i8]* @.str.1481, i64 0, i64 0
+  %t25 = getelementptr [7 x i8], [7 x i8]* @.str.1483, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i64 @ast_span_none()
   %t28 = call i8* @__sf_malloc(i64 48)
@@ -32802,8 +33009,8 @@ while.body2839:
   %t39 = add i64 0, 1
   %t40 = add i64 %t38, %t39
   store i64 %t40, i64* %i
-  br label %while.cond2838
-while.end2840:
+  br label %while.cond2849
+while.end2851:
   %t41 = load i64, i64* %params
   %t42 = call i8* @__sf_malloc(i64 8)
   %t43 = bitcast i8* %t42 to [1 x i64]*
@@ -32854,13 +33061,13 @@ entry:
   %t13 = icmp sge i64 %t6, %t11
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %then2842, label %else2843
-then2842:
+  br i1 %t14, label %then2853, label %else2854
+then2853:
   %t15 = add i64 0, 0
   ret i64 %t15
-else2843:
-  br label %endif2841
-endif2841:
+else2854:
+  br label %endif2852
+endif2852:
   %t16 = load i64, i64* %self
   %t17 = inttoptr i64 %t16 to %Parser*
   %t18 = getelementptr %Parser, %Parser* %t17, i32 0, i32 0
@@ -32882,8 +33089,8 @@ endif2841:
   %t34 = inttoptr i64 %t31 to i64*
   %t35 = load i64, i64* %t34
   %t33 = trunc i64 %t35 to i8
-  switch i8 %t33, label %match.end2844 [ i8 0, label %match.arm2845 ]
-match.arm2845:
+  switch i8 %t33, label %match.end2855 [ i8 0, label %match.arm2856 ]
+match.arm2856:
   %t36 = load i64, i64* %k
   %t37 = load i64, i64* %l
   %t38 = load i64, i64* %c
@@ -32912,8 +33119,8 @@ match.arm2845:
   store i64 %t38, i64* %c
   store i64 %t39, i64* %o
   store i64 %t40, i64* %ln
-  br label %match.end2844
-match.end2844:
+  br label %match.end2855
+match.end2855:
   %t53 = load i64, i64* %t32
   store i64 %t53, i64* %next_kind
   %t54 = load i64, i64* %self
@@ -32921,24 +33128,24 @@ match.end2844:
   %t56 = call i64 @Parser__kind_name(i64 %t54, i64 %t55)
   store i64 %t56, i64* %kind_str
   %t57 = load i64, i64* %kind_str
-  %t58 = getelementptr [6 x i8], [6 x i8]* @.str.1482, i64 0, i64 0
+  %t58 = getelementptr [6 x i8], [6 x i8]* @.str.1484, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   %t60 = call i64 @__string_ne(i64 %t57, i64 %t59)
   %t61 = trunc i64 %t60 to i1
-  br i1 %t61, label %then2847, label %else2848
-then2847:
+  br i1 %t61, label %then2858, label %else2859
+then2858:
   %t62 = add i64 0, 0
   ret i64 %t62
-else2848:
-  br label %endif2846
-endif2846:
+else2859:
+  br label %endif2857
+endif2857:
   %t63 = load i64, i64* %next_kind
   %t64 = alloca i64
   %t66 = inttoptr i64 %t63 to i64*
   %t67 = load i64, i64* %t66
   %t65 = trunc i64 %t67 to i8
-  switch i8 %t65, label %match.arm2851 [ i8 6, label %match.arm2850 ]
-match.arm2850:
+  switch i8 %t65, label %match.arm2862 [ i8 6, label %match.arm2861 ]
+match.arm2861:
   %t68 = load i64, i64* %n
   %t69 = inttoptr i64 %t63 to [2 x i64]*
   %t70 = getelementptr [2 x i64], [2 x i64]* %t69, i64 0, i64 1
@@ -32947,13 +33154,13 @@ match.arm2850:
   %t72 = load i64, i64* %n
   store i64 %t72, i64* %t64
   store i64 %t68, i64* %n
-  br label %match.end2849
-match.arm2851:
-  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1483, i64 0, i64 0
+  br label %match.end2860
+match.arm2862:
+  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1485, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   store i64 %t74, i64* %t64
-  br label %match.end2849
-match.end2849:
+  br label %match.end2860
+match.end2860:
   %t75 = load i64, i64* %t64
   store i64 %t75, i64* %name
   %t76 = load i64, i64* %name
@@ -32963,13 +33170,13 @@ match.end2849:
   %t80 = icmp eq i64 %t78, %t79
   %t81 = zext i1 %t80 to i64
   %t82 = trunc i64 %t81 to i1
-  br i1 %t82, label %then2853, label %else2854
-then2853:
+  br i1 %t82, label %then2864, label %else2865
+then2864:
   %t83 = add i64 0, 0
   ret i64 %t83
-else2854:
-  br label %endif2852
-endif2852:
+else2865:
+  br label %endif2863
+endif2863:
   %t84 = load i64, i64* %name
   %t85 = inttoptr i64 %t84 to i8*
   %t86 = add i64 0, 0
@@ -32982,37 +33189,37 @@ endif2852:
   %t91 = ptrtoint i8* %t88 to i64
   store i64 %t91, i64* %first
   %t92 = load i64, i64* %first
-  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.1484, i64 0, i64 0
+  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.1486, i64 0, i64 0
   %t94 = ptrtoint i8* %t93 to i64
   %t97 = call i64 @__safe_strcmp(i64 %t92, i64 %t94)
   %t96 = icmp sge i64 %t97, 0
   %t95 = zext i1 %t96 to i64
   %t98 = trunc i64 %t95 to i1
-  br label %logic.entry2856
-logic.entry2856:
-  br i1 %t98, label %rhs2857, label %end2858
-rhs2857:
+  br label %logic.entry2867
+logic.entry2867:
+  br i1 %t98, label %rhs2868, label %end2869
+rhs2868:
   %t99 = load i64, i64* %first
-  %t100 = getelementptr [2 x i8], [2 x i8]* @.str.1485, i64 0, i64 0
+  %t100 = getelementptr [2 x i8], [2 x i8]* @.str.1487, i64 0, i64 0
   %t101 = ptrtoint i8* %t100 to i64
   %t104 = call i64 @__safe_strcmp(i64 %t99, i64 %t101)
   %t103 = icmp sle i64 %t104, 0
   %t102 = zext i1 %t103 to i64
   %t105 = trunc i64 %t102 to i1
-  br label %rhs.exit2859
-rhs.exit2859:
-  br label %end2858
-end2858:
-  %t106 = phi i1 [%t98, %logic.entry2856], [%t105, %rhs.exit2859]
+  br label %rhs.exit2870
+rhs.exit2870:
+  br label %end2869
+end2869:
+  %t106 = phi i1 [%t98, %logic.entry2867], [%t105, %rhs.exit2870]
   %t107 = zext i1 %t106 to i64
   %t108 = trunc i64 %t107 to i1
-  br i1 %t108, label %then2860, label %else2861
-then2860:
+  br i1 %t108, label %then2871, label %else2872
+then2871:
   %t109 = add i64 0, 1
   ret i64 %t109
-else2861:
-  br label %endif2855
-endif2855:
+else2872:
+  br label %endif2866
+endif2866:
   %t110 = load i64, i64* %self
   %t111 = load i64, i64* %name
   %t112 = call i64 @Parser__is_html_tag(i64 %t110, i64 %t111)
@@ -33026,1193 +33233,1193 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %name.arg, i64* %name
   %t1 = load i64, i64* %name
-  %t2 = getelementptr [4 x i8], [4 x i8]* @.str.1486, i64 0, i64 0
+  %t2 = getelementptr [4 x i8], [4 x i8]* @.str.1488, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @__string_eq(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then2863, label %else2864
-then2863:
+  br i1 %t5, label %then2874, label %else2875
+then2874:
   %t6 = add i64 0, 1
   ret i64 %t6
-else2864:
-  br label %endif2862
-endif2862:
+else2875:
+  br label %endif2873
+endif2873:
   %t7 = load i64, i64* %name
-  %t8 = getelementptr [5 x i8], [5 x i8]* @.str.1487, i64 0, i64 0
+  %t8 = getelementptr [5 x i8], [5 x i8]* @.str.1489, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i64 @__string_eq(i64 %t7, i64 %t9)
   %t11 = trunc i64 %t10 to i1
-  br i1 %t11, label %then2866, label %else2867
-then2866:
+  br i1 %t11, label %then2877, label %else2878
+then2877:
   %t12 = add i64 0, 1
   ret i64 %t12
-else2867:
-  br label %endif2865
-endif2865:
+else2878:
+  br label %endif2876
+endif2876:
   %t13 = load i64, i64* %name
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1488, i64 0, i64 0
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.1490, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = call i64 @__string_eq(i64 %t13, i64 %t15)
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then2869, label %else2870
-then2869:
+  br i1 %t17, label %then2880, label %else2881
+then2880:
   %t18 = add i64 0, 1
   ret i64 %t18
-else2870:
-  br label %endif2868
-endif2868:
+else2881:
+  br label %endif2879
+endif2879:
   %t19 = load i64, i64* %name
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1489, i64 0, i64 0
+  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.1491, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
   %t22 = call i64 @__string_eq(i64 %t19, i64 %t21)
   %t23 = trunc i64 %t22 to i1
-  br i1 %t23, label %then2872, label %else2873
-then2872:
+  br i1 %t23, label %then2883, label %else2884
+then2883:
   %t24 = add i64 0, 1
   ret i64 %t24
-else2873:
-  br label %endif2871
-endif2871:
+else2884:
+  br label %endif2882
+endif2882:
   %t25 = load i64, i64* %name
-  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.1490, i64 0, i64 0
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.1492, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   %t28 = call i64 @__string_eq(i64 %t25, i64 %t27)
   %t29 = trunc i64 %t28 to i1
-  br label %logic.entry2875
-logic.entry2875:
-  br i1 %t29, label %end2877, label %rhs2876
-rhs2876:
+  br label %logic.entry2886
+logic.entry2886:
+  br i1 %t29, label %end2888, label %rhs2887
+rhs2887:
   %t30 = load i64, i64* %name
-  %t31 = getelementptr [3 x i8], [3 x i8]* @.str.1491, i64 0, i64 0
+  %t31 = getelementptr [3 x i8], [3 x i8]* @.str.1493, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = call i64 @__string_eq(i64 %t30, i64 %t32)
   %t34 = trunc i64 %t33 to i1
-  br label %rhs.exit2878
-rhs.exit2878:
-  br label %end2877
-end2877:
-  %t35 = phi i1 [%t29, %logic.entry2875], [%t34, %rhs.exit2878]
+  br label %rhs.exit2889
+rhs.exit2889:
+  br label %end2888
+end2888:
+  %t35 = phi i1 [%t29, %logic.entry2886], [%t34, %rhs.exit2889]
   %t36 = zext i1 %t35 to i64
   %t37 = trunc i64 %t36 to i1
-  br label %logic.entry2879
-logic.entry2879:
-  br i1 %t37, label %end2881, label %rhs2880
-rhs2880:
+  br label %logic.entry2890
+logic.entry2890:
+  br i1 %t37, label %end2892, label %rhs2891
+rhs2891:
   %t38 = load i64, i64* %name
-  %t39 = getelementptr [3 x i8], [3 x i8]* @.str.1492, i64 0, i64 0
+  %t39 = getelementptr [3 x i8], [3 x i8]* @.str.1494, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   %t41 = call i64 @__string_eq(i64 %t38, i64 %t40)
   %t42 = trunc i64 %t41 to i1
-  br label %rhs.exit2882
-rhs.exit2882:
-  br label %end2881
-end2881:
-  %t43 = phi i1 [%t37, %logic.entry2879], [%t42, %rhs.exit2882]
+  br label %rhs.exit2893
+rhs.exit2893:
+  br label %end2892
+end2892:
+  %t43 = phi i1 [%t37, %logic.entry2890], [%t42, %rhs.exit2893]
   %t44 = zext i1 %t43 to i64
   %t45 = trunc i64 %t44 to i1
-  br label %logic.entry2883
-logic.entry2883:
-  br i1 %t45, label %end2885, label %rhs2884
-rhs2884:
+  br label %logic.entry2894
+logic.entry2894:
+  br i1 %t45, label %end2896, label %rhs2895
+rhs2895:
   %t46 = load i64, i64* %name
-  %t47 = getelementptr [3 x i8], [3 x i8]* @.str.1493, i64 0, i64 0
+  %t47 = getelementptr [3 x i8], [3 x i8]* @.str.1495, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
   %t49 = call i64 @__string_eq(i64 %t46, i64 %t48)
   %t50 = trunc i64 %t49 to i1
-  br label %rhs.exit2886
-rhs.exit2886:
-  br label %end2885
-end2885:
-  %t51 = phi i1 [%t45, %logic.entry2883], [%t50, %rhs.exit2886]
+  br label %rhs.exit2897
+rhs.exit2897:
+  br label %end2896
+end2896:
+  %t51 = phi i1 [%t45, %logic.entry2894], [%t50, %rhs.exit2897]
   %t52 = zext i1 %t51 to i64
   %t53 = trunc i64 %t52 to i1
-  br label %logic.entry2887
-logic.entry2887:
-  br i1 %t53, label %end2889, label %rhs2888
-rhs2888:
+  br label %logic.entry2898
+logic.entry2898:
+  br i1 %t53, label %end2900, label %rhs2899
+rhs2899:
   %t54 = load i64, i64* %name
-  %t55 = getelementptr [3 x i8], [3 x i8]* @.str.1494, i64 0, i64 0
+  %t55 = getelementptr [3 x i8], [3 x i8]* @.str.1496, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   %t57 = call i64 @__string_eq(i64 %t54, i64 %t56)
   %t58 = trunc i64 %t57 to i1
-  br label %rhs.exit2890
-rhs.exit2890:
-  br label %end2889
-end2889:
-  %t59 = phi i1 [%t53, %logic.entry2887], [%t58, %rhs.exit2890]
+  br label %rhs.exit2901
+rhs.exit2901:
+  br label %end2900
+end2900:
+  %t59 = phi i1 [%t53, %logic.entry2898], [%t58, %rhs.exit2901]
   %t60 = zext i1 %t59 to i64
   %t61 = trunc i64 %t60 to i1
-  br label %logic.entry2891
-logic.entry2891:
-  br i1 %t61, label %end2893, label %rhs2892
-rhs2892:
+  br label %logic.entry2902
+logic.entry2902:
+  br i1 %t61, label %end2904, label %rhs2903
+rhs2903:
   %t62 = load i64, i64* %name
-  %t63 = getelementptr [3 x i8], [3 x i8]* @.str.1495, i64 0, i64 0
+  %t63 = getelementptr [3 x i8], [3 x i8]* @.str.1497, i64 0, i64 0
   %t64 = ptrtoint i8* %t63 to i64
   %t65 = call i64 @__string_eq(i64 %t62, i64 %t64)
   %t66 = trunc i64 %t65 to i1
-  br label %rhs.exit2894
-rhs.exit2894:
-  br label %end2893
-end2893:
-  %t67 = phi i1 [%t61, %logic.entry2891], [%t66, %rhs.exit2894]
+  br label %rhs.exit2905
+rhs.exit2905:
+  br label %end2904
+end2904:
+  %t67 = phi i1 [%t61, %logic.entry2902], [%t66, %rhs.exit2905]
   %t68 = zext i1 %t67 to i64
   %t69 = trunc i64 %t68 to i1
-  br i1 %t69, label %then2895, label %else2896
-then2895:
+  br i1 %t69, label %then2906, label %else2907
+then2906:
   %t70 = add i64 0, 1
   ret i64 %t70
-else2896:
-  br label %endif2874
-endif2874:
+else2907:
+  br label %endif2885
+endif2885:
   %t71 = load i64, i64* %name
-  %t72 = getelementptr [7 x i8], [7 x i8]* @.str.1496, i64 0, i64 0
+  %t72 = getelementptr [7 x i8], [7 x i8]* @.str.1498, i64 0, i64 0
   %t73 = ptrtoint i8* %t72 to i64
   %t74 = call i64 @__string_eq(i64 %t71, i64 %t73)
   %t75 = trunc i64 %t74 to i1
-  br i1 %t75, label %then2898, label %else2899
-then2898:
+  br i1 %t75, label %then2909, label %else2910
+then2909:
   %t76 = add i64 0, 1
   ret i64 %t76
-else2899:
-  br label %endif2897
-endif2897:
+else2910:
+  br label %endif2908
+endif2908:
   %t77 = load i64, i64* %name
-  %t78 = getelementptr [6 x i8], [6 x i8]* @.str.1497, i64 0, i64 0
+  %t78 = getelementptr [6 x i8], [6 x i8]* @.str.1499, i64 0, i64 0
   %t79 = ptrtoint i8* %t78 to i64
   %t80 = call i64 @__string_eq(i64 %t77, i64 %t79)
   %t81 = trunc i64 %t80 to i1
-  br i1 %t81, label %then2901, label %else2902
-then2901:
+  br i1 %t81, label %then2912, label %else2913
+then2912:
   %t82 = add i64 0, 1
   ret i64 %t82
-else2902:
-  br label %endif2900
-endif2900:
+else2913:
+  br label %endif2911
+endif2911:
   %t83 = load i64, i64* %name
-  %t84 = getelementptr [5 x i8], [5 x i8]* @.str.1498, i64 0, i64 0
+  %t84 = getelementptr [5 x i8], [5 x i8]* @.str.1500, i64 0, i64 0
   %t85 = ptrtoint i8* %t84 to i64
   %t86 = call i64 @__string_eq(i64 %t83, i64 %t85)
   %t87 = trunc i64 %t86 to i1
-  br i1 %t87, label %then2904, label %else2905
-then2904:
+  br i1 %t87, label %then2915, label %else2916
+then2915:
   %t88 = add i64 0, 1
   ret i64 %t88
-else2905:
-  br label %endif2903
-endif2903:
+else2916:
+  br label %endif2914
+endif2914:
   %t89 = load i64, i64* %name
-  %t90 = getelementptr [6 x i8], [6 x i8]* @.str.1499, i64 0, i64 0
+  %t90 = getelementptr [6 x i8], [6 x i8]* @.str.1501, i64 0, i64 0
   %t91 = ptrtoint i8* %t90 to i64
   %t92 = call i64 @__string_eq(i64 %t89, i64 %t91)
   %t93 = trunc i64 %t92 to i1
-  br i1 %t93, label %then2907, label %else2908
-then2907:
+  br i1 %t93, label %then2918, label %else2919
+then2918:
   %t94 = add i64 0, 1
   ret i64 %t94
-else2908:
-  br label %endif2906
-endif2906:
+else2919:
+  br label %endif2917
+endif2917:
   %t95 = load i64, i64* %name
-  %t96 = getelementptr [4 x i8], [4 x i8]* @.str.1500, i64 0, i64 0
+  %t96 = getelementptr [4 x i8], [4 x i8]* @.str.1502, i64 0, i64 0
   %t97 = ptrtoint i8* %t96 to i64
   %t98 = call i64 @__string_eq(i64 %t95, i64 %t97)
   %t99 = trunc i64 %t98 to i1
-  br i1 %t99, label %then2910, label %else2911
-then2910:
+  br i1 %t99, label %then2921, label %else2922
+then2921:
   %t100 = add i64 0, 1
   ret i64 %t100
-else2911:
-  br label %endif2909
-endif2909:
+else2922:
+  br label %endif2920
+endif2920:
   %t101 = load i64, i64* %name
-  %t102 = getelementptr [3 x i8], [3 x i8]* @.str.1501, i64 0, i64 0
+  %t102 = getelementptr [3 x i8], [3 x i8]* @.str.1503, i64 0, i64 0
   %t103 = ptrtoint i8* %t102 to i64
   %t104 = call i64 @__string_eq(i64 %t101, i64 %t103)
   %t105 = trunc i64 %t104 to i1
-  br label %logic.entry2913
-logic.entry2913:
-  br i1 %t105, label %end2915, label %rhs2914
-rhs2914:
+  br label %logic.entry2924
+logic.entry2924:
+  br i1 %t105, label %end2926, label %rhs2925
+rhs2925:
   %t106 = load i64, i64* %name
-  %t107 = getelementptr [3 x i8], [3 x i8]* @.str.1502, i64 0, i64 0
+  %t107 = getelementptr [3 x i8], [3 x i8]* @.str.1504, i64 0, i64 0
   %t108 = ptrtoint i8* %t107 to i64
   %t109 = call i64 @__string_eq(i64 %t106, i64 %t108)
   %t110 = trunc i64 %t109 to i1
-  br label %rhs.exit2916
-rhs.exit2916:
-  br label %end2915
-end2915:
-  %t111 = phi i1 [%t105, %logic.entry2913], [%t110, %rhs.exit2916]
-  %t112 = zext i1 %t111 to i64
-  %t113 = trunc i64 %t112 to i1
-  br label %logic.entry2917
-logic.entry2917:
-  br i1 %t113, label %end2919, label %rhs2918
-rhs2918:
-  %t114 = load i64, i64* %name
-  %t115 = getelementptr [3 x i8], [3 x i8]* @.str.1503, i64 0, i64 0
-  %t116 = ptrtoint i8* %t115 to i64
-  %t117 = call i64 @__string_eq(i64 %t114, i64 %t116)
-  %t118 = trunc i64 %t117 to i1
-  br label %rhs.exit2920
-rhs.exit2920:
-  br label %end2919
-end2919:
-  %t119 = phi i1 [%t113, %logic.entry2917], [%t118, %rhs.exit2920]
-  %t120 = zext i1 %t119 to i64
-  %t121 = trunc i64 %t120 to i1
-  br i1 %t121, label %then2921, label %else2922
-then2921:
-  %t122 = add i64 0, 1
-  ret i64 %t122
-else2922:
-  br label %endif2912
-endif2912:
-  %t123 = load i64, i64* %name
-  %t124 = getelementptr [6 x i8], [6 x i8]* @.str.1504, i64 0, i64 0
-  %t125 = ptrtoint i8* %t124 to i64
-  %t126 = call i64 @__string_eq(i64 %t123, i64 %t125)
-  %t127 = trunc i64 %t126 to i1
-  br label %logic.entry2924
-logic.entry2924:
-  br i1 %t127, label %end2926, label %rhs2925
-rhs2925:
-  %t128 = load i64, i64* %name
-  %t129 = getelementptr [3 x i8], [3 x i8]* @.str.1505, i64 0, i64 0
-  %t130 = ptrtoint i8* %t129 to i64
-  %t131 = call i64 @__string_eq(i64 %t128, i64 %t130)
-  %t132 = trunc i64 %t131 to i1
   br label %rhs.exit2927
 rhs.exit2927:
   br label %end2926
 end2926:
-  %t133 = phi i1 [%t127, %logic.entry2924], [%t132, %rhs.exit2927]
-  %t134 = zext i1 %t133 to i64
-  %t135 = trunc i64 %t134 to i1
+  %t111 = phi i1 [%t105, %logic.entry2924], [%t110, %rhs.exit2927]
+  %t112 = zext i1 %t111 to i64
+  %t113 = trunc i64 %t112 to i1
   br label %logic.entry2928
 logic.entry2928:
-  br i1 %t135, label %end2930, label %rhs2929
+  br i1 %t113, label %end2930, label %rhs2929
 rhs2929:
-  %t136 = load i64, i64* %name
-  %t137 = getelementptr [3 x i8], [3 x i8]* @.str.1506, i64 0, i64 0
-  %t138 = ptrtoint i8* %t137 to i64
-  %t139 = call i64 @__string_eq(i64 %t136, i64 %t138)
-  %t140 = trunc i64 %t139 to i1
+  %t114 = load i64, i64* %name
+  %t115 = getelementptr [3 x i8], [3 x i8]* @.str.1505, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = call i64 @__string_eq(i64 %t114, i64 %t116)
+  %t118 = trunc i64 %t117 to i1
   br label %rhs.exit2931
 rhs.exit2931:
   br label %end2930
 end2930:
-  %t141 = phi i1 [%t135, %logic.entry2928], [%t140, %rhs.exit2931]
+  %t119 = phi i1 [%t113, %logic.entry2928], [%t118, %rhs.exit2931]
+  %t120 = zext i1 %t119 to i64
+  %t121 = trunc i64 %t120 to i1
+  br i1 %t121, label %then2932, label %else2933
+then2932:
+  %t122 = add i64 0, 1
+  ret i64 %t122
+else2933:
+  br label %endif2923
+endif2923:
+  %t123 = load i64, i64* %name
+  %t124 = getelementptr [6 x i8], [6 x i8]* @.str.1506, i64 0, i64 0
+  %t125 = ptrtoint i8* %t124 to i64
+  %t126 = call i64 @__string_eq(i64 %t123, i64 %t125)
+  %t127 = trunc i64 %t126 to i1
+  br label %logic.entry2935
+logic.entry2935:
+  br i1 %t127, label %end2937, label %rhs2936
+rhs2936:
+  %t128 = load i64, i64* %name
+  %t129 = getelementptr [3 x i8], [3 x i8]* @.str.1507, i64 0, i64 0
+  %t130 = ptrtoint i8* %t129 to i64
+  %t131 = call i64 @__string_eq(i64 %t128, i64 %t130)
+  %t132 = trunc i64 %t131 to i1
+  br label %rhs.exit2938
+rhs.exit2938:
+  br label %end2937
+end2937:
+  %t133 = phi i1 [%t127, %logic.entry2935], [%t132, %rhs.exit2938]
+  %t134 = zext i1 %t133 to i64
+  %t135 = trunc i64 %t134 to i1
+  br label %logic.entry2939
+logic.entry2939:
+  br i1 %t135, label %end2941, label %rhs2940
+rhs2940:
+  %t136 = load i64, i64* %name
+  %t137 = getelementptr [3 x i8], [3 x i8]* @.str.1508, i64 0, i64 0
+  %t138 = ptrtoint i8* %t137 to i64
+  %t139 = call i64 @__string_eq(i64 %t136, i64 %t138)
+  %t140 = trunc i64 %t139 to i1
+  br label %rhs.exit2942
+rhs.exit2942:
+  br label %end2941
+end2941:
+  %t141 = phi i1 [%t135, %logic.entry2939], [%t140, %rhs.exit2942]
   %t142 = zext i1 %t141 to i64
   %t143 = trunc i64 %t142 to i1
-  br label %logic.entry2932
-logic.entry2932:
-  br i1 %t143, label %end2934, label %rhs2933
-rhs2933:
+  br label %logic.entry2943
+logic.entry2943:
+  br i1 %t143, label %end2945, label %rhs2944
+rhs2944:
   %t144 = load i64, i64* %name
-  %t145 = getelementptr [3 x i8], [3 x i8]* @.str.1507, i64 0, i64 0
+  %t145 = getelementptr [3 x i8], [3 x i8]* @.str.1509, i64 0, i64 0
   %t146 = ptrtoint i8* %t145 to i64
   %t147 = call i64 @__string_eq(i64 %t144, i64 %t146)
   %t148 = trunc i64 %t147 to i1
-  br label %rhs.exit2935
-rhs.exit2935:
-  br label %end2934
-end2934:
-  %t149 = phi i1 [%t143, %logic.entry2932], [%t148, %rhs.exit2935]
+  br label %rhs.exit2946
+rhs.exit2946:
+  br label %end2945
+end2945:
+  %t149 = phi i1 [%t143, %logic.entry2943], [%t148, %rhs.exit2946]
   %t150 = zext i1 %t149 to i64
   %t151 = trunc i64 %t150 to i1
-  br label %logic.entry2936
-logic.entry2936:
-  br i1 %t151, label %end2938, label %rhs2937
-rhs2937:
+  br label %logic.entry2947
+logic.entry2947:
+  br i1 %t151, label %end2949, label %rhs2948
+rhs2948:
   %t152 = load i64, i64* %name
-  %t153 = getelementptr [6 x i8], [6 x i8]* @.str.1508, i64 0, i64 0
+  %t153 = getelementptr [6 x i8], [6 x i8]* @.str.1510, i64 0, i64 0
   %t154 = ptrtoint i8* %t153 to i64
   %t155 = call i64 @__string_eq(i64 %t152, i64 %t154)
   %t156 = trunc i64 %t155 to i1
-  br label %rhs.exit2939
-rhs.exit2939:
-  br label %end2938
-end2938:
-  %t157 = phi i1 [%t151, %logic.entry2936], [%t156, %rhs.exit2939]
-  %t158 = zext i1 %t157 to i64
-  %t159 = trunc i64 %t158 to i1
-  br label %logic.entry2940
-logic.entry2940:
-  br i1 %t159, label %end2942, label %rhs2941
-rhs2941:
-  %t160 = load i64, i64* %name
-  %t161 = getelementptr [6 x i8], [6 x i8]* @.str.1509, i64 0, i64 0
-  %t162 = ptrtoint i8* %t161 to i64
-  %t163 = call i64 @__string_eq(i64 %t160, i64 %t162)
-  %t164 = trunc i64 %t163 to i1
-  br label %rhs.exit2943
-rhs.exit2943:
-  br label %end2942
-end2942:
-  %t165 = phi i1 [%t159, %logic.entry2940], [%t164, %rhs.exit2943]
-  %t166 = zext i1 %t165 to i64
-  %t167 = trunc i64 %t166 to i1
-  br i1 %t167, label %then2944, label %else2945
-then2944:
-  %t168 = add i64 0, 1
-  ret i64 %t168
-else2945:
-  br label %endif2923
-endif2923:
-  %t169 = load i64, i64* %name
-  %t170 = getelementptr [4 x i8], [4 x i8]* @.str.1510, i64 0, i64 0
-  %t171 = ptrtoint i8* %t170 to i64
-  %t172 = call i64 @__string_eq(i64 %t169, i64 %t171)
-  %t173 = trunc i64 %t172 to i1
-  br label %logic.entry2947
-logic.entry2947:
-  br i1 %t173, label %end2949, label %rhs2948
-rhs2948:
-  %t174 = load i64, i64* %name
-  %t175 = getelementptr [7 x i8], [7 x i8]* @.str.1511, i64 0, i64 0
-  %t176 = ptrtoint i8* %t175 to i64
-  %t177 = call i64 @__string_eq(i64 %t174, i64 %t176)
-  %t178 = trunc i64 %t177 to i1
   br label %rhs.exit2950
 rhs.exit2950:
   br label %end2949
 end2949:
-  %t179 = phi i1 [%t173, %logic.entry2947], [%t178, %rhs.exit2950]
-  %t180 = zext i1 %t179 to i64
-  %t181 = trunc i64 %t180 to i1
+  %t157 = phi i1 [%t151, %logic.entry2947], [%t156, %rhs.exit2950]
+  %t158 = zext i1 %t157 to i64
+  %t159 = trunc i64 %t158 to i1
   br label %logic.entry2951
 logic.entry2951:
-  br i1 %t181, label %end2953, label %rhs2952
+  br i1 %t159, label %end2953, label %rhs2952
 rhs2952:
-  %t182 = load i64, i64* %name
-  %t183 = getelementptr [7 x i8], [7 x i8]* @.str.1512, i64 0, i64 0
-  %t184 = ptrtoint i8* %t183 to i64
-  %t185 = call i64 @__string_eq(i64 %t182, i64 %t184)
-  %t186 = trunc i64 %t185 to i1
+  %t160 = load i64, i64* %name
+  %t161 = getelementptr [6 x i8], [6 x i8]* @.str.1511, i64 0, i64 0
+  %t162 = ptrtoint i8* %t161 to i64
+  %t163 = call i64 @__string_eq(i64 %t160, i64 %t162)
+  %t164 = trunc i64 %t163 to i1
   br label %rhs.exit2954
 rhs.exit2954:
   br label %end2953
 end2953:
-  %t187 = phi i1 [%t181, %logic.entry2951], [%t186, %rhs.exit2954]
+  %t165 = phi i1 [%t159, %logic.entry2951], [%t164, %rhs.exit2954]
+  %t166 = zext i1 %t165 to i64
+  %t167 = trunc i64 %t166 to i1
+  br i1 %t167, label %then2955, label %else2956
+then2955:
+  %t168 = add i64 0, 1
+  ret i64 %t168
+else2956:
+  br label %endif2934
+endif2934:
+  %t169 = load i64, i64* %name
+  %t170 = getelementptr [4 x i8], [4 x i8]* @.str.1512, i64 0, i64 0
+  %t171 = ptrtoint i8* %t170 to i64
+  %t172 = call i64 @__string_eq(i64 %t169, i64 %t171)
+  %t173 = trunc i64 %t172 to i1
+  br label %logic.entry2958
+logic.entry2958:
+  br i1 %t173, label %end2960, label %rhs2959
+rhs2959:
+  %t174 = load i64, i64* %name
+  %t175 = getelementptr [7 x i8], [7 x i8]* @.str.1513, i64 0, i64 0
+  %t176 = ptrtoint i8* %t175 to i64
+  %t177 = call i64 @__string_eq(i64 %t174, i64 %t176)
+  %t178 = trunc i64 %t177 to i1
+  br label %rhs.exit2961
+rhs.exit2961:
+  br label %end2960
+end2960:
+  %t179 = phi i1 [%t173, %logic.entry2958], [%t178, %rhs.exit2961]
+  %t180 = zext i1 %t179 to i64
+  %t181 = trunc i64 %t180 to i1
+  br label %logic.entry2962
+logic.entry2962:
+  br i1 %t181, label %end2964, label %rhs2963
+rhs2963:
+  %t182 = load i64, i64* %name
+  %t183 = getelementptr [7 x i8], [7 x i8]* @.str.1514, i64 0, i64 0
+  %t184 = ptrtoint i8* %t183 to i64
+  %t185 = call i64 @__string_eq(i64 %t182, i64 %t184)
+  %t186 = trunc i64 %t185 to i1
+  br label %rhs.exit2965
+rhs.exit2965:
+  br label %end2964
+end2964:
+  %t187 = phi i1 [%t181, %logic.entry2962], [%t186, %rhs.exit2965]
   %t188 = zext i1 %t187 to i64
   %t189 = trunc i64 %t188 to i1
-  br label %logic.entry2955
-logic.entry2955:
-  br i1 %t189, label %end2957, label %rhs2956
-rhs2956:
+  br label %logic.entry2966
+logic.entry2966:
+  br i1 %t189, label %end2968, label %rhs2967
+rhs2967:
   %t190 = load i64, i64* %name
-  %t191 = getelementptr [5 x i8], [5 x i8]* @.str.1513, i64 0, i64 0
+  %t191 = getelementptr [5 x i8], [5 x i8]* @.str.1515, i64 0, i64 0
   %t192 = ptrtoint i8* %t191 to i64
   %t193 = call i64 @__string_eq(i64 %t190, i64 %t192)
   %t194 = trunc i64 %t193 to i1
-  br label %rhs.exit2958
-rhs.exit2958:
-  br label %end2957
-end2957:
-  %t195 = phi i1 [%t189, %logic.entry2955], [%t194, %rhs.exit2958]
+  br label %rhs.exit2969
+rhs.exit2969:
+  br label %end2968
+end2968:
+  %t195 = phi i1 [%t189, %logic.entry2966], [%t194, %rhs.exit2969]
   %t196 = zext i1 %t195 to i64
   %t197 = trunc i64 %t196 to i1
-  br label %logic.entry2959
-logic.entry2959:
-  br i1 %t197, label %end2961, label %rhs2960
-rhs2960:
+  br label %logic.entry2970
+logic.entry2970:
+  br i1 %t197, label %end2972, label %rhs2971
+rhs2971:
   %t198 = load i64, i64* %name
-  %t199 = getelementptr [8 x i8], [8 x i8]* @.str.1514, i64 0, i64 0
+  %t199 = getelementptr [8 x i8], [8 x i8]* @.str.1516, i64 0, i64 0
   %t200 = ptrtoint i8* %t199 to i64
   %t201 = call i64 @__string_eq(i64 %t198, i64 %t200)
   %t202 = trunc i64 %t201 to i1
-  br label %rhs.exit2962
-rhs.exit2962:
-  br label %end2961
-end2961:
-  %t203 = phi i1 [%t197, %logic.entry2959], [%t202, %rhs.exit2962]
+  br label %rhs.exit2973
+rhs.exit2973:
+  br label %end2972
+end2972:
+  %t203 = phi i1 [%t197, %logic.entry2970], [%t202, %rhs.exit2973]
   %t204 = zext i1 %t203 to i64
   %t205 = trunc i64 %t204 to i1
-  br label %logic.entry2963
-logic.entry2963:
-  br i1 %t205, label %end2965, label %rhs2964
-rhs2964:
+  br label %logic.entry2974
+logic.entry2974:
+  br i1 %t205, label %end2976, label %rhs2975
+rhs2975:
   %t206 = load i64, i64* %name
-  %t207 = getelementptr [8 x i8], [8 x i8]* @.str.1515, i64 0, i64 0
+  %t207 = getelementptr [8 x i8], [8 x i8]* @.str.1517, i64 0, i64 0
   %t208 = ptrtoint i8* %t207 to i64
   %t209 = call i64 @__string_eq(i64 %t206, i64 %t208)
   %t210 = trunc i64 %t209 to i1
-  br label %rhs.exit2966
-rhs.exit2966:
-  br label %end2965
-end2965:
-  %t211 = phi i1 [%t205, %logic.entry2963], [%t210, %rhs.exit2966]
-  %t212 = zext i1 %t211 to i64
-  %t213 = trunc i64 %t212 to i1
-  br label %logic.entry2967
-logic.entry2967:
-  br i1 %t213, label %end2969, label %rhs2968
-rhs2968:
-  %t214 = load i64, i64* %name
-  %t215 = getelementptr [6 x i8], [6 x i8]* @.str.1516, i64 0, i64 0
-  %t216 = ptrtoint i8* %t215 to i64
-  %t217 = call i64 @__string_eq(i64 %t214, i64 %t216)
-  %t218 = trunc i64 %t217 to i1
-  br label %rhs.exit2970
-rhs.exit2970:
-  br label %end2969
-end2969:
-  %t219 = phi i1 [%t213, %logic.entry2967], [%t218, %rhs.exit2970]
-  %t220 = zext i1 %t219 to i64
-  %t221 = trunc i64 %t220 to i1
-  br i1 %t221, label %then2971, label %else2972
-then2971:
-  %t222 = add i64 0, 1
-  ret i64 %t222
-else2972:
-  br label %endif2946
-endif2946:
-  %t223 = load i64, i64* %name
-  %t224 = getelementptr [3 x i8], [3 x i8]* @.str.1517, i64 0, i64 0
-  %t225 = ptrtoint i8* %t224 to i64
-  %t226 = call i64 @__string_eq(i64 %t223, i64 %t225)
-  %t227 = trunc i64 %t226 to i1
-  br label %logic.entry2974
-logic.entry2974:
-  br i1 %t227, label %end2976, label %rhs2975
-rhs2975:
-  %t228 = load i64, i64* %name
-  %t229 = getelementptr [3 x i8], [3 x i8]* @.str.1518, i64 0, i64 0
-  %t230 = ptrtoint i8* %t229 to i64
-  %t231 = call i64 @__string_eq(i64 %t228, i64 %t230)
-  %t232 = trunc i64 %t231 to i1
   br label %rhs.exit2977
 rhs.exit2977:
   br label %end2976
 end2976:
-  %t233 = phi i1 [%t227, %logic.entry2974], [%t232, %rhs.exit2977]
-  %t234 = zext i1 %t233 to i64
-  %t235 = trunc i64 %t234 to i1
-  br i1 %t235, label %then2978, label %else2979
-then2978:
-  %t236 = add i64 0, 1
-  ret i64 %t236
-else2979:
-  br label %endif2973
-endif2973:
-  %t237 = load i64, i64* %name
-  %t238 = getelementptr [7 x i8], [7 x i8]* @.str.1519, i64 0, i64 0
-  %t239 = ptrtoint i8* %t238 to i64
-  %t240 = call i64 @__string_eq(i64 %t237, i64 %t239)
-  %t241 = trunc i64 %t240 to i1
-  br label %logic.entry2981
-logic.entry2981:
-  br i1 %t241, label %end2983, label %rhs2982
-rhs2982:
-  %t242 = load i64, i64* %name
-  %t243 = getelementptr [7 x i8], [7 x i8]* @.str.1520, i64 0, i64 0
-  %t244 = ptrtoint i8* %t243 to i64
-  %t245 = call i64 @__string_eq(i64 %t242, i64 %t244)
-  %t246 = trunc i64 %t245 to i1
-  br label %rhs.exit2984
-rhs.exit2984:
-  br label %end2983
-end2983:
-  %t247 = phi i1 [%t241, %logic.entry2981], [%t246, %rhs.exit2984]
-  %t248 = zext i1 %t247 to i64
-  %t249 = trunc i64 %t248 to i1
+  %t211 = phi i1 [%t205, %logic.entry2974], [%t210, %rhs.exit2977]
+  %t212 = zext i1 %t211 to i64
+  %t213 = trunc i64 %t212 to i1
+  br label %logic.entry2978
+logic.entry2978:
+  br i1 %t213, label %end2980, label %rhs2979
+rhs2979:
+  %t214 = load i64, i64* %name
+  %t215 = getelementptr [6 x i8], [6 x i8]* @.str.1518, i64 0, i64 0
+  %t216 = ptrtoint i8* %t215 to i64
+  %t217 = call i64 @__string_eq(i64 %t214, i64 %t216)
+  %t218 = trunc i64 %t217 to i1
+  br label %rhs.exit2981
+rhs.exit2981:
+  br label %end2980
+end2980:
+  %t219 = phi i1 [%t213, %logic.entry2978], [%t218, %rhs.exit2981]
+  %t220 = zext i1 %t219 to i64
+  %t221 = trunc i64 %t220 to i1
+  br i1 %t221, label %then2982, label %else2983
+then2982:
+  %t222 = add i64 0, 1
+  ret i64 %t222
+else2983:
+  br label %endif2957
+endif2957:
+  %t223 = load i64, i64* %name
+  %t224 = getelementptr [3 x i8], [3 x i8]* @.str.1519, i64 0, i64 0
+  %t225 = ptrtoint i8* %t224 to i64
+  %t226 = call i64 @__string_eq(i64 %t223, i64 %t225)
+  %t227 = trunc i64 %t226 to i1
   br label %logic.entry2985
 logic.entry2985:
-  br i1 %t249, label %end2987, label %rhs2986
+  br i1 %t227, label %end2987, label %rhs2986
 rhs2986:
-  %t250 = load i64, i64* %name
-  %t251 = getelementptr [9 x i8], [9 x i8]* @.str.1521, i64 0, i64 0
-  %t252 = ptrtoint i8* %t251 to i64
-  %t253 = call i64 @__string_eq(i64 %t250, i64 %t252)
-  %t254 = trunc i64 %t253 to i1
+  %t228 = load i64, i64* %name
+  %t229 = getelementptr [3 x i8], [3 x i8]* @.str.1520, i64 0, i64 0
+  %t230 = ptrtoint i8* %t229 to i64
+  %t231 = call i64 @__string_eq(i64 %t228, i64 %t230)
+  %t232 = trunc i64 %t231 to i1
   br label %rhs.exit2988
 rhs.exit2988:
   br label %end2987
 end2987:
-  %t255 = phi i1 [%t249, %logic.entry2985], [%t254, %rhs.exit2988]
-  %t256 = zext i1 %t255 to i64
-  %t257 = trunc i64 %t256 to i1
-  br i1 %t257, label %then2989, label %else2990
+  %t233 = phi i1 [%t227, %logic.entry2985], [%t232, %rhs.exit2988]
+  %t234 = zext i1 %t233 to i64
+  %t235 = trunc i64 %t234 to i1
+  br i1 %t235, label %then2989, label %else2990
 then2989:
-  %t258 = add i64 0, 1
-  ret i64 %t258
+  %t236 = add i64 0, 1
+  ret i64 %t236
 else2990:
-  br label %endif2980
-endif2980:
-  %t259 = load i64, i64* %name
-  %t260 = getelementptr [4 x i8], [4 x i8]* @.str.1522, i64 0, i64 0
-  %t261 = ptrtoint i8* %t260 to i64
-  %t262 = call i64 @__string_eq(i64 %t259, i64 %t261)
-  %t263 = trunc i64 %t262 to i1
+  br label %endif2984
+endif2984:
+  %t237 = load i64, i64* %name
+  %t238 = getelementptr [7 x i8], [7 x i8]* @.str.1521, i64 0, i64 0
+  %t239 = ptrtoint i8* %t238 to i64
+  %t240 = call i64 @__string_eq(i64 %t237, i64 %t239)
+  %t241 = trunc i64 %t240 to i1
   br label %logic.entry2992
 logic.entry2992:
-  br i1 %t263, label %end2994, label %rhs2993
+  br i1 %t241, label %end2994, label %rhs2993
 rhs2993:
-  %t264 = load i64, i64* %name
-  %t265 = getelementptr [5 x i8], [5 x i8]* @.str.1523, i64 0, i64 0
-  %t266 = ptrtoint i8* %t265 to i64
-  %t267 = call i64 @__string_eq(i64 %t264, i64 %t266)
-  %t268 = trunc i64 %t267 to i1
+  %t242 = load i64, i64* %name
+  %t243 = getelementptr [7 x i8], [7 x i8]* @.str.1522, i64 0, i64 0
+  %t244 = ptrtoint i8* %t243 to i64
+  %t245 = call i64 @__string_eq(i64 %t242, i64 %t244)
+  %t246 = trunc i64 %t245 to i1
   br label %rhs.exit2995
 rhs.exit2995:
   br label %end2994
 end2994:
-  %t269 = phi i1 [%t263, %logic.entry2992], [%t268, %rhs.exit2995]
-  %t270 = zext i1 %t269 to i64
-  %t271 = trunc i64 %t270 to i1
+  %t247 = phi i1 [%t241, %logic.entry2992], [%t246, %rhs.exit2995]
+  %t248 = zext i1 %t247 to i64
+  %t249 = trunc i64 %t248 to i1
   br label %logic.entry2996
 logic.entry2996:
-  br i1 %t271, label %end2998, label %rhs2997
+  br i1 %t249, label %end2998, label %rhs2997
 rhs2997:
-  %t272 = load i64, i64* %name
-  %t273 = getelementptr [11 x i8], [11 x i8]* @.str.1524, i64 0, i64 0
-  %t274 = ptrtoint i8* %t273 to i64
-  %t275 = call i64 @__string_eq(i64 %t272, i64 %t274)
-  %t276 = trunc i64 %t275 to i1
+  %t250 = load i64, i64* %name
+  %t251 = getelementptr [9 x i8], [9 x i8]* @.str.1523, i64 0, i64 0
+  %t252 = ptrtoint i8* %t251 to i64
+  %t253 = call i64 @__string_eq(i64 %t250, i64 %t252)
+  %t254 = trunc i64 %t253 to i1
   br label %rhs.exit2999
 rhs.exit2999:
   br label %end2998
 end2998:
-  %t277 = phi i1 [%t271, %logic.entry2996], [%t276, %rhs.exit2999]
-  %t278 = zext i1 %t277 to i64
-  %t279 = trunc i64 %t278 to i1
-  br i1 %t279, label %then3000, label %else3001
+  %t255 = phi i1 [%t249, %logic.entry2996], [%t254, %rhs.exit2999]
+  %t256 = zext i1 %t255 to i64
+  %t257 = trunc i64 %t256 to i1
+  br i1 %t257, label %then3000, label %else3001
 then3000:
-  %t280 = add i64 0, 1
-  ret i64 %t280
+  %t258 = add i64 0, 1
+  ret i64 %t258
 else3001:
   br label %endif2991
 endif2991:
-  %t281 = load i64, i64* %name
-  %t282 = getelementptr [3 x i8], [3 x i8]* @.str.1525, i64 0, i64 0
-  %t283 = ptrtoint i8* %t282 to i64
-  %t284 = call i64 @__string_eq(i64 %t281, i64 %t283)
-  %t285 = trunc i64 %t284 to i1
+  %t259 = load i64, i64* %name
+  %t260 = getelementptr [4 x i8], [4 x i8]* @.str.1524, i64 0, i64 0
+  %t261 = ptrtoint i8* %t260 to i64
+  %t262 = call i64 @__string_eq(i64 %t259, i64 %t261)
+  %t263 = trunc i64 %t262 to i1
   br label %logic.entry3003
 logic.entry3003:
-  br i1 %t285, label %end3005, label %rhs3004
+  br i1 %t263, label %end3005, label %rhs3004
 rhs3004:
-  %t286 = load i64, i64* %name
-  %t287 = getelementptr [7 x i8], [7 x i8]* @.str.1526, i64 0, i64 0
-  %t288 = ptrtoint i8* %t287 to i64
-  %t289 = call i64 @__string_eq(i64 %t286, i64 %t288)
-  %t290 = trunc i64 %t289 to i1
+  %t264 = load i64, i64* %name
+  %t265 = getelementptr [5 x i8], [5 x i8]* @.str.1525, i64 0, i64 0
+  %t266 = ptrtoint i8* %t265 to i64
+  %t267 = call i64 @__string_eq(i64 %t264, i64 %t266)
+  %t268 = trunc i64 %t267 to i1
   br label %rhs.exit3006
 rhs.exit3006:
   br label %end3005
 end3005:
-  %t291 = phi i1 [%t285, %logic.entry3003], [%t290, %rhs.exit3006]
-  %t292 = zext i1 %t291 to i64
-  %t293 = trunc i64 %t292 to i1
+  %t269 = phi i1 [%t263, %logic.entry3003], [%t268, %rhs.exit3006]
+  %t270 = zext i1 %t269 to i64
+  %t271 = trunc i64 %t270 to i1
   br label %logic.entry3007
 logic.entry3007:
-  br i1 %t293, label %end3009, label %rhs3008
+  br i1 %t271, label %end3009, label %rhs3008
 rhs3008:
-  %t294 = load i64, i64* %name
-  %t295 = getelementptr [6 x i8], [6 x i8]* @.str.1527, i64 0, i64 0
-  %t296 = ptrtoint i8* %t295 to i64
-  %t297 = call i64 @__string_eq(i64 %t294, i64 %t296)
-  %t298 = trunc i64 %t297 to i1
+  %t272 = load i64, i64* %name
+  %t273 = getelementptr [11 x i8], [11 x i8]* @.str.1526, i64 0, i64 0
+  %t274 = ptrtoint i8* %t273 to i64
+  %t275 = call i64 @__string_eq(i64 %t272, i64 %t274)
+  %t276 = trunc i64 %t275 to i1
   br label %rhs.exit3010
 rhs.exit3010:
   br label %end3009
 end3009:
-  %t299 = phi i1 [%t293, %logic.entry3007], [%t298, %rhs.exit3010]
+  %t277 = phi i1 [%t271, %logic.entry3007], [%t276, %rhs.exit3010]
+  %t278 = zext i1 %t277 to i64
+  %t279 = trunc i64 %t278 to i1
+  br i1 %t279, label %then3011, label %else3012
+then3011:
+  %t280 = add i64 0, 1
+  ret i64 %t280
+else3012:
+  br label %endif3002
+endif3002:
+  %t281 = load i64, i64* %name
+  %t282 = getelementptr [3 x i8], [3 x i8]* @.str.1527, i64 0, i64 0
+  %t283 = ptrtoint i8* %t282 to i64
+  %t284 = call i64 @__string_eq(i64 %t281, i64 %t283)
+  %t285 = trunc i64 %t284 to i1
+  br label %logic.entry3014
+logic.entry3014:
+  br i1 %t285, label %end3016, label %rhs3015
+rhs3015:
+  %t286 = load i64, i64* %name
+  %t287 = getelementptr [7 x i8], [7 x i8]* @.str.1528, i64 0, i64 0
+  %t288 = ptrtoint i8* %t287 to i64
+  %t289 = call i64 @__string_eq(i64 %t286, i64 %t288)
+  %t290 = trunc i64 %t289 to i1
+  br label %rhs.exit3017
+rhs.exit3017:
+  br label %end3016
+end3016:
+  %t291 = phi i1 [%t285, %logic.entry3014], [%t290, %rhs.exit3017]
+  %t292 = zext i1 %t291 to i64
+  %t293 = trunc i64 %t292 to i1
+  br label %logic.entry3018
+logic.entry3018:
+  br i1 %t293, label %end3020, label %rhs3019
+rhs3019:
+  %t294 = load i64, i64* %name
+  %t295 = getelementptr [6 x i8], [6 x i8]* @.str.1529, i64 0, i64 0
+  %t296 = ptrtoint i8* %t295 to i64
+  %t297 = call i64 @__string_eq(i64 %t294, i64 %t296)
+  %t298 = trunc i64 %t297 to i1
+  br label %rhs.exit3021
+rhs.exit3021:
+  br label %end3020
+end3020:
+  %t299 = phi i1 [%t293, %logic.entry3018], [%t298, %rhs.exit3021]
   %t300 = zext i1 %t299 to i64
   %t301 = trunc i64 %t300 to i1
-  br label %logic.entry3011
-logic.entry3011:
-  br i1 %t301, label %end3013, label %rhs3012
-rhs3012:
+  br label %logic.entry3022
+logic.entry3022:
+  br i1 %t301, label %end3024, label %rhs3023
+rhs3023:
   %t302 = load i64, i64* %name
-  %t303 = getelementptr [5 x i8], [5 x i8]* @.str.1528, i64 0, i64 0
+  %t303 = getelementptr [5 x i8], [5 x i8]* @.str.1530, i64 0, i64 0
   %t304 = ptrtoint i8* %t303 to i64
   %t305 = call i64 @__string_eq(i64 %t302, i64 %t304)
   %t306 = trunc i64 %t305 to i1
-  br label %rhs.exit3014
-rhs.exit3014:
-  br label %end3013
-end3013:
-  %t307 = phi i1 [%t301, %logic.entry3011], [%t306, %rhs.exit3014]
+  br label %rhs.exit3025
+rhs.exit3025:
+  br label %end3024
+end3024:
+  %t307 = phi i1 [%t301, %logic.entry3022], [%t306, %rhs.exit3025]
   %t308 = zext i1 %t307 to i64
   %t309 = trunc i64 %t308 to i1
-  br label %logic.entry3015
-logic.entry3015:
-  br i1 %t309, label %end3017, label %rhs3016
-rhs3016:
+  br label %logic.entry3026
+logic.entry3026:
+  br i1 %t309, label %end3028, label %rhs3027
+rhs3027:
   %t310 = load i64, i64* %name
-  %t311 = getelementptr [4 x i8], [4 x i8]* @.str.1529, i64 0, i64 0
+  %t311 = getelementptr [4 x i8], [4 x i8]* @.str.1531, i64 0, i64 0
   %t312 = ptrtoint i8* %t311 to i64
   %t313 = call i64 @__string_eq(i64 %t310, i64 %t312)
   %t314 = trunc i64 %t313 to i1
-  br label %rhs.exit3018
-rhs.exit3018:
-  br label %end3017
-end3017:
-  %t315 = phi i1 [%t309, %logic.entry3015], [%t314, %rhs.exit3018]
-  %t316 = zext i1 %t315 to i64
-  %t317 = trunc i64 %t316 to i1
-  br label %logic.entry3019
-logic.entry3019:
-  br i1 %t317, label %end3021, label %rhs3020
-rhs3020:
-  %t318 = load i64, i64* %name
-  %t319 = getelementptr [4 x i8], [4 x i8]* @.str.1530, i64 0, i64 0
-  %t320 = ptrtoint i8* %t319 to i64
-  %t321 = call i64 @__string_eq(i64 %t318, i64 %t320)
-  %t322 = trunc i64 %t321 to i1
-  br label %rhs.exit3022
-rhs.exit3022:
-  br label %end3021
-end3021:
-  %t323 = phi i1 [%t317, %logic.entry3019], [%t322, %rhs.exit3022]
-  %t324 = zext i1 %t323 to i64
-  %t325 = trunc i64 %t324 to i1
-  br i1 %t325, label %then3023, label %else3024
-then3023:
-  %t326 = add i64 0, 1
-  ret i64 %t326
-else3024:
-  br label %endif3002
-endif3002:
-  %t327 = load i64, i64* %name
-  %t328 = getelementptr [6 x i8], [6 x i8]* @.str.1531, i64 0, i64 0
-  %t329 = ptrtoint i8* %t328 to i64
-  %t330 = call i64 @__string_eq(i64 %t327, i64 %t329)
-  %t331 = trunc i64 %t330 to i1
-  br label %logic.entry3026
-logic.entry3026:
-  br i1 %t331, label %end3028, label %rhs3027
-rhs3027:
-  %t332 = load i64, i64* %name
-  %t333 = getelementptr [6 x i8], [6 x i8]* @.str.1532, i64 0, i64 0
-  %t334 = ptrtoint i8* %t333 to i64
-  %t335 = call i64 @__string_eq(i64 %t332, i64 %t334)
-  %t336 = trunc i64 %t335 to i1
   br label %rhs.exit3029
 rhs.exit3029:
   br label %end3028
 end3028:
-  %t337 = phi i1 [%t331, %logic.entry3026], [%t336, %rhs.exit3029]
-  %t338 = zext i1 %t337 to i64
-  %t339 = trunc i64 %t338 to i1
+  %t315 = phi i1 [%t309, %logic.entry3026], [%t314, %rhs.exit3029]
+  %t316 = zext i1 %t315 to i64
+  %t317 = trunc i64 %t316 to i1
   br label %logic.entry3030
 logic.entry3030:
-  br i1 %t339, label %end3032, label %rhs3031
+  br i1 %t317, label %end3032, label %rhs3031
 rhs3031:
-  %t340 = load i64, i64* %name
-  %t341 = getelementptr [7 x i8], [7 x i8]* @.str.1533, i64 0, i64 0
-  %t342 = ptrtoint i8* %t341 to i64
-  %t343 = call i64 @__string_eq(i64 %t340, i64 %t342)
-  %t344 = trunc i64 %t343 to i1
+  %t318 = load i64, i64* %name
+  %t319 = getelementptr [4 x i8], [4 x i8]* @.str.1532, i64 0, i64 0
+  %t320 = ptrtoint i8* %t319 to i64
+  %t321 = call i64 @__string_eq(i64 %t318, i64 %t320)
+  %t322 = trunc i64 %t321 to i1
   br label %rhs.exit3033
 rhs.exit3033:
   br label %end3032
 end3032:
-  %t345 = phi i1 [%t339, %logic.entry3030], [%t344, %rhs.exit3033]
-  %t346 = zext i1 %t345 to i64
-  %t347 = trunc i64 %t346 to i1
-  br label %logic.entry3034
-logic.entry3034:
-  br i1 %t347, label %end3036, label %rhs3035
-rhs3035:
-  %t348 = load i64, i64* %name
-  %t349 = getelementptr [7 x i8], [7 x i8]* @.str.1534, i64 0, i64 0
-  %t350 = ptrtoint i8* %t349 to i64
-  %t351 = call i64 @__string_eq(i64 %t348, i64 %t350)
-  %t352 = trunc i64 %t351 to i1
-  br label %rhs.exit3037
-rhs.exit3037:
-  br label %end3036
-end3036:
-  %t353 = phi i1 [%t347, %logic.entry3034], [%t352, %rhs.exit3037]
-  %t354 = zext i1 %t353 to i64
-  %t355 = trunc i64 %t354 to i1
-  br i1 %t355, label %then3038, label %else3039
-then3038:
-  %t356 = add i64 0, 1
-  ret i64 %t356
-else3039:
-  br label %endif3025
-endif3025:
-  %t357 = load i64, i64* %name
-  %t358 = getelementptr [8 x i8], [8 x i8]* @.str.1535, i64 0, i64 0
-  %t359 = ptrtoint i8* %t358 to i64
-  %t360 = call i64 @__string_eq(i64 %t357, i64 %t359)
-  %t361 = trunc i64 %t360 to i1
+  %t323 = phi i1 [%t317, %logic.entry3030], [%t322, %rhs.exit3033]
+  %t324 = zext i1 %t323 to i64
+  %t325 = trunc i64 %t324 to i1
+  br i1 %t325, label %then3034, label %else3035
+then3034:
+  %t326 = add i64 0, 1
+  ret i64 %t326
+else3035:
+  br label %endif3013
+endif3013:
+  %t327 = load i64, i64* %name
+  %t328 = getelementptr [6 x i8], [6 x i8]* @.str.1533, i64 0, i64 0
+  %t329 = ptrtoint i8* %t328 to i64
+  %t330 = call i64 @__string_eq(i64 %t327, i64 %t329)
+  %t331 = trunc i64 %t330 to i1
+  br label %logic.entry3037
+logic.entry3037:
+  br i1 %t331, label %end3039, label %rhs3038
+rhs3038:
+  %t332 = load i64, i64* %name
+  %t333 = getelementptr [6 x i8], [6 x i8]* @.str.1534, i64 0, i64 0
+  %t334 = ptrtoint i8* %t333 to i64
+  %t335 = call i64 @__string_eq(i64 %t332, i64 %t334)
+  %t336 = trunc i64 %t335 to i1
+  br label %rhs.exit3040
+rhs.exit3040:
+  br label %end3039
+end3039:
+  %t337 = phi i1 [%t331, %logic.entry3037], [%t336, %rhs.exit3040]
+  %t338 = zext i1 %t337 to i64
+  %t339 = trunc i64 %t338 to i1
   br label %logic.entry3041
 logic.entry3041:
-  br i1 %t361, label %end3043, label %rhs3042
+  br i1 %t339, label %end3043, label %rhs3042
 rhs3042:
-  %t362 = load i64, i64* %name
-  %t363 = getelementptr [8 x i8], [8 x i8]* @.str.1536, i64 0, i64 0
-  %t364 = ptrtoint i8* %t363 to i64
-  %t365 = call i64 @__string_eq(i64 %t362, i64 %t364)
-  %t366 = trunc i64 %t365 to i1
+  %t340 = load i64, i64* %name
+  %t341 = getelementptr [7 x i8], [7 x i8]* @.str.1535, i64 0, i64 0
+  %t342 = ptrtoint i8* %t341 to i64
+  %t343 = call i64 @__string_eq(i64 %t340, i64 %t342)
+  %t344 = trunc i64 %t343 to i1
   br label %rhs.exit3044
 rhs.exit3044:
   br label %end3043
 end3043:
-  %t367 = phi i1 [%t361, %logic.entry3041], [%t366, %rhs.exit3044]
-  %t368 = zext i1 %t367 to i64
-  %t369 = trunc i64 %t368 to i1
+  %t345 = phi i1 [%t339, %logic.entry3041], [%t344, %rhs.exit3044]
+  %t346 = zext i1 %t345 to i64
+  %t347 = trunc i64 %t346 to i1
   br label %logic.entry3045
 logic.entry3045:
-  br i1 %t369, label %end3047, label %rhs3046
+  br i1 %t347, label %end3047, label %rhs3046
 rhs3046:
-  %t370 = load i64, i64* %name
-  %t371 = getelementptr [7 x i8], [7 x i8]* @.str.1537, i64 0, i64 0
-  %t372 = ptrtoint i8* %t371 to i64
-  %t373 = call i64 @__string_eq(i64 %t370, i64 %t372)
-  %t374 = trunc i64 %t373 to i1
+  %t348 = load i64, i64* %name
+  %t349 = getelementptr [7 x i8], [7 x i8]* @.str.1536, i64 0, i64 0
+  %t350 = ptrtoint i8* %t349 to i64
+  %t351 = call i64 @__string_eq(i64 %t348, i64 %t350)
+  %t352 = trunc i64 %t351 to i1
   br label %rhs.exit3048
 rhs.exit3048:
   br label %end3047
 end3047:
-  %t375 = phi i1 [%t369, %logic.entry3045], [%t374, %rhs.exit3048]
-  %t376 = zext i1 %t375 to i64
-  %t377 = trunc i64 %t376 to i1
-  br i1 %t377, label %then3049, label %else3050
+  %t353 = phi i1 [%t347, %logic.entry3045], [%t352, %rhs.exit3048]
+  %t354 = zext i1 %t353 to i64
+  %t355 = trunc i64 %t354 to i1
+  br i1 %t355, label %then3049, label %else3050
 then3049:
-  %t378 = add i64 0, 1
-  ret i64 %t378
+  %t356 = add i64 0, 1
+  ret i64 %t356
 else3050:
-  br label %endif3040
-endif3040:
-  %t379 = load i64, i64* %name
-  %t380 = getelementptr [9 x i8], [9 x i8]* @.str.1538, i64 0, i64 0
-  %t381 = ptrtoint i8* %t380 to i64
-  %t382 = call i64 @__string_eq(i64 %t379, i64 %t381)
-  %t383 = trunc i64 %t382 to i1
+  br label %endif3036
+endif3036:
+  %t357 = load i64, i64* %name
+  %t358 = getelementptr [8 x i8], [8 x i8]* @.str.1537, i64 0, i64 0
+  %t359 = ptrtoint i8* %t358 to i64
+  %t360 = call i64 @__string_eq(i64 %t357, i64 %t359)
+  %t361 = trunc i64 %t360 to i1
   br label %logic.entry3052
 logic.entry3052:
-  br i1 %t383, label %end3054, label %rhs3053
+  br i1 %t361, label %end3054, label %rhs3053
 rhs3053:
-  %t384 = load i64, i64* %name
-  %t385 = getelementptr [7 x i8], [7 x i8]* @.str.1539, i64 0, i64 0
-  %t386 = ptrtoint i8* %t385 to i64
-  %t387 = call i64 @__string_eq(i64 %t384, i64 %t386)
-  %t388 = trunc i64 %t387 to i1
+  %t362 = load i64, i64* %name
+  %t363 = getelementptr [8 x i8], [8 x i8]* @.str.1538, i64 0, i64 0
+  %t364 = ptrtoint i8* %t363 to i64
+  %t365 = call i64 @__string_eq(i64 %t362, i64 %t364)
+  %t366 = trunc i64 %t365 to i1
   br label %rhs.exit3055
 rhs.exit3055:
   br label %end3054
 end3054:
-  %t389 = phi i1 [%t383, %logic.entry3052], [%t388, %rhs.exit3055]
-  %t390 = zext i1 %t389 to i64
-  %t391 = trunc i64 %t390 to i1
+  %t367 = phi i1 [%t361, %logic.entry3052], [%t366, %rhs.exit3055]
+  %t368 = zext i1 %t367 to i64
+  %t369 = trunc i64 %t368 to i1
   br label %logic.entry3056
 logic.entry3056:
-  br i1 %t391, label %end3058, label %rhs3057
+  br i1 %t369, label %end3058, label %rhs3057
 rhs3057:
-  %t392 = load i64, i64* %name
-  %t393 = getelementptr [9 x i8], [9 x i8]* @.str.1540, i64 0, i64 0
-  %t394 = ptrtoint i8* %t393 to i64
-  %t395 = call i64 @__string_eq(i64 %t392, i64 %t394)
-  %t396 = trunc i64 %t395 to i1
+  %t370 = load i64, i64* %name
+  %t371 = getelementptr [7 x i8], [7 x i8]* @.str.1539, i64 0, i64 0
+  %t372 = ptrtoint i8* %t371 to i64
+  %t373 = call i64 @__string_eq(i64 %t370, i64 %t372)
+  %t374 = trunc i64 %t373 to i1
   br label %rhs.exit3059
 rhs.exit3059:
   br label %end3058
 end3058:
-  %t397 = phi i1 [%t391, %logic.entry3056], [%t396, %rhs.exit3059]
-  %t398 = zext i1 %t397 to i64
-  %t399 = trunc i64 %t398 to i1
-  br i1 %t399, label %then3060, label %else3061
+  %t375 = phi i1 [%t369, %logic.entry3056], [%t374, %rhs.exit3059]
+  %t376 = zext i1 %t375 to i64
+  %t377 = trunc i64 %t376 to i1
+  br i1 %t377, label %then3060, label %else3061
 then3060:
-  %t400 = add i64 0, 1
-  ret i64 %t400
+  %t378 = add i64 0, 1
+  ret i64 %t378
 else3061:
   br label %endif3051
 endif3051:
-  %t401 = load i64, i64* %name
-  %t402 = getelementptr [7 x i8], [7 x i8]* @.str.1541, i64 0, i64 0
-  %t403 = ptrtoint i8* %t402 to i64
-  %t404 = call i64 @__string_eq(i64 %t401, i64 %t403)
-  %t405 = trunc i64 %t404 to i1
+  %t379 = load i64, i64* %name
+  %t380 = getelementptr [9 x i8], [9 x i8]* @.str.1540, i64 0, i64 0
+  %t381 = ptrtoint i8* %t380 to i64
+  %t382 = call i64 @__string_eq(i64 %t379, i64 %t381)
+  %t383 = trunc i64 %t382 to i1
   br label %logic.entry3063
 logic.entry3063:
-  br i1 %t405, label %end3065, label %rhs3064
+  br i1 %t383, label %end3065, label %rhs3064
 rhs3064:
-  %t406 = load i64, i64* %name
-  %t407 = getelementptr [6 x i8], [6 x i8]* @.str.1542, i64 0, i64 0
-  %t408 = ptrtoint i8* %t407 to i64
-  %t409 = call i64 @__string_eq(i64 %t406, i64 %t408)
-  %t410 = trunc i64 %t409 to i1
+  %t384 = load i64, i64* %name
+  %t385 = getelementptr [7 x i8], [7 x i8]* @.str.1541, i64 0, i64 0
+  %t386 = ptrtoint i8* %t385 to i64
+  %t387 = call i64 @__string_eq(i64 %t384, i64 %t386)
+  %t388 = trunc i64 %t387 to i1
   br label %rhs.exit3066
 rhs.exit3066:
   br label %end3065
 end3065:
-  %t411 = phi i1 [%t405, %logic.entry3063], [%t410, %rhs.exit3066]
-  %t412 = zext i1 %t411 to i64
-  %t413 = trunc i64 %t412 to i1
+  %t389 = phi i1 [%t383, %logic.entry3063], [%t388, %rhs.exit3066]
+  %t390 = zext i1 %t389 to i64
+  %t391 = trunc i64 %t390 to i1
   br label %logic.entry3067
 logic.entry3067:
-  br i1 %t413, label %end3069, label %rhs3068
+  br i1 %t391, label %end3069, label %rhs3068
 rhs3068:
-  %t414 = load i64, i64* %name
-  %t415 = getelementptr [7 x i8], [7 x i8]* @.str.1543, i64 0, i64 0
-  %t416 = ptrtoint i8* %t415 to i64
-  %t417 = call i64 @__string_eq(i64 %t414, i64 %t416)
-  %t418 = trunc i64 %t417 to i1
+  %t392 = load i64, i64* %name
+  %t393 = getelementptr [9 x i8], [9 x i8]* @.str.1542, i64 0, i64 0
+  %t394 = ptrtoint i8* %t393 to i64
+  %t395 = call i64 @__string_eq(i64 %t392, i64 %t394)
+  %t396 = trunc i64 %t395 to i1
   br label %rhs.exit3070
 rhs.exit3070:
   br label %end3069
 end3069:
-  %t419 = phi i1 [%t413, %logic.entry3067], [%t418, %rhs.exit3070]
-  %t420 = zext i1 %t419 to i64
-  %t421 = trunc i64 %t420 to i1
-  br i1 %t421, label %then3071, label %else3072
+  %t397 = phi i1 [%t391, %logic.entry3067], [%t396, %rhs.exit3070]
+  %t398 = zext i1 %t397 to i64
+  %t399 = trunc i64 %t398 to i1
+  br i1 %t399, label %then3071, label %else3072
 then3071:
-  %t422 = add i64 0, 1
-  ret i64 %t422
+  %t400 = add i64 0, 1
+  ret i64 %t400
 else3072:
   br label %endif3062
 endif3062:
-  %t423 = load i64, i64* %name
-  %t424 = getelementptr [5 x i8], [5 x i8]* @.str.1544, i64 0, i64 0
-  %t425 = ptrtoint i8* %t424 to i64
-  %t426 = call i64 @__string_eq(i64 %t423, i64 %t425)
-  %t427 = trunc i64 %t426 to i1
+  %t401 = load i64, i64* %name
+  %t402 = getelementptr [7 x i8], [7 x i8]* @.str.1543, i64 0, i64 0
+  %t403 = ptrtoint i8* %t402 to i64
+  %t404 = call i64 @__string_eq(i64 %t401, i64 %t403)
+  %t405 = trunc i64 %t404 to i1
   br label %logic.entry3074
 logic.entry3074:
-  br i1 %t427, label %end3076, label %rhs3075
+  br i1 %t405, label %end3076, label %rhs3075
 rhs3075:
-  %t428 = load i64, i64* %name
-  %t429 = getelementptr [5 x i8], [5 x i8]* @.str.1545, i64 0, i64 0
-  %t430 = ptrtoint i8* %t429 to i64
-  %t431 = call i64 @__string_eq(i64 %t428, i64 %t430)
-  %t432 = trunc i64 %t431 to i1
+  %t406 = load i64, i64* %name
+  %t407 = getelementptr [6 x i8], [6 x i8]* @.str.1544, i64 0, i64 0
+  %t408 = ptrtoint i8* %t407 to i64
+  %t409 = call i64 @__string_eq(i64 %t406, i64 %t408)
+  %t410 = trunc i64 %t409 to i1
   br label %rhs.exit3077
 rhs.exit3077:
   br label %end3076
 end3076:
-  %t433 = phi i1 [%t427, %logic.entry3074], [%t432, %rhs.exit3077]
-  %t434 = zext i1 %t433 to i64
-  %t435 = trunc i64 %t434 to i1
+  %t411 = phi i1 [%t405, %logic.entry3074], [%t410, %rhs.exit3077]
+  %t412 = zext i1 %t411 to i64
+  %t413 = trunc i64 %t412 to i1
   br label %logic.entry3078
 logic.entry3078:
-  br i1 %t435, label %end3080, label %rhs3079
+  br i1 %t413, label %end3080, label %rhs3079
 rhs3079:
-  %t436 = load i64, i64* %name
-  %t437 = getelementptr [6 x i8], [6 x i8]* @.str.1546, i64 0, i64 0
-  %t438 = ptrtoint i8* %t437 to i64
-  %t439 = call i64 @__string_eq(i64 %t436, i64 %t438)
-  %t440 = trunc i64 %t439 to i1
+  %t414 = load i64, i64* %name
+  %t415 = getelementptr [7 x i8], [7 x i8]* @.str.1545, i64 0, i64 0
+  %t416 = ptrtoint i8* %t415 to i64
+  %t417 = call i64 @__string_eq(i64 %t414, i64 %t416)
+  %t418 = trunc i64 %t417 to i1
   br label %rhs.exit3081
 rhs.exit3081:
   br label %end3080
 end3080:
-  %t441 = phi i1 [%t435, %logic.entry3078], [%t440, %rhs.exit3081]
-  %t442 = zext i1 %t441 to i64
-  %t443 = trunc i64 %t442 to i1
-  br label %logic.entry3082
-logic.entry3082:
-  br i1 %t443, label %end3084, label %rhs3083
-rhs3083:
-  %t444 = load i64, i64* %name
-  %t445 = getelementptr [7 x i8], [7 x i8]* @.str.1547, i64 0, i64 0
-  %t446 = ptrtoint i8* %t445 to i64
-  %t447 = call i64 @__string_eq(i64 %t444, i64 %t446)
-  %t448 = trunc i64 %t447 to i1
-  br label %rhs.exit3085
-rhs.exit3085:
-  br label %end3084
-end3084:
-  %t449 = phi i1 [%t443, %logic.entry3082], [%t448, %rhs.exit3085]
-  %t450 = zext i1 %t449 to i64
-  %t451 = trunc i64 %t450 to i1
-  br i1 %t451, label %then3086, label %else3087
-then3086:
-  %t452 = add i64 0, 1
-  ret i64 %t452
-else3087:
+  %t419 = phi i1 [%t413, %logic.entry3078], [%t418, %rhs.exit3081]
+  %t420 = zext i1 %t419 to i64
+  %t421 = trunc i64 %t420 to i1
+  br i1 %t421, label %then3082, label %else3083
+then3082:
+  %t422 = add i64 0, 1
+  ret i64 %t422
+else3083:
   br label %endif3073
 endif3073:
-  %t453 = load i64, i64* %name
-  %t454 = getelementptr [5 x i8], [5 x i8]* @.str.1548, i64 0, i64 0
-  %t455 = ptrtoint i8* %t454 to i64
-  %t456 = call i64 @__string_eq(i64 %t453, i64 %t455)
-  %t457 = trunc i64 %t456 to i1
+  %t423 = load i64, i64* %name
+  %t424 = getelementptr [5 x i8], [5 x i8]* @.str.1546, i64 0, i64 0
+  %t425 = ptrtoint i8* %t424 to i64
+  %t426 = call i64 @__string_eq(i64 %t423, i64 %t425)
+  %t427 = trunc i64 %t426 to i1
+  br label %logic.entry3085
+logic.entry3085:
+  br i1 %t427, label %end3087, label %rhs3086
+rhs3086:
+  %t428 = load i64, i64* %name
+  %t429 = getelementptr [5 x i8], [5 x i8]* @.str.1547, i64 0, i64 0
+  %t430 = ptrtoint i8* %t429 to i64
+  %t431 = call i64 @__string_eq(i64 %t428, i64 %t430)
+  %t432 = trunc i64 %t431 to i1
+  br label %rhs.exit3088
+rhs.exit3088:
+  br label %end3087
+end3087:
+  %t433 = phi i1 [%t427, %logic.entry3085], [%t432, %rhs.exit3088]
+  %t434 = zext i1 %t433 to i64
+  %t435 = trunc i64 %t434 to i1
   br label %logic.entry3089
 logic.entry3089:
-  br i1 %t457, label %end3091, label %rhs3090
+  br i1 %t435, label %end3091, label %rhs3090
 rhs3090:
-  %t458 = load i64, i64* %name
-  %t459 = getelementptr [5 x i8], [5 x i8]* @.str.1549, i64 0, i64 0
-  %t460 = ptrtoint i8* %t459 to i64
-  %t461 = call i64 @__string_eq(i64 %t458, i64 %t460)
-  %t462 = trunc i64 %t461 to i1
+  %t436 = load i64, i64* %name
+  %t437 = getelementptr [6 x i8], [6 x i8]* @.str.1548, i64 0, i64 0
+  %t438 = ptrtoint i8* %t437 to i64
+  %t439 = call i64 @__string_eq(i64 %t436, i64 %t438)
+  %t440 = trunc i64 %t439 to i1
   br label %rhs.exit3092
 rhs.exit3092:
   br label %end3091
 end3091:
-  %t463 = phi i1 [%t457, %logic.entry3089], [%t462, %rhs.exit3092]
-  %t464 = zext i1 %t463 to i64
-  %t465 = trunc i64 %t464 to i1
+  %t441 = phi i1 [%t435, %logic.entry3089], [%t440, %rhs.exit3092]
+  %t442 = zext i1 %t441 to i64
+  %t443 = trunc i64 %t442 to i1
   br label %logic.entry3093
 logic.entry3093:
-  br i1 %t465, label %end3095, label %rhs3094
+  br i1 %t443, label %end3095, label %rhs3094
 rhs3094:
-  %t466 = load i64, i64* %name
-  %t467 = getelementptr [5 x i8], [5 x i8]* @.str.1550, i64 0, i64 0
-  %t468 = ptrtoint i8* %t467 to i64
-  %t469 = call i64 @__string_eq(i64 %t466, i64 %t468)
-  %t470 = trunc i64 %t469 to i1
+  %t444 = load i64, i64* %name
+  %t445 = getelementptr [7 x i8], [7 x i8]* @.str.1549, i64 0, i64 0
+  %t446 = ptrtoint i8* %t445 to i64
+  %t447 = call i64 @__string_eq(i64 %t444, i64 %t446)
+  %t448 = trunc i64 %t447 to i1
   br label %rhs.exit3096
 rhs.exit3096:
   br label %end3095
 end3095:
-  %t471 = phi i1 [%t465, %logic.entry3093], [%t470, %rhs.exit3096]
-  %t472 = zext i1 %t471 to i64
-  %t473 = trunc i64 %t472 to i1
-  br label %logic.entry3097
-logic.entry3097:
-  br i1 %t473, label %end3099, label %rhs3098
-rhs3098:
-  %t474 = load i64, i64* %name
-  %t475 = getelementptr [6 x i8], [6 x i8]* @.str.1551, i64 0, i64 0
-  %t476 = ptrtoint i8* %t475 to i64
-  %t477 = call i64 @__string_eq(i64 %t474, i64 %t476)
-  %t478 = trunc i64 %t477 to i1
-  br label %rhs.exit3100
-rhs.exit3100:
-  br label %end3099
-end3099:
-  %t479 = phi i1 [%t473, %logic.entry3097], [%t478, %rhs.exit3100]
-  %t480 = zext i1 %t479 to i64
-  %t481 = trunc i64 %t480 to i1
-  br i1 %t481, label %then3101, label %else3102
-then3101:
-  %t482 = add i64 0, 1
-  ret i64 %t482
-else3102:
-  br label %endif3088
-endif3088:
-  %t483 = load i64, i64* %name
-  %t484 = getelementptr [3 x i8], [3 x i8]* @.str.1552, i64 0, i64 0
-  %t485 = ptrtoint i8* %t484 to i64
-  %t486 = call i64 @__string_eq(i64 %t483, i64 %t485)
-  %t487 = trunc i64 %t486 to i1
+  %t449 = phi i1 [%t443, %logic.entry3093], [%t448, %rhs.exit3096]
+  %t450 = zext i1 %t449 to i64
+  %t451 = trunc i64 %t450 to i1
+  br i1 %t451, label %then3097, label %else3098
+then3097:
+  %t452 = add i64 0, 1
+  ret i64 %t452
+else3098:
+  br label %endif3084
+endif3084:
+  %t453 = load i64, i64* %name
+  %t454 = getelementptr [5 x i8], [5 x i8]* @.str.1550, i64 0, i64 0
+  %t455 = ptrtoint i8* %t454 to i64
+  %t456 = call i64 @__string_eq(i64 %t453, i64 %t455)
+  %t457 = trunc i64 %t456 to i1
+  br label %logic.entry3100
+logic.entry3100:
+  br i1 %t457, label %end3102, label %rhs3101
+rhs3101:
+  %t458 = load i64, i64* %name
+  %t459 = getelementptr [5 x i8], [5 x i8]* @.str.1551, i64 0, i64 0
+  %t460 = ptrtoint i8* %t459 to i64
+  %t461 = call i64 @__string_eq(i64 %t458, i64 %t460)
+  %t462 = trunc i64 %t461 to i1
+  br label %rhs.exit3103
+rhs.exit3103:
+  br label %end3102
+end3102:
+  %t463 = phi i1 [%t457, %logic.entry3100], [%t462, %rhs.exit3103]
+  %t464 = zext i1 %t463 to i64
+  %t465 = trunc i64 %t464 to i1
   br label %logic.entry3104
 logic.entry3104:
-  br i1 %t487, label %end3106, label %rhs3105
+  br i1 %t465, label %end3106, label %rhs3105
 rhs3105:
-  %t488 = load i64, i64* %name
-  %t489 = getelementptr [3 x i8], [3 x i8]* @.str.1553, i64 0, i64 0
-  %t490 = ptrtoint i8* %t489 to i64
-  %t491 = call i64 @__string_eq(i64 %t488, i64 %t490)
-  %t492 = trunc i64 %t491 to i1
+  %t466 = load i64, i64* %name
+  %t467 = getelementptr [5 x i8], [5 x i8]* @.str.1552, i64 0, i64 0
+  %t468 = ptrtoint i8* %t467 to i64
+  %t469 = call i64 @__string_eq(i64 %t466, i64 %t468)
+  %t470 = trunc i64 %t469 to i1
   br label %rhs.exit3107
 rhs.exit3107:
   br label %end3106
 end3106:
-  %t493 = phi i1 [%t487, %logic.entry3104], [%t492, %rhs.exit3107]
-  %t494 = zext i1 %t493 to i64
-  %t495 = trunc i64 %t494 to i1
+  %t471 = phi i1 [%t465, %logic.entry3104], [%t470, %rhs.exit3107]
+  %t472 = zext i1 %t471 to i64
+  %t473 = trunc i64 %t472 to i1
   br label %logic.entry3108
 logic.entry3108:
-  br i1 %t495, label %end3110, label %rhs3109
+  br i1 %t473, label %end3110, label %rhs3109
 rhs3109:
-  %t496 = load i64, i64* %name
-  %t497 = getelementptr [3 x i8], [3 x i8]* @.str.1554, i64 0, i64 0
-  %t498 = ptrtoint i8* %t497 to i64
-  %t499 = call i64 @__string_eq(i64 %t496, i64 %t498)
-  %t500 = trunc i64 %t499 to i1
+  %t474 = load i64, i64* %name
+  %t475 = getelementptr [6 x i8], [6 x i8]* @.str.1553, i64 0, i64 0
+  %t476 = ptrtoint i8* %t475 to i64
+  %t477 = call i64 @__string_eq(i64 %t474, i64 %t476)
+  %t478 = trunc i64 %t477 to i1
   br label %rhs.exit3111
 rhs.exit3111:
   br label %end3110
 end3110:
-  %t501 = phi i1 [%t495, %logic.entry3108], [%t500, %rhs.exit3111]
-  %t502 = zext i1 %t501 to i64
-  %t503 = trunc i64 %t502 to i1
-  br i1 %t503, label %then3112, label %else3113
+  %t479 = phi i1 [%t473, %logic.entry3108], [%t478, %rhs.exit3111]
+  %t480 = zext i1 %t479 to i64
+  %t481 = trunc i64 %t480 to i1
+  br i1 %t481, label %then3112, label %else3113
 then3112:
-  %t504 = add i64 0, 1
-  ret i64 %t504
+  %t482 = add i64 0, 1
+  ret i64 %t482
 else3113:
-  br label %endif3103
-endif3103:
-  %t505 = load i64, i64* %name
-  %t506 = getelementptr [7 x i8], [7 x i8]* @.str.1555, i64 0, i64 0
-  %t507 = ptrtoint i8* %t506 to i64
-  %t508 = call i64 @__string_eq(i64 %t505, i64 %t507)
-  %t509 = trunc i64 %t508 to i1
+  br label %endif3099
+endif3099:
+  %t483 = load i64, i64* %name
+  %t484 = getelementptr [3 x i8], [3 x i8]* @.str.1554, i64 0, i64 0
+  %t485 = ptrtoint i8* %t484 to i64
+  %t486 = call i64 @__string_eq(i64 %t483, i64 %t485)
+  %t487 = trunc i64 %t486 to i1
   br label %logic.entry3115
 logic.entry3115:
-  br i1 %t509, label %end3117, label %rhs3116
+  br i1 %t487, label %end3117, label %rhs3116
 rhs3116:
-  %t510 = load i64, i64* %name
-  %t511 = getelementptr [11 x i8], [11 x i8]* @.str.1556, i64 0, i64 0
-  %t512 = ptrtoint i8* %t511 to i64
-  %t513 = call i64 @__string_eq(i64 %t510, i64 %t512)
-  %t514 = trunc i64 %t513 to i1
+  %t488 = load i64, i64* %name
+  %t489 = getelementptr [3 x i8], [3 x i8]* @.str.1555, i64 0, i64 0
+  %t490 = ptrtoint i8* %t489 to i64
+  %t491 = call i64 @__string_eq(i64 %t488, i64 %t490)
+  %t492 = trunc i64 %t491 to i1
   br label %rhs.exit3118
 rhs.exit3118:
   br label %end3117
 end3117:
-  %t515 = phi i1 [%t509, %logic.entry3115], [%t514, %rhs.exit3118]
-  %t516 = zext i1 %t515 to i64
-  %t517 = trunc i64 %t516 to i1
+  %t493 = phi i1 [%t487, %logic.entry3115], [%t492, %rhs.exit3118]
+  %t494 = zext i1 %t493 to i64
+  %t495 = trunc i64 %t494 to i1
   br label %logic.entry3119
 logic.entry3119:
-  br i1 %t517, label %end3121, label %rhs3120
+  br i1 %t495, label %end3121, label %rhs3120
 rhs3120:
-  %t518 = load i64, i64* %name
-  %t519 = getelementptr [8 x i8], [8 x i8]* @.str.1557, i64 0, i64 0
-  %t520 = ptrtoint i8* %t519 to i64
-  %t521 = call i64 @__string_eq(i64 %t518, i64 %t520)
-  %t522 = trunc i64 %t521 to i1
+  %t496 = load i64, i64* %name
+  %t497 = getelementptr [3 x i8], [3 x i8]* @.str.1556, i64 0, i64 0
+  %t498 = ptrtoint i8* %t497 to i64
+  %t499 = call i64 @__string_eq(i64 %t496, i64 %t498)
+  %t500 = trunc i64 %t499 to i1
   br label %rhs.exit3122
 rhs.exit3122:
   br label %end3121
 end3121:
-  %t523 = phi i1 [%t517, %logic.entry3119], [%t522, %rhs.exit3122]
-  %t524 = zext i1 %t523 to i64
-  %t525 = trunc i64 %t524 to i1
-  br i1 %t525, label %then3123, label %else3124
+  %t501 = phi i1 [%t495, %logic.entry3119], [%t500, %rhs.exit3122]
+  %t502 = zext i1 %t501 to i64
+  %t503 = trunc i64 %t502 to i1
+  br i1 %t503, label %then3123, label %else3124
 then3123:
-  %t526 = add i64 0, 1
-  ret i64 %t526
+  %t504 = add i64 0, 1
+  ret i64 %t504
 else3124:
   br label %endif3114
 endif3114:
-  %t527 = load i64, i64* %name
-  %t528 = getelementptr [5 x i8], [5 x i8]* @.str.1558, i64 0, i64 0
-  %t529 = ptrtoint i8* %t528 to i64
-  %t530 = call i64 @__string_eq(i64 %t527, i64 %t529)
-  %t531 = trunc i64 %t530 to i1
+  %t505 = load i64, i64* %name
+  %t506 = getelementptr [7 x i8], [7 x i8]* @.str.1557, i64 0, i64 0
+  %t507 = ptrtoint i8* %t506 to i64
+  %t508 = call i64 @__string_eq(i64 %t505, i64 %t507)
+  %t509 = trunc i64 %t508 to i1
   br label %logic.entry3126
 logic.entry3126:
-  br i1 %t531, label %end3128, label %rhs3127
+  br i1 %t509, label %end3128, label %rhs3127
 rhs3127:
-  %t532 = load i64, i64* %name
-  %t533 = getelementptr [5 x i8], [5 x i8]* @.str.1559, i64 0, i64 0
-  %t534 = ptrtoint i8* %t533 to i64
-  %t535 = call i64 @__string_eq(i64 %t532, i64 %t534)
-  %t536 = trunc i64 %t535 to i1
+  %t510 = load i64, i64* %name
+  %t511 = getelementptr [11 x i8], [11 x i8]* @.str.1558, i64 0, i64 0
+  %t512 = ptrtoint i8* %t511 to i64
+  %t513 = call i64 @__string_eq(i64 %t510, i64 %t512)
+  %t514 = trunc i64 %t513 to i1
   br label %rhs.exit3129
 rhs.exit3129:
   br label %end3128
 end3128:
-  %t537 = phi i1 [%t531, %logic.entry3126], [%t536, %rhs.exit3129]
-  %t538 = zext i1 %t537 to i64
-  %t539 = trunc i64 %t538 to i1
+  %t515 = phi i1 [%t509, %logic.entry3126], [%t514, %rhs.exit3129]
+  %t516 = zext i1 %t515 to i64
+  %t517 = trunc i64 %t516 to i1
   br label %logic.entry3130
 logic.entry3130:
-  br i1 %t539, label %end3132, label %rhs3131
+  br i1 %t517, label %end3132, label %rhs3131
 rhs3131:
-  %t540 = load i64, i64* %name
-  %t541 = getelementptr [4 x i8], [4 x i8]* @.str.1560, i64 0, i64 0
-  %t542 = ptrtoint i8* %t541 to i64
-  %t543 = call i64 @__string_eq(i64 %t540, i64 %t542)
-  %t544 = trunc i64 %t543 to i1
+  %t518 = load i64, i64* %name
+  %t519 = getelementptr [8 x i8], [8 x i8]* @.str.1559, i64 0, i64 0
+  %t520 = ptrtoint i8* %t519 to i64
+  %t521 = call i64 @__string_eq(i64 %t518, i64 %t520)
+  %t522 = trunc i64 %t521 to i1
   br label %rhs.exit3133
 rhs.exit3133:
   br label %end3132
 end3132:
-  %t545 = phi i1 [%t539, %logic.entry3130], [%t544, %rhs.exit3133]
+  %t523 = phi i1 [%t517, %logic.entry3130], [%t522, %rhs.exit3133]
+  %t524 = zext i1 %t523 to i64
+  %t525 = trunc i64 %t524 to i1
+  br i1 %t525, label %then3134, label %else3135
+then3134:
+  %t526 = add i64 0, 1
+  ret i64 %t526
+else3135:
+  br label %endif3125
+endif3125:
+  %t527 = load i64, i64* %name
+  %t528 = getelementptr [5 x i8], [5 x i8]* @.str.1560, i64 0, i64 0
+  %t529 = ptrtoint i8* %t528 to i64
+  %t530 = call i64 @__string_eq(i64 %t527, i64 %t529)
+  %t531 = trunc i64 %t530 to i1
+  br label %logic.entry3137
+logic.entry3137:
+  br i1 %t531, label %end3139, label %rhs3138
+rhs3138:
+  %t532 = load i64, i64* %name
+  %t533 = getelementptr [5 x i8], [5 x i8]* @.str.1561, i64 0, i64 0
+  %t534 = ptrtoint i8* %t533 to i64
+  %t535 = call i64 @__string_eq(i64 %t532, i64 %t534)
+  %t536 = trunc i64 %t535 to i1
+  br label %rhs.exit3140
+rhs.exit3140:
+  br label %end3139
+end3139:
+  %t537 = phi i1 [%t531, %logic.entry3137], [%t536, %rhs.exit3140]
+  %t538 = zext i1 %t537 to i64
+  %t539 = trunc i64 %t538 to i1
+  br label %logic.entry3141
+logic.entry3141:
+  br i1 %t539, label %end3143, label %rhs3142
+rhs3142:
+  %t540 = load i64, i64* %name
+  %t541 = getelementptr [4 x i8], [4 x i8]* @.str.1562, i64 0, i64 0
+  %t542 = ptrtoint i8* %t541 to i64
+  %t543 = call i64 @__string_eq(i64 %t540, i64 %t542)
+  %t544 = trunc i64 %t543 to i1
+  br label %rhs.exit3144
+rhs.exit3144:
+  br label %end3143
+end3143:
+  %t545 = phi i1 [%t539, %logic.entry3141], [%t544, %rhs.exit3144]
   %t546 = zext i1 %t545 to i64
   %t547 = trunc i64 %t546 to i1
-  br label %logic.entry3134
-logic.entry3134:
-  br i1 %t547, label %end3136, label %rhs3135
-rhs3135:
+  br label %logic.entry3145
+logic.entry3145:
+  br i1 %t547, label %end3147, label %rhs3146
+rhs3146:
   %t548 = load i64, i64* %name
-  %t549 = getelementptr [9 x i8], [9 x i8]* @.str.1561, i64 0, i64 0
+  %t549 = getelementptr [9 x i8], [9 x i8]* @.str.1563, i64 0, i64 0
   %t550 = ptrtoint i8* %t549 to i64
   %t551 = call i64 @__string_eq(i64 %t548, i64 %t550)
   %t552 = trunc i64 %t551 to i1
-  br label %rhs.exit3137
-rhs.exit3137:
-  br label %end3136
-end3136:
-  %t553 = phi i1 [%t547, %logic.entry3134], [%t552, %rhs.exit3137]
-  %t554 = zext i1 %t553 to i64
-  %t555 = trunc i64 %t554 to i1
-  br label %logic.entry3138
-logic.entry3138:
-  br i1 %t555, label %end3140, label %rhs3139
-rhs3139:
-  %t556 = load i64, i64* %name
-  %t557 = getelementptr [8 x i8], [8 x i8]* @.str.1562, i64 0, i64 0
-  %t558 = ptrtoint i8* %t557 to i64
-  %t559 = call i64 @__string_eq(i64 %t556, i64 %t558)
-  %t560 = trunc i64 %t559 to i1
-  br label %rhs.exit3141
-rhs.exit3141:
-  br label %end3140
-end3140:
-  %t561 = phi i1 [%t555, %logic.entry3138], [%t560, %rhs.exit3141]
-  %t562 = zext i1 %t561 to i64
-  %t563 = trunc i64 %t562 to i1
-  br i1 %t563, label %then3142, label %else3143
-then3142:
-  %t564 = add i64 0, 1
-  ret i64 %t564
-else3143:
-  br label %endif3125
-endif3125:
-  %t565 = load i64, i64* %name
-  %t566 = getelementptr [6 x i8], [6 x i8]* @.str.1563, i64 0, i64 0
-  %t567 = ptrtoint i8* %t566 to i64
-  %t568 = call i64 @__string_eq(i64 %t565, i64 %t567)
-  %t569 = trunc i64 %t568 to i1
-  br label %logic.entry3145
-logic.entry3145:
-  br i1 %t569, label %end3147, label %rhs3146
-rhs3146:
-  %t570 = load i64, i64* %name
-  %t571 = getelementptr [4 x i8], [4 x i8]* @.str.1564, i64 0, i64 0
-  %t572 = ptrtoint i8* %t571 to i64
-  %t573 = call i64 @__string_eq(i64 %t570, i64 %t572)
-  %t574 = trunc i64 %t573 to i1
   br label %rhs.exit3148
 rhs.exit3148:
   br label %end3147
 end3147:
-  %t575 = phi i1 [%t569, %logic.entry3145], [%t574, %rhs.exit3148]
-  %t576 = zext i1 %t575 to i64
-  %t577 = trunc i64 %t576 to i1
+  %t553 = phi i1 [%t547, %logic.entry3145], [%t552, %rhs.exit3148]
+  %t554 = zext i1 %t553 to i64
+  %t555 = trunc i64 %t554 to i1
   br label %logic.entry3149
 logic.entry3149:
-  br i1 %t577, label %end3151, label %rhs3150
+  br i1 %t555, label %end3151, label %rhs3150
 rhs3150:
-  %t578 = load i64, i64* %name
-  %t579 = getelementptr [5 x i8], [5 x i8]* @.str.1565, i64 0, i64 0
-  %t580 = ptrtoint i8* %t579 to i64
-  %t581 = call i64 @__string_eq(i64 %t578, i64 %t580)
-  %t582 = trunc i64 %t581 to i1
+  %t556 = load i64, i64* %name
+  %t557 = getelementptr [8 x i8], [8 x i8]* @.str.1564, i64 0, i64 0
+  %t558 = ptrtoint i8* %t557 to i64
+  %t559 = call i64 @__string_eq(i64 %t556, i64 %t558)
+  %t560 = trunc i64 %t559 to i1
   br label %rhs.exit3152
 rhs.exit3152:
   br label %end3151
 end3151:
-  %t583 = phi i1 [%t577, %logic.entry3149], [%t582, %rhs.exit3152]
+  %t561 = phi i1 [%t555, %logic.entry3149], [%t560, %rhs.exit3152]
+  %t562 = zext i1 %t561 to i64
+  %t563 = trunc i64 %t562 to i1
+  br i1 %t563, label %then3153, label %else3154
+then3153:
+  %t564 = add i64 0, 1
+  ret i64 %t564
+else3154:
+  br label %endif3136
+endif3136:
+  %t565 = load i64, i64* %name
+  %t566 = getelementptr [6 x i8], [6 x i8]* @.str.1565, i64 0, i64 0
+  %t567 = ptrtoint i8* %t566 to i64
+  %t568 = call i64 @__string_eq(i64 %t565, i64 %t567)
+  %t569 = trunc i64 %t568 to i1
+  br label %logic.entry3156
+logic.entry3156:
+  br i1 %t569, label %end3158, label %rhs3157
+rhs3157:
+  %t570 = load i64, i64* %name
+  %t571 = getelementptr [4 x i8], [4 x i8]* @.str.1566, i64 0, i64 0
+  %t572 = ptrtoint i8* %t571 to i64
+  %t573 = call i64 @__string_eq(i64 %t570, i64 %t572)
+  %t574 = trunc i64 %t573 to i1
+  br label %rhs.exit3159
+rhs.exit3159:
+  br label %end3158
+end3158:
+  %t575 = phi i1 [%t569, %logic.entry3156], [%t574, %rhs.exit3159]
+  %t576 = zext i1 %t575 to i64
+  %t577 = trunc i64 %t576 to i1
+  br label %logic.entry3160
+logic.entry3160:
+  br i1 %t577, label %end3162, label %rhs3161
+rhs3161:
+  %t578 = load i64, i64* %name
+  %t579 = getelementptr [5 x i8], [5 x i8]* @.str.1567, i64 0, i64 0
+  %t580 = ptrtoint i8* %t579 to i64
+  %t581 = call i64 @__string_eq(i64 %t578, i64 %t580)
+  %t582 = trunc i64 %t581 to i1
+  br label %rhs.exit3163
+rhs.exit3163:
+  br label %end3162
+end3162:
+  %t583 = phi i1 [%t577, %logic.entry3160], [%t582, %rhs.exit3163]
   %t584 = zext i1 %t583 to i64
   %t585 = trunc i64 %t584 to i1
-  br label %logic.entry3153
-logic.entry3153:
-  br i1 %t585, label %end3155, label %rhs3154
-rhs3154:
+  br label %logic.entry3164
+logic.entry3164:
+  br i1 %t585, label %end3166, label %rhs3165
+rhs3165:
   %t586 = load i64, i64* %name
-  %t587 = getelementptr [9 x i8], [9 x i8]* @.str.1566, i64 0, i64 0
+  %t587 = getelementptr [9 x i8], [9 x i8]* @.str.1568, i64 0, i64 0
   %t588 = ptrtoint i8* %t587 to i64
   %t589 = call i64 @__string_eq(i64 %t586, i64 %t588)
   %t590 = trunc i64 %t589 to i1
-  br label %rhs.exit3156
-rhs.exit3156:
-  br label %end3155
-end3155:
-  %t591 = phi i1 [%t585, %logic.entry3153], [%t590, %rhs.exit3156]
+  br label %rhs.exit3167
+rhs.exit3167:
+  br label %end3166
+end3166:
+  %t591 = phi i1 [%t585, %logic.entry3164], [%t590, %rhs.exit3167]
   %t592 = zext i1 %t591 to i64
   %t593 = trunc i64 %t592 to i1
-  br i1 %t593, label %then3157, label %else3158
-then3157:
+  br i1 %t593, label %then3168, label %else3169
+then3168:
   %t594 = add i64 0, 1
   ret i64 %t594
-else3158:
-  br label %endif3144
-endif3144:
+else3169:
+  br label %endif3155
+endif3155:
   %t595 = add i64 0, 0
   ret i64 %t595
 }
@@ -34224,201 +34431,201 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %name.arg, i64* %name
   %t1 = load i64, i64* %name
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1567, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.1569, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @__string_eq(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br label %logic.entry3160
-logic.entry3160:
-  br i1 %t5, label %end3162, label %rhs3161
-rhs3161:
+  br label %logic.entry3171
+logic.entry3171:
+  br i1 %t5, label %end3173, label %rhs3172
+rhs3172:
   %t6 = load i64, i64* %name
-  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1568, i64 0, i64 0
+  %t7 = getelementptr [3 x i8], [3 x i8]* @.str.1570, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @__string_eq(i64 %t6, i64 %t8)
   %t10 = trunc i64 %t9 to i1
-  br label %rhs.exit3163
-rhs.exit3163:
-  br label %end3162
-end3162:
-  %t11 = phi i1 [%t5, %logic.entry3160], [%t10, %rhs.exit3163]
+  br label %rhs.exit3174
+rhs.exit3174:
+  br label %end3173
+end3173:
+  %t11 = phi i1 [%t5, %logic.entry3171], [%t10, %rhs.exit3174]
   %t12 = zext i1 %t11 to i64
   %t13 = trunc i64 %t12 to i1
-  br label %logic.entry3164
-logic.entry3164:
-  br i1 %t13, label %end3166, label %rhs3165
-rhs3165:
+  br label %logic.entry3175
+logic.entry3175:
+  br i1 %t13, label %end3177, label %rhs3176
+rhs3176:
   %t14 = load i64, i64* %name
-  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.1569, i64 0, i64 0
+  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.1571, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = call i64 @__string_eq(i64 %t14, i64 %t16)
   %t18 = trunc i64 %t17 to i1
-  br label %rhs.exit3167
-rhs.exit3167:
-  br label %end3166
-end3166:
-  %t19 = phi i1 [%t13, %logic.entry3164], [%t18, %rhs.exit3167]
-  %t20 = zext i1 %t19 to i64
-  %t21 = trunc i64 %t20 to i1
-  br label %logic.entry3168
-logic.entry3168:
-  br i1 %t21, label %end3170, label %rhs3169
-rhs3169:
-  %t22 = load i64, i64* %name
-  %t23 = getelementptr [6 x i8], [6 x i8]* @.str.1570, i64 0, i64 0
-  %t24 = ptrtoint i8* %t23 to i64
-  %t25 = call i64 @__string_eq(i64 %t22, i64 %t24)
-  %t26 = trunc i64 %t25 to i1
-  br label %rhs.exit3171
-rhs.exit3171:
-  br label %end3170
-end3170:
-  %t27 = phi i1 [%t21, %logic.entry3168], [%t26, %rhs.exit3171]
-  %t28 = zext i1 %t27 to i64
-  %t29 = trunc i64 %t28 to i1
-  br i1 %t29, label %then3172, label %else3173
-then3172:
-  %t30 = add i64 0, 1
-  ret i64 %t30
-else3173:
-  br label %endif3159
-endif3159:
-  %t31 = load i64, i64* %name
-  %t32 = getelementptr [5 x i8], [5 x i8]* @.str.1571, i64 0, i64 0
-  %t33 = ptrtoint i8* %t32 to i64
-  %t34 = call i64 @__string_eq(i64 %t31, i64 %t33)
-  %t35 = trunc i64 %t34 to i1
-  br label %logic.entry3175
-logic.entry3175:
-  br i1 %t35, label %end3177, label %rhs3176
-rhs3176:
-  %t36 = load i64, i64* %name
-  %t37 = getelementptr [5 x i8], [5 x i8]* @.str.1572, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = call i64 @__string_eq(i64 %t36, i64 %t38)
-  %t40 = trunc i64 %t39 to i1
   br label %rhs.exit3178
 rhs.exit3178:
   br label %end3177
 end3177:
-  %t41 = phi i1 [%t35, %logic.entry3175], [%t40, %rhs.exit3178]
-  %t42 = zext i1 %t41 to i64
-  %t43 = trunc i64 %t42 to i1
+  %t19 = phi i1 [%t13, %logic.entry3175], [%t18, %rhs.exit3178]
+  %t20 = zext i1 %t19 to i64
+  %t21 = trunc i64 %t20 to i1
   br label %logic.entry3179
 logic.entry3179:
-  br i1 %t43, label %end3181, label %rhs3180
+  br i1 %t21, label %end3181, label %rhs3180
 rhs3180:
-  %t44 = load i64, i64* %name
-  %t45 = getelementptr [4 x i8], [4 x i8]* @.str.1573, i64 0, i64 0
-  %t46 = ptrtoint i8* %t45 to i64
-  %t47 = call i64 @__string_eq(i64 %t44, i64 %t46)
-  %t48 = trunc i64 %t47 to i1
+  %t22 = load i64, i64* %name
+  %t23 = getelementptr [6 x i8], [6 x i8]* @.str.1572, i64 0, i64 0
+  %t24 = ptrtoint i8* %t23 to i64
+  %t25 = call i64 @__string_eq(i64 %t22, i64 %t24)
+  %t26 = trunc i64 %t25 to i1
   br label %rhs.exit3182
 rhs.exit3182:
   br label %end3181
 end3181:
-  %t49 = phi i1 [%t43, %logic.entry3179], [%t48, %rhs.exit3182]
-  %t50 = zext i1 %t49 to i64
-  %t51 = trunc i64 %t50 to i1
-  br label %logic.entry3183
-logic.entry3183:
-  br i1 %t51, label %end3185, label %rhs3184
-rhs3184:
-  %t52 = load i64, i64* %name
-  %t53 = getelementptr [6 x i8], [6 x i8]* @.str.1574, i64 0, i64 0
-  %t54 = ptrtoint i8* %t53 to i64
-  %t55 = call i64 @__string_eq(i64 %t52, i64 %t54)
-  %t56 = trunc i64 %t55 to i1
-  br label %rhs.exit3186
-rhs.exit3186:
-  br label %end3185
-end3185:
-  %t57 = phi i1 [%t51, %logic.entry3183], [%t56, %rhs.exit3186]
-  %t58 = zext i1 %t57 to i64
-  %t59 = trunc i64 %t58 to i1
-  br i1 %t59, label %then3187, label %else3188
-then3187:
-  %t60 = add i64 0, 1
-  ret i64 %t60
-else3188:
-  br label %endif3174
-endif3174:
-  %t61 = load i64, i64* %name
-  %t62 = getelementptr [5 x i8], [5 x i8]* @.str.1575, i64 0, i64 0
-  %t63 = ptrtoint i8* %t62 to i64
-  %t64 = call i64 @__string_eq(i64 %t61, i64 %t63)
-  %t65 = trunc i64 %t64 to i1
+  %t27 = phi i1 [%t21, %logic.entry3179], [%t26, %rhs.exit3182]
+  %t28 = zext i1 %t27 to i64
+  %t29 = trunc i64 %t28 to i1
+  br i1 %t29, label %then3183, label %else3184
+then3183:
+  %t30 = add i64 0, 1
+  ret i64 %t30
+else3184:
+  br label %endif3170
+endif3170:
+  %t31 = load i64, i64* %name
+  %t32 = getelementptr [5 x i8], [5 x i8]* @.str.1573, i64 0, i64 0
+  %t33 = ptrtoint i8* %t32 to i64
+  %t34 = call i64 @__string_eq(i64 %t31, i64 %t33)
+  %t35 = trunc i64 %t34 to i1
+  br label %logic.entry3186
+logic.entry3186:
+  br i1 %t35, label %end3188, label %rhs3187
+rhs3187:
+  %t36 = load i64, i64* %name
+  %t37 = getelementptr [5 x i8], [5 x i8]* @.str.1574, i64 0, i64 0
+  %t38 = ptrtoint i8* %t37 to i64
+  %t39 = call i64 @__string_eq(i64 %t36, i64 %t38)
+  %t40 = trunc i64 %t39 to i1
+  br label %rhs.exit3189
+rhs.exit3189:
+  br label %end3188
+end3188:
+  %t41 = phi i1 [%t35, %logic.entry3186], [%t40, %rhs.exit3189]
+  %t42 = zext i1 %t41 to i64
+  %t43 = trunc i64 %t42 to i1
   br label %logic.entry3190
 logic.entry3190:
-  br i1 %t65, label %end3192, label %rhs3191
+  br i1 %t43, label %end3192, label %rhs3191
 rhs3191:
-  %t66 = load i64, i64* %name
-  %t67 = getelementptr [5 x i8], [5 x i8]* @.str.1576, i64 0, i64 0
-  %t68 = ptrtoint i8* %t67 to i64
-  %t69 = call i64 @__string_eq(i64 %t66, i64 %t68)
-  %t70 = trunc i64 %t69 to i1
+  %t44 = load i64, i64* %name
+  %t45 = getelementptr [4 x i8], [4 x i8]* @.str.1575, i64 0, i64 0
+  %t46 = ptrtoint i8* %t45 to i64
+  %t47 = call i64 @__string_eq(i64 %t44, i64 %t46)
+  %t48 = trunc i64 %t47 to i1
   br label %rhs.exit3193
 rhs.exit3193:
   br label %end3192
 end3192:
-  %t71 = phi i1 [%t65, %logic.entry3190], [%t70, %rhs.exit3193]
-  %t72 = zext i1 %t71 to i64
-  %t73 = trunc i64 %t72 to i1
+  %t49 = phi i1 [%t43, %logic.entry3190], [%t48, %rhs.exit3193]
+  %t50 = zext i1 %t49 to i64
+  %t51 = trunc i64 %t50 to i1
   br label %logic.entry3194
 logic.entry3194:
-  br i1 %t73, label %end3196, label %rhs3195
+  br i1 %t51, label %end3196, label %rhs3195
 rhs3195:
-  %t74 = load i64, i64* %name
-  %t75 = getelementptr [7 x i8], [7 x i8]* @.str.1577, i64 0, i64 0
-  %t76 = ptrtoint i8* %t75 to i64
-  %t77 = call i64 @__string_eq(i64 %t74, i64 %t76)
-  %t78 = trunc i64 %t77 to i1
+  %t52 = load i64, i64* %name
+  %t53 = getelementptr [6 x i8], [6 x i8]* @.str.1576, i64 0, i64 0
+  %t54 = ptrtoint i8* %t53 to i64
+  %t55 = call i64 @__string_eq(i64 %t52, i64 %t54)
+  %t56 = trunc i64 %t55 to i1
   br label %rhs.exit3197
 rhs.exit3197:
   br label %end3196
 end3196:
-  %t79 = phi i1 [%t73, %logic.entry3194], [%t78, %rhs.exit3197]
+  %t57 = phi i1 [%t51, %logic.entry3194], [%t56, %rhs.exit3197]
+  %t58 = zext i1 %t57 to i64
+  %t59 = trunc i64 %t58 to i1
+  br i1 %t59, label %then3198, label %else3199
+then3198:
+  %t60 = add i64 0, 1
+  ret i64 %t60
+else3199:
+  br label %endif3185
+endif3185:
+  %t61 = load i64, i64* %name
+  %t62 = getelementptr [5 x i8], [5 x i8]* @.str.1577, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i64 @__string_eq(i64 %t61, i64 %t63)
+  %t65 = trunc i64 %t64 to i1
+  br label %logic.entry3201
+logic.entry3201:
+  br i1 %t65, label %end3203, label %rhs3202
+rhs3202:
+  %t66 = load i64, i64* %name
+  %t67 = getelementptr [5 x i8], [5 x i8]* @.str.1578, i64 0, i64 0
+  %t68 = ptrtoint i8* %t67 to i64
+  %t69 = call i64 @__string_eq(i64 %t66, i64 %t68)
+  %t70 = trunc i64 %t69 to i1
+  br label %rhs.exit3204
+rhs.exit3204:
+  br label %end3203
+end3203:
+  %t71 = phi i1 [%t65, %logic.entry3201], [%t70, %rhs.exit3204]
+  %t72 = zext i1 %t71 to i64
+  %t73 = trunc i64 %t72 to i1
+  br label %logic.entry3205
+logic.entry3205:
+  br i1 %t73, label %end3207, label %rhs3206
+rhs3206:
+  %t74 = load i64, i64* %name
+  %t75 = getelementptr [7 x i8], [7 x i8]* @.str.1579, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i64 @__string_eq(i64 %t74, i64 %t76)
+  %t78 = trunc i64 %t77 to i1
+  br label %rhs.exit3208
+rhs.exit3208:
+  br label %end3207
+end3207:
+  %t79 = phi i1 [%t73, %logic.entry3205], [%t78, %rhs.exit3208]
   %t80 = zext i1 %t79 to i64
   %t81 = trunc i64 %t80 to i1
-  br label %logic.entry3198
-logic.entry3198:
-  br i1 %t81, label %end3200, label %rhs3199
-rhs3199:
+  br label %logic.entry3209
+logic.entry3209:
+  br i1 %t81, label %end3211, label %rhs3210
+rhs3210:
   %t82 = load i64, i64* %name
-  %t83 = getelementptr [6 x i8], [6 x i8]* @.str.1578, i64 0, i64 0
+  %t83 = getelementptr [6 x i8], [6 x i8]* @.str.1580, i64 0, i64 0
   %t84 = ptrtoint i8* %t83 to i64
   %t85 = call i64 @__string_eq(i64 %t82, i64 %t84)
   %t86 = trunc i64 %t85 to i1
-  br label %rhs.exit3201
-rhs.exit3201:
-  br label %end3200
-end3200:
-  %t87 = phi i1 [%t81, %logic.entry3198], [%t86, %rhs.exit3201]
+  br label %rhs.exit3212
+rhs.exit3212:
+  br label %end3211
+end3211:
+  %t87 = phi i1 [%t81, %logic.entry3209], [%t86, %rhs.exit3212]
   %t88 = zext i1 %t87 to i64
   %t89 = trunc i64 %t88 to i1
-  br label %logic.entry3202
-logic.entry3202:
-  br i1 %t89, label %end3204, label %rhs3203
-rhs3203:
+  br label %logic.entry3213
+logic.entry3213:
+  br i1 %t89, label %end3215, label %rhs3214
+rhs3214:
   %t90 = load i64, i64* %name
-  %t91 = getelementptr [4 x i8], [4 x i8]* @.str.1579, i64 0, i64 0
+  %t91 = getelementptr [4 x i8], [4 x i8]* @.str.1581, i64 0, i64 0
   %t92 = ptrtoint i8* %t91 to i64
   %t93 = call i64 @__string_eq(i64 %t90, i64 %t92)
   %t94 = trunc i64 %t93 to i1
-  br label %rhs.exit3205
-rhs.exit3205:
-  br label %end3204
-end3204:
-  %t95 = phi i1 [%t89, %logic.entry3202], [%t94, %rhs.exit3205]
+  br label %rhs.exit3216
+rhs.exit3216:
+  br label %end3215
+end3215:
+  %t95 = phi i1 [%t89, %logic.entry3213], [%t94, %rhs.exit3216]
   %t96 = zext i1 %t95 to i64
   %t97 = trunc i64 %t96 to i1
-  br i1 %t97, label %then3206, label %else3207
-then3206:
+  br i1 %t97, label %then3217, label %else3218
+then3217:
   %t98 = add i64 0, 1
   ret i64 %t98
-else3207:
-  br label %endif3189
-endif3189:
+else3218:
+  br label %endif3200
+endif3200:
   %t99 = add i64 0, 0
   ret i64 %t99
 }
@@ -34433,7 +34640,7 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = call i64 @Parser__advance(i64 %t3)
   %t5 = load i64, i64* %self
-  %t6 = getelementptr [1 x i8], [1 x i8]* @.str.1580, i64 0, i64 0
+  %t6 = getelementptr [1 x i8], [1 x i8]* @.str.1582, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i64
   %t8 = call i64 @Parser__parse_html_children(i64 %t5, i64 %t7)
   store i64 %t8, i64* %children
@@ -34479,16 +34686,16 @@ entry:
   %t10 = call i64 @Parser__parse_html_attrs(i64 %t9)
   store i64 %t10, i64* %args
   %t11 = load i64, i64* %self
-  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.1581, i64 0, i64 0
+  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.1583, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   %t14 = call i64 @Parser__match_kind_check(i64 %t11, i64 %t13)
   %t15 = trunc i64 %t14 to i1
-  br i1 %t15, label %then3209, label %else3210
-then3209:
+  br i1 %t15, label %then3220, label %else3221
+then3220:
   %t16 = load i64, i64* %self
   %t17 = call i64 @Parser__advance(i64 %t16)
   %t18 = load i64, i64* %self
-  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.1582, i64 0, i64 0
+  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.1584, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @Parser__consume(i64 %t18, i64 %t20)
   %t22 = load i64, i64* %tag
@@ -34518,19 +34725,19 @@ then3209:
   store i64 %t33, i64* %t39
   %t40 = ptrtoint [4 x i64]* %t35 to i64
   ret i64 %t40
-else3210:
-  br label %endif3208
-endif3208:
+else3221:
+  br label %endif3219
+endif3219:
   %t41 = load i64, i64* %self
-  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.1583, i64 0, i64 0
+  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.1585, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = call i64 @Parser__consume(i64 %t41, i64 %t43)
   %t45 = load i64, i64* %self
   %t46 = load i64, i64* %tag
   %t47 = call i64 @Parser__is_void_tag(i64 %t45, i64 %t46)
   %t48 = trunc i64 %t47 to i1
-  br i1 %t48, label %then3212, label %else3213
-then3212:
+  br i1 %t48, label %then3223, label %else3224
+then3223:
   %t49 = load i64, i64* %tag
   %t50 = load i64, i64* %tag_span
   %t51 = call i8* @__sf_malloc(i64 24)
@@ -34558,9 +34765,9 @@ then3212:
   store i64 %t60, i64* %t66
   %t67 = ptrtoint [4 x i64]* %t62 to i64
   ret i64 %t67
-else3213:
-  br label %endif3211
-endif3211:
+else3224:
+  br label %endif3222
+endif3222:
   %t68 = load i64, i64* %self
   %t69 = load i64, i64* %tag
   %t70 = call i64 @Parser__parse_html_children(i64 %t68, i64 %t69)
@@ -34624,153 +34831,153 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = call i64 @__list_new()
   store i64 %t1, i64* %args
-  br label %while.cond3214
-while.cond3214:
+  br label %while.cond3225
+while.cond3225:
   %t2 = load i64, i64* %self
-  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1584, i64 0, i64 0
+  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1586, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @Parser__match_kind_check(i64 %t2, i64 %t4)
   %t6 = trunc i64 %t5 to i1
-  br label %logic.entry3217
-logic.entry3217:
-  br i1 %t6, label %end3219, label %rhs3218
-rhs3218:
+  br label %logic.entry3228
+logic.entry3228:
+  br i1 %t6, label %end3230, label %rhs3229
+rhs3229:
   %t7 = load i64, i64* %self
-  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.1585, i64 0, i64 0
+  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.1587, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i64 @Parser__match_kind_check(i64 %t7, i64 %t9)
   %t11 = trunc i64 %t10 to i1
-  br label %rhs.exit3220
-rhs.exit3220:
-  br label %end3219
-end3219:
-  %t12 = phi i1 [%t6, %logic.entry3217], [%t11, %rhs.exit3220]
+  br label %rhs.exit3231
+rhs.exit3231:
+  br label %end3230
+end3230:
+  %t12 = phi i1 [%t6, %logic.entry3228], [%t11, %rhs.exit3231]
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br label %logic.entry3221
-logic.entry3221:
-  br i1 %t14, label %end3223, label %rhs3222
-rhs3222:
+  br label %logic.entry3232
+logic.entry3232:
+  br i1 %t14, label %end3234, label %rhs3233
+rhs3233:
   %t15 = load i64, i64* %self
-  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.1586, i64 0, i64 0
+  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.1588, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = call i64 @Parser__match_kind_check(i64 %t15, i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br label %rhs.exit3224
-rhs.exit3224:
-  br label %end3223
-end3223:
-  %t20 = phi i1 [%t14, %logic.entry3221], [%t19, %rhs.exit3224]
+  br label %rhs.exit3235
+rhs.exit3235:
+  br label %end3234
+end3234:
+  %t20 = phi i1 [%t14, %logic.entry3232], [%t19, %rhs.exit3235]
   %t21 = zext i1 %t20 to i64
   %t22 = trunc i64 %t21 to i1
-  br label %logic.entry3225
-logic.entry3225:
-  br i1 %t22, label %end3227, label %rhs3226
-rhs3226:
+  br label %logic.entry3236
+logic.entry3236:
+  br i1 %t22, label %end3238, label %rhs3237
+rhs3237:
   %t23 = load i64, i64* %self
-  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.1587, i64 0, i64 0
+  %t24 = getelementptr [3 x i8], [3 x i8]* @.str.1589, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   %t26 = call i64 @Parser__match_kind_check(i64 %t23, i64 %t25)
   %t27 = trunc i64 %t26 to i1
-  br label %rhs.exit3228
-rhs.exit3228:
-  br label %end3227
-end3227:
-  %t28 = phi i1 [%t22, %logic.entry3225], [%t27, %rhs.exit3228]
+  br label %rhs.exit3239
+rhs.exit3239:
+  br label %end3238
+end3238:
+  %t28 = phi i1 [%t22, %logic.entry3236], [%t27, %rhs.exit3239]
   %t29 = zext i1 %t28 to i64
   %t30 = trunc i64 %t29 to i1
-  br label %logic.entry3229
-logic.entry3229:
-  br i1 %t30, label %end3231, label %rhs3230
-rhs3230:
+  br label %logic.entry3240
+logic.entry3240:
+  br i1 %t30, label %end3242, label %rhs3241
+rhs3241:
   %t31 = load i64, i64* %self
-  %t32 = getelementptr [3 x i8], [3 x i8]* @.str.1588, i64 0, i64 0
+  %t32 = getelementptr [3 x i8], [3 x i8]* @.str.1590, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   %t34 = call i64 @Parser__match_kind_check(i64 %t31, i64 %t33)
   %t35 = trunc i64 %t34 to i1
-  br label %rhs.exit3232
-rhs.exit3232:
-  br label %end3231
-end3231:
-  %t36 = phi i1 [%t30, %logic.entry3229], [%t35, %rhs.exit3232]
+  br label %rhs.exit3243
+rhs.exit3243:
+  br label %end3242
+end3242:
+  %t36 = phi i1 [%t30, %logic.entry3240], [%t35, %rhs.exit3243]
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %while.body3215, label %while.end3216
-while.body3215:
-  %t39 = getelementptr [1 x i8], [1 x i8]* @.str.1589, i64 0, i64 0
+  br i1 %t38, label %while.body3226, label %while.end3227
+while.body3226:
+  %t39 = getelementptr [1 x i8], [1 x i8]* @.str.1591, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   store i64 %t40, i64* %attr_name
   %t41 = load i64, i64* %self
-  %t42 = getelementptr [6 x i8], [6 x i8]* @.str.1590, i64 0, i64 0
+  %t42 = getelementptr [6 x i8], [6 x i8]* @.str.1592, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = call i64 @Parser__match_kind_check(i64 %t41, i64 %t43)
   %t45 = trunc i64 %t44 to i1
-  br i1 %t45, label %then3234, label %else3235
-then3234:
-  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.1591, i64 0, i64 0
+  br i1 %t45, label %then3245, label %else3246
+then3245:
+  %t46 = getelementptr [4 x i8], [4 x i8]* @.str.1593, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   store i64 %t47, i64* %attr_name
   %t48 = load i64, i64* %self
   %t49 = call i64 @Parser__advance(i64 %t48)
-  br label %endif3233
-else3235:
+  br label %endif3244
+else3246:
   %t50 = load i64, i64* %self
-  %t51 = getelementptr [4 x i8], [4 x i8]* @.str.1592, i64 0, i64 0
+  %t51 = getelementptr [4 x i8], [4 x i8]* @.str.1594, i64 0, i64 0
   %t52 = ptrtoint i8* %t51 to i64
   %t53 = call i64 @Parser__match_kind_check(i64 %t50, i64 %t52)
   %t54 = trunc i64 %t53 to i1
-  br i1 %t54, label %then3236, label %else3237
-then3236:
-  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.1593, i64 0, i64 0
+  br i1 %t54, label %then3247, label %else3248
+then3247:
+  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.1595, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   store i64 %t56, i64* %attr_name
   %t57 = load i64, i64* %self
   %t58 = call i64 @Parser__advance(i64 %t57)
-  br label %endif3233
-else3237:
+  br label %endif3244
+else3248:
   %t59 = load i64, i64* %self
-  %t60 = getelementptr [3 x i8], [3 x i8]* @.str.1594, i64 0, i64 0
+  %t60 = getelementptr [3 x i8], [3 x i8]* @.str.1596, i64 0, i64 0
   %t61 = ptrtoint i8* %t60 to i64
   %t62 = call i64 @Parser__match_kind_check(i64 %t59, i64 %t61)
   %t63 = trunc i64 %t62 to i1
-  br i1 %t63, label %then3238, label %else3239
-then3238:
-  %t64 = getelementptr [3 x i8], [3 x i8]* @.str.1595, i64 0, i64 0
+  br i1 %t63, label %then3249, label %else3250
+then3249:
+  %t64 = getelementptr [3 x i8], [3 x i8]* @.str.1597, i64 0, i64 0
   %t65 = ptrtoint i8* %t64 to i64
   store i64 %t65, i64* %attr_name
   %t66 = load i64, i64* %self
   %t67 = call i64 @Parser__advance(i64 %t66)
-  br label %endif3233
-else3239:
+  br label %endif3244
+else3250:
   %t68 = load i64, i64* %self
-  %t69 = getelementptr [3 x i8], [3 x i8]* @.str.1596, i64 0, i64 0
+  %t69 = getelementptr [3 x i8], [3 x i8]* @.str.1598, i64 0, i64 0
   %t70 = ptrtoint i8* %t69 to i64
   %t71 = call i64 @Parser__match_kind_check(i64 %t68, i64 %t70)
   %t72 = trunc i64 %t71 to i1
-  br i1 %t72, label %then3240, label %else3241
-then3240:
-  %t73 = getelementptr [3 x i8], [3 x i8]* @.str.1597, i64 0, i64 0
+  br i1 %t72, label %then3251, label %else3252
+then3251:
+  %t73 = getelementptr [3 x i8], [3 x i8]* @.str.1599, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   store i64 %t74, i64* %attr_name
   %t75 = load i64, i64* %self
   %t76 = call i64 @Parser__advance(i64 %t75)
-  br label %endif3233
-else3241:
+  br label %endif3244
+else3252:
   %t77 = load i64, i64* %self
   %t78 = call i64 @Parser__expect_ident(i64 %t77)
   store i64 %t78, i64* %attr_name
-  br label %endif3233
-endif3233:
+  br label %endif3244
+endif3244:
   %t79 = load i64, i64* %self
   %t80 = call i64 @Parser__prev_span(i64 %t79)
   store i64 %t80, i64* %attr_span
   %t81 = load i64, i64* %self
-  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.1598, i64 0, i64 0
+  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.1600, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i64
   %t84 = call i64 @Parser__match_kind(i64 %t81, i64 %t83)
   %t85 = trunc i64 %t84 to i1
-  br i1 %t85, label %then3243, label %else3244
-then3243:
+  br i1 %t85, label %then3254, label %else3255
+then3254:
   %t86 = load i64, i64* %self
   %t87 = call i64 @Parser__parse_html_attr_value(i64 %t86)
   store i64 %t87, i64* %attr_val
@@ -34790,8 +34997,8 @@ then3243:
   store i64 %t91, i64* %t97
   %t98 = ptrtoint [4 x i64]* %t93 to i64
   %t99 = call i64 @__list_push(i64 %t88, i64 %t98)
-  br label %endif3242
-else3244:
+  br label %endif3253
+else3255:
   %t100 = load i64, i64* %args
   %t101 = load i64, i64* %attr_name
   %t102 = add i64 0, 1
@@ -34815,10 +35022,10 @@ else3244:
   store i64 %t108, i64* %t114
   %t115 = ptrtoint [4 x i64]* %t110 to i64
   %t116 = call i64 @__list_push(i64 %t100, i64 %t115)
-  br label %endif3242
-endif3242:
-  br label %while.cond3214
-while.end3216:
+  br label %endif3253
+endif3253:
+  br label %while.cond3225
+while.end3227:
   %t117 = load i64, i64* %args
   ret i64 %t117
 }
@@ -34848,12 +35055,12 @@ entry:
   %expr = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.1599, i64 0, i64 0
+  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.1601, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__match_kind_check(i64 %t1, i64 %t3)
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then3246, label %else3247
-then3246:
+  br i1 %t5, label %then3257, label %else3258
+then3257:
   %t6 = load i64, i64* %self
   %t7 = call i64 @Parser__current_kind(i64 %t6)
   store i64 %t7, i64* %kind
@@ -34864,8 +35071,8 @@ then3246:
   %t13 = inttoptr i64 %t10 to i64*
   %t14 = load i64, i64* %t13
   %t12 = trunc i64 %t14 to i8
-  switch i8 %t12, label %match.arm3250 [ i8 2, label %match.arm3249 ]
-match.arm3249:
+  switch i8 %t12, label %match.arm3261 [ i8 2, label %match.arm3260 ]
+match.arm3260:
   %t15 = load i64, i64* %s
   %t16 = inttoptr i64 %t10 to [2 x i64]*
   %t17 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 1
@@ -34881,28 +35088,28 @@ match.arm3249:
   %t24 = ptrtoint [2 x i64]* %t21 to i64
   store i64 %t24, i64* %t11
   store i64 %t15, i64* %s
-  br label %match.end3248
-match.arm3250:
+  br label %match.end3259
+match.arm3261:
   %t25 = call i8* @__sf_malloc(i64 8)
   %t26 = bitcast i8* %t25 to [1 x i64]*
   %t27 = getelementptr [1 x i64], [1 x i64]* %t26, i64 0, i64 0
   store i64 4, i64* %t27
   %t28 = ptrtoint [1 x i64]* %t26 to i64
   store i64 %t28, i64* %t11
-  br label %match.end3248
-match.end3248:
+  br label %match.end3259
+match.end3259:
   %t29 = load i64, i64* %t11
   ret i64 %t29
-else3247:
-  br label %endif3245
-endif3245:
+else3258:
+  br label %endif3256
+endif3256:
   %t30 = load i64, i64* %self
-  %t31 = getelementptr [2 x i8], [2 x i8]* @.str.1600, i64 0, i64 0
+  %t31 = getelementptr [2 x i8], [2 x i8]* @.str.1602, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = call i64 @Parser__match_kind_check(i64 %t30, i64 %t32)
   %t34 = trunc i64 %t33 to i1
-  br i1 %t34, label %then3252, label %else3253
-then3252:
+  br i1 %t34, label %then3263, label %else3264
+then3263:
   %t35 = load i64, i64* %self
   %t36 = call i64 @Parser__advance(i64 %t35)
   %t37 = load i64, i64* %self
@@ -34916,12 +35123,12 @@ then3252:
   %t44 = getelementptr %Parser, %Parser* %t43, i32 0, i32 5
   store volatile i64 %t42, i64* %t44
   %t45 = load i64, i64* %self
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.1601, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.1603, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
   %t48 = call i64 @Parser__match_kind_check(i64 %t45, i64 %t47)
   %t49 = trunc i64 %t48 to i1
-  br i1 %t49, label %then3255, label %else3256
-then3255:
+  br i1 %t49, label %then3266, label %else3267
+then3266:
   %t50 = load i64, i64* %self
   %t51 = call i64 @Parser__advance(i64 %t50)
   %t52 = load i64, i64* %self
@@ -34935,55 +35142,55 @@ then3255:
   store i64 22, i64* %t58
   %t59 = ptrtoint [1 x i64]* %t57 to i64
   ret i64 %t59
-else3256:
-  br label %endif3254
-endif3254:
+else3267:
+  br label %endif3265
+endif3265:
   %t60 = add i64 0, 0
   store i64 %t60, i64* %is_kotlin_lambda
   %t61 = load i64, i64* %self
-  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.1602, i64 0, i64 0
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.1604, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
   %t64 = call i64 @Parser__match_kind_check(i64 %t61, i64 %t63)
   %t65 = trunc i64 %t64 to i1
-  br i1 %t65, label %then3258, label %else3259
-then3258:
+  br i1 %t65, label %then3269, label %else3270
+then3269:
   %t66 = load i64, i64* %self
-  %t67 = getelementptr [3 x i8], [3 x i8]* @.str.1603, i64 0, i64 0
+  %t67 = getelementptr [3 x i8], [3 x i8]* @.str.1605, i64 0, i64 0
   %t68 = ptrtoint i8* %t67 to i64
   %t69 = call i64 @Parser__peek_is(i64 %t66, i64 %t68)
   %t70 = trunc i64 %t69 to i1
-  br label %logic.entry3261
-logic.entry3261:
-  br i1 %t70, label %end3263, label %rhs3262
-rhs3262:
+  br label %logic.entry3272
+logic.entry3272:
+  br i1 %t70, label %end3274, label %rhs3273
+rhs3273:
   %t71 = load i64, i64* %self
-  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.1604, i64 0, i64 0
+  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.1606, i64 0, i64 0
   %t73 = ptrtoint i8* %t72 to i64
   %t74 = call i64 @Parser__peek_is(i64 %t71, i64 %t73)
   %t75 = trunc i64 %t74 to i1
-  br label %rhs.exit3264
-rhs.exit3264:
-  br label %end3263
-end3263:
-  %t76 = phi i1 [%t70, %logic.entry3261], [%t75, %rhs.exit3264]
+  br label %rhs.exit3275
+rhs.exit3275:
+  br label %end3274
+end3274:
+  %t76 = phi i1 [%t70, %logic.entry3272], [%t75, %rhs.exit3275]
   %t77 = zext i1 %t76 to i64
   %t78 = trunc i64 %t77 to i1
-  br i1 %t78, label %then3265, label %else3266
-then3265:
+  br i1 %t78, label %then3276, label %else3277
+then3276:
   %t79 = add i64 0, 1
   store i64 %t79, i64* %is_kotlin_lambda
-  br label %endif3260
-else3266:
-  br label %endif3260
-endif3260:
-  br label %endif3257
-else3259:
-  br label %endif3257
-endif3257:
+  br label %endif3271
+else3277:
+  br label %endif3271
+endif3271:
+  br label %endif3268
+else3270:
+  br label %endif3268
+endif3268:
   %t80 = load i64, i64* %is_kotlin_lambda
   %t81 = trunc i64 %t80 to i1
-  br i1 %t81, label %then3268, label %else3269
-then3268:
+  br i1 %t81, label %then3279, label %else3280
+then3279:
   %t82 = load i64, i64* %self
   %t83 = inttoptr i64 %t82 to %Parser*
   %t84 = getelementptr %Parser, %Parser* %t83, i32 0, i32 1
@@ -34993,12 +35200,12 @@ then3268:
   %t87 = call i64 @Parser__expect_ident(i64 %t86)
   store i64 %t87, i64* %kl_name
   %t88 = load i64, i64* %self
-  %t89 = getelementptr [3 x i8], [3 x i8]* @.str.1605, i64 0, i64 0
+  %t89 = getelementptr [3 x i8], [3 x i8]* @.str.1607, i64 0, i64 0
   %t90 = ptrtoint i8* %t89 to i64
   %t91 = call i64 @Parser__match_kind(i64 %t88, i64 %t90)
   %t92 = trunc i64 %t91 to i1
-  br i1 %t92, label %then3271, label %else3272
-then3271:
+  br i1 %t92, label %then3282, label %else3283
+then3282:
   %t93 = call i64 @__list_new()
   store i64 %t93, i64* %lparams
   %t94 = load i64, i64* %lparams
@@ -35013,7 +35220,7 @@ then3271:
   %t102 = getelementptr [1 x i64], [1 x i64]* %t101, i64 0, i64 0
   store i64 4, i64* %t102
   %t103 = ptrtoint [1 x i64]* %t101 to i64
-  %t104 = getelementptr [7 x i8], [7 x i8]* @.str.1606, i64 0, i64 0
+  %t104 = getelementptr [7 x i8], [7 x i8]* @.str.1608, i64 0, i64 0
   %t105 = ptrtoint i8* %t104 to i64
   %t106 = call i64 @ast_span_none()
   %t107 = call i8* @__sf_malloc(i64 48)
@@ -35034,79 +35241,79 @@ then3271:
   %t116 = call i64 @__list_push(i64 %t94, i64 %t115)
   %t117 = call i64 @__list_new()
   store i64 %t117, i64* %lbody
-  br label %while.cond3273
-while.cond3273:
+  br label %while.cond3284
+while.cond3284:
   %t118 = load i64, i64* %self
-  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.1607, i64 0, i64 0
+  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.1609, i64 0, i64 0
   %t120 = ptrtoint i8* %t119 to i64
   %t121 = call i64 @Parser__match_kind_check(i64 %t118, i64 %t120)
   %t122 = xor i64 %t121, 1
   %t123 = trunc i64 %t122 to i1
-  br label %logic.entry3276
-logic.entry3276:
-  br i1 %t123, label %rhs3277, label %end3278
-rhs3277:
+  br label %logic.entry3287
+logic.entry3287:
+  br i1 %t123, label %rhs3288, label %end3289
+rhs3288:
   %t124 = load i64, i64* %self
-  %t125 = getelementptr [4 x i8], [4 x i8]* @.str.1608, i64 0, i64 0
+  %t125 = getelementptr [4 x i8], [4 x i8]* @.str.1610, i64 0, i64 0
   %t126 = ptrtoint i8* %t125 to i64
   %t127 = call i64 @Parser__match_kind_check(i64 %t124, i64 %t126)
   %t128 = xor i64 %t127, 1
   %t129 = trunc i64 %t128 to i1
-  br label %rhs.exit3279
-rhs.exit3279:
-  br label %end3278
-end3278:
-  %t130 = phi i1 [%t123, %logic.entry3276], [%t129, %rhs.exit3279]
+  br label %rhs.exit3290
+rhs.exit3290:
+  br label %end3289
+end3289:
+  %t130 = phi i1 [%t123, %logic.entry3287], [%t129, %rhs.exit3290]
   %t131 = zext i1 %t130 to i64
   %t132 = trunc i64 %t131 to i1
-  br i1 %t132, label %while.body3274, label %while.end3275
-while.body3274:
-  br label %while.cond3280
-while.cond3280:
+  br i1 %t132, label %while.body3285, label %while.end3286
+while.body3285:
+  br label %while.cond3291
+while.cond3291:
   %t133 = load i64, i64* %self
-  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1609, i64 0, i64 0
+  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1611, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
   %t136 = call i64 @Parser__match_kind(i64 %t133, i64 %t135)
   %t137 = trunc i64 %t136 to i1
-  br i1 %t137, label %while.body3281, label %while.end3282
-while.body3281:
-  br label %while.cond3280
-while.end3282:
+  br i1 %t137, label %while.body3292, label %while.end3293
+while.body3292:
+  br label %while.cond3291
+while.end3293:
   %t138 = load i64, i64* %self
-  %t139 = getelementptr [2 x i8], [2 x i8]* @.str.1610, i64 0, i64 0
+  %t139 = getelementptr [2 x i8], [2 x i8]* @.str.1612, i64 0, i64 0
   %t140 = ptrtoint i8* %t139 to i64
   %t141 = call i64 @Parser__match_kind_check(i64 %t138, i64 %t140)
   %t142 = trunc i64 %t141 to i1
-  br label %logic.entry3284
-logic.entry3284:
-  br i1 %t142, label %end3286, label %rhs3285
-rhs3285:
+  br label %logic.entry3295
+logic.entry3295:
+  br i1 %t142, label %end3297, label %rhs3296
+rhs3296:
   %t143 = load i64, i64* %self
-  %t144 = getelementptr [4 x i8], [4 x i8]* @.str.1611, i64 0, i64 0
+  %t144 = getelementptr [4 x i8], [4 x i8]* @.str.1613, i64 0, i64 0
   %t145 = ptrtoint i8* %t144 to i64
   %t146 = call i64 @Parser__match_kind_check(i64 %t143, i64 %t145)
   %t147 = trunc i64 %t146 to i1
-  br label %rhs.exit3287
-rhs.exit3287:
-  br label %end3286
-end3286:
-  %t148 = phi i1 [%t142, %logic.entry3284], [%t147, %rhs.exit3287]
+  br label %rhs.exit3298
+rhs.exit3298:
+  br label %end3297
+end3297:
+  %t148 = phi i1 [%t142, %logic.entry3295], [%t147, %rhs.exit3298]
   %t149 = zext i1 %t148 to i64
   %t150 = trunc i64 %t149 to i1
-  br i1 %t150, label %then3288, label %else3289
-then3288:
-  br label %while.end3275
-else3289:
-  br label %endif3283
-endif3283:
+  br i1 %t150, label %then3299, label %else3300
+then3299:
+  br label %while.end3286
+else3300:
+  br label %endif3294
+endif3294:
   %t151 = load i64, i64* %lbody
   %t152 = load i64, i64* %self
   %t153 = call i64 @Parser__parse_stmt(i64 %t152)
   %t154 = call i64 @__list_push(i64 %t151, i64 %t153)
-  br label %while.cond3273
-while.end3275:
+  br label %while.cond3284
+while.end3286:
   %t155 = load i64, i64* %self
-  %t156 = getelementptr [2 x i8], [2 x i8]* @.str.1612, i64 0, i64 0
+  %t156 = getelementptr [2 x i8], [2 x i8]* @.str.1614, i64 0, i64 0
   %t157 = ptrtoint i8* %t156 to i64
   %t158 = call i64 @Parser__consume(i64 %t155, i64 %t157)
   %t159 = load i64, i64* %lbody
@@ -35115,8 +35322,8 @@ while.end3275:
   %t163 = icmp sgt i64 %t160, %t161
   %t162 = zext i1 %t163 to i64
   %t164 = trunc i64 %t162 to i1
-  br i1 %t164, label %then3291, label %else3292
-then3291:
+  br i1 %t164, label %then3302, label %else3303
+then3302:
   %t165 = load i64, i64* %lbody
   %t166 = load i64, i64* %lbody
   %t167 = call i64 @__list_length(i64 %t166)
@@ -35133,8 +35340,8 @@ then3291:
   %t178 = inttoptr i64 %t175 to i64*
   %t179 = load i64, i64* %t178
   %t177 = trunc i64 %t179 to i8
-  switch i8 %t177, label %match.arm3295 [ i8 0, label %match.arm3294 ]
-match.arm3294:
+  switch i8 %t177, label %match.arm3306 [ i8 0, label %match.arm3305 ]
+match.arm3305:
   %t180 = load i64, i64* %e
   %t181 = inttoptr i64 %t175 to [2 x i64]*
   %t182 = getelementptr [2 x i64], [2 x i64]* %t181, i64 0, i64 1
@@ -35143,25 +35350,25 @@ match.arm3294:
   %t184 = add i64 0, 1
   store i64 %t184, i64* %t176
   store i64 %t180, i64* %e
-  br label %match.end3293
-match.arm3295:
+  br label %match.end3304
+match.arm3306:
   %t185 = add i64 0, 0
   store i64 %t185, i64* %t176
-  br label %match.end3293
-match.end3293:
+  br label %match.end3304
+match.end3304:
   %t186 = load i64, i64* %t176
   store i64 %t186, i64* %kis_expr
   %t187 = load i64, i64* %kis_expr
   %t188 = trunc i64 %t187 to i1
-  br i1 %t188, label %then3297, label %else3298
-then3297:
+  br i1 %t188, label %then3308, label %else3309
+then3308:
   %t189 = load i64, i64* %klast
   %t190 = alloca i64
   %t192 = inttoptr i64 %t189 to i64*
   %t193 = load i64, i64* %t192
   %t191 = trunc i64 %t193 to i8
-  switch i8 %t191, label %match.arm3301 [ i8 0, label %match.arm3300 ]
-match.arm3300:
+  switch i8 %t191, label %match.arm3312 [ i8 0, label %match.arm3311 ]
+match.arm3311:
   %t194 = load i64, i64* %e
   %t195 = inttoptr i64 %t189 to [2 x i64]*
   %t196 = getelementptr [2 x i64], [2 x i64]* %t195, i64 0, i64 1
@@ -35170,16 +35377,16 @@ match.arm3300:
   %t198 = load i64, i64* %e
   store i64 %t198, i64* %t190
   store i64 %t194, i64* %e
-  br label %match.end3299
-match.arm3301:
+  br label %match.end3310
+match.arm3312:
   %t199 = call i8* @__sf_malloc(i64 8)
   %t200 = bitcast i8* %t199 to [1 x i64]*
   %t201 = getelementptr [1 x i64], [1 x i64]* %t200, i64 0, i64 0
   store i64 4, i64* %t201
   %t202 = ptrtoint [1 x i64]* %t200 to i64
   store i64 %t202, i64* %t190
-  br label %match.end3299
-match.end3299:
+  br label %match.end3310
+match.end3310:
   %t203 = load i64, i64* %t190
   store i64 %t203, i64* %kexpr
   %t204 = load i64, i64* %lbody
@@ -35196,14 +35403,14 @@ match.end3299:
   store i64 %t209, i64* %t213
   %t214 = ptrtoint [2 x i64]* %t211 to i64
   %t215 = call i64 @__list_set(i64 %t204, i64 %t208, i64 %t214)
-  br label %endif3296
-else3298:
-  br label %endif3296
-endif3296:
-  br label %endif3290
-else3292:
-  br label %endif3290
-endif3290:
+  br label %endif3307
+else3309:
+  br label %endif3307
+endif3307:
+  br label %endif3301
+else3303:
+  br label %endif3301
+endif3301:
   %t216 = load i64, i64* %self
   %t217 = load i64, i64* %saved_depth
   %t218 = inttoptr i64 %t216 to %Parser*
@@ -35228,14 +35435,14 @@ endif3290:
   store i64 %t225, i64* %t231
   %t232 = ptrtoint [4 x i64]* %t227 to i64
   ret i64 %t232
-else3272:
+else3283:
   %t233 = load i64, i64* %self
-  %t234 = getelementptr [2 x i8], [2 x i8]* @.str.1613, i64 0, i64 0
+  %t234 = getelementptr [2 x i8], [2 x i8]* @.str.1615, i64 0, i64 0
   %t235 = ptrtoint i8* %t234 to i64
   %t236 = call i64 @Parser__match_kind(i64 %t233, i64 %t235)
   %t237 = trunc i64 %t236 to i1
-  br i1 %t237, label %then3302, label %else3303
-then3302:
+  br i1 %t237, label %then3313, label %else3314
+then3313:
   %t238 = call i64 @__list_new()
   store i64 %t238, i64* %lparams
   %t239 = load i64, i64* %lparams
@@ -35250,7 +35457,7 @@ then3302:
   %t247 = getelementptr [1 x i64], [1 x i64]* %t246, i64 0, i64 0
   store i64 4, i64* %t247
   %t248 = ptrtoint [1 x i64]* %t246 to i64
-  %t249 = getelementptr [7 x i8], [7 x i8]* @.str.1614, i64 0, i64 0
+  %t249 = getelementptr [7 x i8], [7 x i8]* @.str.1616, i64 0, i64 0
   %t250 = ptrtoint i8* %t249 to i64
   %t251 = call i64 @ast_span_none()
   %t252 = call i8* @__sf_malloc(i64 48)
@@ -35284,7 +35491,7 @@ then3302:
   %t272 = getelementptr [1 x i64], [1 x i64]* %t271, i64 0, i64 0
   store i64 4, i64* %t272
   %t273 = ptrtoint [1 x i64]* %t271 to i64
-  %t274 = getelementptr [7 x i8], [7 x i8]* @.str.1615, i64 0, i64 0
+  %t274 = getelementptr [7 x i8], [7 x i8]* @.str.1617, i64 0, i64 0
   %t275 = ptrtoint i8* %t274 to i64
   %t276 = call i64 @ast_span_none()
   %t277 = call i8* @__sf_malloc(i64 48)
@@ -35303,15 +35510,15 @@ then3302:
   store i64 %t276, i64* %t284
   %t285 = ptrtoint [6 x i64]* %t278 to i64
   %t286 = call i64 @__list_push(i64 %t264, i64 %t285)
-  br label %while.cond3304
-while.cond3304:
+  br label %while.cond3315
+while.cond3315:
   %t287 = load i64, i64* %self
-  %t288 = getelementptr [2 x i8], [2 x i8]* @.str.1616, i64 0, i64 0
+  %t288 = getelementptr [2 x i8], [2 x i8]* @.str.1618, i64 0, i64 0
   %t289 = ptrtoint i8* %t288 to i64
   %t290 = call i64 @Parser__match_kind(i64 %t287, i64 %t289)
   %t291 = trunc i64 %t290 to i1
-  br i1 %t291, label %while.body3305, label %while.end3306
-while.body3305:
+  br i1 %t291, label %while.body3316, label %while.end3317
+while.body3316:
   %t292 = load i64, i64* %self
   %t293 = call i64 @Parser__expect_ident(i64 %t292)
   store i64 %t293, i64* %lpname
@@ -35327,7 +35534,7 @@ while.body3305:
   %t302 = getelementptr [1 x i64], [1 x i64]* %t301, i64 0, i64 0
   store i64 4, i64* %t302
   %t303 = ptrtoint [1 x i64]* %t301 to i64
-  %t304 = getelementptr [7 x i8], [7 x i8]* @.str.1617, i64 0, i64 0
+  %t304 = getelementptr [7 x i8], [7 x i8]* @.str.1619, i64 0, i64 0
   %t305 = ptrtoint i8* %t304 to i64
   %t306 = call i64 @ast_span_none()
   %t307 = call i8* @__sf_malloc(i64 48)
@@ -35346,87 +35553,87 @@ while.body3305:
   store i64 %t306, i64* %t314
   %t315 = ptrtoint [6 x i64]* %t308 to i64
   %t316 = call i64 @__list_push(i64 %t294, i64 %t315)
-  br label %while.cond3304
-while.end3306:
+  br label %while.cond3315
+while.end3317:
   %t317 = load i64, i64* %self
-  %t318 = getelementptr [3 x i8], [3 x i8]* @.str.1618, i64 0, i64 0
+  %t318 = getelementptr [3 x i8], [3 x i8]* @.str.1620, i64 0, i64 0
   %t319 = ptrtoint i8* %t318 to i64
   %t320 = call i64 @Parser__consume(i64 %t317, i64 %t319)
   %t321 = call i64 @__list_new()
   store i64 %t321, i64* %lbody
-  br label %while.cond3307
-while.cond3307:
+  br label %while.cond3318
+while.cond3318:
   %t322 = load i64, i64* %self
-  %t323 = getelementptr [2 x i8], [2 x i8]* @.str.1619, i64 0, i64 0
+  %t323 = getelementptr [2 x i8], [2 x i8]* @.str.1621, i64 0, i64 0
   %t324 = ptrtoint i8* %t323 to i64
   %t325 = call i64 @Parser__match_kind_check(i64 %t322, i64 %t324)
   %t326 = xor i64 %t325, 1
   %t327 = trunc i64 %t326 to i1
-  br label %logic.entry3310
-logic.entry3310:
-  br i1 %t327, label %rhs3311, label %end3312
-rhs3311:
+  br label %logic.entry3321
+logic.entry3321:
+  br i1 %t327, label %rhs3322, label %end3323
+rhs3322:
   %t328 = load i64, i64* %self
-  %t329 = getelementptr [4 x i8], [4 x i8]* @.str.1620, i64 0, i64 0
+  %t329 = getelementptr [4 x i8], [4 x i8]* @.str.1622, i64 0, i64 0
   %t330 = ptrtoint i8* %t329 to i64
   %t331 = call i64 @Parser__match_kind_check(i64 %t328, i64 %t330)
   %t332 = xor i64 %t331, 1
   %t333 = trunc i64 %t332 to i1
-  br label %rhs.exit3313
-rhs.exit3313:
-  br label %end3312
-end3312:
-  %t334 = phi i1 [%t327, %logic.entry3310], [%t333, %rhs.exit3313]
+  br label %rhs.exit3324
+rhs.exit3324:
+  br label %end3323
+end3323:
+  %t334 = phi i1 [%t327, %logic.entry3321], [%t333, %rhs.exit3324]
   %t335 = zext i1 %t334 to i64
   %t336 = trunc i64 %t335 to i1
-  br i1 %t336, label %while.body3308, label %while.end3309
-while.body3308:
-  br label %while.cond3314
-while.cond3314:
+  br i1 %t336, label %while.body3319, label %while.end3320
+while.body3319:
+  br label %while.cond3325
+while.cond3325:
   %t337 = load i64, i64* %self
-  %t338 = getelementptr [2 x i8], [2 x i8]* @.str.1621, i64 0, i64 0
+  %t338 = getelementptr [2 x i8], [2 x i8]* @.str.1623, i64 0, i64 0
   %t339 = ptrtoint i8* %t338 to i64
   %t340 = call i64 @Parser__match_kind(i64 %t337, i64 %t339)
   %t341 = trunc i64 %t340 to i1
-  br i1 %t341, label %while.body3315, label %while.end3316
-while.body3315:
-  br label %while.cond3314
-while.end3316:
+  br i1 %t341, label %while.body3326, label %while.end3327
+while.body3326:
+  br label %while.cond3325
+while.end3327:
   %t342 = load i64, i64* %self
-  %t343 = getelementptr [2 x i8], [2 x i8]* @.str.1622, i64 0, i64 0
+  %t343 = getelementptr [2 x i8], [2 x i8]* @.str.1624, i64 0, i64 0
   %t344 = ptrtoint i8* %t343 to i64
   %t345 = call i64 @Parser__match_kind_check(i64 %t342, i64 %t344)
   %t346 = trunc i64 %t345 to i1
-  br label %logic.entry3318
-logic.entry3318:
-  br i1 %t346, label %end3320, label %rhs3319
-rhs3319:
+  br label %logic.entry3329
+logic.entry3329:
+  br i1 %t346, label %end3331, label %rhs3330
+rhs3330:
   %t347 = load i64, i64* %self
-  %t348 = getelementptr [4 x i8], [4 x i8]* @.str.1623, i64 0, i64 0
+  %t348 = getelementptr [4 x i8], [4 x i8]* @.str.1625, i64 0, i64 0
   %t349 = ptrtoint i8* %t348 to i64
   %t350 = call i64 @Parser__match_kind_check(i64 %t347, i64 %t349)
   %t351 = trunc i64 %t350 to i1
-  br label %rhs.exit3321
-rhs.exit3321:
-  br label %end3320
-end3320:
-  %t352 = phi i1 [%t346, %logic.entry3318], [%t351, %rhs.exit3321]
+  br label %rhs.exit3332
+rhs.exit3332:
+  br label %end3331
+end3331:
+  %t352 = phi i1 [%t346, %logic.entry3329], [%t351, %rhs.exit3332]
   %t353 = zext i1 %t352 to i64
   %t354 = trunc i64 %t353 to i1
-  br i1 %t354, label %then3322, label %else3323
-then3322:
-  br label %while.end3309
-else3323:
-  br label %endif3317
-endif3317:
+  br i1 %t354, label %then3333, label %else3334
+then3333:
+  br label %while.end3320
+else3334:
+  br label %endif3328
+endif3328:
   %t355 = load i64, i64* %lbody
   %t356 = load i64, i64* %self
   %t357 = call i64 @Parser__parse_stmt(i64 %t356)
   %t358 = call i64 @__list_push(i64 %t355, i64 %t357)
-  br label %while.cond3307
-while.end3309:
+  br label %while.cond3318
+while.end3320:
   %t359 = load i64, i64* %self
-  %t360 = getelementptr [2 x i8], [2 x i8]* @.str.1624, i64 0, i64 0
+  %t360 = getelementptr [2 x i8], [2 x i8]* @.str.1626, i64 0, i64 0
   %t361 = ptrtoint i8* %t360 to i64
   %t362 = call i64 @Parser__consume(i64 %t359, i64 %t361)
   %t363 = load i64, i64* %lbody
@@ -35435,8 +35642,8 @@ while.end3309:
   %t367 = icmp sgt i64 %t364, %t365
   %t366 = zext i1 %t367 to i64
   %t368 = trunc i64 %t366 to i1
-  br i1 %t368, label %then3325, label %else3326
-then3325:
+  br i1 %t368, label %then3336, label %else3337
+then3336:
   %t369 = load i64, i64* %lbody
   %t370 = load i64, i64* %lbody
   %t371 = call i64 @__list_length(i64 %t370)
@@ -35453,8 +35660,8 @@ then3325:
   %t382 = inttoptr i64 %t379 to i64*
   %t383 = load i64, i64* %t382
   %t381 = trunc i64 %t383 to i8
-  switch i8 %t381, label %match.arm3329 [ i8 0, label %match.arm3328 ]
-match.arm3328:
+  switch i8 %t381, label %match.arm3340 [ i8 0, label %match.arm3339 ]
+match.arm3339:
   %t384 = load i64, i64* %e
   %t385 = inttoptr i64 %t379 to [2 x i64]*
   %t386 = getelementptr [2 x i64], [2 x i64]* %t385, i64 0, i64 1
@@ -35463,25 +35670,25 @@ match.arm3328:
   %t388 = add i64 0, 1
   store i64 %t388, i64* %t380
   store i64 %t384, i64* %e
-  br label %match.end3327
-match.arm3329:
+  br label %match.end3338
+match.arm3340:
   %t389 = add i64 0, 0
   store i64 %t389, i64* %t380
-  br label %match.end3327
-match.end3327:
+  br label %match.end3338
+match.end3338:
   %t390 = load i64, i64* %t380
   store i64 %t390, i64* %kis_expr
   %t391 = load i64, i64* %kis_expr
   %t392 = trunc i64 %t391 to i1
-  br i1 %t392, label %then3331, label %else3332
-then3331:
+  br i1 %t392, label %then3342, label %else3343
+then3342:
   %t393 = load i64, i64* %klast
   %t394 = alloca i64
   %t396 = inttoptr i64 %t393 to i64*
   %t397 = load i64, i64* %t396
   %t395 = trunc i64 %t397 to i8
-  switch i8 %t395, label %match.arm3335 [ i8 0, label %match.arm3334 ]
-match.arm3334:
+  switch i8 %t395, label %match.arm3346 [ i8 0, label %match.arm3345 ]
+match.arm3345:
   %t398 = load i64, i64* %e
   %t399 = inttoptr i64 %t393 to [2 x i64]*
   %t400 = getelementptr [2 x i64], [2 x i64]* %t399, i64 0, i64 1
@@ -35490,16 +35697,16 @@ match.arm3334:
   %t402 = load i64, i64* %e
   store i64 %t402, i64* %t394
   store i64 %t398, i64* %e
-  br label %match.end3333
-match.arm3335:
+  br label %match.end3344
+match.arm3346:
   %t403 = call i8* @__sf_malloc(i64 8)
   %t404 = bitcast i8* %t403 to [1 x i64]*
   %t405 = getelementptr [1 x i64], [1 x i64]* %t404, i64 0, i64 0
   store i64 4, i64* %t405
   %t406 = ptrtoint [1 x i64]* %t404 to i64
   store i64 %t406, i64* %t394
-  br label %match.end3333
-match.end3333:
+  br label %match.end3344
+match.end3344:
   %t407 = load i64, i64* %t394
   store i64 %t407, i64* %kexpr
   %t408 = load i64, i64* %lbody
@@ -35516,14 +35723,14 @@ match.end3333:
   store i64 %t413, i64* %t417
   %t418 = ptrtoint [2 x i64]* %t415 to i64
   %t419 = call i64 @__list_set(i64 %t408, i64 %t412, i64 %t418)
-  br label %endif3330
-else3332:
-  br label %endif3330
-endif3330:
-  br label %endif3324
-else3326:
-  br label %endif3324
-endif3324:
+  br label %endif3341
+else3343:
+  br label %endif3341
+endif3341:
+  br label %endif3335
+else3337:
+  br label %endif3335
+endif3335:
   %t420 = load i64, i64* %self
   %t421 = load i64, i64* %saved_depth
   %t422 = inttoptr i64 %t420 to %Parser*
@@ -35548,40 +35755,40 @@ endif3324:
   store i64 %t429, i64* %t435
   %t436 = ptrtoint [4 x i64]* %t431 to i64
   ret i64 %t436
-else3303:
+else3314:
   %t437 = load i64, i64* %self
   %t438 = load i64, i64* %kl_before
   %t439 = inttoptr i64 %t437 to %Parser*
   %t440 = getelementptr %Parser, %Parser* %t439, i32 0, i32 1
   store volatile i64 %t438, i64* %t440
-  br label %endif3270
-endif3270:
-  br label %endif3267
-else3269:
-  br label %endif3267
-endif3267:
+  br label %endif3281
+endif3281:
+  br label %endif3278
+else3280:
+  br label %endif3278
+endif3278:
   %t441 = load i64, i64* %self
   %t442 = call i64 @Parser__is_map_key_start(i64 %t441)
   %t443 = trunc i64 %t442 to i1
-  br label %logic.entry3337
-logic.entry3337:
-  br i1 %t443, label %rhs3338, label %end3339
-rhs3338:
+  br label %logic.entry3348
+logic.entry3348:
+  br i1 %t443, label %rhs3349, label %end3350
+rhs3349:
   %t444 = load i64, i64* %self
-  %t445 = getelementptr [2 x i8], [2 x i8]* @.str.1625, i64 0, i64 0
+  %t445 = getelementptr [2 x i8], [2 x i8]* @.str.1627, i64 0, i64 0
   %t446 = ptrtoint i8* %t445 to i64
   %t447 = call i64 @Parser__peek_is(i64 %t444, i64 %t446)
   %t448 = trunc i64 %t447 to i1
-  br label %rhs.exit3340
-rhs.exit3340:
-  br label %end3339
-end3339:
-  %t449 = phi i1 [%t443, %logic.entry3337], [%t448, %rhs.exit3340]
+  br label %rhs.exit3351
+rhs.exit3351:
+  br label %end3350
+end3350:
+  %t449 = phi i1 [%t443, %logic.entry3348], [%t448, %rhs.exit3351]
   %t450 = zext i1 %t449 to i64
   %t451 = trunc i64 %t450 to i1
-  br i1 %t451, label %then3341, label %else3342
-then3341:
-  %t452 = getelementptr [6 x i8], [6 x i8]* @.str.1626, i64 0, i64 0
+  br i1 %t451, label %then3352, label %else3353
+then3352:
+  %t452 = getelementptr [6 x i8], [6 x i8]* @.str.1628, i64 0, i64 0
   %t453 = ptrtoint i8* %t452 to i64
   %t454 = load i64, i64* %self
   %t455 = call i64 @Parser__next_map_uid(i64 %t454)
@@ -35603,7 +35810,7 @@ then3341:
   store i64 %t467, i64* %map_stmts
   %t468 = load i64, i64* %map_stmts
   %t469 = load i64, i64* %mvar
-  %t470 = getelementptr [4 x i8], [4 x i8]* @.str.1627, i64 0, i64 0
+  %t470 = getelementptr [4 x i8], [4 x i8]* @.str.1629, i64 0, i64 0
   %t471 = ptrtoint i8* %t470 to i64
   %t472 = call i8* @__sf_malloc(i64 16)
   %t473 = bitcast i8* %t472 to [2 x i64]*
@@ -35617,9 +35824,9 @@ then3341:
   %t479 = getelementptr [1 x i64], [1 x i64]* %t478, i64 0, i64 0
   store i64 22, i64* %t479
   %t480 = ptrtoint [1 x i64]* %t478 to i64
-  %t481 = getelementptr [1 x i8], [1 x i8]* @.str.1628, i64 0, i64 0
+  %t481 = getelementptr [1 x i8], [1 x i8]* @.str.1630, i64 0, i64 0
   %t482 = ptrtoint i8* %t481 to i64
-  %t483 = getelementptr [7 x i8], [7 x i8]* @.str.1629, i64 0, i64 0
+  %t483 = getelementptr [7 x i8], [7 x i8]* @.str.1631, i64 0, i64 0
   %t484 = ptrtoint i8* %t483 to i64
   %t485 = call i64 @ast_span_none()
   %t486 = call i64 @ast_span_none()
@@ -35647,7 +35854,7 @@ then3341:
   %t500 = call i64 @Parser__parse_map_key(i64 %t499)
   store i64 %t500, i64* %key
   %t501 = load i64, i64* %self
-  %t502 = getelementptr [2 x i8], [2 x i8]* @.str.1630, i64 0, i64 0
+  %t502 = getelementptr [2 x i8], [2 x i8]* @.str.1632, i64 0, i64 0
   %t503 = ptrtoint i8* %t502 to i64
   %t504 = call i64 @Parser__consume(i64 %t501, i64 %t503)
   %t505 = load i64, i64* %self
@@ -35665,7 +35872,7 @@ then3341:
   %t514 = getelementptr [3 x i64], [3 x i64]* %t511, i64 0, i64 2
   store i64 %t509, i64* %t514
   %t515 = ptrtoint [3 x i64]* %t511 to i64
-  %t516 = getelementptr [4 x i8], [4 x i8]* @.str.1631, i64 0, i64 0
+  %t516 = getelementptr [4 x i8], [4 x i8]* @.str.1633, i64 0, i64 0
   %t517 = ptrtoint i8* %t516 to i64
   %t518 = call i64 @__list_new()
   %t519 = load i64, i64* %key
@@ -35694,31 +35901,31 @@ then3341:
   store i64 %t531, i64* %t535
   %t536 = ptrtoint [2 x i64]* %t533 to i64
   %t537 = call i64 @__list_push(i64 %t507, i64 %t536)
-  br label %while.cond3343
-while.cond3343:
+  br label %while.cond3354
+while.cond3354:
   %t538 = load i64, i64* %self
-  %t539 = getelementptr [2 x i8], [2 x i8]* @.str.1632, i64 0, i64 0
+  %t539 = getelementptr [2 x i8], [2 x i8]* @.str.1634, i64 0, i64 0
   %t540 = ptrtoint i8* %t539 to i64
   %t541 = call i64 @Parser__match_kind(i64 %t538, i64 %t540)
   %t542 = trunc i64 %t541 to i1
-  br i1 %t542, label %while.body3344, label %while.end3345
-while.body3344:
+  br i1 %t542, label %while.body3355, label %while.end3356
+while.body3355:
   %t543 = load i64, i64* %self
-  %t544 = getelementptr [2 x i8], [2 x i8]* @.str.1633, i64 0, i64 0
+  %t544 = getelementptr [2 x i8], [2 x i8]* @.str.1635, i64 0, i64 0
   %t545 = ptrtoint i8* %t544 to i64
   %t546 = call i64 @Parser__match_kind_check(i64 %t543, i64 %t545)
   %t547 = trunc i64 %t546 to i1
-  br i1 %t547, label %then3347, label %else3348
-then3347:
-  br label %while.end3345
-else3348:
-  br label %endif3346
-endif3346:
+  br i1 %t547, label %then3358, label %else3359
+then3358:
+  br label %while.end3356
+else3359:
+  br label %endif3357
+endif3357:
   %t548 = load i64, i64* %self
   %t549 = call i64 @Parser__parse_map_key(i64 %t548)
   store i64 %t549, i64* %k
   %t550 = load i64, i64* %self
-  %t551 = getelementptr [2 x i8], [2 x i8]* @.str.1634, i64 0, i64 0
+  %t551 = getelementptr [2 x i8], [2 x i8]* @.str.1636, i64 0, i64 0
   %t552 = ptrtoint i8* %t551 to i64
   %t553 = call i64 @Parser__consume(i64 %t550, i64 %t552)
   %t554 = load i64, i64* %self
@@ -35736,7 +35943,7 @@ endif3346:
   %t563 = getelementptr [3 x i64], [3 x i64]* %t560, i64 0, i64 2
   store i64 %t558, i64* %t563
   %t564 = ptrtoint [3 x i64]* %t560 to i64
-  %t565 = getelementptr [4 x i8], [4 x i8]* @.str.1635, i64 0, i64 0
+  %t565 = getelementptr [4 x i8], [4 x i8]* @.str.1637, i64 0, i64 0
   %t566 = ptrtoint i8* %t565 to i64
   %t567 = call i64 @__list_new()
   %t568 = load i64, i64* %k
@@ -35765,10 +35972,10 @@ endif3346:
   store i64 %t580, i64* %t584
   %t585 = ptrtoint [2 x i64]* %t582 to i64
   %t586 = call i64 @__list_push(i64 %t556, i64 %t585)
-  br label %while.cond3343
-while.end3345:
+  br label %while.cond3354
+while.end3356:
   %t587 = load i64, i64* %self
-  %t588 = getelementptr [2 x i8], [2 x i8]* @.str.1636, i64 0, i64 0
+  %t588 = getelementptr [2 x i8], [2 x i8]* @.str.1638, i64 0, i64 0
   %t589 = ptrtoint i8* %t588 to i64
   %t590 = call i64 @Parser__consume(i64 %t587, i64 %t589)
   %t591 = load i64, i64* %self
@@ -35798,14 +36005,14 @@ while.end3345:
   store i64 %t603, i64* %t608
   %t609 = ptrtoint [3 x i64]* %t605 to i64
   ret i64 %t609
-else3342:
-  br label %endif3336
-endif3336:
+else3353:
+  br label %endif3347
+endif3347:
   %t610 = load i64, i64* %self
   %t611 = call i64 @Parser__parse_expr(i64 %t610)
   store i64 %t611, i64* %expr
   %t612 = load i64, i64* %self
-  %t613 = getelementptr [2 x i8], [2 x i8]* @.str.1637, i64 0, i64 0
+  %t613 = getelementptr [2 x i8], [2 x i8]* @.str.1639, i64 0, i64 0
   %t614 = ptrtoint i8* %t613 to i64
   %t615 = call i64 @Parser__consume(i64 %t612, i64 %t614)
   %t616 = load i64, i64* %self
@@ -35815,9 +36022,9 @@ endif3336:
   store volatile i64 %t617, i64* %t619
   %t620 = load i64, i64* %expr
   ret i64 %t620
-else3253:
-  br label %endif3251
-endif3251:
+else3264:
+  br label %endif3262
+endif3262:
   %t621 = load i64, i64* %self
   %t622 = call i64 @Parser__parse_call(i64 %t621)
   ret i64 %t622
@@ -35865,59 +36072,59 @@ entry:
   %t9 = inttoptr i64 %t2 to %Parser*
   %t10 = getelementptr %Parser, %Parser* %t9, i32 0, i32 5
   store volatile i64 %t8, i64* %t10
-  br label %while.cond3349
-while.cond3349:
+  br label %while.cond3360
+while.cond3360:
   %t11 = load i64, i64* %self
-  %t12 = getelementptr [4 x i8], [4 x i8]* @.str.1638, i64 0, i64 0
+  %t12 = getelementptr [4 x i8], [4 x i8]* @.str.1640, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   %t14 = call i64 @Parser__match_kind_check(i64 %t11, i64 %t13)
   %t15 = xor i64 %t14, 1
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %while.body3350, label %while.end3351
-while.body3350:
+  br i1 %t16, label %while.body3361, label %while.end3362
+while.body3361:
   %t17 = load i64, i64* %self
-  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.1639, i64 0, i64 0
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.1641, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = call i64 @Parser__match_kind_check(i64 %t17, i64 %t19)
   %t21 = trunc i64 %t20 to i1
-  br label %logic.entry3353
-logic.entry3353:
-  br i1 %t21, label %rhs3354, label %end3355
-rhs3354:
+  br label %logic.entry3364
+logic.entry3364:
+  br i1 %t21, label %rhs3365, label %end3366
+rhs3365:
   %t22 = load i64, i64* %self
-  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.1640, i64 0, i64 0
+  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.1642, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   %t25 = call i64 @Parser__peek_is(i64 %t22, i64 %t24)
   %t26 = trunc i64 %t25 to i1
-  br label %rhs.exit3356
-rhs.exit3356:
-  br label %end3355
-end3355:
-  %t27 = phi i1 [%t21, %logic.entry3353], [%t26, %rhs.exit3356]
+  br label %rhs.exit3367
+rhs.exit3367:
+  br label %end3366
+end3366:
+  %t27 = phi i1 [%t21, %logic.entry3364], [%t26, %rhs.exit3367]
   %t28 = zext i1 %t27 to i64
   %t29 = trunc i64 %t28 to i1
-  br i1 %t29, label %then3357, label %else3358
-then3357:
+  br i1 %t29, label %then3368, label %else3369
+then3368:
   %t30 = load i64, i64* %self
   %t31 = call i64 @Parser__advance(i64 %t30)
   %t32 = load i64, i64* %self
   %t33 = call i64 @Parser__advance(i64 %t32)
   %t34 = load i64, i64* %self
-  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.1641, i64 0, i64 0
+  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.1643, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = call i64 @Parser__match_kind_check(i64 %t34, i64 %t36)
   %t38 = xor i64 %t37, 1
   %t39 = trunc i64 %t38 to i1
-  br i1 %t39, label %then3360, label %else3361
-then3360:
+  br i1 %t39, label %then3371, label %else3372
+then3371:
   %t40 = load i64, i64* %self
   %t41 = call i64 @Parser__expect_ident(i64 %t40)
-  br label %endif3359
-else3361:
-  br label %endif3359
-endif3359:
+  br label %endif3370
+else3372:
+  br label %endif3370
+endif3370:
   %t42 = load i64, i64* %self
-  %t43 = getelementptr [2 x i8], [2 x i8]* @.str.1642, i64 0, i64 0
+  %t43 = getelementptr [2 x i8], [2 x i8]* @.str.1644, i64 0, i64 0
   %t44 = ptrtoint i8* %t43 to i64
   %t45 = call i64 @Parser__consume(i64 %t42, i64 %t44)
   %t46 = load i64, i64* %self
@@ -35932,32 +36139,32 @@ endif3359:
   store volatile i64 %t52, i64* %t54
   %t55 = load i64, i64* %stmts
   ret i64 %t55
-else3358:
-  br label %endif3352
-endif3352:
+else3369:
+  br label %endif3363
+endif3363:
   %t56 = load i64, i64* %self
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1643, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.1645, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i64 @Parser__match_kind_check(i64 %t56, i64 %t58)
   %t60 = trunc i64 %t59 to i1
-  br label %logic.entry3363
-logic.entry3363:
-  br i1 %t60, label %rhs3364, label %end3365
-rhs3364:
+  br label %logic.entry3374
+logic.entry3374:
+  br i1 %t60, label %rhs3375, label %end3376
+rhs3375:
   %t61 = load i64, i64* %self
-  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.1644, i64 0, i64 0
+  %t62 = getelementptr [2 x i8], [2 x i8]* @.str.1646, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
   %t64 = call i64 @Parser__peek_is(i64 %t61, i64 %t63)
   %t65 = trunc i64 %t64 to i1
-  br label %rhs.exit3366
-rhs.exit3366:
-  br label %end3365
-end3365:
-  %t66 = phi i1 [%t60, %logic.entry3363], [%t65, %rhs.exit3366]
+  br label %rhs.exit3377
+rhs.exit3377:
+  br label %end3376
+end3376:
+  %t66 = phi i1 [%t60, %logic.entry3374], [%t65, %rhs.exit3377]
   %t67 = zext i1 %t66 to i64
   %t68 = trunc i64 %t67 to i1
-  br i1 %t68, label %then3367, label %else3368
-then3367:
+  br i1 %t68, label %then3378, label %else3379
+then3378:
   %t69 = load i64, i64* %self
   %t70 = call i64 @Parser__parse_html_fragment(i64 %t69)
   store i64 %t70, i64* %child
@@ -35971,31 +36178,31 @@ then3367:
   store i64 %t72, i64* %t76
   %t77 = ptrtoint [2 x i64]* %t74 to i64
   %t78 = call i64 @__list_push(i64 %t71, i64 %t77)
-  br label %endif3362
-else3368:
+  br label %endif3373
+else3379:
   %t79 = load i64, i64* %self
-  %t80 = getelementptr [2 x i8], [2 x i8]* @.str.1645, i64 0, i64 0
+  %t80 = getelementptr [2 x i8], [2 x i8]* @.str.1647, i64 0, i64 0
   %t81 = ptrtoint i8* %t80 to i64
   %t82 = call i64 @Parser__match_kind_check(i64 %t79, i64 %t81)
   %t83 = trunc i64 %t82 to i1
-  br label %logic.entry3369
-logic.entry3369:
-  br i1 %t83, label %rhs3370, label %end3371
-rhs3370:
+  br label %logic.entry3380
+logic.entry3380:
+  br i1 %t83, label %rhs3381, label %end3382
+rhs3381:
   %t84 = load i64, i64* %self
-  %t85 = getelementptr [6 x i8], [6 x i8]* @.str.1646, i64 0, i64 0
+  %t85 = getelementptr [6 x i8], [6 x i8]* @.str.1648, i64 0, i64 0
   %t86 = ptrtoint i8* %t85 to i64
   %t87 = call i64 @Parser__peek_is(i64 %t84, i64 %t86)
   %t88 = trunc i64 %t87 to i1
-  br label %rhs.exit3372
-rhs.exit3372:
-  br label %end3371
-end3371:
-  %t89 = phi i1 [%t83, %logic.entry3369], [%t88, %rhs.exit3372]
+  br label %rhs.exit3383
+rhs.exit3383:
+  br label %end3382
+end3382:
+  %t89 = phi i1 [%t83, %logic.entry3380], [%t88, %rhs.exit3383]
   %t90 = zext i1 %t89 to i64
   %t91 = trunc i64 %t90 to i1
-  br i1 %t91, label %then3373, label %else3374
-then3373:
+  br i1 %t91, label %then3384, label %else3385
+then3384:
   %t92 = load i64, i64* %self
   %t93 = call i64 @Parser__parse_html_element(i64 %t92)
   store i64 %t93, i64* %child
@@ -36009,15 +36216,15 @@ then3373:
   store i64 %t95, i64* %t99
   %t100 = ptrtoint [2 x i64]* %t97 to i64
   %t101 = call i64 @__list_push(i64 %t94, i64 %t100)
-  br label %endif3362
-else3374:
+  br label %endif3373
+else3385:
   %t102 = load i64, i64* %self
-  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.1647, i64 0, i64 0
+  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.1649, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   %t105 = call i64 @Parser__match_kind_check(i64 %t102, i64 %t104)
   %t106 = trunc i64 %t105 to i1
-  br i1 %t106, label %then3375, label %else3376
-then3375:
+  br i1 %t106, label %then3386, label %else3387
+then3386:
   %t107 = load i64, i64* %self
   %t108 = call i64 @Parser__advance(i64 %t107)
   %t109 = load i64, i64* %self
@@ -36032,79 +36239,79 @@ then3375:
   store volatile i64 %t114, i64* %t116
   %t117 = call i64 @__list_new()
   store i64 %t117, i64* %interp_stmts
-  br label %while.cond3377
-while.cond3377:
+  br label %while.cond3388
+while.cond3388:
   %t118 = load i64, i64* %self
-  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.1648, i64 0, i64 0
+  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.1650, i64 0, i64 0
   %t120 = ptrtoint i8* %t119 to i64
   %t121 = call i64 @Parser__match_kind_check(i64 %t118, i64 %t120)
   %t122 = xor i64 %t121, 1
   %t123 = trunc i64 %t122 to i1
-  br label %logic.entry3380
-logic.entry3380:
-  br i1 %t123, label %rhs3381, label %end3382
-rhs3381:
+  br label %logic.entry3391
+logic.entry3391:
+  br i1 %t123, label %rhs3392, label %end3393
+rhs3392:
   %t124 = load i64, i64* %self
-  %t125 = getelementptr [4 x i8], [4 x i8]* @.str.1649, i64 0, i64 0
+  %t125 = getelementptr [4 x i8], [4 x i8]* @.str.1651, i64 0, i64 0
   %t126 = ptrtoint i8* %t125 to i64
   %t127 = call i64 @Parser__match_kind_check(i64 %t124, i64 %t126)
   %t128 = xor i64 %t127, 1
   %t129 = trunc i64 %t128 to i1
-  br label %rhs.exit3383
-rhs.exit3383:
-  br label %end3382
-end3382:
-  %t130 = phi i1 [%t123, %logic.entry3380], [%t129, %rhs.exit3383]
+  br label %rhs.exit3394
+rhs.exit3394:
+  br label %end3393
+end3393:
+  %t130 = phi i1 [%t123, %logic.entry3391], [%t129, %rhs.exit3394]
   %t131 = zext i1 %t130 to i64
   %t132 = trunc i64 %t131 to i1
-  br i1 %t132, label %while.body3378, label %while.end3379
-while.body3378:
-  br label %while.cond3384
-while.cond3384:
+  br i1 %t132, label %while.body3389, label %while.end3390
+while.body3389:
+  br label %while.cond3395
+while.cond3395:
   %t133 = load i64, i64* %self
-  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1650, i64 0, i64 0
+  %t134 = getelementptr [2 x i8], [2 x i8]* @.str.1652, i64 0, i64 0
   %t135 = ptrtoint i8* %t134 to i64
   %t136 = call i64 @Parser__match_kind(i64 %t133, i64 %t135)
   %t137 = trunc i64 %t136 to i1
-  br i1 %t137, label %while.body3385, label %while.end3386
-while.body3385:
-  br label %while.cond3384
-while.end3386:
+  br i1 %t137, label %while.body3396, label %while.end3397
+while.body3396:
+  br label %while.cond3395
+while.end3397:
   %t138 = load i64, i64* %self
-  %t139 = getelementptr [2 x i8], [2 x i8]* @.str.1651, i64 0, i64 0
+  %t139 = getelementptr [2 x i8], [2 x i8]* @.str.1653, i64 0, i64 0
   %t140 = ptrtoint i8* %t139 to i64
   %t141 = call i64 @Parser__match_kind_check(i64 %t138, i64 %t140)
   %t142 = trunc i64 %t141 to i1
-  br label %logic.entry3388
-logic.entry3388:
-  br i1 %t142, label %end3390, label %rhs3389
-rhs3389:
+  br label %logic.entry3399
+logic.entry3399:
+  br i1 %t142, label %end3401, label %rhs3400
+rhs3400:
   %t143 = load i64, i64* %self
-  %t144 = getelementptr [4 x i8], [4 x i8]* @.str.1652, i64 0, i64 0
+  %t144 = getelementptr [4 x i8], [4 x i8]* @.str.1654, i64 0, i64 0
   %t145 = ptrtoint i8* %t144 to i64
   %t146 = call i64 @Parser__match_kind_check(i64 %t143, i64 %t145)
   %t147 = trunc i64 %t146 to i1
-  br label %rhs.exit3391
-rhs.exit3391:
-  br label %end3390
-end3390:
-  %t148 = phi i1 [%t142, %logic.entry3388], [%t147, %rhs.exit3391]
+  br label %rhs.exit3402
+rhs.exit3402:
+  br label %end3401
+end3401:
+  %t148 = phi i1 [%t142, %logic.entry3399], [%t147, %rhs.exit3402]
   %t149 = zext i1 %t148 to i64
   %t150 = trunc i64 %t149 to i1
-  br i1 %t150, label %then3392, label %else3393
-then3392:
-  br label %while.end3379
-else3393:
-  br label %endif3387
-endif3387:
+  br i1 %t150, label %then3403, label %else3404
+then3403:
+  br label %while.end3390
+else3404:
+  br label %endif3398
+endif3398:
   %t151 = load i64, i64* %interp_stmts
   %t152 = load i64, i64* %self
   %t153 = call i64 @Parser__parse_stmt(i64 %t152)
   %t154 = call i64 @__list_push(i64 %t151, i64 %t153)
-  br label %while.cond3377
-while.end3379:
+  br label %while.cond3388
+while.end3390:
   %t155 = load i64, i64* %self
-  %t156 = getelementptr [2 x i8], [2 x i8]* @.str.1653, i64 0, i64 0
+  %t156 = getelementptr [2 x i8], [2 x i8]* @.str.1655, i64 0, i64 0
   %t157 = ptrtoint i8* %t156 to i64
   %t158 = call i64 @Parser__consume(i64 %t155, i64 %t157)
   %t159 = load i64, i64* %self
@@ -36118,8 +36325,8 @@ while.end3379:
   %t166 = icmp eq i64 %t164, %t165
   %t167 = zext i1 %t166 to i64
   %t168 = trunc i64 %t167 to i1
-  br i1 %t168, label %then3395, label %else3396
-then3395:
+  br i1 %t168, label %then3406, label %else3407
+then3406:
   %t169 = load i64, i64* %interp_stmts
   %t170 = add i64 0, 0
   %t171 = icmp slt i64 %t170, 0
@@ -36131,8 +36338,8 @@ then3395:
   %t178 = inttoptr i64 %t175 to i64*
   %t179 = load i64, i64* %t178
   %t177 = trunc i64 %t179 to i8
-  switch i8 %t177, label %match.arm3399 [ i8 0, label %match.arm3398 ]
-match.arm3398:
+  switch i8 %t177, label %match.arm3410 [ i8 0, label %match.arm3409 ]
+match.arm3409:
   %t180 = load i64, i64* %e
   %t181 = inttoptr i64 %t175 to [2 x i64]*
   %t182 = getelementptr [2 x i64], [2 x i64]* %t181, i64 0, i64 1
@@ -36141,18 +36348,18 @@ match.arm3398:
   %t184 = add i64 0, 1
   store i64 %t184, i64* %t176
   store i64 %t180, i64* %e
-  br label %match.end3397
-match.arm3399:
+  br label %match.end3408
+match.arm3410:
   %t185 = add i64 0, 0
   store i64 %t185, i64* %t176
-  br label %match.end3397
-match.end3397:
+  br label %match.end3408
+match.end3408:
   %t186 = load i64, i64* %t176
   store i64 %t186, i64* %interp_is_expr
   %t187 = load i64, i64* %interp_is_expr
   %t188 = trunc i64 %t187 to i1
-  br i1 %t188, label %then3401, label %else3402
-then3401:
+  br i1 %t188, label %then3412, label %else3413
+then3412:
   %t189 = load i64, i64* %interp_stmts
   %t190 = add i64 0, 0
   %t191 = icmp slt i64 %t190, 0
@@ -36164,8 +36371,8 @@ then3401:
   %t198 = inttoptr i64 %t195 to i64*
   %t199 = load i64, i64* %t198
   %t197 = trunc i64 %t199 to i8
-  switch i8 %t197, label %match.arm3405 [ i8 0, label %match.arm3404 ]
-match.arm3404:
+  switch i8 %t197, label %match.arm3416 [ i8 0, label %match.arm3415 ]
+match.arm3415:
   %t200 = load i64, i64* %e
   %t201 = inttoptr i64 %t195 to [2 x i64]*
   %t202 = getelementptr [2 x i64], [2 x i64]* %t201, i64 0, i64 1
@@ -36174,16 +36381,16 @@ match.arm3404:
   %t204 = load i64, i64* %e
   store i64 %t204, i64* %t196
   store i64 %t200, i64* %e
-  br label %match.end3403
-match.arm3405:
+  br label %match.end3414
+match.arm3416:
   %t205 = call i8* @__sf_malloc(i64 8)
   %t206 = bitcast i8* %t205 to [1 x i64]*
   %t207 = getelementptr [1 x i64], [1 x i64]* %t206, i64 0, i64 0
   store i64 4, i64* %t207
   %t208 = ptrtoint [1 x i64]* %t206 to i64
   store i64 %t208, i64* %t196
-  br label %match.end3403
-match.end3403:
+  br label %match.end3414
+match.end3414:
   %t209 = load i64, i64* %t196
   store i64 %t209, i64* %interp_expr
   %t210 = load i64, i64* %interp_expr
@@ -36191,8 +36398,8 @@ match.end3403:
   %t213 = inttoptr i64 %t210 to i64*
   %t214 = load i64, i64* %t213
   %t212 = trunc i64 %t214 to i8
-  switch i8 %t212, label %match.arm3410 [ i8 8, label %match.arm3407 i8 21, label %match.arm3408 i8 9, label %match.arm3409 ]
-match.arm3407:
+  switch i8 %t212, label %match.arm3421 [ i8 8, label %match.arm3418 i8 21, label %match.arm3419 i8 9, label %match.arm3420 ]
+match.arm3418:
   %t215 = load i64, i64* %c
   %t216 = load i64, i64* %a
   %t217 = load i64, i64* %__cs
@@ -36211,8 +36418,8 @@ match.arm3407:
   store i64 %t215, i64* %c
   store i64 %t216, i64* %a
   store i64 %t217, i64* %__cs
-  br label %match.end3406
-match.arm3408:
+  br label %match.end3417
+match.arm3419:
   %t226 = load i64, i64* %o
   %t227 = load i64, i64* %m
   %t228 = load i64, i64* %a
@@ -36236,8 +36443,8 @@ match.arm3408:
   store i64 %t227, i64* %m
   store i64 %t228, i64* %a
   store i64 %t229, i64* %__ks
-  br label %match.end3406
-match.arm3409:
+  br label %match.end3417
+match.arm3420:
   %t240 = load i64, i64* %n
   %t241 = load i64, i64* %v
   %t242 = load i64, i64* %__as
@@ -36256,21 +36463,21 @@ match.arm3409:
   store i64 %t240, i64* %n
   store i64 %t241, i64* %v
   store i64 %t242, i64* %__as
-  br label %match.end3406
-match.arm3410:
+  br label %match.end3417
+match.arm3421:
   %t251 = add i64 0, 0
   store i64 %t251, i64* %t211
-  br label %match.end3406
-match.end3406:
+  br label %match.end3417
+match.end3417:
   %t252 = load i64, i64* %t211
   store i64 %t252, i64* %interp_skip
   %t253 = load i64, i64* %interp_skip
   %t254 = xor i64 %t253, 1
   %t255 = trunc i64 %t254 to i1
-  br i1 %t255, label %then3412, label %else3413
-then3412:
+  br i1 %t255, label %then3423, label %else3424
+then3423:
   %t256 = load i64, i64* %stmts
-  %t257 = getelementptr [5 x i8], [5 x i8]* @.str.1654, i64 0, i64 0
+  %t257 = getelementptr [5 x i8], [5 x i8]* @.str.1656, i64 0, i64 0
   %t258 = ptrtoint i8* %t257 to i64
   %t259 = call i64 @ast_span_none()
   %t260 = call i8* @__sf_malloc(i64 24)
@@ -36305,8 +36512,8 @@ then3412:
   store i64 %t276, i64* %t280
   %t281 = ptrtoint [2 x i64]* %t278 to i64
   %t282 = call i64 @__list_push(i64 %t256, i64 %t281)
-  br label %endif3411
-else3413:
+  br label %endif3422
+else3424:
   %t283 = load i64, i64* %stmts
   %t284 = load i64, i64* %interp_stmts
   %t285 = add i64 0, 0
@@ -36316,10 +36523,10 @@ else3413:
   %t289 = select i1 %t286, i64 %t288, i64 %t285
   %t290 = call i64 @__list_get(i64 %t284, i64 %t289)
   %t291 = call i64 @__list_push(i64 %t283, i64 %t290)
+  br label %endif3422
+endif3422:
   br label %endif3411
-endif3411:
-  br label %endif3400
-else3402:
+else3413:
   %t292 = load i64, i64* %stmts
   %t293 = load i64, i64* %interp_stmts
   %t294 = add i64 0, 0
@@ -36329,22 +36536,22 @@ else3402:
   %t298 = select i1 %t295, i64 %t297, i64 %t294
   %t299 = call i64 @__list_get(i64 %t293, i64 %t298)
   %t300 = call i64 @__list_push(i64 %t292, i64 %t299)
-  br label %endif3400
-endif3400:
-  br label %endif3394
-else3396:
+  br label %endif3411
+endif3411:
+  br label %endif3405
+else3407:
   %t301 = add i64 0, 0
   store i64 %t301, i64* %interp_i
-  br label %while.cond3414
-while.cond3414:
+  br label %while.cond3425
+while.cond3425:
   %t302 = load i64, i64* %interp_i
   %t303 = load i64, i64* %interp_stmts
   %t304 = call i64 @__list_length(i64 %t303)
   %t306 = icmp slt i64 %t302, %t304
   %t305 = zext i1 %t306 to i64
   %t307 = trunc i64 %t305 to i1
-  br i1 %t307, label %while.body3415, label %while.end3416
-while.body3415:
+  br i1 %t307, label %while.body3426, label %while.end3427
+while.body3426:
   %t308 = load i64, i64* %stmts
   %t309 = load i64, i64* %interp_stmts
   %t310 = load i64, i64* %interp_i
@@ -36358,19 +36565,19 @@ while.body3415:
   %t318 = add i64 0, 1
   %t319 = add i64 %t317, %t318
   store i64 %t319, i64* %interp_i
-  br label %while.cond3414
-while.end3416:
-  br label %endif3394
-endif3394:
-  br label %endif3362
-else3376:
+  br label %while.cond3425
+while.end3427:
+  br label %endif3405
+endif3405:
+  br label %endif3373
+else3387:
   %t320 = load i64, i64* %self
-  %t321 = getelementptr [7 x i8], [7 x i8]* @.str.1655, i64 0, i64 0
+  %t321 = getelementptr [7 x i8], [7 x i8]* @.str.1657, i64 0, i64 0
   %t322 = ptrtoint i8* %t321 to i64
   %t323 = call i64 @Parser__match_kind_check(i64 %t320, i64 %t322)
   %t324 = trunc i64 %t323 to i1
-  br i1 %t324, label %then3417, label %else3418
-then3417:
+  br i1 %t324, label %then3428, label %else3429
+then3428:
   %t325 = load i64, i64* %self
   %t326 = call i64 @Parser__current_kind(i64 %t325)
   store i64 %t326, i64* %kind
@@ -36381,8 +36588,8 @@ then3417:
   %t332 = inttoptr i64 %t329 to i64*
   %t333 = load i64, i64* %t332
   %t331 = trunc i64 %t333 to i8
-  switch i8 %t331, label %match.arm3421 [ i8 2, label %match.arm3420 ]
-match.arm3420:
+  switch i8 %t331, label %match.arm3432 [ i8 2, label %match.arm3431 ]
+match.arm3431:
   %t334 = load i64, i64* %s
   %t335 = inttoptr i64 %t329 to [2 x i64]*
   %t336 = getelementptr [2 x i64], [2 x i64]* %t335, i64 0, i64 1
@@ -36391,17 +36598,17 @@ match.arm3420:
   %t338 = load i64, i64* %s
   store i64 %t338, i64* %t330
   store i64 %t334, i64* %s
-  br label %match.end3419
-match.arm3421:
-  %t339 = getelementptr [1 x i8], [1 x i8]* @.str.1656, i64 0, i64 0
+  br label %match.end3430
+match.arm3432:
+  %t339 = getelementptr [1 x i8], [1 x i8]* @.str.1658, i64 0, i64 0
   %t340 = ptrtoint i8* %t339 to i64
   store i64 %t340, i64* %t330
-  br label %match.end3419
-match.end3419:
+  br label %match.end3430
+match.end3430:
   %t341 = load i64, i64* %t330
   store i64 %t341, i64* %text
   %t342 = load i64, i64* %stmts
-  %t343 = getelementptr [5 x i8], [5 x i8]* @.str.1657, i64 0, i64 0
+  %t343 = getelementptr [5 x i8], [5 x i8]* @.str.1659, i64 0, i64 0
   %t344 = ptrtoint i8* %t343 to i64
   %t345 = call i64 @ast_span_none()
   %t346 = call i8* @__sf_malloc(i64 24)
@@ -36443,58 +36650,58 @@ match.end3419:
   store i64 %t367, i64* %t371
   %t372 = ptrtoint [2 x i64]* %t369 to i64
   %t373 = call i64 @__list_push(i64 %t342, i64 %t372)
-  br label %endif3362
-else3418:
-  %t374 = getelementptr [1 x i8], [1 x i8]* @.str.1658, i64 0, i64 0
+  br label %endif3373
+else3429:
+  %t374 = getelementptr [1 x i8], [1 x i8]* @.str.1660, i64 0, i64 0
   %t375 = ptrtoint i8* %t374 to i64
   store i64 %t375, i64* %full_text
-  %t376 = getelementptr [1 x i8], [1 x i8]* @.str.1659, i64 0, i64 0
+  %t376 = getelementptr [1 x i8], [1 x i8]* @.str.1661, i64 0, i64 0
   %t377 = ptrtoint i8* %t376 to i64
   store i64 %t377, i64* %prev_part
-  br label %while.cond3422
-while.cond3422:
+  br label %while.cond3433
+while.cond3433:
   %t378 = load i64, i64* %self
-  %t379 = getelementptr [2 x i8], [2 x i8]* @.str.1660, i64 0, i64 0
+  %t379 = getelementptr [2 x i8], [2 x i8]* @.str.1662, i64 0, i64 0
   %t380 = ptrtoint i8* %t379 to i64
   %t381 = call i64 @Parser__match_kind_check(i64 %t378, i64 %t380)
   %t382 = xor i64 %t381, 1
   %t383 = trunc i64 %t382 to i1
-  br label %logic.entry3425
-logic.entry3425:
-  br i1 %t383, label %rhs3426, label %end3427
-rhs3426:
+  br label %logic.entry3436
+logic.entry3436:
+  br i1 %t383, label %rhs3437, label %end3438
+rhs3437:
   %t384 = load i64, i64* %self
-  %t385 = getelementptr [2 x i8], [2 x i8]* @.str.1661, i64 0, i64 0
+  %t385 = getelementptr [2 x i8], [2 x i8]* @.str.1663, i64 0, i64 0
   %t386 = ptrtoint i8* %t385 to i64
   %t387 = call i64 @Parser__match_kind_check(i64 %t384, i64 %t386)
   %t388 = xor i64 %t387, 1
   %t389 = trunc i64 %t388 to i1
-  br label %rhs.exit3428
-rhs.exit3428:
-  br label %end3427
-end3427:
-  %t390 = phi i1 [%t383, %logic.entry3425], [%t389, %rhs.exit3428]
+  br label %rhs.exit3439
+rhs.exit3439:
+  br label %end3438
+end3438:
+  %t390 = phi i1 [%t383, %logic.entry3436], [%t389, %rhs.exit3439]
   %t391 = zext i1 %t390 to i64
   %t392 = trunc i64 %t391 to i1
-  br label %logic.entry3429
-logic.entry3429:
-  br i1 %t392, label %rhs3430, label %end3431
-rhs3430:
+  br label %logic.entry3440
+logic.entry3440:
+  br i1 %t392, label %rhs3441, label %end3442
+rhs3441:
   %t393 = load i64, i64* %self
-  %t394 = getelementptr [4 x i8], [4 x i8]* @.str.1662, i64 0, i64 0
+  %t394 = getelementptr [4 x i8], [4 x i8]* @.str.1664, i64 0, i64 0
   %t395 = ptrtoint i8* %t394 to i64
   %t396 = call i64 @Parser__match_kind_check(i64 %t393, i64 %t395)
   %t397 = xor i64 %t396, 1
   %t398 = trunc i64 %t397 to i1
-  br label %rhs.exit3432
-rhs.exit3432:
-  br label %end3431
-end3431:
-  %t399 = phi i1 [%t392, %logic.entry3429], [%t398, %rhs.exit3432]
+  br label %rhs.exit3443
+rhs.exit3443:
+  br label %end3442
+end3442:
+  %t399 = phi i1 [%t392, %logic.entry3440], [%t398, %rhs.exit3443]
   %t400 = zext i1 %t399 to i64
   %t401 = trunc i64 %t400 to i1
-  br i1 %t401, label %while.body3423, label %while.end3424
-while.body3423:
+  br i1 %t401, label %while.body3434, label %while.end3435
+while.body3434:
   %t402 = load i64, i64* %self
   %t403 = call i64 @Parser__current_kind(i64 %t402)
   store i64 %t403, i64* %kind
@@ -36503,8 +36710,8 @@ while.body3423:
   %t407 = inttoptr i64 %t404 to i64*
   %t408 = load i64, i64* %t407
   %t406 = trunc i64 %t408 to i8
-  switch i8 %t406, label %match.arm3436 [ i8 6, label %match.arm3434 i8 0, label %match.arm3435 ]
-match.arm3434:
+  switch i8 %t406, label %match.arm3447 [ i8 6, label %match.arm3445 i8 0, label %match.arm3446 ]
+match.arm3445:
   %t409 = load i64, i64* %s
   %t410 = inttoptr i64 %t404 to [2 x i64]*
   %t411 = getelementptr [2 x i64], [2 x i64]* %t410, i64 0, i64 1
@@ -36513,8 +36720,8 @@ match.arm3434:
   %t413 = load i64, i64* %s
   store i64 %t413, i64* %t405
   store i64 %t409, i64* %s
-  br label %match.end3433
-match.arm3435:
+  br label %match.end3444
+match.arm3446:
   %t414 = load i64, i64* %v
   %t415 = inttoptr i64 %t404 to [2 x i64]*
   %t416 = getelementptr [2 x i64], [2 x i64]* %t415, i64 0, i64 1
@@ -36525,14 +36732,14 @@ match.arm3435:
   %t420 = call i64 @__rt_tag_ptr(i64 %t419)
   store i64 %t420, i64* %t405
   store i64 %t414, i64* %v
-  br label %match.end3433
-match.arm3436:
+  br label %match.end3444
+match.arm3447:
   %t421 = load i64, i64* %self
   %t422 = load i64, i64* %kind
   %t423 = call i64 @Parser__kind_name(i64 %t421, i64 %t422)
   store i64 %t423, i64* %t405
-  br label %match.end3433
-match.end3433:
+  br label %match.end3444
+match.end3444:
   %t424 = load i64, i64* %t405
   store i64 %t424, i64* %text_part
   %t425 = load i64, i64* %full_text
@@ -36542,99 +36749,99 @@ match.end3433:
   %t429 = icmp eq i64 %t427, %t428
   %t430 = zext i1 %t429 to i64
   %t431 = trunc i64 %t430 to i1
-  br i1 %t431, label %then3438, label %else3439
-then3438:
+  br i1 %t431, label %then3449, label %else3450
+then3449:
   %t432 = load i64, i64* %text_part
   store i64 %t432, i64* %full_text
-  br label %endif3437
-else3439:
+  br label %endif3448
+else3450:
   %t433 = load i64, i64* %text_part
-  %t434 = getelementptr [2 x i8], [2 x i8]* @.str.1663, i64 0, i64 0
+  %t434 = getelementptr [2 x i8], [2 x i8]* @.str.1665, i64 0, i64 0
   %t435 = ptrtoint i8* %t434 to i64
   %t436 = call i64 @__string_eq(i64 %t433, i64 %t435)
   %t437 = trunc i64 %t436 to i1
-  br label %logic.entry3440
-logic.entry3440:
-  br i1 %t437, label %end3442, label %rhs3441
-rhs3441:
+  br label %logic.entry3451
+logic.entry3451:
+  br i1 %t437, label %end3453, label %rhs3452
+rhs3452:
   %t438 = load i64, i64* %text_part
-  %t439 = getelementptr [2 x i8], [2 x i8]* @.str.1664, i64 0, i64 0
+  %t439 = getelementptr [2 x i8], [2 x i8]* @.str.1666, i64 0, i64 0
   %t440 = ptrtoint i8* %t439 to i64
   %t441 = call i64 @__string_eq(i64 %t438, i64 %t440)
   %t442 = trunc i64 %t441 to i1
-  br label %rhs.exit3443
-rhs.exit3443:
-  br label %end3442
-end3442:
-  %t443 = phi i1 [%t437, %logic.entry3440], [%t442, %rhs.exit3443]
+  br label %rhs.exit3454
+rhs.exit3454:
+  br label %end3453
+end3453:
+  %t443 = phi i1 [%t437, %logic.entry3451], [%t442, %rhs.exit3454]
   %t444 = zext i1 %t443 to i64
   %t445 = trunc i64 %t444 to i1
-  br label %logic.entry3444
-logic.entry3444:
-  br i1 %t445, label %end3446, label %rhs3445
-rhs3445:
+  br label %logic.entry3455
+logic.entry3455:
+  br i1 %t445, label %end3457, label %rhs3456
+rhs3456:
   %t446 = load i64, i64* %text_part
-  %t447 = getelementptr [2 x i8], [2 x i8]* @.str.1665, i64 0, i64 0
+  %t447 = getelementptr [2 x i8], [2 x i8]* @.str.1667, i64 0, i64 0
   %t448 = ptrtoint i8* %t447 to i64
   %t449 = call i64 @__string_eq(i64 %t446, i64 %t448)
   %t450 = trunc i64 %t449 to i1
-  br label %rhs.exit3447
-rhs.exit3447:
-  br label %end3446
-end3446:
-  %t451 = phi i1 [%t445, %logic.entry3444], [%t450, %rhs.exit3447]
+  br label %rhs.exit3458
+rhs.exit3458:
+  br label %end3457
+end3457:
+  %t451 = phi i1 [%t445, %logic.entry3455], [%t450, %rhs.exit3458]
   %t452 = zext i1 %t451 to i64
   %t453 = trunc i64 %t452 to i1
-  br label %logic.entry3448
-logic.entry3448:
-  br i1 %t453, label %end3450, label %rhs3449
-rhs3449:
+  br label %logic.entry3459
+logic.entry3459:
+  br i1 %t453, label %end3461, label %rhs3460
+rhs3460:
   %t454 = load i64, i64* %text_part
-  %t455 = getelementptr [2 x i8], [2 x i8]* @.str.1666, i64 0, i64 0
+  %t455 = getelementptr [2 x i8], [2 x i8]* @.str.1668, i64 0, i64 0
   %t456 = ptrtoint i8* %t455 to i64
   %t457 = call i64 @__string_eq(i64 %t454, i64 %t456)
   %t458 = trunc i64 %t457 to i1
-  br label %rhs.exit3451
-rhs.exit3451:
-  br label %end3450
-end3450:
-  %t459 = phi i1 [%t453, %logic.entry3448], [%t458, %rhs.exit3451]
+  br label %rhs.exit3462
+rhs.exit3462:
+  br label %end3461
+end3461:
+  %t459 = phi i1 [%t453, %logic.entry3459], [%t458, %rhs.exit3462]
   %t460 = zext i1 %t459 to i64
   %t461 = trunc i64 %t460 to i1
-  br label %logic.entry3452
-logic.entry3452:
-  br i1 %t461, label %end3454, label %rhs3453
-rhs3453:
+  br label %logic.entry3463
+logic.entry3463:
+  br i1 %t461, label %end3465, label %rhs3464
+rhs3464:
   %t462 = load i64, i64* %text_part
-  %t463 = getelementptr [2 x i8], [2 x i8]* @.str.1667, i64 0, i64 0
+  %t463 = getelementptr [2 x i8], [2 x i8]* @.str.1669, i64 0, i64 0
   %t464 = ptrtoint i8* %t463 to i64
   %t465 = call i64 @__string_eq(i64 %t462, i64 %t464)
   %t466 = trunc i64 %t465 to i1
-  br label %rhs.exit3455
-rhs.exit3455:
-  br label %end3454
-end3454:
-  %t467 = phi i1 [%t461, %logic.entry3452], [%t466, %rhs.exit3455]
+  br label %rhs.exit3466
+rhs.exit3466:
+  br label %end3465
+end3465:
+  %t467 = phi i1 [%t461, %logic.entry3463], [%t466, %rhs.exit3466]
   %t468 = zext i1 %t467 to i64
   %t469 = trunc i64 %t468 to i1
-  br label %logic.entry3456
-logic.entry3456:
-  br i1 %t469, label %end3458, label %rhs3457
-rhs3457:
+  br label %logic.entry3467
+logic.entry3467:
+  br i1 %t469, label %end3469, label %rhs3468
+rhs3468:
   %t470 = load i64, i64* %text_part
-  %t471 = getelementptr [2 x i8], [2 x i8]* @.str.1668, i64 0, i64 0
+  %t471 = getelementptr [2 x i8], [2 x i8]* @.str.1670, i64 0, i64 0
   %t472 = ptrtoint i8* %t471 to i64
   %t473 = call i64 @__string_eq(i64 %t470, i64 %t472)
   %t474 = trunc i64 %t473 to i1
-  br label %rhs.exit3459
-rhs.exit3459:
-  br label %end3458
-end3458:
-  %t475 = phi i1 [%t469, %logic.entry3456], [%t474, %rhs.exit3459]
+  br label %rhs.exit3470
+rhs.exit3470:
+  br label %end3469
+end3469:
+  %t475 = phi i1 [%t469, %logic.entry3467], [%t474, %rhs.exit3470]
   %t476 = zext i1 %t475 to i64
   %t477 = trunc i64 %t476 to i1
-  br i1 %t477, label %then3460, label %else3461
-then3460:
+  br i1 %t477, label %then3471, label %else3472
+then3471:
   %t478 = load i64, i64* %full_text
   %t479 = load i64, i64* %text_part
   %t480 = inttoptr i64 %t478 to i8*
@@ -36651,31 +36858,31 @@ then3460:
   %t489 = inttoptr i64 %t488 to i8*
   %t490 = ptrtoint i8* %t489 to i64
   store i64 %t490, i64* %full_text
-  br label %endif3437
-else3461:
+  br label %endif3448
+else3472:
   %t491 = load i64, i64* %prev_part
-  %t492 = getelementptr [2 x i8], [2 x i8]* @.str.1669, i64 0, i64 0
+  %t492 = getelementptr [2 x i8], [2 x i8]* @.str.1671, i64 0, i64 0
   %t493 = ptrtoint i8* %t492 to i64
   %t494 = call i64 @__string_eq(i64 %t491, i64 %t493)
   %t495 = trunc i64 %t494 to i1
-  br label %logic.entry3462
-logic.entry3462:
-  br i1 %t495, label %end3464, label %rhs3463
-rhs3463:
+  br label %logic.entry3473
+logic.entry3473:
+  br i1 %t495, label %end3475, label %rhs3474
+rhs3474:
   %t496 = load i64, i64* %text_part
-  %t497 = getelementptr [2 x i8], [2 x i8]* @.str.1670, i64 0, i64 0
+  %t497 = getelementptr [2 x i8], [2 x i8]* @.str.1672, i64 0, i64 0
   %t498 = ptrtoint i8* %t497 to i64
   %t499 = call i64 @__string_eq(i64 %t496, i64 %t498)
   %t500 = trunc i64 %t499 to i1
-  br label %rhs.exit3465
-rhs.exit3465:
-  br label %end3464
-end3464:
-  %t501 = phi i1 [%t495, %logic.entry3462], [%t500, %rhs.exit3465]
+  br label %rhs.exit3476
+rhs.exit3476:
+  br label %end3475
+end3475:
+  %t501 = phi i1 [%t495, %logic.entry3473], [%t500, %rhs.exit3476]
   %t502 = zext i1 %t501 to i64
   %t503 = trunc i64 %t502 to i1
-  br i1 %t503, label %then3466, label %else3467
-then3466:
+  br i1 %t503, label %then3477, label %else3478
+then3477:
   %t504 = load i64, i64* %full_text
   %t505 = load i64, i64* %text_part
   %t506 = inttoptr i64 %t504 to i8*
@@ -36692,10 +36899,10 @@ then3466:
   %t515 = inttoptr i64 %t514 to i8*
   %t516 = ptrtoint i8* %t515 to i64
   store i64 %t516, i64* %full_text
-  br label %endif3437
-else3467:
+  br label %endif3448
+else3478:
   %t517 = load i64, i64* %full_text
-  %t518 = getelementptr [2 x i8], [2 x i8]* @.str.1671, i64 0, i64 0
+  %t518 = getelementptr [2 x i8], [2 x i8]* @.str.1673, i64 0, i64 0
   %t519 = ptrtoint i8* %t518 to i64
   %t520 = inttoptr i64 %t517 to i8*
   %t521 = inttoptr i64 %t519 to i8*
@@ -36725,14 +36932,14 @@ else3467:
   %t541 = inttoptr i64 %t540 to i8*
   %t542 = ptrtoint i8* %t541 to i64
   store i64 %t542, i64* %full_text
-  br label %endif3437
-endif3437:
+  br label %endif3448
+endif3448:
   %t543 = load i64, i64* %text_part
   store i64 %t543, i64* %prev_part
   %t544 = load i64, i64* %self
   %t545 = call i64 @Parser__advance(i64 %t544)
-  br label %while.cond3422
-while.end3424:
+  br label %while.cond3433
+while.end3435:
   %t546 = load i64, i64* %full_text
   %t547 = inttoptr i64 %t546 to i8*
   %t548 = call i64 @strlen(i8* %t547)
@@ -36740,10 +36947,10 @@ while.end3424:
   %t551 = icmp sgt i64 %t548, %t549
   %t550 = zext i1 %t551 to i64
   %t552 = trunc i64 %t550 to i1
-  br i1 %t552, label %then3469, label %else3470
-then3469:
+  br i1 %t552, label %then3480, label %else3481
+then3480:
   %t553 = load i64, i64* %stmts
-  %t554 = getelementptr [5 x i8], [5 x i8]* @.str.1672, i64 0, i64 0
+  %t554 = getelementptr [5 x i8], [5 x i8]* @.str.1674, i64 0, i64 0
   %t555 = ptrtoint i8* %t554 to i64
   %t556 = call i64 @ast_span_none()
   %t557 = call i8* @__sf_malloc(i64 24)
@@ -36785,16 +36992,16 @@ then3469:
   store i64 %t578, i64* %t582
   %t583 = ptrtoint [2 x i64]* %t580 to i64
   %t584 = call i64 @__list_push(i64 %t553, i64 %t583)
-  br label %endif3468
-else3470:
+  br label %endif3479
+else3481:
   %t585 = load i64, i64* %self
   %t586 = call i64 @Parser__advance(i64 %t585)
-  br label %endif3468
-endif3468:
-  br label %endif3362
-endif3362:
-  br label %while.cond3349
-while.end3351:
+  br label %endif3479
+endif3479:
+  br label %endif3373
+endif3373:
+  br label %while.cond3360
+while.end3362:
   %t587 = load i64, i64* %stmts
   ret i64 %t587
 }
@@ -36821,89 +37028,89 @@ entry:
   %stmts = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1673, i64 0, i64 0
+  %t2 = getelementptr [2 x i8], [2 x i8]* @.str.1675, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @Parser__consume(i64 %t1, i64 %t3)
   %t5 = call i64 @__list_new()
   store i64 %t5, i64* %stmts
-  br label %while.cond3471
-while.cond3471:
+  br label %while.cond3482
+while.cond3482:
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1674, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.1676, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @Parser__match_kind_check(i64 %t6, i64 %t8)
   %t10 = xor i64 %t9, 1
   %t11 = trunc i64 %t10 to i1
-  br label %logic.entry3474
-logic.entry3474:
-  br i1 %t11, label %rhs3475, label %end3476
-rhs3475:
+  br label %logic.entry3485
+logic.entry3485:
+  br i1 %t11, label %rhs3486, label %end3487
+rhs3486:
   %t12 = load i64, i64* %self
-  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.1675, i64 0, i64 0
+  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.1677, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @Parser__match_kind_check(i64 %t12, i64 %t14)
   %t16 = xor i64 %t15, 1
   %t17 = trunc i64 %t16 to i1
-  br label %rhs.exit3477
-rhs.exit3477:
-  br label %end3476
-end3476:
-  %t18 = phi i1 [%t11, %logic.entry3474], [%t17, %rhs.exit3477]
+  br label %rhs.exit3488
+rhs.exit3488:
+  br label %end3487
+end3487:
+  %t18 = phi i1 [%t11, %logic.entry3485], [%t17, %rhs.exit3488]
   %t19 = zext i1 %t18 to i64
   %t20 = trunc i64 %t19 to i1
-  br i1 %t20, label %while.body3472, label %while.end3473
-while.body3472:
-  br label %while.cond3478
-while.cond3478:
+  br i1 %t20, label %while.body3483, label %while.end3484
+while.body3483:
+  br label %while.cond3489
+while.cond3489:
   %t21 = load i64, i64* %self
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.1676, i64 0, i64 0
+  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.1678, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   %t24 = call i64 @Parser__match_kind(i64 %t21, i64 %t23)
   %t25 = trunc i64 %t24 to i1
-  br i1 %t25, label %while.body3479, label %while.end3480
-while.body3479:
-  br label %while.cond3478
-while.end3480:
+  br i1 %t25, label %while.body3490, label %while.end3491
+while.body3490:
+  br label %while.cond3489
+while.end3491:
   %t26 = load i64, i64* %self
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1677, i64 0, i64 0
+  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.1679, i64 0, i64 0
   %t28 = ptrtoint i8* %t27 to i64
   %t29 = call i64 @Parser__match_kind_check(i64 %t26, i64 %t28)
   %t30 = trunc i64 %t29 to i1
-  br label %logic.entry3482
-logic.entry3482:
-  br i1 %t30, label %end3484, label %rhs3483
-rhs3483:
+  br label %logic.entry3493
+logic.entry3493:
+  br i1 %t30, label %end3495, label %rhs3494
+rhs3494:
   %t31 = load i64, i64* %self
-  %t32 = getelementptr [4 x i8], [4 x i8]* @.str.1678, i64 0, i64 0
+  %t32 = getelementptr [4 x i8], [4 x i8]* @.str.1680, i64 0, i64 0
   %t33 = ptrtoint i8* %t32 to i64
   %t34 = call i64 @Parser__match_kind_check(i64 %t31, i64 %t33)
   %t35 = trunc i64 %t34 to i1
-  br label %rhs.exit3485
-rhs.exit3485:
-  br label %end3484
-end3484:
-  %t36 = phi i1 [%t30, %logic.entry3482], [%t35, %rhs.exit3485]
+  br label %rhs.exit3496
+rhs.exit3496:
+  br label %end3495
+end3495:
+  %t36 = phi i1 [%t30, %logic.entry3493], [%t35, %rhs.exit3496]
   %t37 = zext i1 %t36 to i64
   %t38 = trunc i64 %t37 to i1
-  br i1 %t38, label %then3486, label %else3487
-then3486:
+  br i1 %t38, label %then3497, label %else3498
+then3497:
   %t39 = load i64, i64* %self
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1679, i64 0, i64 0
+  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.1681, i64 0, i64 0
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = call i64 @Parser__consume(i64 %t39, i64 %t41)
   %t43 = load i64, i64* %stmts
   ret i64 %t43
-else3487:
-  br label %endif3481
-endif3481:
+else3498:
+  br label %endif3492
+endif3492:
   %t44 = load i64, i64* %stmts
   %t45 = load i64, i64* %self
   %t46 = call i64 @Parser__parse_stmt(i64 %t45)
   %t47 = call i64 @__list_push(i64 %t44, i64 %t46)
-  br label %while.cond3471
-while.end3473:
+  br label %while.cond3482
+while.end3484:
   %t48 = load i64, i64* %self
-  %t49 = getelementptr [2 x i8], [2 x i8]* @.str.1680, i64 0, i64 0
+  %t49 = getelementptr [2 x i8], [2 x i8]* @.str.1682, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i64 @Parser__consume(i64 %t48, i64 %t50)
   %t52 = load i64, i64* %stmts
@@ -36947,19 +37154,19 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.end3488 [ i8 0, label %match.arm3489 i8 1, label %match.arm3490 i8 2, label %match.arm3491 i8 3, label %match.arm3492 i8 4, label %match.arm3493 i8 5, label %match.arm3494 i8 6, label %match.arm3495 i8 7, label %match.arm3496 i8 8, label %match.arm3497 i8 9, label %match.arm3498 i8 10, label %match.arm3499 i8 11, label %match.arm3500 i8 12, label %match.arm3501 i8 13, label %match.arm3502 i8 14, label %match.arm3503 ]
-match.arm3489:
+  switch i8 %t3, label %match.end3499 [ i8 0, label %match.arm3500 i8 1, label %match.arm3501 i8 2, label %match.arm3502 i8 3, label %match.arm3503 i8 4, label %match.arm3504 i8 5, label %match.arm3505 i8 6, label %match.arm3506 i8 7, label %match.arm3507 i8 8, label %match.arm3508 i8 9, label %match.arm3509 i8 10, label %match.arm3510 i8 11, label %match.arm3511 i8 12, label %match.arm3512 i8 13, label %match.arm3513 i8 14, label %match.arm3514 ]
+match.arm3500:
   %t6 = load i64, i64* %e
   %t7 = inttoptr i64 %t1 to [2 x i64]*
   %t8 = getelementptr [2 x i64], [2 x i64]* %t7, i64 0, i64 1
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %e
-  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.1681, i64 0, i64 0
+  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.1683, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %t2
   store i64 %t6, i64* %e
-  br label %match.end3488
-match.arm3490:
+  br label %match.end3499
+match.arm3501:
   %t12 = load i64, i64* %n
   %t13 = load i64, i64* %t
   %t14 = load i64, i64* %i
@@ -36989,7 +37196,7 @@ match.arm3490:
   %t32 = getelementptr [8 x i64], [8 x i64]* %t19, i64 0, i64 7
   %t33 = load i64, i64* %t32
   store i64 %t33, i64* %__fs
-  %t34 = getelementptr [6 x i8], [6 x i8]* @.str.1682, i64 0, i64 0
+  %t34 = getelementptr [6 x i8], [6 x i8]* @.str.1684, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   store i64 %t35, i64* %t2
   store i64 %t12, i64* %n
@@ -36999,8 +37206,8 @@ match.arm3490:
   store i64 %t16, i64* %v_vis
   store i64 %t17, i64* %__ns
   store i64 %t18, i64* %__fs
-  br label %match.end3488
-match.arm3491:
+  br label %match.end3499
+match.arm3502:
   %t36 = load i64, i64* %n
   %t37 = load i64, i64* %p
   %t38 = load i64, i64* %r
@@ -37034,7 +37241,7 @@ match.arm3491:
   %t59 = getelementptr [9 x i64], [9 x i64]* %t44, i64 0, i64 8
   %t60 = load i64, i64* %t59
   store i64 %t60, i64* %__fs
-  %t61 = getelementptr [6 x i8], [6 x i8]* @.str.1683, i64 0, i64 0
+  %t61 = getelementptr [6 x i8], [6 x i8]* @.str.1685, i64 0, i64 0
   %t62 = ptrtoint i8* %t61 to i64
   store i64 %t62, i64* %t2
   store i64 %t36, i64* %n
@@ -37045,8 +37252,8 @@ match.arm3491:
   store i64 %t41, i64* %f_vis
   store i64 %t42, i64* %__ns
   store i64 %t43, i64* %__fs
-  br label %match.end3488
-match.arm3492:
+  br label %match.end3499
+match.arm3503:
   %t63 = load i64, i64* %n
   %t64 = load i64, i64* %v
   %t65 = load i64, i64* %d
@@ -37072,7 +37279,7 @@ match.arm3492:
   %t80 = getelementptr [7 x i64], [7 x i64]* %t69, i64 0, i64 6
   %t81 = load i64, i64* %t80
   store i64 %t81, i64* %__fs
-  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.1684, i64 0, i64 0
+  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.1686, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i64
   store i64 %t83, i64* %t2
   store i64 %t63, i64* %n
@@ -37081,8 +37288,8 @@ match.arm3492:
   store i64 %t66, i64* %e_vis
   store i64 %t67, i64* %__ns
   store i64 %t68, i64* %__fs
-  br label %match.end3488
-match.arm3493:
+  br label %match.end3499
+match.arm3504:
   %t84 = load i64, i64* %n
   %t85 = load i64, i64* %tp
   %t86 = load i64, i64* %ps
@@ -37124,7 +37331,7 @@ match.arm3493:
   %t113 = getelementptr [11 x i64], [11 x i64]* %t94, i64 0, i64 10
   %t114 = load i64, i64* %t113
   store i64 %t114, i64* %__intro
-  %t115 = getelementptr [6 x i8], [6 x i8]* @.str.1685, i64 0, i64 0
+  %t115 = getelementptr [6 x i8], [6 x i8]* @.str.1687, i64 0, i64 0
   %t116 = ptrtoint i8* %t115 to i64
   store i64 %t116, i64* %t2
   store i64 %t84, i64* %n
@@ -37137,19 +37344,19 @@ match.arm3493:
   store i64 %t91, i64* %__ns
   store i64 %t92, i64* %__fs
   store i64 %t93, i64* %__intro
-  br label %match.end3488
-match.arm3494:
+  br label %match.end3499
+match.arm3505:
   %t117 = load i64, i64* %v
   %t118 = inttoptr i64 %t1 to [2 x i64]*
   %t119 = getelementptr [2 x i64], [2 x i64]* %t118, i64 0, i64 1
   %t120 = load i64, i64* %t119
   store i64 %t120, i64* %v
-  %t121 = getelementptr [6 x i8], [6 x i8]* @.str.1686, i64 0, i64 0
+  %t121 = getelementptr [6 x i8], [6 x i8]* @.str.1688, i64 0, i64 0
   %t122 = ptrtoint i8* %t121 to i64
   store i64 %t122, i64* %t2
   store i64 %t117, i64* %v
-  br label %match.end3488
-match.arm3495:
+  br label %match.end3499
+match.arm3506:
   %t123 = load i64, i64* %c
   %t124 = load i64, i64* %t
   %t125 = load i64, i64* %e
@@ -37163,14 +37370,14 @@ match.arm3495:
   %t131 = getelementptr [4 x i64], [4 x i64]* %t126, i64 0, i64 3
   %t132 = load i64, i64* %t131
   store i64 %t132, i64* %e
-  %t133 = getelementptr [3 x i8], [3 x i8]* @.str.1687, i64 0, i64 0
+  %t133 = getelementptr [3 x i8], [3 x i8]* @.str.1689, i64 0, i64 0
   %t134 = ptrtoint i8* %t133 to i64
   store i64 %t134, i64* %t2
   store i64 %t123, i64* %c
   store i64 %t124, i64* %t
   store i64 %t125, i64* %e
-  br label %match.end3488
-match.arm3496:
+  br label %match.end3499
+match.arm3507:
   %t135 = load i64, i64* %c
   %t136 = load i64, i64* %b
   %t137 = inttoptr i64 %t1 to [3 x i64]*
@@ -37180,34 +37387,34 @@ match.arm3496:
   %t140 = getelementptr [3 x i64], [3 x i64]* %t137, i64 0, i64 2
   %t141 = load i64, i64* %t140
   store i64 %t141, i64* %b
-  %t142 = getelementptr [6 x i8], [6 x i8]* @.str.1688, i64 0, i64 0
+  %t142 = getelementptr [6 x i8], [6 x i8]* @.str.1690, i64 0, i64 0
   %t143 = ptrtoint i8* %t142 to i64
   store i64 %t143, i64* %t2
   store i64 %t135, i64* %c
   store i64 %t136, i64* %b
-  br label %match.end3488
-match.arm3497:
+  br label %match.end3499
+match.arm3508:
   %t144 = load i64, i64* %s
   %t145 = inttoptr i64 %t1 to [2 x i64]*
   %t146 = getelementptr [2 x i64], [2 x i64]* %t145, i64 0, i64 1
   %t147 = load i64, i64* %t146
   store i64 %t147, i64* %s
-  %t148 = getelementptr [6 x i8], [6 x i8]* @.str.1689, i64 0, i64 0
+  %t148 = getelementptr [6 x i8], [6 x i8]* @.str.1691, i64 0, i64 0
   %t149 = ptrtoint i8* %t148 to i64
   store i64 %t149, i64* %t2
   store i64 %t144, i64* %s
-  br label %match.end3488
-match.arm3498:
-  %t150 = getelementptr [6 x i8], [6 x i8]* @.str.1690, i64 0, i64 0
+  br label %match.end3499
+match.arm3509:
+  %t150 = getelementptr [6 x i8], [6 x i8]* @.str.1692, i64 0, i64 0
   %t151 = ptrtoint i8* %t150 to i64
   store i64 %t151, i64* %t2
-  br label %match.end3488
-match.arm3499:
-  %t152 = getelementptr [6 x i8], [6 x i8]* @.str.1691, i64 0, i64 0
+  br label %match.end3499
+match.arm3510:
+  %t152 = getelementptr [6 x i8], [6 x i8]* @.str.1693, i64 0, i64 0
   %t153 = ptrtoint i8* %t152 to i64
   store i64 %t153, i64* %t2
-  br label %match.end3488
-match.arm3500:
+  br label %match.end3499
+match.arm3511:
   %t154 = load i64, i64* %t
   %t155 = load i64, i64* %n
   %t156 = load i64, i64* %c
@@ -37225,26 +37432,26 @@ match.arm3500:
   %t165 = getelementptr [5 x i64], [5 x i64]* %t158, i64 0, i64 4
   %t166 = load i64, i64* %t165
   store i64 %t166, i64* %f
-  %t167 = getelementptr [6 x i8], [6 x i8]* @.str.1692, i64 0, i64 0
+  %t167 = getelementptr [6 x i8], [6 x i8]* @.str.1694, i64 0, i64 0
   %t168 = ptrtoint i8* %t167 to i64
   store i64 %t168, i64* %t2
   store i64 %t154, i64* %t
   store i64 %t155, i64* %n
   store i64 %t156, i64* %c
   store i64 %t157, i64* %f
-  br label %match.end3488
-match.arm3501:
+  br label %match.end3499
+match.arm3512:
   %t169 = load i64, i64* %v
   %t170 = inttoptr i64 %t1 to [2 x i64]*
   %t171 = getelementptr [2 x i64], [2 x i64]* %t170, i64 0, i64 1
   %t172 = load i64, i64* %t171
   store i64 %t172, i64* %v
-  %t173 = getelementptr [6 x i8], [6 x i8]* @.str.1693, i64 0, i64 0
+  %t173 = getelementptr [6 x i8], [6 x i8]* @.str.1695, i64 0, i64 0
   %t174 = ptrtoint i8* %t173 to i64
   store i64 %t174, i64* %t2
   store i64 %t169, i64* %v
-  br label %match.end3488
-match.arm3502:
+  br label %match.end3499
+match.arm3513:
   %t175 = load i64, i64* %p
   %t176 = load i64, i64* %v
   %t177 = inttoptr i64 %t1 to [3 x i64]*
@@ -37254,13 +37461,13 @@ match.arm3502:
   %t180 = getelementptr [3 x i64], [3 x i64]* %t177, i64 0, i64 2
   %t181 = load i64, i64* %t180
   store i64 %t181, i64* %v
-  %t182 = getelementptr [6 x i8], [6 x i8]* @.str.1694, i64 0, i64 0
+  %t182 = getelementptr [6 x i8], [6 x i8]* @.str.1696, i64 0, i64 0
   %t183 = ptrtoint i8* %t182 to i64
   store i64 %t183, i64* %t2
   store i64 %t175, i64* %p
   store i64 %t176, i64* %v
-  br label %match.end3488
-match.arm3503:
+  br label %match.end3499
+match.arm3514:
   %t184 = load i64, i64* %ta_n
   %t185 = load i64, i64* %ta_t
   %t186 = load i64, i64* %ta_vis
@@ -37274,30 +37481,30 @@ match.arm3503:
   %t192 = getelementptr [4 x i64], [4 x i64]* %t187, i64 0, i64 3
   %t193 = load i64, i64* %t192
   store i64 %t193, i64* %ta_vis
-  %t194 = getelementptr [6 x i8], [6 x i8]* @.str.1695, i64 0, i64 0
+  %t194 = getelementptr [6 x i8], [6 x i8]* @.str.1697, i64 0, i64 0
   %t195 = ptrtoint i8* %t194 to i64
   store i64 %t195, i64* %t2
   store i64 %t184, i64* %ta_n
   store i64 %t185, i64* %ta_t
   store i64 %t186, i64* %ta_vis
-  br label %match.end3488
-match.end3488:
+  br label %match.end3499
+match.end3499:
   %t196 = load i64, i64* %t2
   store i64 %t196, i64* %kind
   %t197 = load i64, i64* %kind
-  %t198 = getelementptr [5 x i8], [5 x i8]* @.str.1696, i64 0, i64 0
+  %t198 = getelementptr [5 x i8], [5 x i8]* @.str.1698, i64 0, i64 0
   %t199 = ptrtoint i8* %t198 to i64
   %t200 = call i64 @__string_eq(i64 %t197, i64 %t199)
   %t201 = trunc i64 %t200 to i1
-  br i1 %t201, label %then3505, label %else3506
-then3505:
+  br i1 %t201, label %then3516, label %else3517
+then3516:
   %t202 = load i64, i64* %stmt
   %t203 = alloca i64
   %t205 = inttoptr i64 %t202 to i64*
   %t206 = load i64, i64* %t205
   %t204 = trunc i64 %t206 to i8
-  switch i8 %t204, label %match.arm3509 [ i8 0, label %match.arm3508 ]
-match.arm3508:
+  switch i8 %t204, label %match.arm3520 [ i8 0, label %match.arm3519 ]
+match.arm3519:
   %t207 = load i64, i64* %e
   %t208 = inttoptr i64 %t202 to [2 x i64]*
   %t209 = getelementptr [2 x i64], [2 x i64]* %t208, i64 0, i64 1
@@ -37306,35 +37513,35 @@ match.arm3508:
   %t211 = load i64, i64* %e
   store i64 %t211, i64* %t203
   store i64 %t207, i64* %e
-  br label %match.end3507
-match.arm3509:
+  br label %match.end3518
+match.arm3520:
   %t212 = call i8* @__sf_malloc(i64 8)
   %t213 = bitcast i8* %t212 to [1 x i64]*
   %t214 = getelementptr [1 x i64], [1 x i64]* %t213, i64 0, i64 0
   store i64 4, i64* %t214
   %t215 = ptrtoint [1 x i64]* %t213 to i64
   store i64 %t215, i64* %t203
-  br label %match.end3507
-match.end3507:
+  br label %match.end3518
+match.end3518:
   %t216 = load i64, i64* %t203
   ret i64 %t216
-else3506:
-  br label %endif3504
-endif3504:
+else3517:
+  br label %endif3515
+endif3515:
   %t217 = load i64, i64* %kind
-  %t218 = getelementptr [3 x i8], [3 x i8]* @.str.1697, i64 0, i64 0
+  %t218 = getelementptr [3 x i8], [3 x i8]* @.str.1699, i64 0, i64 0
   %t219 = ptrtoint i8* %t218 to i64
   %t220 = call i64 @__string_eq(i64 %t217, i64 %t219)
   %t221 = trunc i64 %t220 to i1
-  br i1 %t221, label %then3511, label %else3512
-then3511:
+  br i1 %t221, label %then3522, label %else3523
+then3522:
   %t222 = load i64, i64* %self
   %t223 = load i64, i64* %stmt
   %t224 = call i64 @Parser__if_stmt_to_expr(i64 %t222, i64 %t223)
   ret i64 %t224
-else3512:
-  br label %endif3510
-endif3510:
+else3523:
+  br label %endif3521
+endif3521:
   %t225 = call i8* @__sf_malloc(i64 8)
   %t226 = bitcast i8* %t225 to [1 x i64]*
   %t227 = getelementptr [1 x i64], [1 x i64]* %t226, i64 0, i64 0
@@ -37366,8 +37573,8 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.arm3515 [ i8 6, label %match.arm3514 ]
-match.arm3514:
+  switch i8 %t3, label %match.arm3526 [ i8 6, label %match.arm3525 ]
+match.arm3525:
   %t6 = load i64, i64* %c
   %t7 = load i64, i64* %t
   %t8 = load i64, i64* %e
@@ -37386,16 +37593,16 @@ match.arm3514:
   store i64 %t6, i64* %c
   store i64 %t7, i64* %t
   store i64 %t8, i64* %e
-  br label %match.end3513
-match.arm3515:
+  br label %match.end3524
+match.arm3526:
   %t17 = call i8* @__sf_malloc(i64 8)
   %t18 = bitcast i8* %t17 to [1 x i64]*
   %t19 = getelementptr [1 x i64], [1 x i64]* %t18, i64 0, i64 0
   store i64 4, i64* %t19
   %t20 = ptrtoint [1 x i64]* %t18 to i64
   store i64 %t20, i64* %t2
-  br label %match.end3513
-match.end3513:
+  br label %match.end3524
+match.end3524:
   %t21 = load i64, i64* %t2
   store i64 %t21, i64* %cond
   %t22 = load i64, i64* %stmt
@@ -37403,8 +37610,8 @@ match.end3513:
   %t25 = inttoptr i64 %t22 to i64*
   %t26 = load i64, i64* %t25
   %t24 = trunc i64 %t26 to i8
-  switch i8 %t24, label %match.arm3518 [ i8 6, label %match.arm3517 ]
-match.arm3517:
+  switch i8 %t24, label %match.arm3529 [ i8 6, label %match.arm3528 ]
+match.arm3528:
   %t27 = load i64, i64* %c
   %t28 = load i64, i64* %t
   %t29 = load i64, i64* %e
@@ -37423,12 +37630,12 @@ match.arm3517:
   store i64 %t27, i64* %c
   store i64 %t28, i64* %t
   store i64 %t29, i64* %e
-  br label %match.end3516
-match.arm3518:
+  br label %match.end3527
+match.arm3529:
   %t38 = call i64 @__list_new()
   store i64 %t38, i64* %t23
-  br label %match.end3516
-match.end3516:
+  br label %match.end3527
+match.end3527:
   %t39 = load i64, i64* %t23
   store i64 %t39, i64* %then_branch
   %t40 = load i64, i64* %stmt
@@ -37436,8 +37643,8 @@ match.end3516:
   %t43 = inttoptr i64 %t40 to i64*
   %t44 = load i64, i64* %t43
   %t42 = trunc i64 %t44 to i8
-  switch i8 %t42, label %match.arm3521 [ i8 6, label %match.arm3520 ]
-match.arm3520:
+  switch i8 %t42, label %match.arm3532 [ i8 6, label %match.arm3531 ]
+match.arm3531:
   %t45 = load i64, i64* %c
   %t46 = load i64, i64* %t
   %t47 = load i64, i64* %e
@@ -37456,12 +37663,12 @@ match.arm3520:
   store i64 %t45, i64* %c
   store i64 %t46, i64* %t
   store i64 %t47, i64* %e
-  br label %match.end3519
-match.arm3521:
+  br label %match.end3530
+match.arm3532:
   %t56 = call i64 @__list_new()
   store i64 %t56, i64* %t41
-  br label %match.end3519
-match.end3519:
+  br label %match.end3530
+match.end3530:
   %t57 = load i64, i64* %t41
   store i64 %t57, i64* %else_branch
   %t58 = load i64, i64* %else_branch
@@ -37470,17 +37677,17 @@ match.end3519:
   %t61 = icmp eq i64 %t59, %t60
   %t62 = zext i1 %t61 to i64
   %t63 = trunc i64 %t62 to i1
-  br i1 %t63, label %then3523, label %else3524
-then3523:
+  br i1 %t63, label %then3534, label %else3535
+then3534:
   %t64 = call i8* @__sf_malloc(i64 8)
   %t65 = bitcast i8* %t64 to [1 x i64]*
   %t66 = getelementptr [1 x i64], [1 x i64]* %t65, i64 0, i64 0
   store i64 4, i64* %t66
   %t67 = ptrtoint [1 x i64]* %t65 to i64
   ret i64 %t67
-else3524:
-  br label %endif3522
-endif3522:
+else3535:
+  br label %endif3533
+endif3533:
   %t68 = call i8* @__sf_malloc(i64 8)
   %t69 = bitcast i8* %t68 to [1 x i64]*
   %t70 = getelementptr [1 x i64], [1 x i64]* %t69, i64 0, i64 0
@@ -37493,8 +37700,8 @@ endif3522:
   %t76 = icmp sgt i64 %t73, %t74
   %t75 = zext i1 %t76 to i64
   %t77 = trunc i64 %t75 to i1
-  br i1 %t77, label %then3526, label %else3527
-then3526:
+  br i1 %t77, label %then3537, label %else3538
+then3537:
   %t78 = load i64, i64* %then_branch
   %t79 = load i64, i64* %then_branch
   %t80 = call i64 @__list_length(i64 %t79)
@@ -37512,22 +37719,22 @@ then3526:
   store i64 %t90, i64* %then_extractable
   %t91 = load i64, i64* %then_extractable
   %t92 = trunc i64 %t91 to i1
-  br i1 %t92, label %then3529, label %else3530
-then3529:
+  br i1 %t92, label %then3540, label %else3541
+then3540:
   %t93 = load i64, i64* %self
   %t94 = load i64, i64* %then_last
   %t95 = call i64 @Parser__stmt_to_expr(i64 %t93, i64 %t94)
   store i64 %t95, i64* %then_val
   %t96 = load i64, i64* %then_branch
   %t97 = call i64 @__list_pop(i64 %t96)
-  br label %endif3528
-else3530:
-  br label %endif3528
-endif3528:
-  br label %endif3525
-else3527:
-  br label %endif3525
-endif3525:
+  br label %endif3539
+else3541:
+  br label %endif3539
+endif3539:
+  br label %endif3536
+else3538:
+  br label %endif3536
+endif3536:
   %t98 = call i8* @__sf_malloc(i64 8)
   %t99 = bitcast i8* %t98 to [1 x i64]*
   %t100 = getelementptr [1 x i64], [1 x i64]* %t99, i64 0, i64 0
@@ -37540,8 +37747,8 @@ endif3525:
   %t106 = icmp sgt i64 %t103, %t104
   %t105 = zext i1 %t106 to i64
   %t107 = trunc i64 %t105 to i1
-  br i1 %t107, label %then3532, label %else3533
-then3532:
+  br i1 %t107, label %then3543, label %else3544
+then3543:
   %t108 = load i64, i64* %else_branch
   %t109 = load i64, i64* %else_branch
   %t110 = call i64 @__list_length(i64 %t109)
@@ -37559,22 +37766,22 @@ then3532:
   store i64 %t120, i64* %else_extractable
   %t121 = load i64, i64* %else_extractable
   %t122 = trunc i64 %t121 to i1
-  br i1 %t122, label %then3535, label %else3536
-then3535:
+  br i1 %t122, label %then3546, label %else3547
+then3546:
   %t123 = load i64, i64* %self
   %t124 = load i64, i64* %else_last
   %t125 = call i64 @Parser__stmt_to_expr(i64 %t123, i64 %t124)
   store i64 %t125, i64* %else_val
   %t126 = load i64, i64* %else_branch
   %t127 = call i64 @__list_pop(i64 %t126)
-  br label %endif3534
-else3536:
-  br label %endif3534
-endif3534:
-  br label %endif3531
-else3533:
-  br label %endif3531
-endif3531:
+  br label %endif3545
+else3547:
+  br label %endif3545
+endif3545:
+  br label %endif3542
+else3544:
+  br label %endif3542
+endif3542:
   %t128 = load i64, i64* %cond
   %t129 = load i64, i64* %then_branch
   %t130 = load i64, i64* %then_val
@@ -37614,19 +37821,19 @@ entry:
   %t4 = inttoptr i64 %t1 to i64*
   %t5 = load i64, i64* %t4
   %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.arm3540 [ i8 0, label %match.arm3538 i8 6, label %match.arm3539 ]
-match.arm3538:
+  switch i8 %t3, label %match.arm3551 [ i8 0, label %match.arm3549 i8 6, label %match.arm3550 ]
+match.arm3549:
   %t6 = load i64, i64* %e
   %t7 = inttoptr i64 %t1 to [2 x i64]*
   %t8 = getelementptr [2 x i64], [2 x i64]* %t7, i64 0, i64 1
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %e
-  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.1698, i64 0, i64 0
+  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.1700, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   store i64 %t11, i64* %t2
   store i64 %t6, i64* %e
-  br label %match.end3537
-match.arm3539:
+  br label %match.end3548
+match.arm3550:
   %t12 = load i64, i64* %c
   %t13 = load i64, i64* %t
   %t14 = load i64, i64* %e
@@ -37640,47 +37847,47 @@ match.arm3539:
   %t20 = getelementptr [4 x i64], [4 x i64]* %t15, i64 0, i64 3
   %t21 = load i64, i64* %t20
   store i64 %t21, i64* %e
-  %t22 = getelementptr [3 x i8], [3 x i8]* @.str.1699, i64 0, i64 0
+  %t22 = getelementptr [3 x i8], [3 x i8]* @.str.1701, i64 0, i64 0
   %t23 = ptrtoint i8* %t22 to i64
   store i64 %t23, i64* %t2
   store i64 %t12, i64* %c
   store i64 %t13, i64* %t
   store i64 %t14, i64* %e
-  br label %match.end3537
-match.arm3540:
-  %t24 = getelementptr [6 x i8], [6 x i8]* @.str.1700, i64 0, i64 0
+  br label %match.end3548
+match.arm3551:
+  %t24 = getelementptr [6 x i8], [6 x i8]* @.str.1702, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i64
   store i64 %t25, i64* %t2
-  br label %match.end3537
-match.end3537:
+  br label %match.end3548
+match.end3548:
   %t26 = load i64, i64* %t2
   store i64 %t26, i64* %kind
   %t27 = load i64, i64* %kind
-  %t28 = getelementptr [5 x i8], [5 x i8]* @.str.1701, i64 0, i64 0
+  %t28 = getelementptr [5 x i8], [5 x i8]* @.str.1703, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
   %t30 = call i64 @__string_eq(i64 %t27, i64 %t29)
   %t31 = trunc i64 %t30 to i1
-  br i1 %t31, label %then3542, label %else3543
-then3542:
+  br i1 %t31, label %then3553, label %else3554
+then3553:
   %t32 = add i64 0, 1
   ret i64 %t32
-else3543:
-  br label %endif3541
-endif3541:
+else3554:
+  br label %endif3552
+endif3552:
   %t33 = load i64, i64* %kind
-  %t34 = getelementptr [3 x i8], [3 x i8]* @.str.1702, i64 0, i64 0
+  %t34 = getelementptr [3 x i8], [3 x i8]* @.str.1704, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @__string_eq(i64 %t33, i64 %t35)
   %t37 = trunc i64 %t36 to i1
-  br i1 %t37, label %then3545, label %else3546
-then3545:
+  br i1 %t37, label %then3556, label %else3557
+then3556:
   %t38 = load i64, i64* %stmt
   %t39 = alloca i64
   %t41 = inttoptr i64 %t38 to i64*
   %t42 = load i64, i64* %t41
   %t40 = trunc i64 %t42 to i8
-  switch i8 %t40, label %match.arm3549 [ i8 6, label %match.arm3548 ]
-match.arm3548:
+  switch i8 %t40, label %match.arm3560 [ i8 6, label %match.arm3559 ]
+match.arm3559:
   %t43 = load i64, i64* %c
   %t44 = load i64, i64* %t
   %t45 = load i64, i64* %e
@@ -37699,12 +37906,12 @@ match.arm3548:
   store i64 %t43, i64* %c
   store i64 %t44, i64* %t
   store i64 %t45, i64* %e
-  br label %match.end3547
-match.arm3549:
+  br label %match.end3558
+match.arm3560:
   %t54 = call i64 @__list_new()
   store i64 %t54, i64* %t39
-  br label %match.end3547
-match.end3547:
+  br label %match.end3558
+match.end3558:
   %t55 = load i64, i64* %t39
   store i64 %t55, i64* %else_br
   %t56 = load i64, i64* %else_br
@@ -37713,9 +37920,9 @@ match.end3547:
   %t60 = icmp sgt i64 %t57, %t58
   %t59 = zext i1 %t60 to i64
   ret i64 %t59
-else3546:
-  br label %endif3544
-endif3544:
+else3557:
+  br label %endif3555
+endif3555:
   %t61 = add i64 0, 0
   ret i64 %t61
 }
