@@ -3325,7 +3325,7 @@ class NullChecker {
             // rendered through the lossy `type_to_string`, so two branches guarded
             // on `ret.contains("<")` could never run. That is the argument for
             // classifying before migrating.
-            Call(callee, args, __cs) => this.parse_type_node(this.infer_call(callee, args))
+            Call(callee, args, __cs) => this.infer_call(callee, args)
             Assign(name, value, __as) => this.check_assign_node(name, value, __as)
             // Both operands are code, so walk them. Returning BoolType without
             // visiting `left` and `right` meant a variable used ONLY inside an
@@ -3371,8 +3371,8 @@ class NullChecker {
                 this.env.pop_scope()
                 AST.Type.BoolType
             }
-            MemberAccess(obj, field, __ms) => this.parse_type_node(this.infer_member_access(obj, field))
-            Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
+            MemberAccess(obj, field, __ms) => this.infer_member_access(obj, field)
+            Match(subject, arms) => this.infer_match(subject, arms)
             EnumConstruct(e, v, a) => AST.Type.EnumType(e)
             // A lambda's body is code, so walk it. Returning the FuncType without
             // visiting `b` meant a variable captured *only* inside a lambda was
@@ -3493,7 +3493,7 @@ class NullChecker {
                 }
             }
             IndexSet(obj, index, value) => this.infer_type(value)
-            MethodCall(obj, method, args, __ks) => this.parse_type_node(this.infer_method_call(obj, method, args, __ks))
+            MethodCall(obj, method, args, __ks) => this.infer_method_call(obj, method, args, __ks)
             MapLit => AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
             BlockExpr(stmts, value) => {
                 this.check_stmts(stmts)
@@ -3596,7 +3596,12 @@ class NullChecker {
         return this.type_to_str(t)
     }
 
-    fun infer_member_access(obj: AST.Expr, field: String): String {
+    // Signature flipped from `: String` in the same shape as infer_match: each
+    // return is wrapped in parse_type_node so the internal string surgery
+    // (generic_base, substitute_class_type_params, enum-variant lookup) is
+    // preserved exactly. The five returns are correspondingly wrapped one by one.
+    // Pure composition; IR guaranteed identical.
+    fun infer_member_access(obj: AST.Expr, field: String): AST.Type {
         var obj_type: String = this.infer_expr(obj)
         // this.field → look up field type from current class
         if (obj_type == this.current_class or obj_type == "This") {
@@ -3609,7 +3614,7 @@ class NullChecker {
                 // check_member_visibility permits, so the ordinary use is
                 // unaffected.
                 this.check_member_visibility(this.current_class, field, "field")
-                return this.get_class_field_type(this.current_class, field)
+                return this.parse_type_node(this.get_class_field_type(this.current_class, field))
             }
         }
         // variable.field → look up from variable's class type. Keyed by the bare
@@ -3624,9 +3629,9 @@ class NullChecker {
             this.check_member_visibility(obj_type, field, "field")
             if (this.member_is_absent(ma_base, field)) {
                 this.error("type '" + ma_base + "' has no member '" + field + "'")
-                return "Any"
+                return AST.Type.AnyType
             }
-            return this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type)
+            return this.parse_type_node(this.substitute_class_type_params(this.get_class_field_type(ma_base, field), obj_type))
         }
         // Known module members
         if (obj_type == "Any") {
@@ -3643,7 +3648,7 @@ class NullChecker {
             }
             // Enum variant access (Color.Red, Option.Some, etc.)
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
-                return obj_name
+                return this.parse_type_node(obj_name)
             }
             // §6a path 2 for a plain member READ: `Mod._name` where `Mod` is a
             // module alias. The twin path for a member CALL — `Mod.method()` —
@@ -3662,7 +3667,7 @@ class NullChecker {
         // this member name is private on some class. This is also the working
         // route for `Math.PI`, which is why it must not become an error (§3).
         this.check_member_visibility(obj_type, field, "field")
-        return field
+        return this.parse_type_node(field)
     }
 
     fun get_class_field_type(class_name: String, field: String): String {
@@ -4028,7 +4033,16 @@ class NullChecker {
         return base + "<" + resolved_args.join(",") + ">"
     }
 
-    fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
+    // The Call arm's caller. Same shape as infer_match/infer_member_access: the
+    // node-returning entry parse_type_node's the string helper's answer at the
+    // single exit, so all 21 returns and their internal string surgery
+    // (resolve_type_params, resolve_generic_return, get_func_ret, is_type_param)
+    // stay unchanged. IR guaranteed identical.
+    fun infer_call(callee: AST.Expr, args: List<AST.Expr>): AST.Type {
+        return this.parse_type_node(this.infer_call_str(callee, args))
+    }
+
+    fun infer_call_str(callee: AST.Expr, args: List<AST.Expr>): String {
         var name: String = match (callee) {
             Variable(n, __vs) => n
             Ref(rk, rn, rs, __rs) => rn
@@ -4221,7 +4235,16 @@ class NullChecker {
 
     // --- Method call inference (the key null-safety check) ---
 
-    fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>, method_span: AST.Span): String {
+    // The MethodCall arm's caller. Same shape as infer_call: the node-returning
+    // entry wraps the string helper's answer at the single exit. The string helper
+    // keeps its 42 returns and its internal string surgery unchanged
+    // (substitute_class_type_params, the Map K/V extractors, generic_base). IR
+    // guaranteed identical.
+    fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>, method_span: AST.Span): AST.Type {
+        return this.parse_type_node(this.infer_method_call_str(obj, method, args, method_span))
+    }
+
+    fun infer_method_call_str(obj: AST.Expr, method: String, args: List<AST.Expr>, method_span: AST.Span): String {
         var obj_type: String = this.infer_expr(obj)
 
         // `__iter_get` — the for-in desugaring's element read (BUGS #62). It is
@@ -4538,7 +4561,21 @@ class NullChecker {
         return false
     }
 
-    fun infer_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
+    // The Match arm was `parse_type_node(this.infer_match(...))`. Moving the
+    // parse_type_node inside — one line at the single return — flips the signature
+    // to AST.Type without touching any of the internal string surgery (matched-
+    // variant accumulation, "A|B|C" union building, the delicate dedup against the
+    // accumulated string). Pure composition, so IR is guaranteed identical.
+    //
+    // Removing the round trip itself is a later slice: the union spelling grows
+    // with `+ "|" +` in the same shape #86's fun_param_sigs did, and both dedup
+    // and Any-handling are string comparisons on the accumulated form (`arm_type
+    // != result_type`, where result_type is the ALREADY-JOINED "A|B"). Reproducing
+    // that in nodes needs a matching accumulator and a decision about whether the
+    // faithful bug (a third arm A re-adding onto "A|B" to make "A|B|A", which
+    // parse_type_node then reads as UnionType([A,B,A]) with a real duplicate)
+    // stays or goes. That is a semantic move, not a mechanical one.
+    fun infer_match(subject: AST.Expr, arms: List<AST.MatchArm>): AST.Type {
         var subj_type: String = this.infer_expr(subject)
 
         // Check exhaustiveness: collect matched variant names
@@ -4614,7 +4651,7 @@ class NullChecker {
             this.check_exhaustiveness(subj_type, matched_variants)
         }
 
-        return result_type
+        return this.parse_type_node(result_type)
     }
 
     // `enum_fields` and `enum_variants` are keyed by the enum's *declared* name,
