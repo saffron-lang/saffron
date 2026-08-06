@@ -10186,7 +10186,16 @@ class Codegen {
         }
         match (stmt) {
             VarDecl(name, type_ann, init, doc, v_vis, __ns, __fs) => {
-                this.add_var_unique(names, types, name, type_ann)
+                // type_ann became an AST.Type node in the VarDecl migration, but
+                // add_var_unique's `typ` and the `types` list are String. Render it;
+                // an omitted annotation (UnknownType) renders as the permissive
+                // "Any" rather than the literal word "Unknown" (invariant I2),
+                // matching the "Any" the let-pattern bindings above push. BUGS #165's
+                // new check surfaced this: an AST.Type was being pushed into a
+                // List<String> unrendered.
+                var va_type: String = "Any"
+                if (!this.is_unknown_type(type_ann)) { va_type = this.type_to_string(type_ann) }
+                this.add_var_unique(names, types, name, va_type)
                 this.collect_vars_expr(init, names, types)
             }
             // A CONDITION can declare variables too, for the same reason a

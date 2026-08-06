@@ -140,6 +140,7 @@ declare void @__print_debug_location()
 declare i64 @__gc_alloc_safe(i64, i64)
 declare i64 @__val_untag_int(i64)
 declare i8* @__val_untag_ptr(i64)
+declare i64 @__rt_gc_ptr_floor()
 declare double @__val_untag_float(i64)
 declare i32 @system(i8*)
 
@@ -2578,7 +2579,7 @@ else268:
   br label %endif266
 endif266:
   %t40 = load i64, i64* %raw
-  %t41 = add i64 0, 4294967296
+  %t41 = call i64 @__rt_gc_ptr_floor()
   %t43 = icmp slt i64 %t40, %t41
   %t42 = zext i1 %t43 to i64
   %t44 = trunc i64 %t42 to i1

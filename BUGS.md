@@ -2,8 +2,16 @@
 
 ## Open
 
-**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #171, #172. Next free number is **#173**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158,
+#171, #172. Next free number is **#173**.
+
+#155 and #165 were in this list and are now fixed together — a class-typed
+parameter or return that accepted an incompatible concrete type (a String where a
+`Box` was declared) and segfaulted, at the argument site and the return site
+respectively. One helper, `class_type_mismatch`, guarded on the class/enum
+registries rather than on name spelling (the discipline #143's `check_condition`
+already used), closed both; it turned out not to need the resolve pass #155's
+narrative had gated it on. Count 14 → 12, next-free unchanged, nothing else moved.
 
 #172 (wasm32 `malloc` hands out pointers past memory when `memory.grow` is
 capped/fails) was filed from the playground: compiling a program returns a ~21 KB
@@ -872,184 +880,6 @@ deleted.
 
 ---
 
-### 155. OPEN (narrowed) — a `return` is checked against its declared return type only for scalar-vs-scalar; the class-typed segfault is still live
-
-**Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for
-rewrite stage 3.
-
-The `Return` arm of `check_stmt` (`checker.sf:2574`) inferred the value's type and
-then asked exactly one question: is a *nullable* value being returned from a
-non-nullable slot. It never compared two concrete types, so every one of these
-compiled with zero diagnostics:
-
-```saffron
-fun f(): String { return 42 }
-fun f(): Int    { return "hi" }
-fun f(): Bool   { return 42 }
-fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
-```
-
-**Landed 2026-08-04 (second): the declared-`Nil` half**, the fourth case above.
-`fun f(): Nil { return 42 }` is now `return: cannot return Int from function
-declared ': Nil'`. It became expressible only after `FunDecl.ret_type` and
-`Lambda.ret_type` became `AST.Type` nodes with an explicit `UnknownType` — see
-"And the sentinel *was* in-band" below for what that unblocked and what it cost.
-`test/fail/return_nil_declared.sf` is the regression test; the legitimate shapes
-(`return nil`, bare `return`, falling off the end, and every unannotated function)
-are pinned in `test/pass/return_type_valid.sf`.
-
-**Landed 2026-08-04: the scalar-vs-scalar half.** The `Return` arm now calls
-`scalar_mismatch` (`checker.sf:890`), inheriting the same one-sided discipline
-`check_call_args` uses — it fires only on two *different concrete scalars*, and
-lets `Any`, `Nil`, unions, generics, class and enum types through. The first three
-cases above are now errors; `test/fail/return_type_mismatch.sf` is the regression
-test and `test/pass/return_type_valid.sf` pins the legitimate patterns
-(same-type, `Int`→`Float` widening, nil-from-nullable, concrete-into-nullable,
-`Any` in either position, unannotated).
-
-Two exclusions are deliberate and both are documented at the site:
-
-- **`Int`→`String` is allowed.** In the NaN-boxed runtime an `Int` holding a heap
-  address *is* a String — a pointer to a NUL-terminated buffer.
-  `lexer.sf:byte_to_char` (line 431) returns a `__lex_malloc` result from a
-  `: String` function, and it is correct. This is the identity-mode analog of
-  `Int`→`Float` widening and disappears when I5 introduces `Ptr<T>`. The check
-  found this on its first bootstrap: `STAGE 1` rejected `lexer.sf` with
-  `cannot return Int from function expecting String`.
-- ~~**The declared-`Nil` case is still unchecked**, because the sentinel problem
-  below is unsolved.~~ Solved 2026-08-04; see above.
-
-**Still open: the class-typed case, which is the one that crashes.**
-
-```saffron
-class Box { var n: Int
-  fun init(n: Int) { this.n = n }
-  fun get(): Int { return this.n } }
-
-fun make(): Box { return "not a box" }
-var b = make()
-IO.println("n=${b.get()}")         // segfault
-```
-
-The checker binds `b` to `Box` on the declaration's authority, codegen emits a
-direct `Box__get` call with a field load, and the receiver is a `String` pointer.
-
-A first attempt added the obvious two arms — declared-class/returned-scalar and
-declared-scalar/returned-class — and they were **reverted**: they are too eager,
-because "not a scalar name" is not the same as "a class." The suite named three
-distinct false-positive families in one run (5 tests):
-
-| Test | Spurious error | Why it is legal |
-|---|---|---|
-| `nullable_narrowing`, `pass/nullable_recv_dispatch` | `cannot return String from function expecting String\|Nil` | `String` **is** a subtype of `String\|Nil` |
-| `pass/nullable_shorthand` | `cannot return Int from function expecting Int\|Nil` | same |
-| `test_generics` | `cannot return Int from function expecting T` | `T` is a type *parameter*, resolved from the call site |
-| `pass/module_member_write_valid` | `cannot return e from function expecting Float` | `return Math.e` — the type came back as the raw member name `e`; an inference gap, not a type |
-
-The last row is the useful one: an unresolved type currently *spells itself as a
-plausible type name*, which is mechanism M2 again — "I don't know" wearing the
-costume of an answer. A membership test against a real class/enum registry, or
-`is_subtype_node`, is what this needs, and both want the resolve pass (I4) to
-answer reliably for module-qualified names. `parse_type_node("AST.Type")` falls
-through to `ClassType("AST.Type")` while the value side infers `EnumType("Type")`
-— two spellings of one type, and `inherits_from` knows neither.
-
-**And the sentinel *was* in-band — fixed 2026-08-04.** The parser used to default
-an omitted return type to a *real type name*: `"Nil"` for `FunDecl`, `"Int"` for
-`Lambda`. Both were indistinguishable from an annotation the author wrote, so the
-declared-`Nil` case could not be enforced without rejecting every unannotated
-`fun f() { return 42 }` — several hundred of them in the compiler's own source,
-which the checker type-checks, so the false positive broke the bootstrap outright.
-#147 under `## Resolved` is the same defect one AST node over, and
-`check_lambda_body` already set `current_func_ret = AnyType` for exactly this
-reason — a walk that exists to record uses "must not start enforcing a return type
-nobody wrote."
-
-Both `ret_type` fields are now `AST.Type` with an explicit `UnknownType`
-(invariant I2), so the arm can tell "the author declared `Nil`" from "nobody
-declared anything." Three things that fell out of doing it, all worth keeping:
-
-- **The two sentinels meant opposite things.** Measured on the pre-migration
-  binary: `FunDecl`'s `"Nil"` *suppressed* implicit return, `Lambda`'s `"Int"`
-  *enabled* it. So `UnknownType` alone could not replace both — `gen_function`
-  recovers the distinction from the construct (`__lambda` in the emit name).
-  Collapsing them would have made every block-form lambda return 0 silently, with
-  no test naming it.
-- **The guard removed to enable the `: Nil` case had been shielding a second,
-  unrelated check.** The nullable-return test in the same arm was excluded from
-  unannotated functions only as a side effect of excluding real `: Nil` ones, so
-  dropping the outer guard produced `cannot return nullable Nil from function
-  expecting Unknown` — `Unknown` named as if the author had written it. This is
-  the inverse of #147's lesson: a sentinel blocks the checks that inspect it, and
-  sometimes the checks merely standing next to it.
-- **An LSP bug, incidentally.** `render_signature`'s `length() > 0` guard was
-  never false, so every unannotated function's hover claimed `: Nil`.
-
-What remains under this number is the class-typed segfault above, still gated on
-the resolve pass (I4), plus the `Int`→`String` concession, still gated on I5's
-`Ptr<T>`.
-
-See **#165** for the same hole on the *argument* side of a call, which this entry
-does not cover and which segfaults identically.
-
----
-
-### 165. OPEN — passing a String where a class-typed parameter is declared compiles clean and segfaults; #155's hole, one site over
-
-**Severity: high.** Found while classifying `checker.sf`'s `: String`-returning
-functions for rewrite stage 3.
-
-`check_call_args` (`checker.sf:1058`) closed #145 by comparing arguments to
-parameters, and reuses `scalar_mismatch`, so it fires only on two *different
-concrete scalars*. A class-typed parameter is therefore never checked against
-anything, and all three call forms accept a `String`:
-
-```saffron
-class Box { var n: Int
-  fun init(n: Int) { this.n = n }
-  fun get(): Int { return this.n }
-  fun eat(b: Box): Int { return b.get() } }
-
-fun free_fn(b: Box): Int { return b.get() }
-
-var s: String = "nope"
-free_fn(s)          // compiles; segfault
-Box(1).eat(s)       // compiles; segfault
-Holder(s)           // compiles; segfault  (constructor, `var b: Box` field)
-```
-
-Measured: each of the three compiles to a `.ll` with no diagnostic, and running
-the first is `Segmentation fault: 11`. The mechanism is #155's exactly — the
-checker trusts the declaration, codegen emits a direct `Box__get` with a field
-load, and the receiver is a String pointer — but at the *call* boundary rather
-than the `return` boundary. #155's narrative is entirely about `return` and its
-"still open" paragraph names only that site, so nothing tracked this one.
-
-**Why this is a separate number rather than a note under #155.** They share a
-cause and will likely share a fix, but they are different code: #155 is
-`check_stmt`'s `Return` arm, this is `check_call_args`, wired at three keys
-(`name`, `Class__method`, `Class__init`). #145 landed only the free-function key
-first and both the method and constructor negatives printed `NOT CAUGHT`, so
-"fixed at the return site" would not have implied fixed here even if the arm were
-shared.
-
-**What is NOT the bug.** `scalar_mismatch` letting this through is deliberate and
-documented at the site: the checker type-checks the compiler's own source, so a
-false positive is a broken bootstrap, and #155 already reverted an obvious
-declared-class/passed-scalar arm after it produced three distinct false-positive
-families. I re-probed all three at the *argument* site and they are live here too
-— a `String` into `String|Nil`, an `Int` into a type parameter `T`, and
-`Math.e` into `: Float` all compile clean and must keep doing so. So the fix is
-not "add the arm"; it is the same membership test against a real class/enum
-registry, or `is_subtype_node`, that #155 is gated on, which wants I4 to answer
-reliably for module-qualified names.
-
-Filed rather than fixed for that reason. What this entry adds is that closing
-#155 will not close the argument side unless the fix is written at both sites,
-and that a probe of *one* call form is not evidence about the others.
-
----
-
 ### 154. An enum inside a printed collection still prints a bit pattern — PAYLOAD HALF FIXED, fieldless half open
 
 **Severity: medium as filed; now low.** Silent wrong answer, but narrower than it
@@ -1244,6 +1074,224 @@ class — semicolon, comment, trailing brace, stray punctuation — rather than 
 semicolon alone.
 
 ## Resolved
+
+### 155. FIXED — a class-typed `return` accepted an incompatible concrete type (a String from a `: Box` function) and segfaulted; the scalar and `: Nil` halves were closed earlier
+
+**Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for
+rewrite stage 3.
+
+The `Return` arm of `check_stmt` (`checker.sf:2574`) inferred the value's type and
+then asked exactly one question: is a *nullable* value being returned from a
+non-nullable slot. It never compared two concrete types, so every one of these
+compiled with zero diagnostics:
+
+```saffron
+fun f(): String { return 42 }
+fun f(): Int    { return "hi" }
+fun f(): Bool   { return 42 }
+fun f(): Nil    { return 42 }      // and the caller's `r + 1` is 43
+```
+
+**Landed 2026-08-04 (second): the declared-`Nil` half**, the fourth case above.
+`fun f(): Nil { return 42 }` is now `return: cannot return Int from function
+declared ': Nil'`. It became expressible only after `FunDecl.ret_type` and
+`Lambda.ret_type` became `AST.Type` nodes with an explicit `UnknownType` — see
+"And the sentinel *was* in-band" below for what that unblocked and what it cost.
+`test/fail/return_nil_declared.sf` is the regression test; the legitimate shapes
+(`return nil`, bare `return`, falling off the end, and every unannotated function)
+are pinned in `test/pass/return_type_valid.sf`.
+
+**Landed 2026-08-04: the scalar-vs-scalar half.** The `Return` arm now calls
+`scalar_mismatch` (`checker.sf:890`), inheriting the same one-sided discipline
+`check_call_args` uses — it fires only on two *different concrete scalars*, and
+lets `Any`, `Nil`, unions, generics, class and enum types through. The first three
+cases above are now errors; `test/fail/return_type_mismatch.sf` is the regression
+test and `test/pass/return_type_valid.sf` pins the legitimate patterns
+(same-type, `Int`→`Float` widening, nil-from-nullable, concrete-into-nullable,
+`Any` in either position, unannotated).
+
+Two exclusions are deliberate and both are documented at the site:
+
+- **`Int`→`String` is allowed.** In the NaN-boxed runtime an `Int` holding a heap
+  address *is* a String — a pointer to a NUL-terminated buffer.
+  `lexer.sf:byte_to_char` (line 431) returns a `__lex_malloc` result from a
+  `: String` function, and it is correct. This is the identity-mode analog of
+  `Int`→`Float` widening and disappears when I5 introduces `Ptr<T>`. The check
+  found this on its first bootstrap: `STAGE 1` rejected `lexer.sf` with
+  `cannot return Int from function expecting String`.
+- ~~**The declared-`Nil` case is still unchecked**, because the sentinel problem
+  below is unsolved.~~ Solved 2026-08-04; see above.
+
+**Landed 2026-08-06: the class-typed case, which was the one that crashed.**
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n } }
+
+fun make(): Box { return "not a box" }   // now: return: cannot return String from function expecting Box
+var b = make()
+IO.println("n=${b.get()}")               // (previously segfaulted)
+```
+
+The checker bound `b` to `Box` on the declaration's authority, codegen emitted a
+direct `Box__get` call with a field load, and the receiver was a `String` pointer.
+
+A first attempt added the obvious two arms — declared-class/returned-scalar and
+declared-scalar/returned-class — and they were **reverted**: they are too eager,
+because "not a scalar name" is not the same as "a class." The suite named three
+distinct false-positive families in one run (5 tests):
+
+| Test | Spurious error | Why it is legal |
+|---|---|---|
+| `nullable_narrowing`, `pass/nullable_recv_dispatch` | `cannot return String from function expecting String\|Nil` | `String` **is** a subtype of `String\|Nil` |
+| `pass/nullable_shorthand` | `cannot return Int from function expecting Int\|Nil` | same |
+| `test_generics` | `cannot return Int from function expecting T` | `T` is a type *parameter*, resolved from the call site |
+| `pass/module_member_write_valid` | `cannot return e from function expecting Float` | `return Math.e` — the type came back as the raw member name `e`; an inference gap, not a type |
+
+The last row is the useful one: an unresolved type currently *spells itself as a
+plausible type name*, which is mechanism M2 again — "I don't know" wearing the
+costume of an answer. A membership test against a real class/enum registry, or
+`is_subtype_node`, is what this needs, and both want the resolve pass (I4) to
+answer reliably for module-qualified names. `parse_type_node("AST.Type")` falls
+through to `ClassType("AST.Type")` while the value side infers `EnumType("Type")`
+— two spellings of one type, and `inherits_from` knows neither.
+
+**And the sentinel *was* in-band — fixed 2026-08-04.** The parser used to default
+an omitted return type to a *real type name*: `"Nil"` for `FunDecl`, `"Int"` for
+`Lambda`. Both were indistinguishable from an annotation the author wrote, so the
+declared-`Nil` case could not be enforced without rejecting every unannotated
+`fun f() { return 42 }` — several hundred of them in the compiler's own source,
+which the checker type-checks, so the false positive broke the bootstrap outright.
+#147 under `## Resolved` is the same defect one AST node over, and
+`check_lambda_body` already set `current_func_ret = AnyType` for exactly this
+reason — a walk that exists to record uses "must not start enforcing a return type
+nobody wrote."
+
+Both `ret_type` fields are now `AST.Type` with an explicit `UnknownType`
+(invariant I2), so the arm can tell "the author declared `Nil`" from "nobody
+declared anything." Three things that fell out of doing it, all worth keeping:
+
+- **The two sentinels meant opposite things.** Measured on the pre-migration
+  binary: `FunDecl`'s `"Nil"` *suppressed* implicit return, `Lambda`'s `"Int"`
+  *enabled* it. So `UnknownType` alone could not replace both — `gen_function`
+  recovers the distinction from the construct (`__lambda` in the emit name).
+  Collapsing them would have made every block-form lambda return 0 silently, with
+  no test naming it.
+- **The guard removed to enable the `: Nil` case had been shielding a second,
+  unrelated check.** The nullable-return test in the same arm was excluded from
+  unannotated functions only as a side effect of excluding real `: Nil` ones, so
+  dropping the outer guard produced `cannot return nullable Nil from function
+  expecting Unknown` — `Unknown` named as if the author had written it. This is
+  the inverse of #147's lesson: a sentinel blocks the checks that inspect it, and
+  sometimes the checks merely standing next to it.
+- **An LSP bug, incidentally.** `render_signature`'s `length() > 0` guard was
+  never false, so every unannotated function's hover claimed `: Nil`.
+
+**The fix (2026-08-06), and why it did not need the resolve pass after all.** The
+class-typed check the reverted attempt got wrong is expressible today, because the
+thing it needed was never I4 — it was the discipline `check_condition` (BUGS #143)
+already uses: *guard on the registries, not on spelling.* A new helper
+`class_type_mismatch` (`checker.sf`, beside `scalar_mismatch`) fires only when BOTH
+sides are provably concrete AND incompatible:
+
+- at least one side is a concrete class/enum, tested by membership in
+  `class_fields` (minus `interface_names`) or `enum_variants` — never by name
+  shape, so a name that never resolved is simply absent and let through;
+- the other side is provably concrete too — a scalar, or a *different* registered
+  class/enum;
+- and they are not equal, not `Any`/`Nil`, and not in a subtype relation
+  (`is_subtype`).
+
+Every row of the reverted attempt's false-positive table is let through *by
+construction*: a union (`String|Nil`) is neither a scalar nor a registered class
+name; a type parameter (`T`) is in no registry; and the `Math.e` inference gap
+arrives as the bare name `e`, which is in neither the scalar set nor the
+registries. The M2 problem the last row named — "I don't know" wearing the costume
+of a type name — stops mattering once the test is membership rather than spelling:
+an unresolved name fails the membership test and is left alone, which is exactly
+the safe answer. `test/fail/return_class_type_mismatch.sf` is the regression test;
+`test/pass/class_type_compat_valid.sf` pins the subtype, exact-match, nullable and
+`Any` shapes that must keep compiling.
+
+The bootstrap earned its keep here: with the check active, STAGE 2 rejected the
+compiler's own source with `argument 4 of 'add_var_unique' expects String, got
+Type` — a genuine latent bug, not a false positive. `VarDecl.type_ann` became an
+`AST.Type` node in its migration, but `collect_vars_stmt` still passed it into a
+`typ: String` parameter, pushing a node into a `List<String>`. Rendered at the
+call site in the same change.
+
+The `Int`→`String` concession is untouched and still gated on I5's `Ptr<T>`.
+
+This closes **#165** too — the same hole on the *argument* side — because the fix
+is one helper called from both `check_stmt`'s `Return` arm and `check_call_args`.
+
+---
+
+### 165. FIXED — passing a String where a class-typed parameter was declared compiled clean and segfaulted; #155's hole, one site over
+
+**Severity: high.** Found while classifying `checker.sf`'s `: String`-returning
+functions for rewrite stage 3.
+
+`check_call_args` (`checker.sf:1058`) closed #145 by comparing arguments to
+parameters, and reuses `scalar_mismatch`, so it fires only on two *different
+concrete scalars*. A class-typed parameter is therefore never checked against
+anything, and all three call forms accept a `String`:
+
+```saffron
+class Box { var n: Int
+  fun init(n: Int) { this.n = n }
+  fun get(): Int { return this.n }
+  fun eat(b: Box): Int { return b.get() } }
+
+fun free_fn(b: Box): Int { return b.get() }
+
+var s: String = "nope"
+free_fn(s)          // compiles; segfault
+Box(1).eat(s)       // compiles; segfault
+Holder(s)           // compiles; segfault  (constructor, `var b: Box` field)
+```
+
+Measured: each of the three compiles to a `.ll` with no diagnostic, and running
+the first is `Segmentation fault: 11`. The mechanism is #155's exactly — the
+checker trusts the declaration, codegen emits a direct `Box__get` with a field
+load, and the receiver is a String pointer — but at the *call* boundary rather
+than the `return` boundary. #155's narrative is entirely about `return` and its
+"still open" paragraph names only that site, so nothing tracked this one.
+
+**Why this is a separate number rather than a note under #155.** They share a
+cause and will likely share a fix, but they are different code: #155 is
+`check_stmt`'s `Return` arm, this is `check_call_args`, wired at three keys
+(`name`, `Class__method`, `Class__init`). #145 landed only the free-function key
+first and both the method and constructor negatives printed `NOT CAUGHT`, so
+"fixed at the return site" would not have implied fixed here even if the arm were
+shared.
+
+**What is NOT the bug.** `scalar_mismatch` letting this through is deliberate and
+documented at the site: the checker type-checks the compiler's own source, so a
+false positive is a broken bootstrap, and #155 already reverted an obvious
+declared-class/passed-scalar arm after it produced three distinct false-positive
+families. I re-probed all three at the *argument* site and they are live here too
+— a `String` into `String|Nil`, an `Int` into a type parameter `T`, and
+`Math.e` into `: Float` all compile clean and must keep doing so. So the fix is
+not "add the arm"; it is the same membership test against a real class/enum
+registry, or `is_subtype_node`, that #155 is gated on, which wants I4 to answer
+reliably for module-qualified names.
+
+**Fixed 2026-08-06, at both sites, with one helper.** `class_type_mismatch` (see
+#155's resolution note) is called from `check_call_args` here as well as from the
+`Return` arm. The prediction in the paragraph above held exactly: the membership
+test — not I4 — was what it needed, and writing it at only one site would have left
+the other live, so it went into both in the same change. All three call forms
+(free function, method, constructor) route through `check_call_args`, so all three
+are covered. `test/fail/class_param_type_mismatch.sf` is the regression test.
+
+The re-probed false positives all still compile: the `String|Nil`, `T`, and
+`Math.e` cases are let through because none of them passes the registry membership
+test, which is the whole point of guarding on the registry rather than on whether
+a name merely *looks* like a type.
+
+---
 
 ### 170. FIXED — a `for-in` loop over a list/map/string trapped with IndexError on wasm32, though it worked natively and via direct indexing
 

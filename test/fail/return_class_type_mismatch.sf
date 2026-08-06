@@ -1,0 +1,16 @@
+// BUGS #155's class-typed half: returning a String from a function declared to
+// return a user class must be rejected, not compiled to a segfault. The caller
+// binds its variable to Box on the declaration's authority, then codegen emits a
+// direct Box__get field load against what is actually a String pointer.
+// Companion to #165's argument-site case (class_param_type_mismatch.sf).
+//
+// The compiler MUST reject this file. A clean compile is itself a failure.
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun get(): Int { return this.v }
+}
+
+fun make(): Box { return "not a box" }
+
+IO.println(make().get().to_string())

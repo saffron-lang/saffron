@@ -1,0 +1,41 @@
+// BUGS #155/#165 non-regression: the class-typed compatibility check must fire
+// ONLY on a provably-incompatible concrete pair. Everything here is legal and
+// must keep compiling — these are the shapes the earlier, reverted attempt broke
+// (it fired on unions, type parameters, subtypes and inference gaps).
+import "@test" as Test
+
+class Animal {
+    var name: String
+    fun init(name: String) { this.name = name }
+    fun speak(): String { return "..." }
+}
+
+class Dog extends Animal {
+    fun speak(): String { return "woof" }
+}
+
+// A subclass flowing into a base-typed slot — argument and return both legal.
+fun describe(a: Animal): String { return a.speak() }
+fun make_dog(): Animal { return Dog("Rex") }
+
+Test.assert_eq(describe(Dog("Fido")), "woof", "a Dog passes where an Animal is declared")
+Test.assert_eq(make_dog().speak(), "woof", "a Dog returns where an Animal is declared")
+
+// Exact-type match — the ordinary case, obviously fine.
+fun louder(a: Animal): String { return a.speak() + "!" }
+Test.assert_eq(louder(Animal("x")), "...!", "exact class type matches")
+
+// A nullable slot accepts the non-null concrete type (String is a subtype of
+// String|Nil). This was one of the reverted attempt's false positives.
+fun tag(s: String|Nil): String {
+    if (s != nil) { return "${s}" }
+    return "none"
+}
+Test.assert_eq(tag("hi"), "hi", "a String passes where String|Nil is declared")
+
+// Any accepts anything, in both directions.
+fun anyify(x: Any): Any { return x }
+var back: Any = anyify(Dog("z"))
+Test.assert(back != nil, "a class passes through Any and back")
+
+Test.summary()

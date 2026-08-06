@@ -1029,6 +1029,62 @@ class NullChecker {
         return false
     }
 
+    // A concrete class or enum whose runtime shape is fixed and known: it is
+    // registered in this compilation, and it is not an interface. Guarded on the
+    // registries, not on spelling — exactly like check_condition (BUGS #143) —
+    // because only names actually declared here appear in class_fields /
+    // enum_variants, so an unresolved or module-qualified name that never
+    // resolved (BUGS #155's `Math.e` false-positive family) is left alone.
+    //
+    // Interfaces are excluded: an interface-typed slot holds some implementor, so
+    // it is not a fixed shape and a concrete class flowing into it is legal.
+    fun is_concrete_named_type(s: String): Bool {
+        if (this.env.class_fields.has(s) and !this.interface_names.has(s)) return true
+        if (this.env.enum_variants.has(s)) return true
+        return false
+    }
+
+    // The class-typed half of BUGS #155/#165, the segfault scalar_mismatch cannot
+    // express: a `String` passed where `Box` is declared, or returned from a
+    // `: Box` function. The checker trusts the declaration, codegen emits a direct
+    // `Box__get` field load, and the receiver is a String pointer.
+    //
+    // Fires ONLY on a pair BOTH of which are provably concrete AND incompatible —
+    // the same one-sided discipline as scalar_mismatch and check_condition, and
+    // for the same reason: the checker type-checks the compiler's own source, so a
+    // false positive breaks the bootstrap. #155 reverted an earlier "not a scalar
+    // name → it's a class" attempt precisely because that fired on unions, type
+    // parameters and inference gaps. This is registry-guarded instead:
+    //
+    //   - at least one side is a concrete class/enum (is_concrete_named_type);
+    //   - the other side is provably concrete too — a scalar, or a DIFFERENT
+    //     concrete class/enum;
+    //   - and they are not equal, not in a subtype relation, and neither is Any/Nil.
+    //
+    // Everything the reverted attempt tripped on is let through by construction: a
+    // union (`String|Nil`) is neither a scalar nor a registered class name, a type
+    // parameter (`T`) is not in the registries, and an unresolved module member
+    // (`Math.e` arriving as the bare name `e`) is in neither the scalar set nor the
+    // registries. Subtype pairs (a subclass into its base) pass via is_subtype.
+    fun class_type_mismatch(declared: String, actual: String): Bool {
+        if (declared == actual) return false
+        if (declared == "Any" or actual == "Any") return false
+        if (declared == "Nil" or actual == "Nil") return false
+        var decl_named: Bool = this.is_concrete_named_type(declared)
+        var act_named: Bool = this.is_concrete_named_type(actual)
+        // At least one side must be a concrete class/enum, or this is scalar-only
+        // territory and scalar_mismatch's job.
+        if (!decl_named and !act_named) return false
+        var decl_concrete: Bool = decl_named or this.is_scalar_name(declared)
+        var act_concrete: Bool = act_named or this.is_scalar_name(actual)
+        // Both sides must be provably concrete. If one is a union, a type param, or
+        // an unresolved name, we cannot prove a mismatch and must let it through.
+        if (!decl_concrete or !act_concrete) return false
+        // Two concrete named types may still be compatible by inheritance.
+        if (decl_named and act_named and this.is_subtype(actual, declared)) return false
+        return true
+    }
+
     // Infer a condition and require it to be Bool (BUGS #143).
     //
     // Codegen lowers every condition through `to_i1`, which is
@@ -1152,6 +1208,13 @@ class NullChecker {
             if (!this.is_type_param(ptype)) {
                 var atype: String = this.infer_expr(args[i])
                 if (this.scalar_mismatch(ptype, atype)) {
+                    this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
+                } else if (this.class_type_mismatch(ptype, atype)) {
+                    // BUGS #165: #155's hole one site over — a String into a
+                    // class-typed parameter compiles clean and segfaults when the
+                    // callee field-loads it. Same registry-guarded check as the
+                    // return site, wired here for free functions, methods and
+                    // constructors (all three route through check_call_args).
                     this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
                 }
             }
@@ -2979,15 +3042,14 @@ class NullChecker {
                             // allowed — raw pointer returned as String
                         } else if (this.scalar_mismatch(ret_s, val_s)) {
                             this.error("return: cannot return " + val_s + " from function expecting " + ret_s)
+                        } else if (this.class_type_mismatch(ret_s, val_s)) {
+                            // BUGS #155: the class-typed half, the one that segfaults.
+                            // `fun make(): Box { return "s" }` — the checker binds the
+                            // caller's var to Box on this declaration's authority, then
+                            // codegen field-loads a String pointer. Registry-guarded so
+                            // unions, type parameters and inference gaps still pass.
+                            this.error("return: cannot return " + val_s + " from function expecting " + ret_s)
                         }
-                        // NOTE: class-vs-scalar and scalar-vs-class checks are
-                        // deferred. They fire false positives on:
-                        //   - nullable unions ("String|Nil" not scalar → triggers)
-                        //   - type parameters ("T" not scalar → triggers)
-                        //   - inference gaps (module member types as raw names)
-                        // The segfault case (`: Box` returning a String) needs
-                        // either is_subtype or a class-name registry query, both
-                        // of which require the full resolve pass (I4) to be safe.
                     }
                 }
             }
