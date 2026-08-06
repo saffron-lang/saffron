@@ -1028,19 +1028,60 @@ write side, `length() > 0 and != "Any"`, which refused to record an `Any`
 annotation at all and so mangled a global with no reassignment involved. All five
 write-ups under I3 above record the techniques that found each defect.
 
-Next slice: the **59 `: String`-returning functions in `checker.sf`**. With every
-declaration node's type field now an `AST.Type`, these are what still force a node
-back into a string in the middle of the pipeline — `infer_expr_type` and its
-callees, which is where the union and generic questions stage 1 counted actually
-have to be answered. Then interning behind a `TypeId`.
+**Stage 3 progress (2026-08-05 — 2026-08-06).** Six further slices landed, dropping
+the count from 54 to 50 `: String {` and — more importantly — beginning the
+**table migration**: making the stored form nodes rather than strings.
 
-What the five slices say to expect there: these functions are not sentinel-shaped,
-so the technique that found #147, #155 and #160 — probe the old binary, one construct
-per probe, before replacing a spelling — applies to their *return values* instead.
-`type_to_string` collapsing `Map<String,Int>` to `"Map"` and every union to `"Union"`
-is the same lossiness that produced the fourth slice's false positive, and 59
-functions returning that form is 59 places a comparison may already be answering a
-coarser question than it appears to.
+| Commit | Slice | Shape |
+|--------|-------|-------|
+| `ba59a56` | `fun_param_sigs` → `Map<String, List<AST.Type>>` | Tri-state string → nodes; first table flip |
+| `e283fd6` | `IndexGet` element node | Last 2 `parse_type_node(this.…)` round trips |
+| `2c7da15` | 4 `infer_*` → `: AST.Type` | `parse_type_node` moved to exit; arms consume nodes |
+| `d047e05` | `get_func_ret_type` + `get_enum_binding_type_node` | Consolidation of remaining closed round trips |
+| `35fdadd` | **`func_params`** → `Map<String, List<AST.Param>>` | First `TypeEnv` table stores nodes |
+
+The `func_params` migration is the template for the rest: store nodes (the
+producer already had them), render the **same lossy CSV on read** so every
+consumer sees byte-identical strings, expose a `get_func_param_nodes` accessor
+for future slices that want nodes. Verified structural: 138/139 baselined files
+emit byte-identical IR; the one that changes is `pass/check_module_imports`, which
+compiles the checker's own source and so must differ.
+
+**Discovery: `resolve_type_params` case-2 is dead pre-existing.** The lossy
+renderer `AST.type_to_string` collapses `GenericType("List", [ClassType("T")])` to
+the bare string `"List"`, which does not contain `<`, so the case-2 guard
+`param_type.contains("<")` can never fire. Empirically confirmed on the pre-change
+binary: `fun unwrap<T>(xs: List<T>): T` fails to resolve `T` from the argument.
+This is a separate bug (BUGS file TBD) that predates the func_params migration; my
+change reproduces the same lossy render at the same point and is byte-identical
+against a true baseline.
+
+**What remains for stage 3:**
+
+1. **Table migrations** (same pattern as `func_params`):
+   - `class_fields: Map<String, String>` — CSV `"name:Type,..."`, 5 producers,
+     ~15 consumers (most just `.has()`).
+   - `enum_fields: Map<String, String>` — same shape.
+   - `func_type_params: Map<String, String>` — comma-joined type param names.
+
+2. **Consumer migration** — one consumer at a time, from `get_func_params` (the
+   string view) to `get_func_param_nodes` (the node list). Each flip removes one
+   `split_type_args` + `index_of(":")` site and is independently verifiable.
+
+3. **Fix `resolve_type_params` case-2** — swap the lossy renderer for
+   `checker.type_to_str` (which keeps generic args), or read the node directly
+   from `get_func_param_nodes`. This is a *behavioural* change (makes case-2
+   live) and needs its own test + BUGS entry.
+
+4. **Interning behind `TypeId`** — once no consumer reads the string form, the
+   table values are nodes, node equality is structural, and TypeId is cheap
+   (index into a dedup list). This is the final goal.
+
+`infer_call_str` / `infer_method_call_str` still exist — the string surgery
+inside them (`resolve_type_params`, `resolve_generic_return`,
+`substitute_class_type_params`, `generic_base`) is all keyed off the lossy CSV
+strings. Each one migrates when its inputs become nodes; items 1-2 above are what
+moves those inputs.
 
 Stage 9 (generated runtime) remains independent of everything and can be picked up
 in parallel at any time; stage 10 is still blocked on the single

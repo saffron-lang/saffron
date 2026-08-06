@@ -58,7 +58,10 @@ class TypeEnv {
     var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
-    var class_fields: Map<String, String>
+    // Declared fields per class, as nodes. Same pattern as func_params: the
+    // producer already had List<AST.Param>; the lossy CSV render moves to read
+    // time in get_class_fields_str so every consumer sees byte-identical strings.
+    var class_fields: Map<String, List<AST.Param>>
     var class_methods: Map<String, String>
 
     fun init() {
@@ -255,6 +258,24 @@ class TypeEnv {
             return this.func_type_params.get(name)
         }
         return ""
+    }
+
+    // Lossy CSV view of class_fields — same pattern as get_func_params.
+    fun get_class_fields_str(name: String): String {
+        if (!this.class_fields.has(name)) { return "" }
+        var params: List<AST.Param> = this.class_fields.get(name)
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(AST.type_to_string(pt))
+            i = i + 1
+        }
+        return sb.to_string()
     }
 
     fun get_func_ret_type(name: String): AST.Type {
@@ -1500,7 +1521,7 @@ class NullChecker {
                 // Keyed by prefix + name as well as by the bare name, so two
                 // modules declaring the same class stay distinguishable
                 // (register_class_identity; the `Response` collision).
-                this.register_class_identity(name, this.params_list_to_string(fields))
+                this.register_class_identity(name, fields)
                 this.register_member_visibility(name, fields, methods)
                 this.register_type_visibility(name, c_vis)
                 // register_class_identity already wrote decl_module_file /
@@ -1733,7 +1754,7 @@ class NullChecker {
     // wrong declaration reports a type error about a field the receiver does not
     // have. The qualified entry below is what a later phase reads to answer "was
     // this declared in my file?" without re-deriving it.
-    fun register_class_identity(name: String, fields_str: String) {
+    fun register_class_identity(name: String, fields: List<AST.Param>) {
         var qualified: String = this.current_prefix + name
         this.decl_module_file.set(qualified, this.current_prefix)
         // The package seam, now filled: current_package is what main.sf read out
@@ -1741,7 +1762,7 @@ class NullChecker {
         // qualified name as decl_module_file so the two answers about one
         // declaration cannot drift apart.
         this.decl_module_package.set(qualified, this.current_package)
-        this.env.class_fields.set(qualified, fields_str)
+        this.env.class_fields.set(qualified, fields)
         // A declaration in the module under check wins its bare name outright.
         // It is not one of two rival imported declarations that the checker has
         // to choose between — it is the one the code being checked means. Marking
@@ -1752,7 +1773,7 @@ class NullChecker {
             if (!this.local_classes.contains(name)) {
                 this.local_classes.push(name)
             }
-            this.env.class_fields.set(name, fields_str)
+            this.env.class_fields.set(name, fields)
             return
         }
         // The bare key stays populated so every existing unqualified lookup
@@ -1762,20 +1783,18 @@ class NullChecker {
         // invention, so it is recorded as such and the bare entry is left as it
         // was rather than flipped to the newcomer.
         if (this.env.class_fields.has(name)) {
-            // Bound to a String first: `.get()` is typed `String|Nil`, and
-            // comparing that directly emits __any_ne, which base.ll (the
-            // bootstrap base) does not define — gen3 fails to link with an
-            // undefined symbol rather than any compile-time complaint. Same
-            // hazard register_enum documents.
-            var prior: String = this.env.class_fields.get(name)
-            if (prior != fields_str) {
+            // Compare the rendered strings: List<AST.Param> has no deep equality
+            // in Saffron, and the render is the same lossy CSV as before.
+            var prior: String = this.env.get_class_fields_str(name)
+            var incoming: String = this.env.get_class_fields_str(qualified)
+            if (prior != incoming) {
                 if (!this.ambiguous_classes.contains(name)) {
                     this.ambiguous_classes.push(name)
                 }
                 return
             }
         }
-        this.env.class_fields.set(name, fields_str)
+        this.env.class_fields.set(name, fields)
     }
 
     // Record a top-level declaration's owning module and its module-level
@@ -3035,10 +3054,9 @@ class NullChecker {
                 // to THIS declaration even when another module also declares the
                 // name. The qualified entry is recorded too, so the identity
                 // table stays complete for later phases.
-                var cs_fields_str: String = this.params_list_to_string(fields)
-                this.env.class_fields.set(this.current_prefix + name, cs_fields_str)
+                this.env.class_fields.set(this.current_prefix + name, fields)
                 this.decl_module_file.set(this.current_prefix + name, this.current_prefix)
-                this.env.class_fields.set(name, cs_fields_str)
+                this.env.class_fields.set(name, fields)
                 if (!this.local_classes.contains(name)) {
                     this.local_classes.push(name)
                 }
@@ -3724,7 +3742,7 @@ class NullChecker {
         if (lookup == this.generic_base(class_name) and this.is_ambiguous_class(class_name)) {
             return "Any"
         }
-        var fields_str: String = this.env.class_fields.get(lookup)
+        var fields_str: String = this.env.get_class_fields_str(lookup)
         if (fields_str.length() == 0) return "Any"
         var parts: List<String> = fields_str.split(",")
         var i: Float = 0
@@ -4871,7 +4889,7 @@ class NullChecker {
         // Returns list of field names for a class
         var result: List<String> = []
         if (!this.env.class_fields.has(class_name)) return result
-        var fields_str: String = this.env.class_fields.get(class_name)
+        var fields_str: String = this.env.get_class_fields_str(class_name)
         if (fields_str.length() == 0) return result
         var parts: List<String> = fields_str.split(",")
         var i: Float = 0
