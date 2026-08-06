@@ -2913,8 +2913,10 @@
             this.gen_pop_arg_roots(arg_roots)
             if (this.func_ret_types.has(resolved_callee)) {
                 this.last_type = this.func_ret_types.get(resolved_callee)
+                this.apply_ret_type_param_resolution(resolved_callee, args)
             } else if (this.func_ret_types.has(callee_name)) {
                 this.last_type = this.func_ret_types.get(callee_name)
+                this.apply_ret_type_param_resolution(callee_name, args)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -3155,6 +3157,7 @@
             this.gen_pop_arg_roots(arg_roots2)
             if (this.func_ret_types.has(emit_callee)) {
                 this.last_type = this.func_ret_types.get(emit_callee)
+                this.apply_ret_type_param_resolution(emit_callee, args)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -3198,6 +3201,7 @@
                 this.emit_indent(direct + " = call i64 @" + resolved_callee + "(" + d_args.join(", ") + ")")
                 if (this.func_ret_types.has(resolved_callee)) {
                     this.last_type = this.func_ret_types.get(resolved_callee)
+                    this.apply_ret_type_param_resolution(resolved_callee, args)
                 } else {
                     this.last_type = AST.Type.IntType
                 }
