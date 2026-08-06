@@ -2,17 +2,17 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #173. Next free number is **#174**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165. Next free number is **#174**.
 
 #171 (a type parameter used only inside a generic parameter never resolves) was
 filed as a two-layer defect and is now FIXED — both layers landed together, as its
 entry said they had to. Moved to Resolved; count 14 → 13, next-free stays 174.
 
-#173 (`try`/`catch`/`throw` traps on wasm32 — setjmp/longjmp are no-op stubs) was
-filed from the playground eval: exception handling works natively but the wasm32
-runtime cannot do the non-local jump, so a thrown value falls through to
-`unreachable`. Count 13 → 14.
+#173 (`try`/`catch`/`throw` trapping on wasm32) is fixed and moved to Resolved:
+the wasm32 link path now enables LLVM WebAssembly SjLj (`-mllvm -wasm-enable-sjlj`)
+with a small hand-written support file, so setjmp/longjmp actually jump. Count
+13 → 12.
 
 #172 (wasm32 `malloc` handing out pointers past memory when `memory.grow` is
 capped/fails) is fixed and moved to Resolved: `@malloc` now honors the grow
@@ -332,43 +332,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 173. OPEN — `try`/`catch`/`throw` traps on wasm32; setjmp/longjmp are no-op stubs
-
-**Severity: high on wasm32.** Any use of exceptions traps. Works natively.
-
-```saffron
-try { throw "boom" } catch (e) { IO.println("caught:" + e) }
-// native: caught:boom
-// wasm32: RuntimeError: unreachable (nothing is caught)
-```
-
-**Cause.** Exception handling is lowered to `setjmp`/`longjmp` (codegen emits
-`@setjmp` at the `try` and `@longjmp` at the `throw` — `expr_body.sf:717`,
-`stmts_body.sf:1789`, declared `returns_twice`/`noreturn` in `output_body.sf:1219`).
-Native links libc's real setjmp/longjmp. But `wasm_base_32.ll:645` defines them as
-**no-op stubs**:
-
-```llvm
-define i32 @setjmp(i8* %buf) { ret i32 0 }
-define void @longjmp(i8* %buf, i32 %val) {
-  ; In WASM we cannot truly longjmp. Return and hope for the best.
-  ret void
-}
-```
-
-So `throw` returns instead of jumping to the handler; execution falls through to
-code that assumes the jump happened and hits `unreachable`. The stub comment names
-the real fix: Emscripten-style setjmp/longjmp emulation.
-
-**Fixable with the current toolchain.** Homebrew clang 22 + wasm-ld accept
-`-mllvm -wasm-enable-sjlj` (verified). The fix is to build/link the wasm32 target
-with SjLj emulation enabled and drop the no-op stubs (or replace them with the
-emulated primitives), rather than the "hope for the best" `ret void`.
-
-**Scope note.** None of the 7 bundled playground examples use exceptions, so the
-example eval is green; this was found by a wider feature eval. It still blocks any
-user program that uses `try`/`catch`. wasm32 only — native is unaffected.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -1197,6 +1160,46 @@ class — semicolon, comment, trailing brace, stray punctuation — rather than 
 semicolon alone.
 
 ## Resolved
+
+### 173. FIXED — `try`/`catch`/`throw` trapped on wasm32; enabled LLVM WebAssembly SjLj
+
+**Was high on wasm32.** Any use of exceptions trapped, though it worked natively.
+
+```saffron
+try { throw "boom" } catch (e) { IO.println("caught:" + e) }
+// native: caught:boom   |   wasm32 (before): RuntimeError: unreachable
+```
+
+**Cause.** Exceptions lower to `setjmp`/`longjmp` (codegen emits `@setjmp` at the
+`try`, `@longjmp` at the `throw`). Native links libc's real ones; `wasm_base_32.ll:645`
+defined them as no-op stubs (`longjmp` was `ret void` — "we cannot truly longjmp"),
+so a throw returned instead of jumping and execution hit `unreachable`.
+
+**Fix** (no compiler change, no rebootstrap — `.ll`/link-time only):
+
+- `tools/saffron`: when the compiled wasm32 IR contains `call i32 @setjmp` (the
+  program uses `try`/`catch`), add `-mllvm -wasm-enable-sjlj -mexception-handling`
+  and link the support file. Applied **conditionally**, so exception-free programs
+  link byte-for-byte as before.
+- `src/runtime/wasm_sjlj_32.s` (new): defines the four SjLj support symbols
+  (`__c_longjmp` tag, `__wasm_setjmp` / `__wasm_setjmp_test` / `__wasm_longjmp`)
+  that normally ship in compiler-rt's `libclang_rt.builtins-wasm32.a`, absent from
+  the Homebrew LLVM install here.
+
+`-wasm-enable-sjlj` is an IR transform that rewrites setjmp call sites into wasm
+`try`/`catch __c_longjmp` regions and longjmp into a tag throw — a **pure-wasm**
+mechanism (the exception-handling proposal), needing **no new JS host import** (the
+exception module imports only `env.js_log_str`, same as any `IO.println` program),
+so every existing host works unchanged. The no-op stubs are kept intentionally: a
+bare `throw` with no `try` emits `@longjmp` but no `@setjmp`, SjLj isn't applied,
+and the stub supplies the link-time definition for that (never-executed) path.
+
+**Verified** through the real `tools/saffron` driver and the browser: try/catch,
+`finally`, and nested routing all work on wasm32; native unchanged; no-exception
+and alloc+for-in programs unregressed. Browser feature eval 8/8 including
+exceptions; 8-round stress eval still 8/8 (#172 unregressed). Requires the wasm
+exception-handling proposal (Node 22 and current browsers support it). Found by a
+wider playground feature eval — no bundled example uses exceptions.
 
 ### 171. FIXED — a type parameter used only inside a generic parameter never resolved; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` was dropped
 
