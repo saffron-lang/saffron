@@ -1154,26 +1154,25 @@ class NullChecker {
     //
     // `key` is the func_params key (mangled: `Class__method`, `Class__init`);
     // `disp` is what the user wrote and is the only one that reaches the message.
+    // The first consumer migrated from get_func_params (string CSV) to
+    // get_func_param_nodes. The split_type_args + index_of(":") + slice is gone;
+    // the Param node gives name and type directly. The type is still rendered
+    // through the lossy AST.type_to_string for scalar_mismatch — same bytes as
+    // before, same #155 proof set untouched.
     fun check_call_args(key: String, disp: String, args: List<AST.Expr>) {
-        var params_str: String = this.env.get_func_params(key)
-        if (params_str.length() == 0) return
-        var entries: List<String> = this.split_type_args(params_str)
+        var params: List<AST.Param> = this.env.get_func_param_nodes(key)
+        if (params.length() == 0) return
         var i: Float = 0
-        while (i < entries.length() and i < args.length()) {
-            var entry: String = entries[i]
-            var colon_pos: Float = entry.index_of(":")
-            if (colon_pos >= 0) {
-                var pname: String = entry.slice(0, colon_pos)
-                var ptype: String = entry.slice(colon_pos + 1, entry.length())
-                if (!this.is_type_param(ptype)) {
-                    var atype: String = this.infer_expr(args[i])
-                    if (this.scalar_mismatch(ptype, atype)) {
-                        // Point at the offending argument, not at the call: this
-                        // is the most common expression-level type error, and
-                        // without a span it reached the editor with no position
-                        // at all and so could not be shown in place.
-                        this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
-                    }
+        while (i < params.length() and i < args.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            // Render lossy for scalar_mismatch — same bytes as the old
+            // entry.slice(colon_pos+1, ...) which was AST.type_to_string output.
+            var ptype: String = AST.type_to_string(pt)
+            if (!this.is_type_param(ptype)) {
+                var atype: String = this.infer_expr(args[i])
+                if (this.scalar_mismatch(ptype, atype)) {
+                    this.error_at(AST.expr_span(args[i]), "argument " + (i + 1).floor().to_string() + " of " + disp + " (parameter '" + pname + "') expects " + ptype + ", got " + atype)
                 }
             }
             i = i + 1
