@@ -842,6 +842,25 @@
         if (vtype.contains(".")) {
             var dot_idx: Float = vtype.index_of(".")
             var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            // BUGS #161: the dotted part is an import alias, and it is the only
+            // thing that disambiguates two modules that both declare `Thing`.
+            // class_fields is keyed by the module-prefixed struct name (ta_Thing,
+            // tb_Thing) as well as by the last-registered bare `Thing`, so resolve
+            // the alias to its prefix and try prefix+bare FIRST. Falling straight
+            // through to the bare lookup below returns whichever module registered
+            // `Thing` last, which is how a target-a receiver reached target-b's
+            // method. This mirrors the alias resolution the constructor call path
+            // already does (expr_body.sf: module_alias_prefix(alias) + name).
+            var alias: String = vtype.slice(0, dot_idx)
+            if (this.has_module_alias(alias)) {
+                var alias_prefixed: String = this.module_alias_prefix(alias) + bare
+                if (this.class_fields.has(alias_prefixed)) {
+                    if (this.class_struct_names.has(alias_prefixed)) {
+                        return this.class_struct_names.get(alias_prefixed)
+                    }
+                    return alias_prefixed
+                }
+            }
             // Try current module prefix on the bare name
             if (this.current_prefix.length() > 0) {
                 var prefixed_bare: String = this.current_prefix + bare
