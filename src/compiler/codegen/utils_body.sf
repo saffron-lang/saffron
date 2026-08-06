@@ -1433,6 +1433,22 @@
         var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
             _ => []
         }
+        // BUGS #161: register the constructor's return type here, prefixed, so the
+        // second global-var pass (prescan_global_call_types) can type an inferred
+        // `var m = TargetA.Marker(x)`. That pass runs after this one but BEFORE
+        // gen_class_decl — which is where func_ret_types is otherwise filled — so
+        // without this the alias arm in get_expr_type finds no entry for ta_Marker,
+        // the global stays untyped, and dispatch falls through to the ambiguous
+        // last-writer-wins bare lookup and binds the wrong module's method. Same
+        // ordering gap BUGS #146 hit for a free function returning a class. The
+        // prefixed key carries the module identity; the bare key stays bare, which
+        // is the inherently-ambiguous unqualified case.
+        if (cname.length() > 0) {
+            var ctor_type: String = cname
+            if (prefix.length() > 0) { ctor_type = prefix + cname }
+            this.func_ret_types.set(ctor_type, this.str_to_type(ctor_type))
+            this.func_ret_types.set(cname, this.str_to_type(cname))
+        }
         var mi: Float = 0
         while (mi < methods.length()) {
             var mname: String = this.get_fun_name(methods[mi])
