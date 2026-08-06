@@ -2275,7 +2275,10 @@ class NullChecker {
                 if (cname.length() == 0) {
                     AST.Type.AnyType
                 } else {
-                    this.parse_type_node(this.env.get_func_ret(cname))
+                    // Was parse_type_node(env.get_func_ret(...)) — a round trip
+                    // through the lossy String view. get_func_ret_type is the node
+                    // reader that already exists.
+                    this.env.get_func_ret_type(cname)
                 }
             }
             _ => AST.Type.AnyType
@@ -4616,9 +4619,9 @@ class NullChecker {
             }
             var bi: Float = 0
             while (bi < bindings.length()) {
-                // Bindings from enum fields — try to get type from enum_fields
-                var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
-                this.env.define_pattern_var(bindings[bi], this.parse_type_node(field_type))
+                // Bindings from enum fields — node form consolidates the parse
+                // into get_enum_binding_type_node.
+                this.env.define_pattern_var(bindings[bi], this.get_enum_binding_type_node(subj_type, variant_name, bi))
                 bi = bi + 1
             }
 
@@ -4697,6 +4700,14 @@ class NullChecker {
         var colon: Float = field_def.index_of(":")
         if (colon < 0) return "Any"
         return field_def.slice(colon + 1, field_def.length()).trim()
+    }
+
+    // Node view. Every current caller of get_enum_binding_type immediately wraps
+    // its string in parse_type_node before handing the result to define_var /
+    // define_pattern_var, so consolidating the parse here removes three closed
+    // round trips at once. Pure composition; IR guaranteed identical.
+    fun get_enum_binding_type_node(enum_type: String, variant: String, field_idx: Float): AST.Type {
+        return this.parse_type_node(this.get_enum_binding_type(enum_type, variant, field_idx))
     }
 
     // A pattern must name exactly as many bindings as the variant has fields.
@@ -4796,8 +4807,7 @@ class NullChecker {
         this.check_pattern_arity(val_type, variant, bindings, "let-destructuring of")
         var bi: Float = 0
         while (bi < bindings.length()) {
-            var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
-            this.env.define_var(bindings[bi], this.parse_type_node(field_type))
+            this.env.define_var(bindings[bi], this.get_enum_binding_type_node(val_type, variant, bi))
             bi = bi + 1
         }
     }
