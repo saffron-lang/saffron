@@ -72,7 +72,7 @@ test('register a new account', async ({ request }) => {
     expect(resp.ok()).toBe(true);
 
     const data = await resp.json();
-    expect(data.ok).toBe('true');
+    expect(data.ok).toBe(true);
     expect(data.username).toBe(registeredUsername);
     expect(data.token).toBeTruthy();
     expect(data.token.startsWith('bzr_')).toBe(true);
@@ -88,7 +88,7 @@ test('login with registered account', async ({ request }) => {
     expect(resp.ok()).toBe(true);
 
     const data = await resp.json();
-    expect(data.ok).toBe('true');
+    expect(data.ok).toBe(true);
     expect(data.token).toBeTruthy();
 });
 
@@ -131,7 +131,7 @@ test('publish a package with valid token', async ({ request }) => {
     expect(resp.ok()).toBe(true);
 
     const data = await resp.json();
-    expect(data.ok).toBe('true');
+    expect(data.ok).toBe(true);
     expect(data.package_name).toBe('e2e-test-pkg');
     expect(data.version).toBe('1.0.0');
 });
