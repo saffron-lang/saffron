@@ -63,6 +63,28 @@
         } else if (name.contains("__lambda")) {
             emit_name = name
         }
+        // Overloaded name: mangle the symbol this definition emits to
+        // `<emit_name>$<arity>$<firstparamtype>`, so the redefinition guard below
+        // no longer collapses two bodies with the same bare name onto one symbol.
+        // The call-site resolver picks the matching mangled symbol. Inert for a
+        // single-definition name (is_overloaded false), and `main`/lambdas never
+        // reach here as overload sets. Derives arity + first-param type from the
+        // `params` CSV, matching how prescan_fun_decl and detect_overload_sets
+        // spell them.
+        if (this.is_overloaded(emit_name)) {
+            var ov_arity: Float = 0
+            var ov_first: String = ""
+            if (params.length() > 0) {
+                var ov_pl: List<String> = this.split_respecting_generics(params, ",")
+                ov_arity = ov_pl.length()
+                if (ov_pl.length() > 0) {
+                    var ov_p0: String = ov_pl[0]
+                    var ov_c: Float = ov_p0.index_of(":")
+                    if (ov_c >= 0) { ov_first = ov_p0.slice(ov_c + 1, ov_p0.length()) }
+                }
+            }
+            emit_name = this.overload_mangle(emit_name, ov_arity, ov_first)
+        }
         this.known_functions.push(emit_name)
         // Same collapse as everywhere else, except that an unannotated *lambda*
         // registered `Int` under the old encoding rather than `Nil`, and call-site
