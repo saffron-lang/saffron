@@ -511,13 +511,16 @@ Both halves are compiled, so a sweep over AST node shapes must cover
 
 ## Known Issues
 
-`BUGS.md` is the list. The count and open set are **derived, not stored**: run
+`BUGS.md` is the list of **open** bugs; the resolved/fixed archive lives in
+`BUGS_CLOSED.md`. The count and open set are **derived, not stored**: run
 `tools/bugs.sh` to print them (`--check` also flags any FIXED-titled entry
-stranded in `## Open`). It reads the section an entry physically sits in — OPEN
-iff its `### N.` heading is above the first `## Resolved` — which is the one
-fact a merge cannot silently corrupt. `## Resolved` keeps closed entries in the
-file for their narratives, so the file is long by design; do not try to eyeball
-the count from its length.
+stranded in the open file). Every `### N.` heading in `BUGS.md` is open by
+definition — closing a bug MOVES its entry (full narrative intact) to
+`BUGS_CLOSED.md`. That is the one fact a merge cannot silently corrupt: open vs
+closed is which *file* an entry sits in, not which section, so a botched merge
+can no longer strand a FIXED entry among the open ones. The split (2026-08-06)
+was to stop the ~9000-line archive from being the repo's worst merge-conflict
+source; `BUGS.md` is now ~1000 lines, all of it live.
 
 The header still carries a hand-written `**N open entries: #...**` tally for
 now. It is the single largest source of merge conflicts in this repo — every

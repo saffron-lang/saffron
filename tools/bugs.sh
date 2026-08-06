@@ -4,13 +4,19 @@
 # header is the single worst source of merge conflicts in this repo: every
 # branch that opens or closes an entry rewrites it, and concurrent worktrees
 # then collide on that one line at merge. This reads the ground truth instead —
-# the section an entry physically sits in.
+# the file an entry physically sits in.
 #
-# The rule the file already follows (CLAUDE.md, and BUGS.md's own preamble): an
-# entry is OPEN iff its `### N.` heading appears between `## Open` and the FIRST
-# `## Resolved`, and CLOSED once moved below it. That boundary is authoritative;
-# a status WORD in the title is not, because early titles (### 2., ### 49.,
-# ### 75.) carry none.
+# The invariant, since the open/closed split: BUGS.md holds ONLY open entries,
+# and the resolved/fixed archive lives in BUGS_CLOSED.md. So every `### N.`
+# heading in BUGS.md is open by definition, and closing a bug MOVES its heading
+# to the other file — a merge can no longer strand a FIXED entry in the open
+# list, because the list is a whole file rather than a section above a marker.
+# A status WORD in the title is still not authoritative (early titles ### 2.,
+# ### 49., ### 75. carry none); the file is.
+#
+# The `^## Resolved$` guard below is kept as a belt-and-suspenders stop: if a
+# stray Resolved section ever reappears in BUGS.md (a botched merge, a partial
+# revert), headings under it are excluded rather than miscounted as open.
 #
 # Usage:
 #   tools/bugs.sh            # print "N open: #a, #b, ..."
@@ -20,7 +26,8 @@ set -euo pipefail
 
 FILE="${BUGS_FILE:-$(dirname "$0")/../BUGS.md}"
 
-# Numbers of every `### N.` heading above the first `## Resolved`.
+# Numbers of every `### N.` heading in the open file (stopping at a stray
+# `## Resolved` if one ever leaks back in — see the header note).
 open_nums=$(awk '
     /^## Resolved$/ { exit }
     /^### [0-9]+\./ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }
