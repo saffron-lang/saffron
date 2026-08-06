@@ -100,7 +100,16 @@ grow:
   %deficit_plus = add i32 %deficit, 65535
   %pages_needed = udiv i32 %deficit_plus, 65536
   %grow_result = call i32 @llvm.wasm.memory.grow.i32(i32 0, i32 %pages_needed)
-  br label %done
+  ; memory.grow returns -1 when the grow is refused (max-memory cap hit or the
+  ; host declines). Advancing __heap_ptr anyway hands the caller a pointer into
+  ; memory that was never mapped, so the next store traps far from here (BUGS
+  ; #172). A bump allocator has no recovery path, so trap cleanly at the point
+  ; of failure instead of corrupting.
+  %grow_failed = icmp eq i32 %grow_result, -1
+  br i1 %grow_failed, label %oom, label %done
+oom:
+  call void @__builtin_trap()
+  unreachable
 done:
   store i32 %new_heap, i32* @__heap_ptr
   %ptr = inttoptr i32 %heap to i8*
@@ -153,9 +162,10 @@ entry:
 ; in gc.ll, which is not linked for wasm, so provide pass-throughs here purely
 ; for link compatibility.
 ;
-; The cap itself is NOT enforced on wasm and is out of scope: this bump
-; allocator discards memory.grow's result (see @malloc above), so it cannot even
-; detect an out-of-memory condition today. Capping wasm needs that fixed first.
+; The cap itself is NOT enforced on wasm and is out of scope. @malloc above now
+; checks memory.grow's result and traps on a refused grow (BUGS #172), so an
+; out-of-memory condition is a clean trap rather than a bad pointer; it does not
+; route through this --max-memory shim, which stays a link-compat no-op.
 
 define i8* @__sf_malloc(i64 %size) {
 entry:
