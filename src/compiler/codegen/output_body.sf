@@ -526,9 +526,17 @@
             var parts: List<String> = param_list[i].split(":")
             var pname: String = parts[0]
             var ptype: String = parts[1]
-            this.typed_vars.set(pname, this.str_to_type(ptype))
-            if (ptype == "String") {
-                this.string_vars.push(pname)
+            // Variadic `*nums:Int`: the body binding is `nums` of type List<Int>.
+            // sanitize_name already strips the `*` from the emitted registers, so
+            // only the typed_vars key and its type need the marker handled here.
+            if (pname.starts_with("*")) {
+                pname = pname.slice(1, pname.length())
+                this.typed_vars.set(pname, this.str_to_type("List<" + ptype + ">"))
+            } else {
+                this.typed_vars.set(pname, this.str_to_type(ptype))
+                if (ptype == "String") {
+                    this.string_vars.push(pname)
+                }
             }
             this.emit_indent("store i64 %" + this.sanitize_name(pname) + ".arg, i64* %" + this.sanitize_name(pname))
             i = i + 1
