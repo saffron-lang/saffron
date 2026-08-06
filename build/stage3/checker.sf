@@ -2961,6 +2961,13 @@ class NullChecker {
                     var p: AST.Param = params[j]
                     var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
                     var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
+                    // Variadic `*nums: Int` binds inside the body as `List<Int>`
+                    // (BUGS varargs). The `*` marker lives in the name; strip it
+                    // and wrap the declared element type in a List.
+                    if (pname.starts_with("*")) {
+                        pname = pname.slice(1, pname.length())
+                        pt = AST.Type.GenericType("List", [pt])
+                    }
                     this.env.define_var(pname, pt)
                     j = j + 1
                 }

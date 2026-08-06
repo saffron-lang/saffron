@@ -463,11 +463,12 @@
 # (oracle_enum_println) and the async scheduler auto-link question (async) — none
 # is a plain codegen regression.
 #
-# 2026-08-06: dropped `pass/expressions` — the test FILE was deleted upstream
-# (the pipe operator / atoms were dropped as features), so it can no longer fail
-# and naming it here was a stale reference to a nonexistent test, not a tracked
-# failure. The comment above still lists it for narrative continuity. Suite is now
-# 329 passed / 5 failed / 14 skipped; the 5 below.
+# Updated 2026-08-06: pass/expressions.sf DELETED, not fixed. It exercised the pipe
+# operator (`|>`), Elixir-style atoms (`:atom`), and C-style `;` statement
+# terminators — none of which the language defines. The pipe operator and atoms
+# were explicitly dropped as language features, so the test tested syntax that will
+# never exist. Removed from the tree and from this list; 5 names remain. (This line
+# and the #2/#175 line both dropped the name independently — same conclusion.)
 
 async
 docstrings
