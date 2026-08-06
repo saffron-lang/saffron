@@ -89,6 +89,26 @@ fun _too_large(source: String): Bool {
     return source.length() > MAX_SOURCE_BYTES
 }
 
+/// The git revision of the repo whose compiler this service will invoke.
+///
+/// Surfaced in /api/health as a freshness signal: the service shells out to
+/// `<root>/tools/saffron build` at request time, so what it actually compiles
+/// with is whatever `build/saffronc` is at `_repo_root()` — NOT whatever built
+/// this service binary. If the running service is pointed at an older checkout
+/// (or an unrebuilt gen3), comparing this against `git -C <repo> rev-parse HEAD`
+/// makes the drift visible instead of silently compiling with a stale compiler.
+/// Returns "unknown" if git or the repo is unavailable.
+fun compiler_rev(): String {
+    var root: String = _repo_root()
+    var r = Process.run("git -C " + _shell_quote(root) + " rev-parse --short HEAD 2>/dev/null")
+    var rev: String = r.stdout.trim()
+    if (rev.length() == 0) { return "unknown" }
+    // A dirty working tree means build/saffronc may not match HEAD either.
+    var st = Process.run("git -C " + _shell_quote(root) + " status --porcelain 2>/dev/null")
+    if (st.stdout.trim().length() > 0) { return rev + "-dirty" }
+    return rev
+}
+
 /// Report whether the wasm32 toolchain is actually usable. Apple's system clang
 /// cannot target wasm32 at all, so a machine without Homebrew LLVM will compile
 /// nothing — better to say so at startup than to fail every request opaquely.
