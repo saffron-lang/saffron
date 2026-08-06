@@ -62148,33 +62148,31 @@ ifexpr.then5342:
   br label %ifexpr.end5344
 ifexpr.else5343:
   %t114 = load i64, i64* %self
-  %t115 = load i64, i64* %self
-  %t116 = inttoptr i64 %t115 to %checker_NullChecker*
-  %t117 = getelementptr %checker_NullChecker, %checker_NullChecker* %t116, i32 0, i32 0
-  %t118 = load volatile i64, i64* %t117
-  %t119 = load i64, i64* %cname
-  %t120 = call i64 @checker_TypeEnv__get_func_ret(i64 %t118, i64 %t119)
-  %t121 = call i64 @checker_NullChecker__parse_type_node(i64 %t114, i64 %t120)
-  store i64 %t121, i64* %t102
+  %t115 = inttoptr i64 %t114 to %checker_NullChecker*
+  %t116 = getelementptr %checker_NullChecker, %checker_NullChecker* %t115, i32 0, i32 0
+  %t117 = load volatile i64, i64* %t116
+  %t118 = load i64, i64* %cname
+  %t119 = call i64 @checker_TypeEnv__get_func_ret_type(i64 %t117, i64 %t118)
+  store i64 %t119, i64* %t102
   br label %ifexpr.end5344
 ifexpr.end5344:
-  %t122 = load i64, i64* %t102
-  store i64 %t122, i64* %t2
+  %t120 = load i64, i64* %t102
+  store i64 %t120, i64* %t2
   store i64 %t51, i64* %callee
   store i64 %t52, i64* %args
   store i64 %t53, i64* %__cs
   br label %match.end5330
 match.arm5333:
-  %t123 = call i8* @__sf_malloc(i64 8)
-  %t124 = bitcast i8* %t123 to [1 x i64]*
-  %t125 = getelementptr [1 x i64], [1 x i64]* %t124, i64 0, i64 0
-  store i64 5, i64* %t125
-  %t126 = ptrtoint [1 x i64]* %t124 to i64
-  store i64 %t126, i64* %t2
+  %t121 = call i8* @__sf_malloc(i64 8)
+  %t122 = bitcast i8* %t121 to [1 x i64]*
+  %t123 = getelementptr [1 x i64], [1 x i64]* %t122, i64 0, i64 0
+  store i64 5, i64* %t123
+  %t124 = ptrtoint [1 x i64]* %t122 to i64
+  store i64 %t124, i64* %t2
   br label %match.end5330
 match.end5330:
-  %t127 = load i64, i64* %t2
-  ret i64 %t127
+  %t125 = load i64, i64* %t2
+  ret i64 %t125
 }
 
 define linkonce_odr i64 @checker_NullChecker__register_member_visibility(i64 %self.arg, i64 %name.arg, i64 %fields.arg, i64 %methods.arg) {
@@ -74200,7 +74198,6 @@ entry:
   %named_wc = alloca i64
   %n = alloca i64
   %bi = alloca i64
-  %field_type = alloca i64
   %arm_type = alloca i64
   store i64 %self.arg, i64* %self
   store i64 %subject.arg, i64* %subject
@@ -74441,130 +74438,126 @@ while.cond6593:
   br i1 %t143, label %while.body6594, label %while.end6595
 while.body6594:
   %t144 = load i64, i64* %self
-  %t145 = load i64, i64* %subj_type
-  %t146 = load i64, i64* %variant_name
-  %t147 = load i64, i64* %bi
-  %t148 = call i64 @checker_NullChecker__get_enum_binding_type(i64 %t144, i64 %t145, i64 %t146, i64 %t147)
-  store i64 %t148, i64* %field_type
-  %t149 = load i64, i64* %self
-  %t150 = inttoptr i64 %t149 to %checker_NullChecker*
-  %t151 = getelementptr %checker_NullChecker, %checker_NullChecker* %t150, i32 0, i32 0
-  %t152 = load volatile i64, i64* %t151
-  %t153 = load i64, i64* %bindings
-  %t154 = load i64, i64* %bi
-  %t155 = icmp slt i64 %t154, 0
-  %t156 = call i64 @__list_length(i64 %t153)
-  %t157 = add i64 %t156, %t154
-  %t158 = select i1 %t155, i64 %t157, i64 %t154
-  %t159 = call i64 @__list_get(i64 %t153, i64 %t158)
-  %t160 = load i64, i64* %self
-  %t161 = load i64, i64* %field_type
-  %t162 = call i64 @checker_NullChecker__parse_type_node(i64 %t160, i64 %t161)
-  %t163 = call i64 @checker_TypeEnv__define_pattern_var(i64 %t152, i64 %t159, i64 %t162)
-  %t164 = load i64, i64* %bi
-  %t165 = add i64 0, 1
-  %t166 = add i64 %t164, %t165
-  store i64 %t166, i64* %bi
+  %t145 = inttoptr i64 %t144 to %checker_NullChecker*
+  %t146 = getelementptr %checker_NullChecker, %checker_NullChecker* %t145, i32 0, i32 0
+  %t147 = load volatile i64, i64* %t146
+  %t148 = load i64, i64* %bindings
+  %t149 = load i64, i64* %bi
+  %t150 = icmp slt i64 %t149, 0
+  %t151 = call i64 @__list_length(i64 %t148)
+  %t152 = add i64 %t151, %t149
+  %t153 = select i1 %t150, i64 %t152, i64 %t149
+  %t154 = call i64 @__list_get(i64 %t148, i64 %t153)
+  %t155 = load i64, i64* %self
+  %t156 = load i64, i64* %subj_type
+  %t157 = load i64, i64* %variant_name
+  %t158 = load i64, i64* %bi
+  %t159 = call i64 @checker_NullChecker__get_enum_binding_type_node(i64 %t155, i64 %t156, i64 %t157, i64 %t158)
+  %t160 = call i64 @checker_TypeEnv__define_pattern_var(i64 %t147, i64 %t154, i64 %t159)
+  %t161 = load i64, i64* %bi
+  %t162 = add i64 0, 1
+  %t163 = add i64 %t161, %t162
+  store i64 %t163, i64* %bi
   br label %while.cond6593
 while.end6595:
+  %t164 = load i64, i64* %self
+  %t165 = load i64, i64* %v_body
+  %t166 = call i64 @checker_NullChecker__infer_expr(i64 %t164, i64 %t165)
+  store i64 %t166, i64* %arm_type
   %t167 = load i64, i64* %self
-  %t168 = load i64, i64* %v_body
-  %t169 = call i64 @checker_NullChecker__infer_expr(i64 %t167, i64 %t168)
-  store i64 %t169, i64* %arm_type
-  %t170 = load i64, i64* %self
-  %t171 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t170)
-  %t172 = load i64, i64* %self
-  %t173 = inttoptr i64 %t172 to %checker_NullChecker*
-  %t174 = getelementptr %checker_NullChecker, %checker_NullChecker* %t173, i32 0, i32 0
-  %t175 = load volatile i64, i64* %t174
-  %t176 = call i64 @checker_TypeEnv__pop_scope(i64 %t175)
-  %t177 = load i64, i64* %self
-  %t178 = load i64, i64* %v_body
-  %t179 = call i64 @checker_NullChecker__expr_diverges(i64 %t177, i64 %t178)
+  %t168 = call i64 @checker_NullChecker__check_unused_in_scope(i64 %t167)
+  %t169 = load i64, i64* %self
+  %t170 = inttoptr i64 %t169 to %checker_NullChecker*
+  %t171 = getelementptr %checker_NullChecker, %checker_NullChecker* %t170, i32 0, i32 0
+  %t172 = load volatile i64, i64* %t171
+  %t173 = call i64 @checker_TypeEnv__pop_scope(i64 %t172)
+  %t174 = load i64, i64* %self
+  %t175 = load i64, i64* %v_body
+  %t176 = call i64 @checker_NullChecker__expr_diverges(i64 %t174, i64 %t175)
+  %t177 = xor i64 %t176, 1
+  %t178 = trunc i64 %t177 to i1
+  br i1 %t178, label %then6597, label %else6598
+then6597:
+  %t179 = load i64, i64* %have_result
   %t180 = xor i64 %t179, 1
   %t181 = trunc i64 %t180 to i1
-  br i1 %t181, label %then6597, label %else6598
-then6597:
-  %t182 = load i64, i64* %have_result
-  %t183 = xor i64 %t182, 1
-  %t184 = trunc i64 %t183 to i1
-  br i1 %t184, label %then6600, label %else6601
+  br i1 %t181, label %then6600, label %else6601
 then6600:
-  %t185 = load i64, i64* %arm_type
-  store i64 %t185, i64* %result_type
-  %t186 = add i64 0, 1
-  store i64 %t186, i64* %have_result
+  %t182 = load i64, i64* %arm_type
+  store i64 %t182, i64* %result_type
+  %t183 = add i64 0, 1
+  store i64 %t183, i64* %have_result
   br label %endif6599
 else6601:
-  %t187 = load i64, i64* %arm_type
-  %t188 = load i64, i64* %result_type
-  %t189 = call i64 @__string_ne(i64 %t187, i64 %t188)
-  %t190 = trunc i64 %t189 to i1
+  %t184 = load i64, i64* %arm_type
+  %t185 = load i64, i64* %result_type
+  %t186 = call i64 @__string_ne(i64 %t184, i64 %t185)
+  %t187 = trunc i64 %t186 to i1
   br label %logic.entry6602
 logic.entry6602:
-  br i1 %t190, label %rhs6603, label %end6604
+  br i1 %t187, label %rhs6603, label %end6604
 rhs6603:
-  %t191 = load i64, i64* %arm_type
-  %t192 = getelementptr [4 x i8], [4 x i8]* @.str.2464, i64 0, i64 0
-  %t193 = ptrtoint i8* %t192 to i64
-  %t194 = call i64 @__string_ne(i64 %t191, i64 %t193)
-  %t195 = trunc i64 %t194 to i1
+  %t188 = load i64, i64* %arm_type
+  %t189 = getelementptr [4 x i8], [4 x i8]* @.str.2464, i64 0, i64 0
+  %t190 = ptrtoint i8* %t189 to i64
+  %t191 = call i64 @__string_ne(i64 %t188, i64 %t190)
+  %t192 = trunc i64 %t191 to i1
   br label %rhs.exit6605
 rhs.exit6605:
   br label %end6604
 end6604:
-  %t196 = phi i1 [%t190, %logic.entry6602], [%t195, %rhs.exit6605]
-  %t197 = zext i1 %t196 to i64
-  %t198 = trunc i64 %t197 to i1
+  %t193 = phi i1 [%t187, %logic.entry6602], [%t192, %rhs.exit6605]
+  %t194 = zext i1 %t193 to i64
+  %t195 = trunc i64 %t194 to i1
   br label %logic.entry6606
 logic.entry6606:
-  br i1 %t198, label %rhs6607, label %end6608
+  br i1 %t195, label %rhs6607, label %end6608
 rhs6607:
-  %t199 = load i64, i64* %result_type
-  %t200 = getelementptr [4 x i8], [4 x i8]* @.str.2465, i64 0, i64 0
-  %t201 = ptrtoint i8* %t200 to i64
-  %t202 = call i64 @__string_ne(i64 %t199, i64 %t201)
-  %t203 = trunc i64 %t202 to i1
+  %t196 = load i64, i64* %result_type
+  %t197 = getelementptr [4 x i8], [4 x i8]* @.str.2465, i64 0, i64 0
+  %t198 = ptrtoint i8* %t197 to i64
+  %t199 = call i64 @__string_ne(i64 %t196, i64 %t198)
+  %t200 = trunc i64 %t199 to i1
   br label %rhs.exit6609
 rhs.exit6609:
   br label %end6608
 end6608:
-  %t204 = phi i1 [%t198, %logic.entry6606], [%t203, %rhs.exit6609]
-  %t205 = zext i1 %t204 to i64
-  %t206 = trunc i64 %t205 to i1
-  br i1 %t206, label %then6610, label %else6611
+  %t201 = phi i1 [%t195, %logic.entry6606], [%t200, %rhs.exit6609]
+  %t202 = zext i1 %t201 to i64
+  %t203 = trunc i64 %t202 to i1
+  br i1 %t203, label %then6610, label %else6611
 then6610:
-  %t207 = load i64, i64* %result_type
-  %t208 = getelementptr [2 x i8], [2 x i8]* @.str.2466, i64 0, i64 0
-  %t209 = ptrtoint i8* %t208 to i64
-  %t210 = inttoptr i64 %t207 to i8*
-  %t211 = inttoptr i64 %t209 to i8*
-  %t212 = call i64 @strlen(i8* %t210)
-  %t213 = call i64 @strlen(i8* %t211)
-  %t214 = add i64 %t212, %t213
-  %t215 = add i64 %t214, 1
-  %t216 = call i8* @__sf_malloc(i64 %t215)
-  call i8* @strcpy(i8* %t216, i8* %t210)
-  call i8* @strcat(i8* %t216, i8* %t211)
+  %t204 = load i64, i64* %result_type
+  %t205 = getelementptr [2 x i8], [2 x i8]* @.str.2466, i64 0, i64 0
+  %t206 = ptrtoint i8* %t205 to i64
+  %t207 = inttoptr i64 %t204 to i8*
+  %t208 = inttoptr i64 %t206 to i8*
+  %t209 = call i64 @strlen(i8* %t207)
+  %t210 = call i64 @strlen(i8* %t208)
+  %t211 = add i64 %t209, %t210
+  %t212 = add i64 %t211, 1
+  %t213 = call i8* @__sf_malloc(i64 %t212)
+  call i8* @strcpy(i8* %t213, i8* %t207)
+  call i8* @strcat(i8* %t213, i8* %t208)
+  %t214 = ptrtoint i8* %t213 to i64
+  %t215 = call i64 @__string_intern(i64 %t214)
+  %t216 = inttoptr i64 %t215 to i8*
   %t217 = ptrtoint i8* %t216 to i64
-  %t218 = call i64 @__string_intern(i64 %t217)
-  %t219 = inttoptr i64 %t218 to i8*
-  %t220 = ptrtoint i8* %t219 to i64
-  %t221 = load i64, i64* %arm_type
-  %t222 = inttoptr i64 %t220 to i8*
-  %t223 = inttoptr i64 %t221 to i8*
-  %t224 = call i64 @strlen(i8* %t222)
-  %t225 = call i64 @strlen(i8* %t223)
-  %t226 = add i64 %t224, %t225
-  %t227 = add i64 %t226, 1
-  %t228 = call i8* @__sf_malloc(i64 %t227)
-  call i8* @strcpy(i8* %t228, i8* %t222)
-  call i8* @strcat(i8* %t228, i8* %t223)
+  %t218 = load i64, i64* %arm_type
+  %t219 = inttoptr i64 %t217 to i8*
+  %t220 = inttoptr i64 %t218 to i8*
+  %t221 = call i64 @strlen(i8* %t219)
+  %t222 = call i64 @strlen(i8* %t220)
+  %t223 = add i64 %t221, %t222
+  %t224 = add i64 %t223, 1
+  %t225 = call i8* @__sf_malloc(i64 %t224)
+  call i8* @strcpy(i8* %t225, i8* %t219)
+  call i8* @strcat(i8* %t225, i8* %t220)
+  %t226 = ptrtoint i8* %t225 to i64
+  %t227 = call i64 @__string_intern(i64 %t226)
+  %t228 = inttoptr i64 %t227 to i8*
   %t229 = ptrtoint i8* %t228 to i64
-  %t230 = call i64 @__string_intern(i64 %t229)
-  %t231 = inttoptr i64 %t230 to i8*
-  %t232 = ptrtoint i8* %t231 to i64
-  store i64 %t232, i64* %result_type
+  store i64 %t229, i64* %result_type
   br label %endif6599
 else6611:
   br label %endif6599
@@ -74573,45 +74566,45 @@ endif6599:
 else6598:
   br label %endif6596
 endif6596:
-  %t233 = load i64, i64* %i
-  %t234 = add i64 0, 1
-  %t235 = add i64 %t233, %t234
-  store i64 %t235, i64* %i
+  %t230 = load i64, i64* %i
+  %t231 = add i64 0, 1
+  %t232 = add i64 %t230, %t231
+  store i64 %t232, i64* %i
   br label %while.cond6568
 while.end6570:
-  %t236 = load i64, i64* %has_wildcard
-  %t237 = xor i64 %t236, 1
-  %t238 = trunc i64 %t237 to i1
+  %t233 = load i64, i64* %has_wildcard
+  %t234 = xor i64 %t233, 1
+  %t235 = trunc i64 %t234 to i1
   br label %logic.entry6613
 logic.entry6613:
-  br i1 %t238, label %rhs6614, label %end6615
+  br i1 %t235, label %rhs6614, label %end6615
 rhs6614:
-  %t239 = load i64, i64* %subj_type
-  %t240 = getelementptr [4 x i8], [4 x i8]* @.str.2467, i64 0, i64 0
-  %t241 = ptrtoint i8* %t240 to i64
-  %t242 = call i64 @__string_ne(i64 %t239, i64 %t241)
-  %t243 = trunc i64 %t242 to i1
+  %t236 = load i64, i64* %subj_type
+  %t237 = getelementptr [4 x i8], [4 x i8]* @.str.2467, i64 0, i64 0
+  %t238 = ptrtoint i8* %t237 to i64
+  %t239 = call i64 @__string_ne(i64 %t236, i64 %t238)
+  %t240 = trunc i64 %t239 to i1
   br label %rhs.exit6616
 rhs.exit6616:
   br label %end6615
 end6615:
-  %t244 = phi i1 [%t238, %logic.entry6613], [%t243, %rhs.exit6616]
-  %t245 = zext i1 %t244 to i64
-  %t246 = trunc i64 %t245 to i1
-  br i1 %t246, label %then6617, label %else6618
+  %t241 = phi i1 [%t235, %logic.entry6613], [%t240, %rhs.exit6616]
+  %t242 = zext i1 %t241 to i64
+  %t243 = trunc i64 %t242 to i1
+  br i1 %t243, label %then6617, label %else6618
 then6617:
-  %t247 = load i64, i64* %self
-  %t248 = load i64, i64* %subj_type
-  %t249 = load i64, i64* %matched_variants
-  %t250 = call i64 @checker_NullChecker__check_exhaustiveness(i64 %t247, i64 %t248, i64 %t249)
+  %t244 = load i64, i64* %self
+  %t245 = load i64, i64* %subj_type
+  %t246 = load i64, i64* %matched_variants
+  %t247 = call i64 @checker_NullChecker__check_exhaustiveness(i64 %t244, i64 %t245, i64 %t246)
   br label %endif6612
 else6618:
   br label %endif6612
 endif6612:
-  %t251 = load i64, i64* %self
-  %t252 = load i64, i64* %result_type
-  %t253 = call i64 @checker_NullChecker__parse_type_node(i64 %t251, i64 %t252)
-  ret i64 %t253
+  %t248 = load i64, i64* %self
+  %t249 = load i64, i64* %result_type
+  %t250 = call i64 @checker_NullChecker__parse_type_node(i64 %t248, i64 %t249)
+  ret i64 %t250
 }
 
 define linkonce_odr i64 @checker_NullChecker__resolve_enum_key_name(i64 %self.arg, i64 %enum_type.arg) {
@@ -74911,6 +74904,26 @@ endif6646:
   %t46 = inttoptr i64 %t45 to i8*
   %t47 = ptrtoint i8* %t46 to i64
   ret i64 %t47
+}
+
+define linkonce_odr i64 @checker_NullChecker__get_enum_binding_type_node(i64 %self.arg, i64 %enum_type.arg, i64 %variant.arg, i64 %field_idx.arg) {
+entry:
+  %self = alloca i64
+  %enum_type = alloca i64
+  %variant = alloca i64
+  %field_idx = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %enum_type.arg, i64* %enum_type
+  store i64 %variant.arg, i64* %variant
+  store i64 %field_idx.arg, i64* %field_idx
+  %t1 = load i64, i64* %self
+  %t2 = load i64, i64* %self
+  %t3 = load i64, i64* %enum_type
+  %t4 = load i64, i64* %variant
+  %t5 = load i64, i64* %field_idx
+  %t6 = call i64 @checker_NullChecker__get_enum_binding_type(i64 %t2, i64 %t3, i64 %t4, i64 %t5)
+  %t7 = call i64 @checker_NullChecker__parse_type_node(i64 %t1, i64 %t6)
+  ret i64 %t7
 }
 
 define linkonce_odr i64 @checker_NullChecker__check_pattern_arity(i64 %self.arg, i64 %enum_type.arg, i64 %variant.arg, i64 %bindings.arg, i64 %ctx.arg) {
@@ -75409,7 +75422,6 @@ entry:
   %rest = alloca i64
   %bi = alloca i64
   %key = alloca i64
-  %field_type = alloca i64
   store i64 %self.arg, i64* %self
   store i64 %pattern.arg, i64* %pattern
   store i64 %val_type.arg, i64* %val_type
@@ -75907,30 +75919,26 @@ while.cond6729:
   br i1 %t355, label %while.body6730, label %while.end6731
 while.body6730:
   %t356 = load i64, i64* %self
-  %t357 = load i64, i64* %val_type
-  %t358 = load i64, i64* %variant
-  %t359 = load i64, i64* %bi
-  %t360 = call i64 @checker_NullChecker__get_enum_binding_type(i64 %t356, i64 %t357, i64 %t358, i64 %t359)
-  store i64 %t360, i64* %field_type
-  %t361 = load i64, i64* %self
-  %t362 = inttoptr i64 %t361 to %checker_NullChecker*
-  %t363 = getelementptr %checker_NullChecker, %checker_NullChecker* %t362, i32 0, i32 0
-  %t364 = load volatile i64, i64* %t363
-  %t365 = load i64, i64* %bindings
-  %t366 = load i64, i64* %bi
-  %t367 = icmp slt i64 %t366, 0
-  %t368 = call i64 @__list_length(i64 %t365)
-  %t369 = add i64 %t368, %t366
-  %t370 = select i1 %t367, i64 %t369, i64 %t366
-  %t371 = call i64 @__list_get(i64 %t365, i64 %t370)
-  %t372 = load i64, i64* %self
-  %t373 = load i64, i64* %field_type
-  %t374 = call i64 @checker_NullChecker__parse_type_node(i64 %t372, i64 %t373)
-  %t375 = call i64 @checker_TypeEnv__define_var(i64 %t364, i64 %t371, i64 %t374)
-  %t376 = load i64, i64* %bi
-  %t377 = add i64 0, 1
-  %t378 = add i64 %t376, %t377
-  store i64 %t378, i64* %bi
+  %t357 = inttoptr i64 %t356 to %checker_NullChecker*
+  %t358 = getelementptr %checker_NullChecker, %checker_NullChecker* %t357, i32 0, i32 0
+  %t359 = load volatile i64, i64* %t358
+  %t360 = load i64, i64* %bindings
+  %t361 = load i64, i64* %bi
+  %t362 = icmp slt i64 %t361, 0
+  %t363 = call i64 @__list_length(i64 %t360)
+  %t364 = add i64 %t363, %t361
+  %t365 = select i1 %t362, i64 %t364, i64 %t361
+  %t366 = call i64 @__list_get(i64 %t360, i64 %t365)
+  %t367 = load i64, i64* %self
+  %t368 = load i64, i64* %val_type
+  %t369 = load i64, i64* %variant
+  %t370 = load i64, i64* %bi
+  %t371 = call i64 @checker_NullChecker__get_enum_binding_type_node(i64 %t367, i64 %t368, i64 %t369, i64 %t370)
+  %t372 = call i64 @checker_TypeEnv__define_var(i64 %t359, i64 %t366, i64 %t371)
+  %t373 = load i64, i64* %bi
+  %t374 = add i64 0, 1
+  %t375 = add i64 %t373, %t374
+  store i64 %t375, i64* %bi
   br label %while.cond6729
 while.end6731:
   ret i64 0
