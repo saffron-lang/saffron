@@ -414,6 +414,8 @@ emulated primitives), rather than the "hope for the best" `ret void`.
 example eval is green; this was found by a wider feature eval. It still blocks any
 user program that uses `try`/`catch`. wasm32 only — native is unaffected.
 
+### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
+
 **Severity: high — this is the reason the other entries survived.**
 
 | | count |
