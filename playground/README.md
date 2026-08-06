@@ -68,8 +68,19 @@ Check it came up correctly:
 
 ```bash
 curl -s http://127.0.0.1:8080/api/health
-# {"ok":true,"wasm_toolchain":"ok"}
+# {"ok":true,"wasm_toolchain":"ok","compiler_rev":"bc70635"}
 ```
+
+`compiler_rev` is the git revision of the repo whose compiler the service invokes
+at request time. **It must match `git rev-parse --short HEAD`.** If it differs (or
+carries a `-dirty` suffix from an uncommitted tree), the service is compiling with
+a compiler older than the current source — the staleness that makes an
+already-fixed bug look unfixed. Because the service always launches via
+`saffron run src/main.sf` (which recompiles from source), this normally matches;
+a mismatch means you are running an old cached service binary or an unrebuilt
+`build/saffronc`. **Never launch the service from a checked-in `./build/playground`**
+— that binary is frozen at whatever compiler built it and is git-ignored for this
+reason. Always use `saffron run src/main.sf`.
 
 If `wasm_toolchain` is anything other than `ok`, compilation will fail for every
 request. It requires **Homebrew LLVM** — Apple's system clang cannot target

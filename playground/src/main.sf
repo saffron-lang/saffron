@@ -87,6 +87,13 @@ fun handle_health(req: Http.Request): Http.Response {
     var payload: Map<String, Any> = {}
     payload.set("ok", true)
     payload.set("wasm_toolchain", Compile.toolchain_status())
+    // Freshness signal: the git rev of the repo whose compiler this service
+    // invokes at request time. Compare against `git rev-parse --short HEAD` — a
+    // mismatch (or a "-dirty" suffix) means the service is compiling with a
+    // compiler older than the current source, the exact staleness that made a
+    // fixed bug appear unfixed. A cached/old service binary reports the rev of
+    // the tree it compiles against, so drift is visible here rather than silent.
+    payload.set("compiler_rev", Compile.compiler_rev())
     return Http.json(JSON.to_string(payload))
 }
 

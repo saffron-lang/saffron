@@ -1,0 +1,6 @@
+# The native service binary is a build artifact. It is NOT committed, because a
+# stale checked-in binary is a footgun: the service shells out to the current
+# compiler at runtime, but a committed binary is frozen at whatever compiler
+# built it. Always launch the service via `saffron run src/main.sf` (which
+# recompiles from source), never a checked-in ./build/playground.
+build/
