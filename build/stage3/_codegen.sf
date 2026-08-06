@@ -64,6 +64,13 @@ class Codegen {
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
     var func_param_names: Map<String, List<String>>
+    // Declared parameter TYPE spellings, parallel to func_param_names. Populated in
+    // gen_function from the same param CSV. Used to resolve a free generic
+    // function's return type parameter from its call arguments (BUGS #171): given
+    // `fun find<T>(xs: List<T>): T`, func_ret_types holds "T" and this holds
+    // ["List<T>"], so a call `find(words)` can bind T to the element type of
+    // `words` and dispatch on the result.
+    var func_param_type_strs: Map<String, List<String>>
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var global_var_types: Map<String, String>
@@ -194,6 +201,7 @@ class Codegen {
         this.func_defaults = {}
         this.func_param_count = {}
         this.func_param_names = {}
+        this.func_param_type_strs = {}
         this.current_prefix = ""
         this.module_globals = {}
         this.global_var_types = {}
@@ -4548,8 +4556,10 @@ class Codegen {
             this.gen_pop_arg_roots(arg_roots)
             if (this.func_ret_types.has(resolved_callee)) {
                 this.last_type = this.func_ret_types.get(resolved_callee)
+                this.apply_ret_type_param_resolution(resolved_callee, args)
             } else if (this.func_ret_types.has(callee_name)) {
                 this.last_type = this.func_ret_types.get(callee_name)
+                this.apply_ret_type_param_resolution(callee_name, args)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -4790,6 +4800,7 @@ class Codegen {
             this.gen_pop_arg_roots(arg_roots2)
             if (this.func_ret_types.has(emit_callee)) {
                 this.last_type = this.func_ret_types.get(emit_callee)
+                this.apply_ret_type_param_resolution(emit_callee, args)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -4833,6 +4844,7 @@ class Codegen {
                 this.emit_indent(direct + " = call i64 @" + resolved_callee + "(" + d_args.join(", ") + ")")
                 if (this.func_ret_types.has(resolved_callee)) {
                     this.last_type = this.func_ret_types.get(resolved_callee)
+                    this.apply_ret_type_param_resolution(resolved_callee, args)
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -11770,15 +11782,27 @@ class Codegen {
             param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
-        // Register param names for named argument dispatch
+        // Register param names for named argument dispatch, and param TYPE
+        // spellings for generic return-type resolution (BUGS #171). Split on the
+        // FIRST colon only: a param type can itself contain colons in a function
+        // type, and the name never does.
         var pnames_list: List<String> = []
+        var ptypes_list: List<String> = []
         var pni: Float = 0
         while (pni < param_list.length()) {
-            var pnparts: List<String> = param_list[pni].split(":")
-            pnames_list.push(pnparts[0])
+            var pentry: String = param_list[pni]
+            var pcolon: Float = pentry.index_of(":")
+            if (pcolon >= 0) {
+                pnames_list.push(pentry.slice(0, pcolon))
+                ptypes_list.push(pentry.slice(pcolon + 1, pentry.length()))
+            } else {
+                pnames_list.push(pentry)
+                ptypes_list.push("")
+            }
             pni = pni + 1
         }
         this.func_param_names.set(emit_name, pnames_list)
+        this.func_param_type_strs.set(emit_name, ptypes_list)
 
         // --- LLVM lib: create FunctionBuilder in parallel ---
         // Build a parallel LLVM Module representation alongside string emission.
@@ -13339,7 +13363,19 @@ class Codegen {
         }
         var callee_name: String = this.resolve_callee(call_callee)
         if (this.func_ret_types.has(callee_name)) {
-            return this.type_to_string(this.func_ret_types.get(callee_name))
+            var cret: String = this.type_to_string(this.func_ret_types.get(callee_name))
+            // BUGS #171: a return type that is a bare type parameter (or a generic
+            // wrapping one) must be resolved from the call's arguments, or a
+            // dispatch on the result fails with "unresolved receiver type 'T'".
+            // Mirror the checker's resolve_type_params using the param type
+            // spellings recorded at registration.
+            var call_args_171: List<AST.Expr> = match (expr) {
+                Call(c, a, __cs) => a
+                x => []
+            }
+            var resolved_171: String = this.resolve_call_ret_type_param(callee_name, cret, call_args_171)
+            if (resolved_171.length() > 0) { return resolved_171 }
+            return cret
         }
         if (callee_name.contains(".")) {
             var cp: List<String> = callee_name.split(".")
@@ -15035,6 +15071,10 @@ class Codegen {
             this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
             if (this.func_ret_types.has(__mp_func)) {
                 this.last_type = this.func_ret_types.get(__mp_func)
+                // BUGS #171: a module-qualified generic function (`Iter.find`) whose
+                // return type is a bare type parameter resolves it from the call
+                // args here, same as the free-function path in gen_call.
+                this.apply_ret_type_param_resolution(__mp_func, args)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -17040,6 +17080,105 @@ class Codegen {
     /// names nothing. Now the declared parameter list decides which names are
     /// parameters and positional matching decides what each one binds to
     /// (BUGS #95).
+    // BUGS #171 (codegen half): resolve a free generic function's return type
+    // parameter from its call arguments, mirroring the checker's
+    // resolve_type_params. `cret` is the registered return spelling (e.g. "T");
+    // returns the concrete type it resolves to, or "" if it does not resolve (not
+    // a type parameter, no matching param, or the argument's type is unknown).
+    //
+    // This duplicates a slice of the checker's inference, which stage 4 exists to
+    // delete — but with codegen's get_expr_type still the receiver-type authority,
+    // a call like `Iter.find(words): T` cannot be dispatched on at all without it.
+    // Kept deliberately narrow: only the two shapes the checker handles (param IS
+    // the type parameter; param is `Container<...param...>`), keyed off the param
+    // type spellings recorded at registration.
+    fun resolve_call_ret_type_param(callee: String, cret: String, args: List<AST.Expr>): String {
+        // Only a bare type-parameter spelling can resolve here: it has no "<" (not
+        // itself a generic) and is not a known concrete/runtime type.
+        if (cret.length() == 0) { return "" }
+        if (cret.contains("<") or cret.contains("|")) { return "" }
+        if (this.is_known_concrete_type(cret)) { return "" }
+        if (!this.func_param_type_strs.has(callee)) { return "" }
+        var ptypes: List<String> = this.func_param_type_strs.get(callee)
+        var i: Float = 0
+        while (i < ptypes.length() and i < args.length()) {
+            var pt: String = ptypes[i]
+            // Case 1: the parameter IS the type parameter (`fun f<T>(x: T): T`).
+            if (pt == cret) {
+                var at: String = this.get_expr_type(args[i])
+                if (at.length() > 0 and at != "Any" and !this.is_type_param_spelling(at)) {
+                    return at
+                }
+            }
+            // Case 2: the parameter is `Container<...cret...>` (`xs: List<T>`).
+            // Take the argument's matching generic slot.
+            if (pt.contains("<")) {
+                var inner: String = this.generic_inner_args(pt)
+                var pparts: List<String> = this.split_respecting_generics(inner, ",")
+                var pj: Float = 0
+                while (pj < pparts.length()) {
+                    if (pparts[pj].trim() == cret) {
+                        var at2: String = this.get_expr_type(args[i])
+                        if (at2.contains("<")) {
+                            var ainner: String = this.generic_inner_args(at2)
+                            var aparts: List<String> = this.split_respecting_generics(ainner, ",")
+                            if (pj < aparts.length()) {
+                                var res: String = aparts[pj.floor()].trim()
+                                if (res.length() > 0 and res != "Any" and !this.is_type_param_spelling(res)) {
+                                    return res
+                                }
+                            }
+                        }
+                    }
+                    pj = pj + 1
+                }
+            }
+            i = i + 1
+        }
+        return ""
+    }
+
+    // Called right after `last_type` is set from a free function's registered
+    // return type. If that return type is a type parameter resolvable from the
+    // call arguments (BUGS #171), rewrite last_type to the concrete type so a
+    // dispatch on the call result finds a real receiver type rather than "T".
+    fun apply_ret_type_param_resolution(callee: String, args: List<AST.Expr>) {
+        var cret: String = this.type_to_string(this.last_type)
+        var resolved: String = this.resolve_call_ret_type_param(callee, cret, args)
+        if (resolved.length() > 0) {
+            this.last_type = this.str_to_type(resolved)
+        }
+    }
+
+    // The characters between the first "<" and the matching final ">".
+    fun generic_inner_args(typ: String): String {
+        if (!typ.contains("<")) { return "" }
+        var lt: Float = typ.index_of("<")
+        return typ.slice(lt + 1, typ.length() - 1)
+    }
+
+    // A concrete/runtime type spelling codegen knows how to represent — the
+    // complement of "is a type parameter" for the narrow use in #171 resolution.
+    fun is_known_concrete_type(typ: String): Bool {
+        if (typ == "Int" or typ == "Float" or typ == "Bool") { return true }
+        if (typ == "String" or typ == "Nil" or typ == "Any") { return true }
+        if (typ == "List" or typ == "Map" or typ == "Fun") { return true }
+        if (typ == "StringBuilder") { return true }
+        var base: String = this.generic_base_name(typ)
+        if (this.class_fields.has(base)) { return true }
+        return false
+    }
+
+    // True when a spelling looks like an unresolved type parameter (uppercase
+    // first letter, not a known concrete type). Used to reject a non-answer.
+    fun is_type_param_spelling(typ: String): Bool {
+        if (typ.length() == 0) { return false }
+        if (this.is_known_concrete_type(typ)) { return false }
+        if (typ.contains("<") or typ.contains("|") or typ.contains("(")) { return false }
+        var c0: String = typ.char_at(0)
+        return c0 >= "A" and c0 <= "Z"
+    }
+
     fun resolve_generic_method_ret(obj_name: String) {
         if (obj_name.length() == 0) { return }
         var recv_type: String = this.get_var_type_str(obj_name)

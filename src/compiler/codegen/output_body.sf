@@ -279,15 +279,27 @@
             param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
-        // Register param names for named argument dispatch
+        // Register param names for named argument dispatch, and param TYPE
+        // spellings for generic return-type resolution (BUGS #171). Split on the
+        // FIRST colon only: a param type can itself contain colons in a function
+        // type, and the name never does.
         var pnames_list: List<String> = []
+        var ptypes_list: List<String> = []
         var pni: Float = 0
         while (pni < param_list.length()) {
-            var pnparts: List<String> = param_list[pni].split(":")
-            pnames_list.push(pnparts[0])
+            var pentry: String = param_list[pni]
+            var pcolon: Float = pentry.index_of(":")
+            if (pcolon >= 0) {
+                pnames_list.push(pentry.slice(0, pcolon))
+                ptypes_list.push(pentry.slice(pcolon + 1, pentry.length()))
+            } else {
+                pnames_list.push(pentry)
+                ptypes_list.push("")
+            }
             pni = pni + 1
         }
         this.func_param_names.set(emit_name, pnames_list)
+        this.func_param_type_strs.set(emit_name, ptypes_list)
 
         // --- LLVM lib: create FunctionBuilder in parallel ---
         // Build a parallel LLVM Module representation alongside string emission.
