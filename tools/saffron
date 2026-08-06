@@ -405,6 +405,32 @@ build_project() {
         for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__on_[a-zA-Z0-9_]+' "$ll_path" | sed 's/define i64 @//'); do
             EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
         done
+        # Exception handling (BUGS #173). Codegen lowers try/catch/throw to
+        # setjmp/longjmp. Natively those link libc's real implementations; on
+        # wasm32 there is no libc, and the wasm base shipped no-op stubs, so a
+        # throw returned instead of jumping and fell through to `unreachable`.
+        #
+        # The fix is LLVM's WebAssembly SjLj lowering: `-mllvm -wasm-enable-sjlj`
+        # is an IR-level transform that rewrites each @setjmp call into a wasm
+        # try/catch region and each @longjmp into a `throw` of the __c_longjmp
+        # exception tag — a pure-wasm mechanism that needs no JS host import. The
+        # four support symbols it calls (__wasm_setjmp, __wasm_setjmp_test,
+        # __wasm_longjmp, and the __c_longjmp tag) normally live in compiler-rt's
+        # libclang_rt.builtins-wasm32.a, which is not part of this Homebrew LLVM
+        # install; src/runtime/wasm_sjlj_32.s provides them. It must be assembled
+        # with -mexception-handling (the throw/tag instructions require it).
+        #
+        # Applied only when the program actually uses setjmp — i.e. contains a
+        # try/catch. Non-exception programs link byte-for-byte as before, so this
+        # cannot regress the common path. The transform emits a wasm try/catch and
+        # the exception-handling feature, both of which WebAssembly runtimes
+        # (Node, browsers) accept.
+        local SJLJ_FLAGS=""
+        local SJLJ_SUPPORT=""
+        if grep -q 'call i32 @setjmp' "$ll_path" 2>/dev/null; then
+            SJLJ_FLAGS="-mllvm -wasm-enable-sjlj -mexception-handling"
+            SJLJ_SUPPORT="$SCRIPT_DIR/src/runtime/wasm_sjlj_32.s"
+        fi
         # --import-undefined, not --allow-undefined. Both let the js_* imports
         # through, but --allow-undefined silently accepts EVERY missing symbol: it
         # was hiding the fact that nothing scheduler-related was linked, producing a
@@ -413,10 +439,10 @@ build_project() {
         # importing the js_* functions the glue supplies.
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
             -fuse-ld="$WASM_LD_PATH" \
-            $EXPORT_FLAGS \
+            $EXPORT_FLAGS $SJLJ_FLAGS \
             -Wl,--allow-multiple-definition -Wl,--import-undefined \
             -Wl,--initial-memory=4194304 -Wl,--max-memory=2147483648 \
-            -o "$output" "$WASM_BASE" "$runtime_ll" "$ll_path" || {
+            -o "$output" "$WASM_BASE" "$runtime_ll" "$ll_path" $SJLJ_SUPPORT || {
             echo "saffron: wasm32 linking failed" >&2
             exit 1
         }
