@@ -6,6 +6,8 @@ import "@os" as OS
 import "@path" as Path
 
 /// Base directory for package tarball storage.
+/// The directory must exist before the server starts — it is created by git
+/// (via the committed .gitkeep) and by the test script.
 var STORAGE_DIR = "data/packages"
 
 // ---------------------------------------------------------------------------

@@ -116,7 +116,7 @@ test.describe('POST /api/v1/auth/register', () => {
 
         const username = `testuser_${Date.now()}`;
         const r = await request.post(`${API}/auth/register`, {
-            data: { username },
+            data: { username, password: 'secret123' },
         });
         expect(r.status()).toBe(200);
         const data = await r.json();
@@ -191,7 +191,7 @@ test.describe('full publish lifecycle', () => {
             return; // backend down — individual tests will skip
         }
         const r = await request.post(`${API}/auth/register`, {
-            data: { username: `lifecycle_${Date.now()}` },
+            data: { username: `lifecycle_${Date.now()}`, password: 'secret123' },
         });
         if (r.ok()) {
             const data = await r.json();
@@ -320,7 +320,7 @@ test.describe('POST /api/v1/packages/publish (validation)', () => {
             return;
         }
         const r = await request.post(`${API}/auth/register`, {
-            data: { username: `val_${Date.now()}` },
+            data: { username: `val_${Date.now()}`, password: 'secret123' },
         });
         if (r.ok()) {
             token = (await r.json()).token;
@@ -371,7 +371,7 @@ test.describe('POST /api/v1/packages/:name/yank/:version (auth)', () => {
 
         // Register to get a valid token
         const regResp = await request.post(`${API}/auth/register`, {
-            data: { username: `yank_test_${Date.now()}` },
+            data: { username: `yank_test_${Date.now()}`, password: 'secret123' },
         });
         if (!regResp.ok()) { test.skip(true, 'registration failed'); return; }
         const { token } = await regResp.json();
@@ -394,7 +394,7 @@ test.describe('POST /api/v1/auth/revoke', () => {
 
         // Register
         const regResp = await request.post(`${API}/auth/register`, {
-            data: { username: `revoke_${Date.now()}` },
+            data: { username: `revoke_${Date.now()}`, password: 'secret123' },
         });
         expect(regResp.status()).toBe(200);
         const { token } = await regResp.json();
@@ -444,7 +444,7 @@ test.describe('GET /api/v1/packages/:name/:version/download', () => {
 
         // Register and publish
         const regResp = await request.post(`${API}/auth/register`, {
-            data: { username: `dl_${Date.now()}` },
+            data: { username: `dl_${Date.now()}`, password: 'secret123' },
         });
         if (!regResp.ok()) { test.skip(true, 'registration failed'); return; }
         const { token } = await regResp.json();
