@@ -448,12 +448,24 @@
 # in the position chronology puts it. The ordering hazard is real and worth naming:
 # my #162 note sits ABOVE origin's later notes because my branch forked before they
 # were written, so read the dates, not the position.
+#
+# Updated 2026-08-06: the reflect-construct codegen fix removed `json` and
+# `pass/deep_deserialize` from this set — both routed through
+# __reflect_construct_from_map, which (1) compared the `%klass` closure box against
+# a raw ctor pointer and always missed, falling to `ret 0` → null deref segfault,
+# and (2) built map lookup keys with an untagged ptrtoint that never matched the
+# NaN-box-tagged stored keys. The fix calls the box as a closure to construct the
+# instance, then dispatches field-fill by the instance's GC class tag. 325 passed,
+# 6 failed, 14 skipped; no regressions. The 6 below are a strict subset of the
+# previous 8. The remaining names are all unimplemented language features
+# (varargs, function overloading, the pipe operator / atoms in `expressions`,
+# docstring reflection) or the #154 fieldless-enum representation problem
+# (oracle_enum_println) and the async scheduler auto-link question (async) — none
+# is a plain codegen regression.
 
 async
 docstrings
-json
 oracle_enum_println
-pass/deep_deserialize
 pass/expressions
 pass/overloading
 pass/varargs
