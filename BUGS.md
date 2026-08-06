@@ -2,8 +2,13 @@
 
 ## Open
 
-**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #170, #171. Next free number is **#172**.
+**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #171. Next free number is **#172**.
+
+#170 (a `for-in` list loop trapping on wasm32) is fixed and moved to Resolved:
+the GC pointer-recognition floor in `__rt_gc_tag_of` was hardcoded to the native
+4 GB value, rejecting every wasm32 heap pointer. Count 14 → 13, next-free
+unchanged, nothing else moved.
 
 #171 (a type parameter used only inside a generic parameter never resolves) is a
 two-layer defect — filed but deliberately NOT half-fixed. Added to the set above;
@@ -361,43 +366,6 @@ IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 
 ```
 
 Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
-
-### 170. OPEN — a `for-in` loop over a list traps with IndexError on wasm32, though it works natively and via direct indexing
-
-**Severity: high on wasm32.** Silent for the author (native and the checker are
-fine), fatal at runtime in the browser. It blocks any Turmeric/playground program
-that iterates a list the idiomatic way.
-
-```saffron
-var s = 0
-for (i in [1, 2, 3, 4, 5]) { s = s + i }
-IO.println("sum=" + s.to_string())
-```
-
-- **Native**: prints `sum=15`.
-- **wasm32**: `Runtime Error: IndexError: index %ld out of bounds (length %ld)`
-  then `unreachable`. (The `%ld` is literal — the error formatter itself is
-  unformatted on this path, a second smaller bug.)
-
-**It is `for-in` specifically, not list access.** Direct indexing and `.length()`
-are correct on wasm32:
-
-```saffron
-var l = [10, 20, 30]
-IO.println(l[0].to_string())        // 10, correct on wasm32
-IO.println(l.length().to_string())  // 3,  correct on wasm32
-```
-
-CLAUDE.md documents that `for-in` desugars to `length()` + an element read, so the
-desugared index read is walking past the end **only in the loop form** on wasm32 —
-the loop bound or the index is computed wrong on this target. A native build of the
-identical desugaring is fine, so this is wasm32 codegen, not the desugaring itself.
-
-**Found via the playground.** Running the 7 bundled examples through the compile→
-run pipeline, the 3 that use `for-in` (`closures`, `collections`, `enums_match`)
-all trap here; the other 4 pass. Reproduced outside the browser by instantiating
-the compiled wasm with a minimal import env, so it is not a playground-runtime
-issue — the trap is in the module the compiler emits.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -1226,6 +1194,46 @@ class — semicolon, comment, trailing brace, stray punctuation — rather than 
 semicolon alone.
 
 ## Resolved
+
+### 170. FIXED — a `for-in` loop over a list/map/string trapped with IndexError on wasm32, though it worked natively and via direct indexing
+
+**Severity was high on wasm32.** Silent for the author (native and the checker are
+fine), fatal at runtime in the browser — it blocked any Turmeric/playground program
+that iterated a collection the idiomatic way.
+
+```saffron
+var s = 0
+for (i in [1, 2, 3, 4, 5]) { s = s + i }
+IO.println("sum=" + s.to_string())   // native: sum=15; wasm32 (before): IndexError -> unreachable
+```
+
+**Root cause.** `for-in` desugars (`parser.sf:3358`) to an element read
+`coll.__iter_get(i)`, which routes through `__any_iter_get` (`runtime.sf:953`) →
+`__rt_gc_tag_of` (`runtime.sf:711`) to recognize the value as a GC list/map by
+loading its header sentinel. `__rt_gc_tag_of` guarded that load with a hardcoded
+`if (raw < 4294967296) return 0` — a 4 GB floor that is correct on native (Darwin
+heap lives above 4 GB) but wrong on wasm32, where linear memory starts near 0, so
+every real list/map pointer was rejected. `__any_iter_get` then fell through to
+`__str_get`, read the 24-byte list struct as a C string, and tripped
+`IndexError: index out of bounds` → `unreachable`.
+
+That is why it was `for-in`-specific: direct `l[i]` / `.length()` have a static
+`List` type and call `__list_get` / `__list_length` directly, never touching
+`__rt_gc_tag_of`. The `.ll` bases already encoded the correct per-target floor in
+`@__val_class_tag` (wasm uses 16, with a comment that the 4 GB bound "would reject
+every real pointer"); `__rt_gc_tag_of` had reimplemented the guard and hardcoded
+the native value.
+
+**Fix.** Made the floor a per-target extern instead of a literal:
+`runtime.sf` calls `__rt_gc_ptr_floor()`; `base.ll`/`base_nanbox.ll` return
+`4294967296` (byte-identical to before on native); `wasm_base_32.ll`/`wasm_base.ll`
+return `16`. The `%ld`-literal in the error text is a separate cosmetic formatter
+bug on that path, left alone.
+
+**Verified.** Native for-in `sum=15` (unchanged); wasm32 for-in `sum=15`; wasm32
+for-in over a String and a Map also work (shared desugaring); full suite
+319 passed / 8 failed with the failure set identical to `FAILURE_BASELINE.txt`;
+all 7 playground bundled examples run on wasm32 (was 4/7). Found via the playground.
 
 ### 161. FIXED — a method call on a receiver from one module bound to a same-named class in another module
 
