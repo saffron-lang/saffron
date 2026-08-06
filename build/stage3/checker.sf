@@ -3517,11 +3517,11 @@ class NullChecker {
                 var idx_base: String = this.generic_base(list_type)
                 if (this.env.class_fields.has(idx_base)
                     and this.get_receiver_methods(idx_base).contains("getItem")) {
-                    // Still a round trip: class_method_ret_type does string surgery
-                    // (the class-type-parameter substitution documented above), so
-                    // its answer is a string and there is nothing to read as a node
-                    // yet. Blocked on that helper, not on this arm.
-                    this.parse_type_node(this.class_method_ret_type(list_type, "getItem"))
+                    // class_method_ret_type_node moves the parse inside; the string
+                    // surgery (substitute_class_type_params) still runs there, so
+                    // this is byte-identical. That surgery migrating to nodes is the
+                    // coupled-cluster slice, not this arm.
+                    this.class_method_ret_type_node(list_type, "getItem")
                 } else {
                     // The real-List / positional-generic case: read the element off
                     // the node. Was parse_type_node(extract_list_element_type(...)),
@@ -3908,6 +3908,16 @@ class NullChecker {
         var base: String = this.generic_base(recv_type)
         var ret: String = this.env.get_func_ret(base + "__" + method)
         return this.substitute_class_type_params(ret, recv_type)
+    }
+
+    // Node view of the above, for the one caller (IndexGet's getItem branch) that
+    // wrapped it in parse_type_node. The string surgery
+    // (substitute_class_type_params) stays inside; only the final parse moves here,
+    // so it is byte-identical — the same closed round-trip collapse as the infer_*
+    // functions. Migrating substitute_class_type_params itself to nodes is the
+    // coupled-cluster slice tracked in compiler-rewrite.md.
+    fun class_method_ret_type_node(recv_type: String, method: String): AST.Type {
+        return this.parse_type_node(this.class_method_ret_type(recv_type, method))
     }
 
     // The type of a binary expression, as a node.
