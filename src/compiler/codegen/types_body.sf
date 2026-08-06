@@ -711,6 +711,31 @@
         return typ.slice(0, typ.index_of("<"))
     }
 
+    /// Normalize a type spelling to the key used for overload dispatch. Strips
+    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`) and
+    /// folds the `Number` spelling onto `Int` so that a declared `Int` parameter
+    /// and an inferred `Number`/`Int` argument agree. Everything else passes
+    /// through unchanged. Both the mangling site (gen_function / prescan) and the
+    /// call-site resolver run every candidate and every argument through this, so
+    /// they compare like against like.
+    fun overload_norm_type(typ: String): String {
+        var base: String = this.generic_base_name(typ)
+        if (base == "Number") { return "Int" }
+        return base
+    }
+
+    /// The overload-mangled symbol for a definition:
+    /// `<emit_name>$<arity>$<first-param-type-normalized>`. A zero-arg definition
+    /// has no first parameter, so its slot is the literal `void` — an arity-only
+    /// overload set (e.g. `f()` vs `f(x)`) still gets distinct symbols.
+    fun overload_mangle(emit_name: String, arity: Float, first_ptype: String): String {
+        var slot: String = "void"
+        if (arity > 0 and first_ptype.length() > 0) {
+            slot = this.overload_norm_type(first_ptype)
+        }
+        return emit_name + "$" + arity.floor().to_string() + "$" + slot
+    }
+
     /// `typ` with the receiver's class type arguments substituted in:
     ///
     ///     substitute_class_type_params("T", "Box<String>")         → "String"

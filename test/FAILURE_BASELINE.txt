@@ -472,10 +472,21 @@
 #
 # Updated 2026-08-06: dropped pass/varargs — variadic parameters (*args) were
 # implemented upstream (c084dc2), so the test now passes. This is a real fix, not
-# a skip: it left the failure set because the feature it needed was built. 4 names
-# remain. Suite 330 passed / 4 failed / 14 skipped.
+# a skip: it left the failure set because the feature it needed was built.
+#
+# Updated 2026-08-06: dropped pass/overloading — arity- and first-param-type-based
+# function overloading implemented. Codegen-only: an overload set (2+ same-name
+# definitions in one prescan slice) mangles each body's symbol as
+# `name$arity$firsttype` and the call site resolves by arity then normalized
+# first-arg type; a single-def name is untouched, which keeps the bootstrap inert
+# (green gen4 fixed-point, 0 inference fallbacks). The checker was deliberately
+# left unchanged — it flattens all modules into one namespace, so detecting
+# overloads there would misfire on cross-module stdlib duplicates
+# (parse/from/min/...); codegen detection is per-slice and provably safe. Suite
+# 328 passed, 3 failed. The 3 below are the fieldless-enum representation problem
+# (#154), docstring reflection (unimplemented runtime table), and async scheduler
+# auto-link (a design question).
 
 async
 docstrings
 oracle_enum_println
-pass/overloading

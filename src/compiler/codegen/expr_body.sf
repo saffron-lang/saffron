@@ -2413,6 +2413,16 @@
                 }
             }
         }
+        // Overload resolution: an overloaded callee resolves to one of its
+        // mangled per-definition symbols by matching arity, then (for arity > 0)
+        // the normalized static type of the first argument against each
+        // candidate's first declared parameter type. Runs before every downstream
+        // consumer of resolved_callee (intrinsic/extern/coroutine checks, the
+        // arity guard, the direct-call emit) so they all see the concrete symbol.
+        // Inert unless resolved_callee names an overload set of 2+ definitions.
+        if (this.is_overloaded(resolved_callee)) {
+            resolved_callee = this.resolve_overload(resolved_callee, args)
+        }
         if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
         }
