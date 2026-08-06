@@ -292,7 +292,11 @@ fun is_owner(package_name: String, user_id: String): Bool {
 /// Returns up to `limit` results.
 fun search(query: String, limit: String): List<Map<String, String>> {
     if (query.length() == 0) {
-        return list_packages()
+        // An empty query lists everything, but must still honour `limit` — the
+        // non-empty branch below applies LIMIT, and callers (and the API's
+        // documented ?limit=) expect the same cap regardless of query. Reusing
+        // the paginated lister from offset 0 keeps one SQL shape for both.
+        return list_packages_paginated("0", limit)
     }
     var esc_q = query.replace("'", "''")
     return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p WHERE p.name LIKE '%" + esc_q + "%' OR p.description LIKE '%" + esc_q + "%' ORDER BY p.total_downloads DESC LIMIT " + limit)
