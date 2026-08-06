@@ -2,7 +2,7 @@
 
 ## Open
 
-**8 open entries:** #49, #65, #75, #107, #131, #132, #154, #175.
+**7 open entries:** #49, #65, #107, #131, #132, #154, #175.
 Next free number is **#176**.
 
 #2 (forward references in nested funcs) was in this list and is now closed as
@@ -12,11 +12,16 @@ warning, now suppressed by pre-registering sibling nested-fun names, and the
 genuinely-undefined case became a hard compile error instead of a linker failure.
 Moved to `BUGS_CLOSED.md`.
 
+#75 (a value re-entering wasm32 from JS was untagged, so it never matched a Map
+key) was closed upstream in the same window — an exported function's numeric
+params are now re-tagged at the JS boundary — and arrives merged, already under
+`BUGS_CLOSED.md`.
+
 #175 (same-named nested funcs in different parents collide on an unqualified
 symbol and silently return the wrong body) was found while fixing #2 and filed
 separately: it is a nested-fun *naming* defect, not a forward-reference one, and
-reproduces without any recursion. Added to the set above. Count stays 8 (one
-closed, one opened); next-free 175 → 176.
+reproduces without any recursion. Added to the set above. Net: #2 and #75 left
+(one fixed here, one upstream), #175 arrived, so 8 → 7; next-free 175 → 176.
 
 #157 and #158 were in this list and are now closed as **already fixed** — both
 were stale open entries, not new work. #157 (punctuation swallowed into an import
@@ -455,111 +460,6 @@ all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
 before its tests mean anything, and a green test run against a stale artifact is
 evidence of nothing.
 
-
-### 75. A value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under
-
-**Reproduction** (wasm32; `t.sf`):
-
-```saffron
-@extern("void js_note(i64)")
-fun _note(id: Float)
-
-var _next_id: Float = 0
-var _cb: Map<Float, String> = {}
-
-fun reg(payload: String): Float {
-    _next_id = _next_id + 1
-    var id: Float = _next_id
-    _cb.set(id, payload)
-    return id
-}
-
-fun kick() { _note(reg("HELLO")) }
-
-// Exported to JS (the `__on_` prefix is what tools/saffron:392 exports).
-fun __on_back(id: Float) {
-    if (_cb.has(id)) { IO.println("FOUND " + _cb.get(id)) }
-    else { IO.println("MISSING") }
-}
-
-kick()
-```
-
-Build with `tools/saffron build t.sf --target wasm32 -o t.wasm`, then from JS call
-`_start()` (which invokes `js_note` and hands you the id) and pass that exact id
-straight back to `__on_back`:
-
-```
-js_note got id = 1n
-MISSING
-```
-
-The id makes a round trip and stops being findable. Handing the *bit pattern of
-1.0* back instead prints `FOUND HELLO`, which localizes it exactly:
-
-```js
-const bb = new ArrayBuffer(8); new Float64Array(bb)[0] = 1.0;
-inst.exports.__on_back(new BigInt64Array(bb)[0]);   // FOUND HELLO
-```
-
-So the two representations of "1" involved are:
-
-| Path | Value seen by `__map_key_cmp` |
-|---|---|
-| stored by `reg()` | `0x3FF0000000000000` — the f64 bit pattern of 1.0 |
-| arriving from JS | `0x0000000000000001` — a bare machine integer |
-
-An exported wasm function's `i64` parameter is whatever JS passed; nothing on the
-boundary re-tags it into the NaN-boxed form the module uses internally. And
-`__map_key_cmp` (`src/runtime/runtime.sf:287`) compares non-string keys by exact
-bit pattern — correctly, for its own purposes — so the lookup misses. Note
-`__val_untag_float` (`src/runtime/wasm_base_32.ll:763`) would convert `1` to `1.0`
-happily; it is simply never called, because a `Map` key is compared as an opaque
-i64 and never untagged at all.
-
-**Why it is nastier than a plain type-mismatch:** every symptom is silent. There
-is no diagnostic at compile time, no trap at runtime, and `has()` returning false
-is a legitimate result, so the callback is *dropped* rather than failing. In the
-playground this meant the Run button POSTed correctly, the service replied
-correctly, and then nothing happened at all — no error in the console, no status
-change. The pattern it breaks (hand JS an opaque id, get it back later) is the
-only way to do asynchronous work across the wasm boundary, so any callback
-registry written the obvious way is affected.
-
-Also note `Bool.to_string()` on wasm32 prints `"false"` for `true` — a separate,
-unfiled printing bug (the branch `if (t)` is taken correctly). It matters here
-because it made an early `IO.println(_cb.has(id).to_string())` read as a Map
-failure in cases where the Map was fine, and it will mislead anyone debugging this
-by printing booleans.
-
-**Workaround (in use):** index a `List` instead of keying a `Map`. An index only
-has to compare numerically, which survives the representation change:
-
-```saffron
-var _callbacks: List<(String) => Nil> = []
-fun _register(cb: (String) => Nil): Float {
-    _callbacks.push(cb)
-    return _callbacks.length() - 1
-}
-fun _resolve(id: Float, payload: String) {
-    if (id >= 0 and id < _callbacks.length()) {
-        var cb: (String) => Nil = _callbacks[id]
-        cb(payload)
-    }
-}
-```
-
-Applied at `playground/frontend/src/api.sf`. This is also why Turmeric's own
-`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based —
-it works, but the reason was not written down, so the Map version looks fine
-until you try it.
-
-The real fix is to normalise incoming values at the export boundary: codegen knows
-each exported function's declared parameter types, so a `Float` parameter on an
-exported function should be re-tagged (`__val_tag_float` on the integer, or a
-tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
-Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
-boundary.
 
 ### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
 

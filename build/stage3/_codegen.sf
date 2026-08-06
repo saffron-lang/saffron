@@ -12158,7 +12158,34 @@ class Codegen {
                     this.string_vars.push(pname)
                 }
             }
-            this.emit_indent("store i64 %" + this.sanitize_name(pname) + ".arg, i64* %" + this.sanitize_name(pname))
+            // BUGS #75: an exported wasm32 function's numeric parameter arrives as
+            // a bare machine integer from JS (e.g. `1n` -> 0x1), not the module's
+            // NaN-boxed representation, so a value that leaves the module as an
+            // opaque id and re-enters through a JS callback never matches what was
+            // stored (a Float `1` is 0x3FF0... internally). Normalize the incoming
+            // value at the boundary. Scoped tightly:
+            //   - only on wasm32 (native/wasm64/identity are untouched)
+            //   - only on functions tools/saffron exports to JS: their names
+            //     contain `__on_` or `__dispatch_` (mirrors tools/saffron's
+            //     --export-if-defined scan). emit_name is the module-prefixed
+            //     symbol actually emitted and exported.
+            //   - only Float/Number/Int params. A String/List/Map param arrives as
+            //     a raw pointer that the js_event_get_string path tags elsewhere;
+            //     re-tagging it here would double-tag.
+            // The runtime helpers are idempotent against an already-tagged value.
+            var arg_reg: String = "%" + this.sanitize_name(pname) + ".arg"
+            if (this.target == "wasm32" and !this.identity_mode and (emit_name.contains("__on_") or emit_name.contains("__dispatch_"))) {
+                if (ptype == "Float" or ptype == "Number") {
+                    var norm_f: String = this.fresh_local()
+                    this.emit_indent(norm_f + " = call i64 @__rt_normalize_incoming_float(i64 " + arg_reg + ")")
+                    arg_reg = norm_f
+                } else if (ptype == "Int") {
+                    var norm_i: String = this.fresh_local()
+                    this.emit_indent(norm_i + " = call i64 @__rt_normalize_incoming_int(i64 " + arg_reg + ")")
+                    arg_reg = norm_i
+                }
+            }
+            this.emit_indent("store i64 " + arg_reg + ", i64* %" + this.sanitize_name(pname))
             i = i + 1
         }
 
@@ -12429,6 +12456,8 @@ class Codegen {
         this.known_functions.push("__val_untag_float")
         this.known_functions.push("__val_tag_bool")
         this.known_functions.push("__val_untag_bool")
+        this.known_functions.push("__rt_normalize_incoming_float")
+        this.known_functions.push("__rt_normalize_incoming_int")
         this.known_functions.push("__rt_tag_ptr")
         // GC runtime functions
         this.known_functions.push("__gc_enable")
@@ -12905,6 +12934,16 @@ class Codegen {
             out.append("declare double @__val_untag_float(i64)\n")
             out.append("declare i64 @__val_tag_bool(i64)\n")
             out.append("declare i64 @__val_untag_bool(i64)\n")
+        }
+        // BUGS #75 export-boundary normalizers. Only defined in wasm_base_32.ll;
+        // declared only for wasm32 so native/wasm64 modules do not reference an
+        // undefined symbol. Emission of a call to these is likewise gated on
+        // this.target == "wasm32" in gen_function, so a declare with no call is
+        // the only thing that can happen off-target — and it does not, because of
+        // this guard.
+        if (!this.identity_mode and this.target == "wasm32") {
+            out.append("declare i64 @__rt_normalize_incoming_float(i64)\n")
+            out.append("declare i64 @__rt_normalize_incoming_int(i64)\n")
         }
         // Always declared, even in identity mode. The tag/untag helpers above
         // are no-ops there and so are elided, but __rt_tag_ptr is the explicit
