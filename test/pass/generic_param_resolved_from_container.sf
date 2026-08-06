@@ -1,0 +1,59 @@
+// BUGS #171 — a type parameter that appears ONLY inside a generic parameter
+// (`fun find<T>(xs: List<T>): T`) must be resolved from the argument's element
+// type so the RESULT can be dispatched on, with no intermediate annotation.
+//
+// Two layers had to move together (see the #171 entry in BUGS.md):
+//   - checker: resolve_type_params' case-2 was dead because param types were
+//     rendered lossily (`List<T>` → "List", no "<").
+//   - codegen: get_expr_type / the call-emission sites carry codegen's own
+//     receiver-type inference and did not resolve the return type parameter from
+//     the call arguments, so a dispatch on the result saw "T" and was dropped.
+//
+// The codegen half resolves the return type parameter at the free-function call
+// site (gen_call) AND the module-qualified call site (gen_method_call), so both
+// `unwrap(xs).m()` and `Iter.find(xs, ...).m()` work. Every assertion below
+// dispatches a method on the call result WITHOUT an intermediate annotation —
+// the exact shape that used to fail — so the test discriminates the fix.
+
+import "@test" as Test
+import "@iter" as Iter
+
+fun unwrap<T>(xs: List<T>): T {
+    return xs[0]
+}
+
+fun second_of<K, V>(keys: List<K>, values: List<V>): V {
+    return values[0]
+}
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun doubled(): Int { return this.v * 2 }
+}
+
+fun main() {
+    var strs: List<String> = ["hello", "world"]
+    // Free generic function, no annotation: T resolved from List<T> to type .to_upper().
+    Test.assert_eq(unwrap(strs).to_upper(), "HELLO", "free unwrap<T>(List<T>): dispatch on T=String")
+
+    var boxes: List<Box> = [Box(21)]
+    Test.assert_eq(unwrap(boxes).doubled(), 42, "free unwrap<T>(List<T>): dispatch on T=Box method")
+
+    // Two type params: V from the SECOND container argument.
+    var ks: List<Int> = [1, 2]
+    var vs: List<String> = ["a", "b"]
+    Test.assert_eq(second_of(ks, vs).to_upper(), "A", "second_of<K,V>: dispatch on V=String")
+
+    // The module-qualified stdlib case that motivated the fix.
+    var words: List<String> = ["apple", "banana", "cherry"]
+    var found: String = Iter.find(words, fun (w: String): Bool => w.length() > 5)
+    Test.assert_eq(found, "banana", "Iter.find binds and returns the element")
+    // And dispatched directly on the call result, no annotation.
+    Test.assert_eq(Iter.find(words, fun (w: String): Bool => w.length() > 5).to_upper(),
+        "BANANA", "Iter.find<T>(List<T>): dispatch on T=String")
+
+    Test.summary()
+}
+
+main()

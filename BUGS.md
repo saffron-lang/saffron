@@ -2,8 +2,12 @@
 
 ## Open
 
-**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #171, #173. Next free number is **#174**.
+**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #173. Next free number is **#174**.
+
+#171 (a type parameter used only inside a generic parameter never resolves) was
+filed as a two-layer defect and is now FIXED — both layers landed together, as its
+entry said they had to. Moved to Resolved; count 14 → 13, next-free stays 174.
 
 #173 (`try`/`catch`/`throw` traps on wasm32 — setjmp/longjmp are no-op stubs) was
 filed from the playground eval: exception handling works natively but the wasm32
@@ -328,54 +332,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 171. OPEN — a type parameter used only inside a generic parameter never resolves; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` is dropped
-
-**Severity: medium.** A generic function whose return type parameter appears
-*only* inside a container parameter — `fun unwrap<T>(xs: List<T>): T` — cannot have
-its result dispatched on without an explicit annotation. `unwrap(a).to_upper()`
-fails with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
-type 'T' — the call would be dropped.` The workaround is a typed intermediate:
-`var s: String = unwrap(a); s.to_upper()`.
-
-**This is two defects in two layers, and half-fixing it is worse than not, which
-is why it is filed rather than partly landed.**
-
-**Layer 1 — the checker (found and fix drafted, then reverted).** The checker's
-`resolve_type_params` has a "case 2" for exactly this shape (return param `T`
-buried in `List<T>`), guarded by `param_type.contains("<")`. But `param_type` was
-rendered through the LOSSY `AST.type_to_string`, which collapses `List<T>` to the
-bare `"List"` — no `<`, so the branch is dead. Rendering through `type_to_str`
-(which keeps the argument, `"List<T>"`) makes case-2 fire. That one-word change
-bootstraps green with zero regressions.
-
-**Layer 2 — codegen, the reason layer 1 alone does nothing observable.** Codegen
-carries its OWN receiver-type inference (`get_expr_type` in
-`codegen/methods_body.sf`) that does not consult the checker's type-parameter
-resolution for a `Call` receiver. So even with the checker resolving `T`→`String`,
-codegen still sees `"T"` at the dispatch site and drops the call. This is the same
-checker/codegen split documented in #169's write-up.
-
-**Why the checker half was reverted rather than landed.** With layer 2 open, the
-layer-1 fix has *no end-to-end observable effect*: every place the checker's
-resolution could be seen (a typed binding, a typed parameter) already supplies the
-type from its annotation, and `scalar_mismatch` lets an unresolved `"T"` through
-regardless — so a regression test written against the checker half asserts nothing
-it wouldn't assert on the buggy binary. The only observation that discriminates
-the fix is `unwrap(a).method()` with no annotation, which is exactly what layer 2
-drops. Landing layer 1 alone would be a speculative change with a non-discriminating
-test; the honest state is both layers filed together, fixed together, with the
-regression test being the un-annotated `.method()` call that requires both.
-
-**Reproduction:**
-
-```saffron
-fun unwrap<T>(xs: List<T>): T { return xs[0] }
-var a: List<String> = ["hello"]
-IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 'T'
-```
-
-Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
 
 ### 173. OPEN — `try`/`catch`/`throw` traps on wasm32; setjmp/longjmp are no-op stubs
 
@@ -1241,6 +1197,45 @@ class — semicolon, comment, trailing brace, stray punctuation — rather than 
 semicolon alone.
 
 ## Resolved
+
+### 171. FIXED — a type parameter used only inside a generic parameter never resolved; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` was dropped
+
+**Severity: medium.** A generic function whose return type parameter appeared
+*only* inside a container parameter — `fun unwrap<T>(xs: List<T>): T`,
+`fun find<T>(xs: List<T>): T` — could not have its result dispatched on without an
+explicit annotation. `unwrap(a).to_upper()` and `Iter.find(xs, ...).to_upper()`
+failed with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
+type 'T' — the call would be dropped.`
+
+**Two layers, fixed together — the entry was filed open with the note that
+half-fixing it was worse than not, because layer 1 alone has no observable effect.**
+
+**Layer 1 — the checker.** `resolve_type_params`' "case 2" (return param `T` buried
+in `List<T>`) was guarded by `param_type.contains("<")`, but `param_type` was
+rendered through the LOSSY `AST.type_to_string`, which collapses `List<T>` to the
+bare `"List"` — no `<`, so the branch was dead. Rendering through `type_to_str`
+(which keeps the argument, `"List<T>"`) makes case-2 fire.
+
+**Layer 2 — codegen.** Codegen carries its OWN receiver-type inference: a call sets
+`last_type` from `func_ret_types`, which for a generic function is the bare `"T"`.
+The fix resolves that type parameter from the call arguments at each call-emission
+site — the free-function path in `gen_call` (both the ordinary and the
+known-function branches) AND the module-qualified path in `gen_method_call`
+(`Iter.find`). A new codegen table `func_param_type_strs` records the parameter
+type spellings at registration; `resolve_call_ret_type_param` mirrors the checker's
+case-1 (`param IS the type parameter`) and case-2 (`param is Container<...T...>`),
+and `apply_ret_type_param_resolution` rewrites `last_type` to the concrete type so a
+dispatch on the result finds a real receiver.
+
+This duplicates a slice of the checker's inference, which stage 4 exists to delete —
+but with codegen's `get_expr_type` still the receiver-type authority, it is the only
+way to make the result dispatchable today. Noted in the code as stage-4 debt.
+
+Regression test: `test/pass/generic_param_resolved_from_container.sf`, five
+assertions, each dispatching a method on the un-annotated call result (the shape
+that used to fail) across the free-function and module-qualified paths and two type
+parameters. Bootstrap green including the gen4 fixed-point; suite 320 passed, 8
+failed, 14 skipped, failure set otherwise unchanged.
 
 ### 172. FIXED — wasm32 `malloc` returned pointers past the end of linear memory when `memory.grow` was capped or failed
 
