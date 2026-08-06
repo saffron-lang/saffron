@@ -1510,6 +1510,13 @@ entry:
 declare i64 @strlen(i8*)
 declare i64 @write(i32, i8*, i64)
 
+; The GC-pointer floor __rt_gc_tag_of applies before loading the header
+; sentinel. Native heap allocations all live above 4 GB (BUGS #170).
+define i64 @__rt_gc_ptr_floor() {
+entry:
+  ret i64 4294967296
+}
+
 define void @__print_debug_location() {
 entry:
   %loc = load i8*, i8** @__debug_location

@@ -598,6 +598,15 @@ entry:
   ret void
 }
 
+; @override wasm64 -- The GC-pointer floor __rt_gc_tag_of applies before loading
+;   the header sentinel. wasm linear memory starts near zero, so the native
+;   4 GB floor would reject every real pointer; the floor is the header size
+;   (16) instead (BUGS #170).
+define i64 @__rt_gc_ptr_floor() {
+entry:
+  ret i64 16
+}
+
 ; Identity discipline: there is no tag, so a null pointer and nil are the same
 ; bits (__val_nil() is 0 in this base). The nanbox version selects the nil
 ; constant for a null input; here the pass-through IS that behaviour.
