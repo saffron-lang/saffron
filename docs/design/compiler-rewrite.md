@@ -1039,12 +1039,16 @@ the count from 54 to 50 `: String {` and — more importantly — beginning the
 | `2c7da15` | 4 `infer_*` → `: AST.Type` | `parse_type_node` moved to exit; arms consume nodes |
 | `d047e05` | `get_func_ret_type` + `get_enum_binding_type_node` | Consolidation of remaining closed round trips |
 | `35fdadd` | **`func_params`** → `Map<String, List<AST.Param>>` | First `TypeEnv` table stores nodes |
+| `9a0ec5e` | **`class_fields`** → `Map<String, List<AST.Param>>` | Second `TypeEnv` table stores nodes |
+| `0fbbb9c` | `check_call_args` reads nodes | First consumer off the string CSV |
+| `f2b3411` | `resolve_type_params`/`resolve_generic_return` read nodes; **`get_func_params` deleted** | `func_params` is now nodes end to end |
 
-The `func_params` migration is the template for the rest: store nodes (the
-producer already had them), render the **same lossy CSV on read** so every
-consumer sees byte-identical strings, expose a `get_func_param_nodes` accessor
-for future slices that want nodes. Verified structural: 138/139 baselined files
-emit byte-identical IR; the one that changes is `pass/check_module_imports`, which
+The `func_params` migration is the template: store nodes (the producer already
+had them), render the **same lossy CSV on read** so every consumer sees
+byte-identical strings, expose a `get_func_param_nodes` accessor, then migrate
+consumers one at a time until the string view is dead and can be deleted — which
+it now is for `func_params`. Verified structural: 138/139 baselined files emit
+byte-identical IR; the one that changes is `pass/check_module_imports`, which
 compiles the checker's own source and so must differ.
 
 **Discovery: `resolve_type_params` case-2 is dead pre-existing.** The lossy
@@ -1056,32 +1060,65 @@ This is a separate bug (BUGS file TBD) that predates the func_params migration; 
 change reproduces the same lossy render at the same point and is byte-identical
 against a true baseline.
 
-**What remains for stage 3:**
+**What the `: String {` count actually is.** The raw count (50 as of `f2b3411`)
+badly overstates the remaining work: most of those functions legitimately return
+strings and are not type representations at all —
 
-1. **Table migrations** (same pattern as `func_params`):
-   - `class_fields: Map<String, String>` — CSV `"name:Type,..."`, 5 producers,
-     ~15 consumers (most just `.has()`).
-   - `enum_fields: Map<String, String>` — same shape.
-   - `func_type_params: Map<String, String>` — comma-joined type param names.
+- **Names / labels / diagnostics** (~30): `no_package_marker`, `exposure_label`,
+  `decl_kind_of`, `member_restriction`, `constructor_owner`, `qualified_class_key`,
+  `report`/`error_report`, the six `check*` entry points, `get_variable_name_from_expr`,
+  `classify_cond`, `extract_receiver_class`, … — class names, messages,
+  classifications. Orthogonal to I3.
+- **Deliberate renderers**: `type_to_str`, `type_node_to_string`,
+  `params_list_to_string`, `get_class_fields_str`, `get_func_ret`. Their *job* is
+  to render a type to a string for a diagnostic or a lossy comparison; they stay.
 
-2. **Consumer migration** — one consumer at a time, from `get_func_params` (the
-   string view) to `get_func_param_nodes` (the node list). Each flip removes one
-   `split_type_args` + `index_of(":")` site and is independently verifiable.
+The genuine I3 remainder is **~10 functions**, and they form one
+**mutually-coupled string-surgery cluster** (mapped 2026-08-06):
 
-3. **Fix `resolve_type_params` case-2** — swap the lossy renderer for
-   `checker.type_to_str` (which keeps generic args), or read the node directly
-   from `get_func_param_nodes`. This is a *behavioural* change (makes case-2
-   live) and needs its own test + BUGS entry.
+- `generic_base` (23 callers) — bare-name extractor, `index_of("<")` + slice.
+- `substitute_class_type_params` — generic-arg surgery, string rebuild.
+- `get_class_field_type` — reads `class_fields` nodes back out as a lossy CSV,
+  then splits. Coupled: its `infer_member_access` caller wraps it in
+  `substitute_class_type_params`, so it cannot go node-valued until that does.
+- `class_method_ret_type` — forwarder over the two above.
+- `extract_generic_args` / `extract_nth_generic_arg` / `extract_map_*_type` —
+  node twins (`*_node`) already exist; the blocker is the string callers
+  (`infer_method_call_str`, `resolve_type_params`) that still hold `obj_type`/`ret`
+  as strings.
+- `resolve_enum_key_name` / `get_variant_fields` — enum-name-qualifier surgery,
+  backed by `enum_fields: Map<String,String>` (a CSV store; needs
+  `AST.Variant.fields: String → List<AST.Param>`, a parser-level change).
 
-4. **Interning behind `TypeId`** — once no consumer reads the string form, the
-   table values are nodes, node equality is structural, and TypeId is cheap
-   (index into a dedup list). This is the final goal.
+**Why these are one slice, not ten.** Migrating `get_class_field_type` to return a
+node needs `substitute_class_type_params` node-valued; that needs the
+`extract_*` inputs as nodes; those come from `infer_method_call_str`'s `obj_type`,
+which is a string from `infer_expr`. The clean closed round trips are exhausted;
+what is left is a connected subgraph that has to move together or not at all. That
+is a genuinely larger and riskier change than the seven landed slices, each of
+which was independently byte-identical-verifiable.
 
-`infer_call_str` / `infer_method_call_str` still exist — the string surgery
-inside them (`resolve_type_params`, `resolve_generic_return`,
-`substitute_class_type_params`, `generic_base`) is all keyed off the lossy CSV
-strings. Each one migrates when its inputs become nodes; items 1-2 above are what
-moves those inputs.
+**Remaining ordered work:**
+
+1. **`enum_fields` / `AST.Variant.fields`** — flip `Variant.fields` from `String`
+   to `List<AST.Param>` at the parser level, then `enum_fields` follows the
+   `func_params` template. Unblocks `get_variant_fields` / `get_enum_binding_type`.
+2. **The surgery cluster** — introduce node twins for `generic_base` and
+   `substitute_class_type_params`, migrate `get_class_field_type` +
+   `class_method_ret_type` together, then route the `extract_*` callers to the
+   existing `*_node` twins. One connected slice; verify with the full IR baseline.
+3. **Fix `resolve_type_params` case-2** — dead pre-existing (below). Swap the
+   lossy renderer for one that keeps generic args, or read the arg node directly.
+   *Behavioural*; needs its own test + BUGS entry.
+4. **Interning behind `TypeId`** — once no consumer reads a string type form, node
+   equality is structural and TypeId is an index into a dedup list. Final goal.
+
+`func_type_params` (comma-joined type-param *names*, with `T:Interface`
+constraints) is **orthogonal to I3**: it stores no `AST.Type`, and its consumers
+(`check_generic_constraints`, `is_generic_func`) read names/constraints, not types.
+
+`infer_call_str` / `infer_method_call_str` still return strings — their bodies do
+the cluster's surgery. They collapse to `: AST.Type` once item 2 lands.
 
 Stage 9 (generated runtime) remains independent of everything and can be picked up
 in parallel at any time; stage 10 is still blocked on the single
