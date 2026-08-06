@@ -1457,6 +1457,25 @@ class Codegen {
         if (vtype.contains(".")) {
             var dot_idx: Float = vtype.index_of(".")
             var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            // BUGS #161: the dotted part is an import alias, and it is the only
+            // thing that disambiguates two modules that both declare `Thing`.
+            // class_fields is keyed by the module-prefixed struct name (ta_Thing,
+            // tb_Thing) as well as by the last-registered bare `Thing`, so resolve
+            // the alias to its prefix and try prefix+bare FIRST. Falling straight
+            // through to the bare lookup below returns whichever module registered
+            // `Thing` last, which is how a target-a receiver reached target-b's
+            // method. This mirrors the alias resolution the constructor call path
+            // already does (expr_body.sf: module_alias_prefix(alias) + name).
+            var alias: String = vtype.slice(0, dot_idx)
+            if (this.has_module_alias(alias)) {
+                var alias_prefixed: String = this.module_alias_prefix(alias) + bare
+                if (this.class_fields.has(alias_prefixed)) {
+                    if (this.class_struct_names.has(alias_prefixed)) {
+                        return this.class_struct_names.get(alias_prefixed)
+                    }
+                    return alias_prefixed
+                }
+            }
             // Try current module prefix on the bare name
             if (this.current_prefix.length() > 0) {
                 var prefixed_bare: String = this.current_prefix + bare
@@ -4284,7 +4303,21 @@ class Codegen {
                     this.emit_indent(discard_init + " = call i64 @" + init_name + "(" + init_args.join(", ") + ")")
                     this.gen_pop_arg_roots(ctor_roots)
                 }
-                this.last_type = this.str_to_type(simple_callee)
+                // BUGS #161: type the result by the RESOLVED (module-prefixed)
+                // class, not the bare simple_callee. The instance was allocated
+                // via @resolved_callee (ta_Marker), so its type is ta_Marker. An
+                // inferred `var m = TargetA.Marker(x)` records this as m's type;
+                // recording the bare `Marker` lost the module identity and let
+                // m.describe() dispatch to whichever module registered Marker
+                // last. resolved_callee already went through the alias resolution
+                // above, so it carries the right prefix; only fall back to the
+                // bare name when the resolved symbol names no known class (a
+                // builtin constructor, or an unprefixed entry-module class).
+                if (this.class_fields.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(resolved_callee)
+                } else {
+                    this.last_type = this.str_to_type(simple_callee)
+                }
                 return instance
             }
 
@@ -8163,7 +8196,14 @@ class Codegen {
         if (this.current_prefix.length() > 0) {
             this.known_functions.push(name)
         }
-        this.func_ret_types.set(type_name, this.str_to_type(name))
+        // BUGS #161: the prefixed constructor (ta_Marker) must return the
+        // PREFIXED type, not the bare name. An inferred `var m = TargetA.Marker(x)`
+        // takes its type from this entry; recording the bare `Marker` there loses
+        // the module identity, so `m.describe()` fell through to the ambiguous
+        // last-writer-wins bare lookup in resolve_class_type and bound the wrong
+        // module's method. The bare `name` key stays bare — it serves callers that
+        // know only the unqualified name, which is inherently the ambiguous case.
+        this.func_ret_types.set(type_name, this.str_to_type(type_name))
         this.func_ret_types.set(name, this.str_to_type(name))
 
         // Generate methods as functions with name prefix: ClassName__method
@@ -11312,6 +11352,22 @@ class Codegen {
         }
         var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
             _ => []
+        }
+        // BUGS #161: register the constructor's return type here, prefixed, so the
+        // second global-var pass (prescan_global_call_types) can type an inferred
+        // `var m = TargetA.Marker(x)`. That pass runs after this one but BEFORE
+        // gen_class_decl — which is where func_ret_types is otherwise filled — so
+        // without this the alias arm in get_expr_type finds no entry for ta_Marker,
+        // the global stays untyped, and dispatch falls through to the ambiguous
+        // last-writer-wins bare lookup and binds the wrong module's method. Same
+        // ordering gap BUGS #146 hit for a free function returning a class. The
+        // prefixed key carries the module identity; the bare key stays bare, which
+        // is the inherently-ambiguous unqualified case.
+        if (cname.length() > 0) {
+            var ctor_type: String = cname
+            if (prefix.length() > 0) { ctor_type = prefix + cname }
+            this.func_ret_types.set(ctor_type, this.str_to_type(ctor_type))
+            this.func_ret_types.set(cname, this.str_to_type(cname))
         }
         var mi: Float = 0
         while (mi < methods.length()) {
@@ -14719,7 +14775,16 @@ class Codegen {
                     var __mp_discard: String = this.fresh_local()
                     this.emit_indent(__mp_discard + " = call i64 @" + __mp_init + "(" + __mp_init_args.join(", ") + ")")
                 }
-                this.last_type = this.str_to_type(method)
+                // BUGS #161: type the result by the module-prefixed class (__mp_func,
+                // e.g. ta_Marker) — the symbol the instance was actually allocated
+                // from — not the bare `method`. An inferred `var m = TargetA.Marker(x)`
+                // stores this as m's type; the bare `Marker` lost the module identity
+                // and m.describe() then bound whichever module registered Marker last.
+                if (this.class_fields.has(__mp_func)) {
+                    this.last_type = this.str_to_type(__mp_func)
+                } else {
+                    this.last_type = this.str_to_type(method)
+                }
                 return __mp_instance
             }
 

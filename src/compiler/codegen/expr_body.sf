@@ -2668,7 +2668,21 @@
                     this.emit_indent(discard_init + " = call i64 @" + init_name + "(" + init_args.join(", ") + ")")
                     this.gen_pop_arg_roots(ctor_roots)
                 }
-                this.last_type = this.str_to_type(simple_callee)
+                // BUGS #161: type the result by the RESOLVED (module-prefixed)
+                // class, not the bare simple_callee. The instance was allocated
+                // via @resolved_callee (ta_Marker), so its type is ta_Marker. An
+                // inferred `var m = TargetA.Marker(x)` records this as m's type;
+                // recording the bare `Marker` lost the module identity and let
+                // m.describe() dispatch to whichever module registered Marker
+                // last. resolved_callee already went through the alias resolution
+                // above, so it carries the right prefix; only fall back to the
+                // bare name when the resolved symbol names no known class (a
+                // builtin constructor, or an unprefixed entry-module class).
+                if (this.class_fields.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(resolved_callee)
+                } else {
+                    this.last_type = this.str_to_type(simple_callee)
+                }
                 return instance
             }
 

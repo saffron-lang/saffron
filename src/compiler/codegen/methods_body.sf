@@ -1781,7 +1781,16 @@
                     var __mp_discard: String = this.fresh_local()
                     this.emit_indent(__mp_discard + " = call i64 @" + __mp_init + "(" + __mp_init_args.join(", ") + ")")
                 }
-                this.last_type = this.str_to_type(method)
+                // BUGS #161: type the result by the module-prefixed class (__mp_func,
+                // e.g. ta_Marker) — the symbol the instance was actually allocated
+                // from — not the bare `method`. An inferred `var m = TargetA.Marker(x)`
+                // stores this as m's type; the bare `Marker` lost the module identity
+                // and m.describe() then bound whichever module registered Marker last.
+                if (this.class_fields.has(__mp_func)) {
+                    this.last_type = this.str_to_type(__mp_func)
+                } else {
+                    this.last_type = this.str_to_type(method)
+                }
                 return __mp_instance
             }
 
