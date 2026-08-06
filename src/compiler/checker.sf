@@ -46,7 +46,15 @@ class Scope {
 class TypeEnv {
     var scopes: List<Scope>
     var funcs: Map<String, AST.Type>
-    var func_params: Map<String, String>
+    // Declared parameters, as nodes. Was Map<String, String> holding a CSV of
+    // "name:Type" pairs rendered through the lossy AST.type_to_string at write
+    // time — the I3 shape this migration removes: the producer already had
+    // List<AST.Param> and threw the nodes away. The nodes are now the stored
+    // truth; get_func_params renders the SAME lossy CSV on read, so every consumer
+    // (check_call_args, resolve_type_params, resolve_generic_return, the generic
+    // constraint check) sees a byte-identical string and scalar_mismatch's #155
+    // proof set is untouched. See get_func_params / get_func_param_nodes.
+    var func_params: Map<String, List<AST.Param>>
     var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
@@ -198,15 +206,44 @@ class TypeEnv {
         return AST.Type.ClassType(s)
     }
 
-    fun define_func_params(name: String, params_str: String) {
-        this.func_params.set(name, params_str)
+    fun define_func_params(name: String, params: List<AST.Param>) {
+        this.func_params.set(name, params)
     }
 
-    fun get_func_params(name: String): String {
+    // The declared parameter nodes, or [] if unknown. The node accessor — prefer
+    // this over get_func_params where a caller can consume nodes; the string form
+    // exists only for the string-surgery helpers not yet migrated.
+    fun get_func_param_nodes(name: String): List<AST.Param> {
         if (this.func_params.has(name)) {
             return this.func_params.get(name)
         }
-        return ""
+        return []
+    }
+
+    // The old CSV view: "name:Type,name:Type", each Type rendered through the
+    // LOSSY AST.type_to_string (GenericType → bare base, Union → "Union", Fun →
+    // "Fun") exactly as params_list_to_string produced at write time. Kept
+    // byte-identical on purpose: check_call_args feeds these types to
+    // scalar_mismatch, whose #155 proof set is written against the lossy
+    // spellings, and resolve_type_params/resolve_generic_return split on the same
+    // commas. Rendering here rather than storing means the render is now the only
+    // place the loss happens — a later slice can migrate a consumer to
+    // get_func_param_nodes and drop it from this string without touching the rest.
+    fun get_func_params(name: String): String {
+        if (!this.func_params.has(name)) { return "" }
+        var params: List<AST.Param> = this.func_params.get(name)
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(AST.type_to_string(pt))
+            i = i + 1
+        }
+        return sb.to_string()
     }
 
     fun define_func_type_params(name: String, type_params_str: String) {
@@ -1400,7 +1437,7 @@ class NullChecker {
                 // honest answer: nothing was declared. Callers that need a
                 // concrete type must infer it rather than read a sentinel.
                 this.env.define_func(name, ret_type)
-                this.env.define_func_params(name, this.params_list_to_string(params))
+                this.env.define_func_params(name, params)
                 // Module-level identity + visibility, so a cross-module reference
                 // to this function can be checked (§6a path 1/2/3). Public is not
                 // stored; register_module_decl records the module either way so
@@ -1515,7 +1552,7 @@ class NullChecker {
                     }
                     if (method_name.length() > 0) {
                         this.env.define_func(name + "__" + method_name, method_ret)
-                        this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
+                        this.env.define_func_params(name + "__" + method_name, method_params)
                         // Same as the FunDecl arm: a method taking a callback has to
                         // be able to type a block passed to it (BUGS #86).
                         //
@@ -2827,7 +2864,7 @@ class NullChecker {
                 // Register method with class prefix if inside a class
                 if (this.current_class.length() > 0) {
                     this.env.define_func(this.current_class + "__" + name, ret_type)
-                    this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
+                    this.env.define_func_params(this.current_class + "__" + name, params)
                     // Register generic type params for class methods
                     this.extract_and_register_generics(this.current_class + "__" + name, doc)
                     // Track method names for conformance checking
