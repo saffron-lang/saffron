@@ -1,0 +1,17 @@
+// BUGS #165: passing a String where a class-typed parameter is declared must be
+// rejected, not compiled to a segfault. The callee does a field load on the
+// argument as if it were a Box struct; a String is a pointer to a byte buffer,
+// so the load reads garbage or faults. The checker must catch it at the call
+// boundary. Companion to #155's return-site case (return_class_type_mismatch.sf).
+//
+// The compiler MUST reject this file. A clean compile is itself a failure.
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun get(): Int { return this.v }
+}
+
+fun use(b: Box): Int { return b.get() }
+
+var s: String = "not a box"
+IO.println(use(s).to_string())
