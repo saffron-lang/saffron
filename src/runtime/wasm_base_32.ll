@@ -2076,6 +2076,15 @@ entry:
   ret void
 }
 
+; @override wasm32 -- The GC-pointer floor __rt_gc_tag_of applies before loading
+;   the header sentinel. wasm32 linear memory starts near zero, so the native
+;   4 GB floor would reject every real pointer; the floor is the header size
+;   (16) instead, matching @__val_class_tag in this base (BUGS #170).
+define i64 @__rt_gc_ptr_floor() {
+entry:
+  ret i64 16
+}
+
 ; wasm has a real trap instruction, so this needs no host support. It was
 ; previously only declared, which left it undefined at link time.
 define void @__builtin_trap() {

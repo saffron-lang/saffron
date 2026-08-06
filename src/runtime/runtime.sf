@@ -277,6 +277,14 @@ fun __sb_to_string(sb: Int): Int {
 @extern("i64 __any_to_string(i64)") fun __any_to_string(val: Int): Int
 // Read the GC type tag from a raw (untagged) GC pointer. TYPE_LIST == 2.
 @extern("i64 __gc_get_type_tag(i64)") fun __rt_gc_type_tag(ptr: Int): Int
+// The lowest address a real GC user pointer can have on this target — the floor
+// __rt_gc_tag_of applies before it dares load the header sentinel. It is
+// per-target because the answer is genuinely different: Darwin heap allocations
+// all live above 4 GB, but wasm32 linear memory starts near zero, so a 4 GB
+// floor there rejects every real pointer (BUGS #170). The `.ll` bases already
+// encode exactly this split in @__val_class_tag; this extern brings
+// __rt_gc_tag_of into agreement instead of hardcoding the native value.
+@extern("i64 __rt_gc_ptr_floor()") fun __rt_gc_ptr_floor(): Int
 
 // NaN-boxed nil sentinel (0x7FFA000000000002 = 9221683186994511874).
 // Cannot use `nil` keyword here: identity-mode compiles nil to raw 0.
@@ -726,10 +734,12 @@ fun __rt_gc_tag_of(v: Int): Int {
     if (raw == 0) { return 0 }
     // Alignment: every GC user pointer is 8-byte aligned.
     if ((raw & 7) != 0) { return 0 }
-    // Bounds: Darwin heap allocations are all above 4 GB. Below that the value
-    // is an integer, an enum tag, or a subnormal double, and raw-8 is either
-    // unmapped or somebody else's memory.
-    if (raw < 4294967296) { return 0 }
+    // Bounds: on native, Darwin heap allocations are all above 4 GB, so below
+    // that the value is an integer, an enum tag, or a subnormal double and
+    // raw-8 is either unmapped or somebody else's memory. On wasm32 the floor
+    // is instead the header size (16), because linear memory starts near zero —
+    // the value comes from the target's @__rt_gc_ptr_floor (BUGS #170).
+    if (raw < __rt_gc_ptr_floor()) { return 0 }
     // Only now is it safe to read the header sentinel.
     var magic: Int = load64(raw - 8)
     if (magic != 6557403441622859503) { return 0 }
