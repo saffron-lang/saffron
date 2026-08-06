@@ -223,31 +223,11 @@ class TypeEnv {
         return []
     }
 
-    // The old CSV view: "name:Type,name:Type", each Type rendered through the
-    // LOSSY AST.type_to_string (GenericType → bare base, Union → "Union", Fun →
-    // "Fun") exactly as params_list_to_string produced at write time. Kept
-    // byte-identical on purpose: check_call_args feeds these types to
-    // scalar_mismatch, whose #155 proof set is written against the lossy
-    // spellings, and resolve_type_params/resolve_generic_return split on the same
-    // commas. Rendering here rather than storing means the render is now the only
-    // place the loss happens — a later slice can migrate a consumer to
-    // get_func_param_nodes and drop it from this string without touching the rest.
-    fun get_func_params(name: String): String {
-        if (!this.func_params.has(name)) { return "" }
-        var params: List<AST.Param> = this.func_params.get(name)
-        var sb: StringBuilder = StringBuilder()
-        var i: Float = 0
-        while (i < params.length()) {
-            if (i > 0) { sb.append(",") }
-            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
-            var pt: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
-            sb.append(pname)
-            sb.append(":")
-            sb.append(AST.type_to_string(pt))
-            i = i + 1
-        }
-        return sb.to_string()
-    }
+    // The lossy CSV string view of func_params is GONE: every consumer
+    // (check_call_args, resolve_type_params, resolve_generic_return,
+    // check_generic_constraints) now reads get_func_param_nodes directly and
+    // renders through AST.type_to_string only at the point of comparison. The
+    // stored form is nodes with no string round trip anywhere.
 
     fun define_func_type_params(name: String, type_params_str: String) {
         this.func_type_params.set(name, type_params_str)
@@ -4022,44 +4002,43 @@ class NullChecker {
     // against actual argument types at the call site.
     // params_str format: "name:Type,name:Type"
     // Returns the resolved concrete type, or the original ret_type if unresolvable.
-    fun resolve_type_params(ret_type: String, params_str: String, args: List<AST.Expr>): String {
-        if (params_str.length() == 0) return ret_type
-        // Split params_str into individual param entries
-        var param_entries: List<String> = this.split_type_args(params_str)
+    // Migrated from a params_str CSV to the param nodes. param_type is rendered
+    // through the LOSSY AST.type_to_string, byte-for-byte what entry.slice(colon+1)
+    // gave when the CSV was itself built lossily — so behaviour is identical,
+    // including the pre-existing dead case-2 (a `List<T>` param renders to "List",
+    // which has no "<", so `param_type.contains("<")` never fires; documented in
+    // compiler-rewrite.md, to be fixed as a behavioural change with its own test).
+    fun resolve_type_params(ret_type: String, params: List<AST.Param>, args: List<AST.Expr>): String {
+        if (params.length() == 0) return ret_type
         var i: Float = 0
-        while (i < param_entries.length() and i < args.length()) {
-            var entry: String = param_entries[i]
-            // Each entry is "name:Type"
-            var colon_pos: Float = entry.index_of(":")
-            if (colon_pos >= 0) {
-                var param_type: String = entry.slice(colon_pos + 1, entry.length())
-                // Case 1: return type directly matches a param type (e.g., ret=T, param=T)
-                if (param_type == ret_type) {
+        while (i < params.length() and i < args.length()) {
+            var param_type: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => AST.type_to_string(t) }
+            // Case 1: return type directly matches a param type (e.g., ret=T, param=T)
+            if (param_type == ret_type) {
+                var arg_type: String = this.infer_expr(args[i])
+                if (arg_type != "Any") return arg_type
+            }
+            // Case 2: return type is a type param inside a generic param
+            // e.g., ret=T, param=List<T> → extract T from the arg's generic type
+            if (param_type.contains("<")) {
+                var inner: String = this.extract_generic_args(param_type)
+                if (inner == ret_type) {
+                    // The param is like List<T> and ret is T
+                    // So extract the first generic arg from the actual arg type
                     var arg_type: String = this.infer_expr(args[i])
-                    if (arg_type != "Any") return arg_type
+                    var resolved: String = this.extract_generic_args(arg_type)
+                    if (resolved.length() > 0 and resolved != "Any") return resolved
                 }
-                // Case 2: return type is a type param inside a generic param
-                // e.g., ret=T, param=List<T> → extract T from the arg's generic type
-                if (param_type.contains("<")) {
-                    var inner: String = this.extract_generic_args(param_type)
-                    if (inner == ret_type) {
-                        // The param is like List<T> and ret is T
-                        // So extract the first generic arg from the actual arg type
+                // Handle Map<K,V> style: check each generic arg
+                var param_args: List<String> = this.split_type_args(inner)
+                var pi: Float = 0
+                while (pi < param_args.length()) {
+                    if (param_args[pi] == ret_type) {
                         var arg_type: String = this.infer_expr(args[i])
-                        var resolved: String = this.extract_generic_args(arg_type)
-                        if (resolved.length() > 0 and resolved != "Any") return resolved
+                        var resolved: String = this.extract_nth_generic_arg(arg_type, pi)
+                        if (resolved != "Any") return resolved
                     }
-                    // Handle Map<K,V> style: check each generic arg
-                    var param_args: List<String> = this.split_type_args(inner)
-                    var pi: Float = 0
-                    while (pi < param_args.length()) {
-                        if (param_args[pi] == ret_type) {
-                            var arg_type: String = this.infer_expr(args[i])
-                            var resolved: String = this.extract_nth_generic_arg(arg_type, pi)
-                            if (resolved != "Any") return resolved
-                        }
-                        pi = pi + 1
-                    }
+                    pi = pi + 1
                 }
             }
             i = i + 1
@@ -4068,7 +4047,7 @@ class NullChecker {
     }
 
     // Resolve type params within a generic return type (e.g., "List<T>" → "List<Int>")
-    fun resolve_generic_return(ret_type: String, params_str: String, args: List<AST.Expr>): String {
+    fun resolve_generic_return(ret_type: String, params: List<AST.Param>, args: List<AST.Expr>): String {
         if (!ret_type.contains("<")) return ret_type
         // Extract base and args from return type
         var lt_pos: Float = ret_type.index_of("<")
@@ -4080,7 +4059,7 @@ class NullChecker {
         while (ri < ret_args.length()) {
             var ra: String = ret_args[ri]
             if (this.is_type_param(ra)) {
-                var resolved: String = this.resolve_type_params(ra, params_str, args)
+                var resolved: String = this.resolve_type_params(ra, params, args)
                 resolved_args.push(resolved)
             } else {
                 resolved_args.push(ra)
@@ -4199,14 +4178,14 @@ class NullChecker {
             if (ret != "Any") {
                 // If return type contains a type parameter, try to resolve it
                 if (this.is_type_param(ret)) {
-                    var params_str: String = this.env.get_func_params(name)
-                    var resolved: String = this.resolve_type_params(ret, params_str, args)
+                    var pnodes: List<AST.Param> = this.env.get_func_param_nodes(name)
+                    var resolved: String = this.resolve_type_params(ret, pnodes, args)
                     if (resolved != ret) return resolved
                 } else if (ret.contains("<")) {
                     // Generic return type like List<T> — resolve type params within
-                    var params_str: String = this.env.get_func_params(name)
-                    if (params_str.length() > 0) {
-                        var resolved: String = this.resolve_generic_return(ret, params_str, args)
+                    var pnodes: List<AST.Param> = this.env.get_func_param_nodes(name)
+                    if (pnodes.length() > 0) {
+                        var resolved: String = this.resolve_generic_return(ret, pnodes, args)
                         if (resolved != ret) return resolved
                     }
                 }
@@ -4512,13 +4491,13 @@ class NullChecker {
             if (ret != "Any") {
                 // Resolve type params for generic method return types
                 if (this.is_type_param(ret)) {
-                    var params_str: String = this.env.get_func_params(full_name)
-                    var resolved: String = this.resolve_type_params(ret, params_str, args)
+                    var pnodes: List<AST.Param> = this.env.get_func_param_nodes(full_name)
+                    var resolved: String = this.resolve_type_params(ret, pnodes, args)
                     if (resolved != ret) return resolved
                 } else if (ret.contains("<")) {
-                    var params_str: String = this.env.get_func_params(full_name)
-                    if (params_str.length() > 0) {
-                        var resolved: String = this.resolve_generic_return(ret, params_str, args)
+                    var pnodes: List<AST.Param> = this.env.get_func_param_nodes(full_name)
+                    if (pnodes.length() > 0) {
+                        var resolved: String = this.resolve_generic_return(ret, pnodes, args)
                         if (resolved != ret) return resolved
                     }
                 }
@@ -5382,8 +5361,8 @@ class NullChecker {
         // Look up type params for this function
         var type_params_str: String = this.env.get_func_type_params(func_name)
         if (type_params_str.length() == 0) return nil
-        var params_str: String = this.env.get_func_params(func_name)
-        if (params_str.length() == 0) return nil
+        var pnodes: List<AST.Param> = this.env.get_func_param_nodes(func_name)
+        if (pnodes.length() == 0) return nil
         // Get type param names
         var tp_names: List<String> = this.parse_type_param_names(type_params_str)
         // For each type param, try to resolve it from the args, then check constraints
@@ -5393,7 +5372,7 @@ class NullChecker {
             var constraints: List<String> = this.get_type_param_constraints(type_params_str, tp_name)
             if (constraints.length() > 0) {
                 // Resolve what type the type param binds to
-                var resolved: String = this.resolve_type_params(tp_name, params_str, args)
+                var resolved: String = this.resolve_type_params(tp_name, pnodes, args)
                 if (resolved != tp_name and resolved != "Any") {
                     // Check each constraint
                     var ci: Float = 0
