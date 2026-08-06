@@ -98,22 +98,28 @@ if (IO.file_exists(html_path)) {
     IO.write_file(html_path, out.to_string())
 }
 
+// Emit the runtime. turmeric.js is the single source of truth (DOM glue, event
+// dispatch, NaN-box marshalling); it is always copied so that both the generated
+// app.js shim and any app-provided app.js can `import { mount } from './turmeric.js'`.
+IO.println("[3/3] Emitting runtime (turmeric.js)...")
+var runtime_js: String = IO.read_file(pkg_dir + "/turmeric/runtime/turmeric.js")
+IO.write_file(build_dir + "/turmeric.js", runtime_js)
+
 // Generate app.js — but never clobber an app's own loader.
 //
 // Step 2 copies public/ into build/, so an app that ships its own public/app.js
-// has already put it in place. Unconditionally writing the generic template over
-// it silently discarded that file: the playground's loader supplies imports the
-// template does not have (js_run_wasm, js_get_hash_source) and instantiates the
-// user's compiled module in a second isolated wasm instance. Overwriting it
-// produced a build that looked fine and then failed at instantiation with a
-// missing-import error.
+// has already put it in place. Unconditionally writing the generic shim over it
+// would discard that file: the playground's loader passes mount() extra imports
+// (js_run_wasm and a custom loader) so it can instantiate the user's compiled
+// module in a second isolated wasm instance. It imports the same turmeric.js, so
+// it shares the runtime rather than forking it.
 //
 // An app opting out of the generated loader is the normal case once it needs any
 // host FFI of its own, so the app's file wins.
 if (IO.file_exists(public_dir + "/app.js")) {
-    IO.println("[3/3] Keeping app-provided app.js (public/app.js)")
+    IO.println("      Keeping app-provided app.js (public/app.js)")
 } else {
-    IO.println("[3/3] Generating app.js...")
+    IO.println("      Generating app.js shim...")
     var app_js: String = IO.read_file(pkg_dir + "/turmeric/runtime/app_template.js")
     IO.write_file(build_dir + "/app.js", app_js)
 }
