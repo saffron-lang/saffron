@@ -1,0 +1,36 @@
+// BUGS #158 regression: a `match` whose arms name variants of an enum declared
+// LATER in the same file must compile to a real tag dispatch, not the
+// unknown-enum fallback that emits the first arm unconditionally (zero
+// icmp/br/switch). When the first arm has MORE fields than the value actually
+// passed, that fallback GEPs past the allocation and segfaults on the load.
+//
+// The fix is the enum prepass in codegen.sf (one loop per corpus) that registers
+// every enum's variant tags/fields before any body is generated, so declaration
+// order no longer decides correctness. No test covered this ("zero occurrences
+// in the tree" — it was a trap for new code), so this pins it.
+import "@test" as Test
+
+// classify() is ABOVE `enum Expr` and its first arm (Call, 3 fields) is WIDER
+// than the value passed through it (Variable, 1 field) — the exact shape the
+// bug report segfaulted on with AST.expr_span.
+fun classify(e: Expr): String {
+    return match (e) {
+        Call(callee, args, extra) => "call:" + callee
+        Variable(nm) => "var:" + nm
+        Literal(v) => "lit:" + v.to_string()
+    }
+}
+
+enum Expr {
+    Call(callee: String, args: String, extra: String),
+    Variable(name: String),
+    Literal(value: Int)
+}
+
+// Each variant reached through the above-declared match: first arm, a middle arm
+// narrower than the first, and a last arm of a different field type.
+Test.assert_eq(classify(Expr.Call("f", "x", "y")), "call:f", "first arm (widest) still correct")
+Test.assert_eq(classify(Expr.Variable("n")), "var:n", "a narrower later arm is reached, not folded into the wide first arm")
+Test.assert_eq(classify(Expr.Literal(42)), "lit:42", "the last arm matches too")
+
+Test.summary()

@@ -2,8 +2,18 @@
 
 ## Open
 
-**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158.
+**8 open entries:** #2, #49, #65, #75, #107, #131, #132, #154.
 Next free number is **#175**.
+
+#157 and #158 were in this list and are now closed as **already fixed** — both
+were stale open entries, not new work. #157 (punctuation swallowed into an import
+alias) was resolved by the `extract_alias_from_line` helper both scanner sites now
+share, with `test/pass/import_alias_punctuation.sf` covering it. #158 (a `match`
+above its enum's declaration compiled to a branchless first-arm destructure) was
+resolved by the enum prepass in `codegen.sf` that registers every enum before any
+body is generated; `test/pass/match_before_enum_decl.sf` now pins it, since the
+entry noted no site in the tree exercised it. Both verified by probing the binary
+before closing — see `BUGS_CLOSED.md`. Count 10 → 8, next-free unchanged.
 
 #174 (`>=` maximal munch breaking `List<Int>=[...]` with no space: the lexer glues
 the generic's closing `>` to the initializer's `=` into one `>=`, so the type
@@ -748,59 +758,6 @@ a one-line edit.
 ---
 
 
-### 158. OPEN — a `match` textually above its enum's declaration compiles to an unconditional destructure of the first arm, with no tag check
-
-`enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the
-declaration (`codegen/stmts_body.sf:843` via `register_variant`), so the table is
-only correct for matches that appear after the enum in the file. A match above it
-asks `find_enum_for_variant` (`codegen/utils_body.sf:124`) for a variant that is
-not registered yet, gets `"Unknown"`, and falls into the unknown-enum branch at
-`codegen/match_body.sf:92`, which is documented as "just generate the first arm's
-body as default" — it GEPs the first arm's bindings out of the subject
-unconditionally and drops every other arm.
-
-The result is not a diagnostic and not a wrong branch. It is *no branch*: the
-emitted function has zero `icmp`/`br`/`switch` instructions and treats every
-input as the first arm's variant. If that arm has more fields than the value
-actually passed, the GEP reads past the allocation and the program segfaults on
-a load of whatever followed.
-
-Measured on `AST.expr_span` while adding it to `src/compiler/ast.sf` above
-`enum Expr`:
-
-```
-expr_span      : branches = 0     <- silently miscompiled
-type_to_string : branches = 15    <- same file, matches Type (declared above it)
-span_merge     : branches = 10    <- same file, matches Span (declared above it)
-```
-
-Calling it on a `Variable` (2 fields) through the first arm `Call` (3 fields)
-segfaulted; moving the function below `enum Expr` produced 10 branches and
-correct results for `Variable`, `Call` and a `Binary` falling through to `_`.
-
-Two things make this nastier than it looks:
-
-- **Declaration order is the only thing that matters, not scope.** Saffron
-  otherwise lets a function call another declared later in the file, so nothing
-  else in the language teaches you to expect this. Reordering two top-level
-  items — a mechanical, apparently meaningless edit — is the whole fix, and the
-  whole cause.
-- **Zero existing occurrences in the tree.** A scan of every `.sf` in `src/` and
-  `tools/` for a match arm naming a variant of an enum declared later in the same
-  file finds none, which is exactly why this has never been hit. It is a trap for
-  new code, not a live defect, so nothing regresses today and nothing will warn
-  the next person.
-
-The real fix is a prepass that registers every enum in the module before any body
-is generated. `register_external_enums` (`codegen/stmts_body.sf:1215`) is that
-prepass and **has no callers** — it is dead code. Either wire it up, or make
-`find_enum_for_variant` returning `"Unknown"` for a name that is a known variant
-somewhere a hard error instead of a silent fallthrough. The unknown-enum branch
-is legitimately needed for class patterns (`is Dog(d)`), so it cannot simply be
-deleted.
-
----
-
 ### 154. An enum inside a printed collection still prints a bit pattern — PAYLOAD HALF FIXED, fieldless half open
 
 **Severity: medium as filed; now low.** Silent wrong answer, but narrower than it
@@ -953,43 +910,3 @@ for that line, so the movement here is *inside* one name — two failing lines t
 NaN-box tag, not another formatter arm.
 
 ---
-
-### 157. Punctuation after an import alias is swallowed into the alias
-
-```saffron
-import "@iter" as Iter;
-var xs = Iter.map([1, 2], fun (x: Int): Int => x * 2)
-// Error: undefined variable 'Iter'
-```
-
-**Severity: low, but the diagnostic actively misleads.** The alias registered is
-`Iter;`, semicolon included, so the module is present and reachable — just not
-under the name the author wrote. The error blames the *use* site for a name the
-*import* line mangled, and it names `Iter`, which looks correct in the source, so
-there is nothing in the message pointing at the real cause. A trailing comment
-(`as Iter // the iterator module`) fails identically.
-
-**Imports are not parsed as AST.** `main.sf` resolves them by scanning raw source
-lines, before the parser runs, because the import graph has to be walked to know
-what to parse at all. Two sites did the alias extraction, and both wrote the same
-expression inline:
-
-```saffron
-line.slice(as_idx + 4, line.length()).trim()
-```
-
-That is everything to end of line. `.trim()` strips whitespace and nothing else,
-which is correct for `as Iter` and wrong for every other line ending.
-
-**One expression written twice was two bugs.** The second site is
-`check_duplicate_aliases`, which hashes the extracted alias to detect a name
-imported twice in one file. There, `as X` and `as X;` produce different keys, so
-the check silently misses a real duplicate — it does not report a wrong alias, it
-reports nothing. That makes the shared-helper fix the systematic one rather than a
-tidiness preference: patching only the site that produced the visible error would
-have left the duplicate check broken with no symptom to lead anyone back to it.
-
-**Fix**: one `extract_alias_from_line(line, as_idx)` helper used by both, stopping
-at the first character that cannot appear in an identifier. That covers the whole
-class — semicolon, comment, trailing brace, stray punctuation — rather than the
-semicolon alone.
