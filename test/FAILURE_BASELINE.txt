@@ -469,9 +469,13 @@
 # were explicitly dropped as language features, so the test tested syntax that will
 # never exist. Removed from the tree and from this list; 5 names remain. (This line
 # and the #2/#175 line both dropped the name independently — same conclusion.)
+#
+# Updated 2026-08-06: dropped pass/varargs — variadic parameters (*args) were
+# implemented upstream (c084dc2), so the test now passes. This is a real fix, not
+# a skip: it left the failure set because the feature it needed was built. 4 names
+# remain. Suite 330 passed / 4 failed / 14 skipped.
 
 async
 docstrings
 oracle_enum_println
 pass/overloading
-pass/varargs
