@@ -9,6 +9,37 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 174. FIXED — `>=` maximal munch broke a generic type annotation with no space before `=`
+
+**Was high.** A typed collection binding written without a space before `=`
+(`var a:List<Int>=[1,2,3]`) failed to parse with a misleading `expected '=' but
+found 'eof'`; a space (`List<Int> =`) worked.
+
+**Cause.** The lexer munges `>` immediately followed by `=` into a single `>=`
+token (`lexer.sf:656`). In `List<Int>=`, that glued the generic's closing `>` to
+the initializer's `=`. In `parse_single_type`'s generic-close loop the `>=` fell
+into the catch-all `else` that blindly `advance()`d past it, consuming both the
+close and the `=`, so the loop ran to EOF and the declaration's `consume("=")`
+never found its assignment.
+
+**Fix.** `src/compiler/parser.sf`, one new branch in `parse_single_type`'s
+generic-close loop, mirroring the existing `>>` split: on a `>=` token it
+decrements depth by 1 and, if that closes the last generic level, rewrites the
+current token in place to a bare `=` (preserving line/col/offset) so the caller's
+`consume("=")` finds it. Context-sensitive — the `>=` operator elsewhere is
+untouched. The lexer only ever forms `>=` (never `>>=`), so one level is correct.
+
+**Verified.** All four spacing variants of `List<Int>=[...]` build and run
+(print 3); `Map<String,Int>={...}` and nested `Map<String,List<Int>>={}` build;
+the `>=` operator still works everywhere (`if (x>=3)`, `while (x>=0)`,
+`a>=3 and b>=2`, tight-spaced included). Bootstrap green through STAGE 2 (0
+inference fallbacks, gen4 links); full suite failure set unchanged vs baseline.
+Playground feature eval 12/12 and 8-round browser stress eval 8/8. Found by the
+playground feature eval. Landed in commit `4f10d60` alongside the reflect-construct
+fix.
+
+---
+
 ### 155. FIXED — a class-typed `return` accepted an incompatible concrete type (a String from a `: Box` function) and segfaulted; the scalar and `: Nil` halves were closed earlier
 
 **Severity: high** for what remains. Found while surveying `FunDecl.ret_type` for

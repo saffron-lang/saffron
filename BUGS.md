@@ -2,12 +2,15 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158, #174.
+**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158.
 Next free number is **#175**.
 
-#174 (`>=` maximal-munch: `List<Int>=[...]` with no space lexes `>=` as the
-comparison operator, so the generic type annotation never closes) was found by
-the playground feature eval. Target-independent; count 10 → 11.
+#174 (`>=` maximal munch breaking `List<Int>=[...]` with no space: the lexer glues
+the generic's closing `>` to the initializer's `=` into one `>=`, so the type
+annotation never closes) was filed from the playground feature eval and fixed in
+the same window — the parser's generic-close loop now splits a `>=` token into a
+closing `>` plus an `=`, mirroring the existing `>>` split. Its full entry is in
+`BUGS_CLOSED.md`.
 
 #155 and #165 were in this list and are now fixed together — a class-typed
 parameter or return that accepted an incompatible concrete type (a String where a
@@ -342,49 +345,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 174. OPEN — `>=` maximal munch: a generic type annotation with no space before `=` fails to parse
-
-**Severity: high.** Hits idiomatic code — a typed collection binding written without
-spaces around `=` does not compile, with a misleading EOF error.
-
-```saffron
-var a: List<Int> = [1, 2, 3]   // OK   — space between > and =
-var a:List<Int>=[1,2,3]        // FAIL — ">=" is lexed as one token
-```
-
-Error: `expected '=' but found 'eof'` at the end of the program (the parser is
-left mid-declaration).
-
-**Cause.** The lexer uses maximal munch: `>` immediately followed by `=` becomes a
-single `>=` (greater-than-or-equal) token. In `var a:List<Int>=[...]` the `>` that
-should close the generic `List<Int>` is glued to the `=` that should begin the
-initializer, so the type parser never sees its closing `>` and the assignment `=`
-vanishes. A space (`List<Int> =`) or (`List<Int> = `) tokenizes `>` and `=`
-separately and parses fine.
-
-**Truth table** (verified, target-independent — reproduces native and wasm32):
-
-| source | result |
-|---|---|
-| `var a:List<Int> = [1,2,3]` | builds |
-| `var a:List<Int> =[1,2,3]` | builds |
-| `var a:List<Int>= [1,2,3]` | **FAIL** |
-| `var a:List<Int>=[1,2,3]` | **FAIL** |
-
-The break is exactly when `>` and `=` are adjacent. `Map<String,Int>=` and
-`List<A>=` fail the same way; a nested `Map<...List<Int>>={}` builds because the
-closing is `>>` then `{`, not `>=`.
-
-**Fix sketch.** The parser already splits a `>>` token when it needs two closing
-`>` for nested generics (that path works). The same treatment is needed for `>=`
-(and likely `>>=`) in type-annotation / generic-close position: when a `>=` token
-is encountered where a generic close is expected, split it into `>` + `=`. Either
-handle it in the parser's generic-close logic (preferred, context-sensitive) or
-stop the lexer from forming `>=` (riskier — it is a real operator elsewhere).
-
-**Found** by the playground feature eval; three feature programs that wrote typed
-list/map bindings without spaces all hit it.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
