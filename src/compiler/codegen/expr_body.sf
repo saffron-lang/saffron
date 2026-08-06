@@ -2228,6 +2228,16 @@
         return rhs
     }
 
+    // A callee is variadic when its last registered parameter name carries the
+    // `*` marker (BUGS varargs). func_param_names holds the marked names.
+    fun is_variadic_callee(name: String): Bool {
+        if (!this.func_param_names.has(name)) { return false }
+        var pn: List<String> = this.func_param_names.get(name)
+        if (pn.length() == 0) { return false }
+        var last: String = pn[pn.length() - 1]
+        return last.starts_with("*")
+    }
+
     fun gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
         var callee_name: String = this.resolve_callee(callee)
 
@@ -2586,7 +2596,14 @@
                 // comparison.
                 if (this.func_param_count.has(resolved_callee)) {
                     var expected: Float = this.func_param_count.get(resolved_callee)
-                    if (args.length() != expected and !has_real_defs) {
+                    // A variadic callee (last param `*nums`) accepts >= the fixed
+                    // count (expected - 1), including zero trailing args.
+                    if (this.is_variadic_callee(resolved_callee)) {
+                        var fixed: Float = expected - 1
+                        if (args.length() < fixed and !has_real_defs) {
+                            this.codegen_error("'" + callee_name + "' expects at least " + fixed.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                        }
+                    } else if (args.length() != expected and !has_real_defs) {
                         this.codegen_error("'" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                     }
                 } else if (this.called_function_arity.has(resolved_callee)) {
@@ -2848,6 +2865,48 @@
             // — but rooting unconditionally keeps the accounting local to this loop.
             var arg_roots: Float = 0
             var i: Float = 0
+            if (this.is_variadic_callee(resolved_callee)) {
+                // Variadic callee (BUGS varargs): emit the `fixed` leading args
+                // normally, then collect every trailing arg into one List built
+                // with __list_new / __list_push and pass it as the final param.
+                // `sum()` with no trailing args yields an empty list, not a nil.
+                var vfixed: Float = this.func_param_count.get(resolved_callee) - 1
+                var vi: Float = 0
+                while (vi < vfixed and vi < reordered_args.length()) {
+                    var fval: String = this.gen_arg_value(reordered_args[vi])
+                    arg_strs.push("i64 " + fval)
+                    arg_roots = arg_roots + this.gen_root_arg_temp(fval)
+                    vi = vi + 1
+                }
+                var vlist: String = this.fresh_local()
+                this.emit_indent(vlist + " = call i64 @__list_new()")
+                var vlist_roots: Float = this.gen_root_arg_temp(vlist)
+                while (vi < reordered_args.length()) {
+                    var eval: String = this.gen_arg_value(reordered_args[vi])
+                    var epush_root: Float = this.gen_root_arg_temp(eval)
+                    var vpush: String = this.fresh_local()
+                    this.emit_indent(vpush + " = call i64 @__list_push(i64 " + vlist + ", i64 " + eval + ")")
+                    this.gen_pop_arg_roots(epush_root)
+                    vi = vi + 1
+                }
+                arg_strs.push("i64 " + vlist)
+                arg_roots = arg_roots + vlist_roots
+                var vlocal: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(vlocal, "i64", call_target, arg_strs.join(", ")))
+                } else {
+                    this.emit_indent(vlocal + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
+                    this.verify_call(vlocal, "i64", call_target, arg_strs.join(", "))
+                }
+                this.gen_pop_arg_roots(arg_roots)
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.func_ret_types.get(resolved_callee)
+                    this.apply_ret_type_param_resolution(resolved_callee, args)
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return vlocal
+            }
             while (i < reordered_args.length()) {
                 // Skip nil placeholders that signal "use default"
                 var used_default: Bool = false
