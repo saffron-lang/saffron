@@ -2,8 +2,12 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #170. Next free number is **#171**.
+**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #170, #171. Next free number is **#172**.
+
+#171 (a type parameter used only inside a generic parameter never resolves) is a
+two-layer defect — filed but deliberately NOT half-fixed. Added to the set above;
+count 13 → 14, next-free 171 → 172, nothing else moved.
 
 #170 (a `for-in` list loop traps in wasm32 while working natively) was filed
 from the playground: 3 of its 7 bundled examples crashed on it. Added to the set
@@ -309,6 +313,54 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 171. OPEN — a type parameter used only inside a generic parameter never resolves; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` is dropped
+
+**Severity: medium.** A generic function whose return type parameter appears
+*only* inside a container parameter — `fun unwrap<T>(xs: List<T>): T` — cannot have
+its result dispatched on without an explicit annotation. `unwrap(a).to_upper()`
+fails with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
+type 'T' — the call would be dropped.` The workaround is a typed intermediate:
+`var s: String = unwrap(a); s.to_upper()`.
+
+**This is two defects in two layers, and half-fixing it is worse than not, which
+is why it is filed rather than partly landed.**
+
+**Layer 1 — the checker (found and fix drafted, then reverted).** The checker's
+`resolve_type_params` has a "case 2" for exactly this shape (return param `T`
+buried in `List<T>`), guarded by `param_type.contains("<")`. But `param_type` was
+rendered through the LOSSY `AST.type_to_string`, which collapses `List<T>` to the
+bare `"List"` — no `<`, so the branch is dead. Rendering through `type_to_str`
+(which keeps the argument, `"List<T>"`) makes case-2 fire. That one-word change
+bootstraps green with zero regressions.
+
+**Layer 2 — codegen, the reason layer 1 alone does nothing observable.** Codegen
+carries its OWN receiver-type inference (`get_expr_type` in
+`codegen/methods_body.sf`) that does not consult the checker's type-parameter
+resolution for a `Call` receiver. So even with the checker resolving `T`→`String`,
+codegen still sees `"T"` at the dispatch site and drops the call. This is the same
+checker/codegen split documented in #169's write-up.
+
+**Why the checker half was reverted rather than landed.** With layer 2 open, the
+layer-1 fix has *no end-to-end observable effect*: every place the checker's
+resolution could be seen (a typed binding, a typed parameter) already supplies the
+type from its annotation, and `scalar_mismatch` lets an unresolved `"T"` through
+regardless — so a regression test written against the checker half asserts nothing
+it wouldn't assert on the buggy binary. The only observation that discriminates
+the fix is `unwrap(a).method()` with no annotation, which is exactly what layer 2
+drops. Landing layer 1 alone would be a speculative change with a non-discriminating
+test; the honest state is both layers filed together, fixed together, with the
+regression test being the un-annotated `.method()` call that requires both.
+
+**Reproduction:**
+
+```saffron
+fun unwrap<T>(xs: List<T>): T { return xs[0] }
+var a: List<String> = ["hello"]
+IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 'T'
+```
+
+Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
 
 ### 170. OPEN — a `for-in` loop over a list traps with IndexError on wasm32, though it works natively and via direct indexing
 
