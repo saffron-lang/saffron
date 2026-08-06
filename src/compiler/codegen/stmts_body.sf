@@ -736,7 +736,14 @@
         if (this.current_prefix.length() > 0) {
             this.known_functions.push(name)
         }
-        this.func_ret_types.set(type_name, this.str_to_type(name))
+        // BUGS #161: the prefixed constructor (ta_Marker) must return the
+        // PREFIXED type, not the bare name. An inferred `var m = TargetA.Marker(x)`
+        // takes its type from this entry; recording the bare `Marker` there loses
+        // the module identity, so `m.describe()` fell through to the ambiguous
+        // last-writer-wins bare lookup in resolve_class_type and bound the wrong
+        // module's method. The bare `name` key stays bare — it serves callers that
+        // know only the unqualified name, which is inherently the ambiguous case.
+        this.func_ret_types.set(type_name, this.str_to_type(type_name))
         this.func_ret_types.set(name, this.str_to_type(name))
 
         // Generate methods as functions with name prefix: ClassName__method

@@ -25,13 +25,13 @@ Test.assert_eq(TargetB.label, "target-b-global", "the other module's is distinct
 // distinct symbols (@fixtures_alias_scope_target_a_Marker and ..._b_Marker in
 // the IR), which is the part #168 must not break.
 //
-// Their METHODS are deliberately not asserted here: `ma.describe()` binds to
-// target_b's describe for both receivers, even with an explicit
-// `TargetA.Marker` annotation, because find_class_for_method scans
-// class_methods globally and takes the first class holding the name. That is
-// BUGS #161, it predates this change (gen2 and gen3 emit the identical wrong
-// call), and pinning it here would make this file fail for a reason that has
-// nothing to do with duplicate declarations.
+// Their METHODS are asserted in test/pass/cross_module_method_bind.sf, not here:
+// `ma.describe()` used to bind to target_b's describe for both receivers even
+// with an explicit `TargetA.Marker` annotation (BUGS #161, dispatch keyed on a
+// bare last-writer-wins class name). That is now fixed, but it is a dispatch bug
+// rather than a duplicate-declaration one, so its regression test lives with the
+// other cross-module dispatch cases. This file asserts only what #168's check
+// must not reject.
 var ma = TargetA.Marker("x")
 var mb = TargetB.Marker("x")
 Test.assert(ma != nil, "module A's Marker constructs")

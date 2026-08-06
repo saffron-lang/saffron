@@ -1,0 +1,43 @@
+// BUGS #161: a method call on a receiver from one module must bind to that
+// module's class, not to whichever module registered the same class name last.
+//
+// alias_scope_target_a.sf and alias_scope_target_b.sf both declare
+// `class Marker { fun describe(): String }`, returning "target-a:..." and
+// "target-b:..." respectively. The two constructors always resolved to distinct
+// symbols; the METHODS did not. `ma.describe()` lowered to
+// @..._target_b_Marker__describe for BOTH receivers, so a correctly-constructed
+// target-a instance was handed to target-b's method and returned the wrong
+// string. An explicit `: TargetA.Marker` annotation was present and ignored.
+//
+// Cause: resolve_class_type stripped "TargetA.Marker" straight to the bare
+// "Marker" and looked it up in class_fields, which is keyed by both the
+// module-prefixed struct name and the last-registered bare name. The alias —
+// the one thing that disambiguates — was discarded. The fix resolves the alias
+// to its module prefix and tries prefix+bare first, mirroring what the
+// constructor call path already did.
+//
+// This is the annotated-receiver half of the #134/#135/#37/#38/#91 cluster:
+// dispatch must key on the receiver's static type, not a global name scan.
+import "../fixtures/alias_scope_target_a.sf" as TargetA
+import "../fixtures/alias_scope_target_b.sf" as TargetB
+import "@test" as Test
+
+// Explicitly annotated receivers — the case the annotation is supposed to pin.
+var ma: TargetA.Marker = TargetA.Marker("x")
+var mb: TargetB.Marker = TargetB.Marker("y")
+Test.assert_eq(ma.describe(), "target-a:x", "an annotated target-a receiver binds target-a's method")
+Test.assert_eq(mb.describe(), "target-b:y", "an annotated target-b receiver binds target-b's method")
+
+// Inferred receivers — no annotation, type carried from the constructor call.
+var ia = TargetA.Marker("p")
+var ib = TargetB.Marker("q")
+Test.assert_eq(ia.describe(), "target-a:p", "an inferred target-a receiver binds target-a's method")
+Test.assert_eq(ib.describe(), "target-b:q", "an inferred target-b receiver binds target-b's method")
+
+// The registration order the bug was sensitive to: target_b is imported second,
+// so it won the last-writer-wins bare key. Call target-a's method AFTER target-b
+// has been touched, to be sure the fix is not merely order-of-first-use luck.
+Test.assert_eq(mb.describe(), "target-b:y", "target-b still correct after re-touch")
+Test.assert_eq(ma.describe(), "target-a:x", "target-a still correct after target-b was used")
+
+Test.summary()

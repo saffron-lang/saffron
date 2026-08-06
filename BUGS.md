@@ -2,13 +2,14 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#161, #165. Next free number is **#170**.
+**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165. Next free number is **#170**.
 
-#162 was in this list and is now fixed — argument temps are GC-rooted by value
-across call setup, on every call form — so it moved to Resolved. The count above
-went 14 → 13 for that reason and no other; the set is otherwise main's line
-verbatim, which is the check.
+#161 was in this list and is now fixed — a method call on a receiver from one
+module bound to a same-named class in another, because codegen dispatch keyed on
+a bare, last-writer-wins class name instead of the receiver's static type — so it
+moved to Resolved. The count above went 13 → 12 for that reason and no other; the
+set is otherwise unchanged, which is the check.
 
 #160, #163, #164, #167, #168 and #169 are taken and not in the list above because
 all six are fixed and live under Resolved: an `: Any` global that could not widen,
@@ -1131,7 +1132,9 @@ at the first character that cannot appear in an identifier. That covers the whol
 class — semicolon, comment, trailing brace, stray punctuation — rather than the
 semicolon alone.
 
-### 161. A method call on a receiver from one module binds to a same-named class in another module
+## Resolved
+
+### 161. FIXED — a method call on a receiver from one module bound to a same-named class in another module
 
 ```saffron
 // two modules, each declaring `class Marker { fun describe(): String }`
@@ -1139,39 +1142,54 @@ import "./target_a.sf" as TargetA
 import "./target_b.sf" as TargetB
 
 var ma: TargetA.Marker = TargetA.Marker("x")
-IO.println(ma.describe())    // prints "target-b:x"
+IO.println(ma.describe())    // printed "target-b:x"
 ```
 
-**The constructors resolve correctly and the methods do not.** The emitted IR
-holds both `@fixtures_alias_scope_target_a_Marker` and `..._b_Marker`, and the two
-`var` initialisers call the right one each. But both `describe()` calls lower to
-`@fixtures_alias_scope_target_b_Marker__describe`, so a correctly-constructed
-target-a instance is handed to target-b's method. An explicit
-`ma: TargetA.Marker` annotation does not help, which is what makes this worse than
-an inference gap — the static type is written down in the source and ignored.
+**The constructors resolved correctly and the methods did not.** The emitted IR
+held both `@..._target_a_Marker` and `..._b_Marker`, and each `var` initialiser
+called the right one — but both `describe()` calls lowered to
+`@..._target_b_Marker__describe`, so a correctly-constructed target-a instance was
+handed to target-b's method. An explicit `ma: TargetA.Marker` annotation did not
+help, which is what made this worse than an inference gap: the static type was
+written down and ignored.
 
-**Same root as the #134/#135/#37/#38/#91 cluster.** `find_class_for_method`
-(`methods_body.sf:1`) is handed a bare method name and scans `class_methods`
-globally, returning the first class that has a method by that name and non-empty
-fields. Two modules declaring `Marker` put two entries in that map, and whichever
-the module walk registered first wins for every receiver in the program. The
-receiver's static type is available and never consulted; the guard the cluster
-keeps asking for is the same one here.
+**Same root as the #134/#135/#37/#38/#91 cluster:** dispatch keyed on a global
+name rather than the receiver's static type. It surfaced through three distinct
+codegen sites, all resolving a *bare* class name against a registry that is
+last-writer-wins across modules:
+
+- **The annotated receiver.** `resolve_class_type("TargetA.Marker")` stripped the
+  dotted type straight to bare `Marker` and looked it up in `class_fields`, which
+  is keyed by both the prefixed struct name (`ta_Marker`, `tb_Marker`) *and* the
+  bare `Marker` — and the bare key is whatever module registered last. The alias
+  is the only thing that disambiguates, so it now resolves the alias to its module
+  prefix and tries `prefix+bare` first, the same resolution the constructor call
+  path already did.
+- **The inferred receiver.** `var m = TargetA.Marker(x)` takes `m`'s type from the
+  constructor call's `last_type`. Two codegen arms that split a constructor into
+  `@Class()` + `@Class__init()` — the alias-qualified `MethodCall` arm in
+  `methods_body.sf` and the dotted-`Call` arm in `expr_body.sf` — both typed the
+  result by the bare `method`/`simple_callee` even though they allocated via the
+  prefixed symbol. Both now type by the resolved prefixed class when it names a
+  known class, falling back to the bare name only for a builtin or entry-module
+  constructor.
+- **The registration.** `gen_class_decl` recorded the *prefixed* constructor's
+  return type as the bare name, and `prescan_class_decl` registered no constructor
+  return type at all — so the global-var pre-scan (which runs before
+  `gen_class_decl`) could not type an inferred module global, the #146 ordering
+  gap. Both now register the prefixed constructor with the prefixed return type;
+  the bare key stays bare, which is the inherently-ambiguous unqualified case.
 
 **Not a duplicate-declaration problem.** Two modules declaring one name is legal —
-#168 deliberately does not reject it, and `register_class_identity`'s prefix keying
-is what keeps the two classes distinguishable in the checker. The bug is that
-codegen's method dispatch does not use that distinction. `test/pass/duplicate_decl_ok.sf`
-asserts the constructors and explicitly documents why it stops short of the
-methods.
+#168 deliberately does not reject it. The bug was that codegen's dispatch ignored
+the distinction the checker's prefix keying already drew.
 
-**It predates the #168 work.** gen2 and gen3 emit byte-identical wrong calls, so
-this was found while writing #168's non-regression test rather than caused by it.
-The `alias_scope_target_a/b.sf` fixtures reproduce it as-is.
-
----
-
-## Resolved
+**Regression test:** `test/pass/cross_module_method_bind.sf`, asserting all four
+combinations — annotated and inferred receivers, both modules — plus a re-touch of
+target-a *after* target-b has been used, since target-b won the last-writer-wins
+bare key. It was found while writing #168's non-regression test
+(`duplicate_decl_ok.sf`), whose comment noting that it "stops short of the methods"
+is now updated: the methods are asserted here.
 
 ### 162. FIXED — a live object held only in an LLVM SSA temp was *freed* by the non-moving collector; `f(Box(7), allocating())` read a dead object
 
