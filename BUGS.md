@@ -2,8 +2,12 @@
 
 ## Open
 
-**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158, #174.
+**10 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158.
 Next free number is **#175**.
+
+#174 (`>=` maximal munch breaking `List<Int>=[...]` with no space) is fixed and
+moved to Resolved: the parser's generic-close loop now splits a `>=` token into a
+closing `>` plus an `=`, mirroring the existing `>>` split. Count 11 → 10.
 
 #174 (`>=` maximal-munch: `List<Int>=[...]` with no space lexes `>=` as the
 comparison operator, so the generic type annotation never closes) was found by
@@ -344,49 +348,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 174. OPEN — `>=` maximal munch: a generic type annotation with no space before `=` fails to parse
-
-**Severity: high.** Hits idiomatic code — a typed collection binding written without
-spaces around `=` does not compile, with a misleading EOF error.
-
-```saffron
-var a: List<Int> = [1, 2, 3]   // OK   — space between > and =
-var a:List<Int>=[1,2,3]        // FAIL — ">=" is lexed as one token
-```
-
-Error: `expected '=' but found 'eof'` at the end of the program (the parser is
-left mid-declaration).
-
-**Cause.** The lexer uses maximal munch: `>` immediately followed by `=` becomes a
-single `>=` (greater-than-or-equal) token. In `var a:List<Int>=[...]` the `>` that
-should close the generic `List<Int>` is glued to the `=` that should begin the
-initializer, so the type parser never sees its closing `>` and the assignment `=`
-vanishes. A space (`List<Int> =`) or (`List<Int> = `) tokenizes `>` and `=`
-separately and parses fine.
-
-**Truth table** (verified, target-independent — reproduces native and wasm32):
-
-| source | result |
-|---|---|
-| `var a:List<Int> = [1,2,3]` | builds |
-| `var a:List<Int> =[1,2,3]` | builds |
-| `var a:List<Int>= [1,2,3]` | **FAIL** |
-| `var a:List<Int>=[1,2,3]` | **FAIL** |
-
-The break is exactly when `>` and `=` are adjacent. `Map<String,Int>=` and
-`List<A>=` fail the same way; a nested `Map<...List<Int>>={}` builds because the
-closing is `>>` then `{`, not `>=`.
-
-**Fix sketch.** The parser already splits a `>>` token when it needs two closing
-`>` for nested generics (that path works). The same treatment is needed for `>=`
-(and likely `>>=`) in type-annotation / generic-close position: when a `>=` token
-is encountered where a generic close is expected, split it into `>` + `=`. Either
-handle it in the parser's generic-close logic (preferred, context-sensitive) or
-stop the lexer from forming `>=` (riskier — it is a real operator elsewhere).
-
-**Found** by the playground feature eval; three feature programs that wrote typed
-list/map bindings without spaces all hit it.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -1037,6 +998,35 @@ class — semicolon, comment, trailing brace, stray punctuation — rather than 
 semicolon alone.
 
 ## Resolved
+
+### 174. FIXED — `>=` maximal munch broke a generic type annotation with no space before `=`
+
+**Was high.** A typed collection binding written without a space before `=`
+(`var a:List<Int>=[1,2,3]`) failed to parse with a misleading `expected '=' but
+found 'eof'`; a space (`List<Int> =`) worked.
+
+**Cause.** The lexer munges `>` immediately followed by `=` into a single `>=`
+token (`lexer.sf:656`). In `List<Int>=`, that glued the generic's closing `>` to
+the initializer's `=`. In `parse_single_type`'s generic-close loop the `>=` fell
+into the catch-all `else` that blindly `advance()`d past it, consuming both the
+close and the `=`, so the loop ran to EOF and the declaration's `consume("=")`
+never found its assignment.
+
+**Fix.** `src/compiler/parser.sf`, one new branch in `parse_single_type`'s
+generic-close loop, mirroring the existing `>>` split: on a `>=` token it
+decrements depth by 1 and, if that closes the last generic level, rewrites the
+current token in place to a bare `=` (preserving line/col/offset) so the caller's
+`consume("=")` finds it. Context-sensitive — the `>=` operator elsewhere is
+untouched. The lexer only ever forms `>=` (never `>>=`), so one level is correct.
+
+**Verified.** All four spacing variants of `List<Int>=[...]` build and run
+(print 3); `Map<String,Int>={...}` and nested `Map<String,List<Int>>={}` build;
+the `>=` operator still works everywhere (`if (x>=3)`, `while (x>=0)`,
+`a>=3 and b>=2`, tight-spaced included). Bootstrap green through STAGE 2 (0
+inference fallbacks, gen4 links); full suite failure set unchanged vs baseline.
+Playground feature eval 12/12 and 8-round browser stress eval 8/8. Found by the
+playground feature eval. Landed in commit `4f10d60` alongside the reflect-construct
+fix.
 
 ### 155. FIXED — a class-typed `return` accepted an incompatible concrete type (a String from a `: Box` function) and segfaulted; the scalar and `: Nil` halves were closed earlier
 
