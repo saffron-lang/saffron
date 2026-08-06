@@ -1,0 +1,42 @@
+// BUGS #2: a nested `fun` may call a sibling nested `fun` declared LATER in the
+// same body. The entry described this as a runtime error / design limitation
+// ("compile-time local resolution, same as Lua/Python"), but the symbol is
+// emitted regardless of order, so it always linked and ran — the only defect was
+// a spurious "[codegen] Warning: calling undefined function" printed on valid
+// code. preregister_nested_funcs now registers sibling names before any body is
+// emitted, so the forward reference resolves cleanly with no warning.
+import "@test" as Test
+
+// Nested-fun names are kept distinct ACROSS the three parents below on purpose:
+// same-named nested funcs in different parents currently collide on an
+// unqualified emitted symbol (BUGS #175), which is a separate defect from the
+// forward-reference resolution this test is about. Using distinct names isolates
+// #2.
+
+// Simple forward reference: sf_a() calls sf_b() declared after it.
+fun simple(): Int {
+    fun sf_a(): Int { return sf_b() }
+    fun sf_b(): Int { return 42 }
+    return sf_a()
+}
+Test.assert_eq(simple(), 42, "a nested fun calls a later-declared sibling")
+
+// Mutual recursion between two nested funcs — neither can be declared before the
+// other, so this is unreachable without forward references working.
+fun mutual(): Bool {
+    fun is_even(n: Int): Bool { if (n == 0) { return true } return is_odd(n - 1) }
+    fun is_odd(n: Int): Bool { if (n == 0) { return false } return is_even(n - 1) }
+    return is_even(10) and is_odd(7)
+}
+Test.assert(mutual(), "mutually recursive nested funcs")
+
+// Forward reference AND a capture in the same nested fun: wc_a() closes over x
+// and forward-calls wc_b().
+fun with_capture(x: Int): Int {
+    fun wc_a(): Int { return wc_b() + x }
+    fun wc_b(): Int { return 10 }
+    return wc_a()
+}
+Test.assert_eq(with_capture(5), 15, "a nested fun captures and forward-refs at once")
+
+Test.summary()

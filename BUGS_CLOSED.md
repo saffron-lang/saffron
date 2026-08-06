@@ -9,6 +9,49 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 2. FIXED — a forward reference to a later-declared sibling nested `fun` printed a false warning (and was mislabeled a design limitation)
+
+**Reproduction:**
+```saffron
+fun test() {
+    fun a() { return b() }
+    fun b() { return 42 }
+    IO.print(a())
+}
+test()
+```
+
+The entry claimed a `Runtime error` and called it a design choice — "compile-time
+local resolution, same as Lua/Python." Neither was true by the time it was probed:
+the symbol for `b` is emitted regardless of declaration order, so this always
+linked and printed 42. The only real defect was codegen printing
+`[codegen] Warning: calling undefined function 'b'` on this valid code — a false
+positive, because when `a`'s body was emitted `b` was not yet in `known_functions`.
+(And unlike Lua/Python, Saffron *accepts* this, so the "won't fix" framing was
+backwards.)
+
+**Fix, in two parts (2026-08-06):**
+
+- `preregister_nested_funcs` (`codegen/output_body.sf`) registers the names of
+  every nested `fun` in a body *before* any sibling body is emitted, so a forward
+  reference resolves at emit time. Same prepass shape that closed #158 for enums.
+  `test/pass/nested_forward_ref.sf` covers simple forward reference, mutual
+  recursion, and forward-reference-plus-capture.
+- With real forward references now resolved before the check, everything still
+  reaching the "undefined function" site is *genuinely* undefined and *genuinely*
+  fails to link. So the warning became a hard `codegen_error` with a span
+  (`codegen/expr_body.sf`), turning a cryptic `ld: symbol(s) not found` into a
+  compile diagnostic. `test/fail/call_undefined_function.sf` and
+  `test/fail/builtin_container_call.sf` (`List("x")` → "use literal syntax") pin
+  both messages. Verified against the full compiler source and every test: zero
+  false positives.
+
+**Left open as #175:** same-named nested funcs in *different* parents still
+collide on an unqualified emitted symbol and silently return the wrong one. That
+is a distinct naming defect, not a forward-reference one.
+
+---
+
 ### 158. FIXED — a `match` textually above its enum's declaration compiled to an unconditional destructure of the first arm, with no tag check
 
 `enum_variant_tags` is populated by `gen_enum_decl` as it *generates* the

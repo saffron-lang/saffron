@@ -1,0 +1,10 @@
+// BUGS #2 (second half): calling a function that no declaration defines must be
+// a compile error, not a warning followed by a cryptic `ld: symbol(s) not found`
+// at link time. Before the fix this compiled to a .ll and only failed when the
+// linker could not find @nonexistent.
+//
+// The compiler MUST reject this file. A clean compile is itself a failure.
+fun run() {
+    return nonexistent()
+}
+run()

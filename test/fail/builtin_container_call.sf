@@ -1,0 +1,8 @@
+// BUGS #2 (second half): a builtin container has literal syntax, not a
+// constructor call. `List("x")` never had a callable symbol, so it failed to
+// link with a cryptic error; it is now a compile error naming the real fix
+// (use `[]` / `{}`).
+//
+// The compiler MUST reject this file. A clean compile is itself a failure.
+var xs = List("x")
+IO.println("unreachable")

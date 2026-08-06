@@ -2942,8 +2942,20 @@
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
                 } else {
-                    // Warning: calling undefined function
-                    // Suppress if it's a known class method (ClassName__method pattern)
+                    // BUGS #2: calling a function that no declaration defines. This
+                    // used to be a WARNING and the compile continued, so the missing
+                    // symbol surfaced as a cryptic `ld: symbol(s) not found` at link
+                    // time — or, for a forward reference to a sibling nested `fun`,
+                    // it was a FALSE warning on code that in fact linked and ran
+                    // (preregister_nested_funcs now registers those before this
+                    // check, so a real forward reference no longer reaches here).
+                    // Everything that still reaches here is genuinely undefined and
+                    // genuinely fails to link, so it is now a hard error with a span,
+                    // turning the linker failure into a compile diagnostic.
+                    //
+                    // Suppress if it's a known class method (ClassName__method
+                    // pattern): a bare method name can reach here through dispatch
+                    // paths that resolve the receiver separately.
                     var is_known_method: Bool = false
                     var kfi: Float = 0
                     while (kfi < this.known_functions.length()) {
@@ -2954,7 +2966,14 @@
                         kfi = kfi + 1
                     }
                     if (!is_known_method) {
-                        IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                        // A builtin container has literal syntax, not a constructor
+                        // call: `List("x")` / `Map(...)` never had a callable symbol,
+                        // so name the real fix rather than reporting "undefined".
+                        if (callee_name == "List" or callee_name == "Map" or callee_name == "Set" or callee_name == "StringBuilder") {
+                            this.codegen_error("'" + callee_name + "' has no constructor call; build it with literal syntax instead (e.g. [] or {})")
+                        } else {
+                            this.codegen_error("call to undefined function '" + callee_name + "'")
+                        }
                     }
 
                 }

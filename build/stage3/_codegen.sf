@@ -4585,8 +4585,20 @@ class Codegen {
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
                 } else {
-                    // Warning: calling undefined function
-                    // Suppress if it's a known class method (ClassName__method pattern)
+                    // BUGS #2: calling a function that no declaration defines. This
+                    // used to be a WARNING and the compile continued, so the missing
+                    // symbol surfaced as a cryptic `ld: symbol(s) not found` at link
+                    // time — or, for a forward reference to a sibling nested `fun`,
+                    // it was a FALSE warning on code that in fact linked and ran
+                    // (preregister_nested_funcs now registers those before this
+                    // check, so a real forward reference no longer reaches here).
+                    // Everything that still reaches here is genuinely undefined and
+                    // genuinely fails to link, so it is now a hard error with a span,
+                    // turning the linker failure into a compile diagnostic.
+                    //
+                    // Suppress if it's a known class method (ClassName__method
+                    // pattern): a bare method name can reach here through dispatch
+                    // paths that resolve the receiver separately.
                     var is_known_method: Bool = false
                     var kfi: Float = 0
                     while (kfi < this.known_functions.length()) {
@@ -4597,7 +4609,14 @@ class Codegen {
                         kfi = kfi + 1
                     }
                     if (!is_known_method) {
-                        IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                        // A builtin container has literal syntax, not a constructor
+                        // call: `List("x")` / `Map(...)` never had a callable symbol,
+                        // so name the real fix rather than reporting "undefined".
+                        if (callee_name == "List" or callee_name == "Map" or callee_name == "Set" or callee_name == "StringBuilder") {
+                            this.codegen_error("'" + callee_name + "' has no constructor call; build it with literal syntax instead (e.g. [] or {})")
+                        } else {
+                            this.codegen_error("call to undefined function '" + callee_name + "'")
+                        }
                     }
 
                 }
@@ -11556,6 +11575,32 @@ class Codegen {
     /// construct is recoverable without threading a flag through six callers.
     /// Measured on the pre-migration binary before it was written down; see the
     /// table in docs/design/compiler-rewrite.md.
+    /// BUGS #2: pre-register the names of every nested `fun` declared directly in
+    /// this body, BEFORE any sibling body is emitted. gen_stmts walks statements
+    /// in source order, so `fun a() { return b() }` followed by `fun b()` compiled
+    /// a's body while b was not yet in known_functions — the call resolved by name
+    /// (b's symbol IS emitted, later, so linking succeeded and it RAN correctly),
+    /// but the emit-time check in gen_call printed a spurious "calling undefined
+    /// function 'b'" on valid, working code. Registering the sibling names up front
+    /// makes the forward reference resolve cleanly, the same shape as the enum
+    /// prepass that closed #158. Only direct children are scanned: a `fun` nested
+    /// deeper is registered when its own enclosing body is emitted.
+    fun preregister_nested_funcs(body: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < body.length()) {
+            if (this.classify_stmt(body[i]) == "fun") {
+                var fname: String = this.get_fun_name(body[i])
+                if (fname.length() > 0) {
+                    var fem: String = this.current_prefix + fname
+                    if (!this.str_in_list(this.known_functions, fem)) {
+                        this.known_functions.push(fem)
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+
     fun gen_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>) {
         var ret_name: String = this.type_to_string(ret_type)
         var is_lambda_body: Bool = name.contains("__lambda")
@@ -11776,6 +11821,7 @@ class Codegen {
                 }
                 pi3 = pi3 + 1
             }
+            this.preregister_nested_funcs(body)
             this.gen_stmts(body)
             if (!this.block_terminated) { this.emit_indent("ret i64 0") }
             this.emit("}")
@@ -12089,6 +12135,11 @@ class Codegen {
             }
         }
         this.gc_root_count = gc_root_count
+
+        // BUGS #2: register sibling nested-fun names before emitting any body, so
+        // a forward reference (fun a calls fun b declared after it) resolves at
+        // emit time instead of warning on code that in fact links and runs.
+        this.preregister_nested_funcs(body)
 
         // Generate body statements, treating last ExprStmt as implicit return
         if (body.length() > 0 and implicit_return) {

@@ -2,8 +2,21 @@
 
 ## Open
 
-**8 open entries:** #2, #49, #65, #75, #107, #131, #132, #154.
-Next free number is **#175**.
+**8 open entries:** #49, #65, #75, #107, #131, #132, #154, #175.
+Next free number is **#176**.
+
+#2 (forward references in nested funcs) was in this list and is now closed as
+**FIXED** — it was never the runtime error / design limitation it claimed. The
+symbol always linked; the only defect was a false "calling undefined function"
+warning, now suppressed by pre-registering sibling nested-fun names, and the
+genuinely-undefined case became a hard compile error instead of a linker failure.
+Moved to `BUGS_CLOSED.md`.
+
+#175 (same-named nested funcs in different parents collide on an unqualified
+symbol and silently return the wrong body) was found while fixing #2 and filed
+separately: it is a nested-fun *naming* defect, not a forward-reference one, and
+reproduces without any recursion. Added to the set above. Count stays 8 (one
+closed, one opened); next-free 175 → 176.
 
 #157 and #158 were in this list and are now closed as **already fixed** — both
 were stale open entries, not new work. #157 (punctuation swallowed into an import
@@ -673,23 +686,37 @@ but its blast radius is shrinking:
 lexer/parser/checker/codegen — which is a breaking change for user programs and
 wants its own decision.
 
-### 2. Forward references in nested closures
+### 175. OPEN — same-named nested funcs in different parent functions collide on an unqualified symbol and silently return the wrong body
 
-**Reproduction:**
 ```saffron
-fun test() {
-    fun a() { return b() }
-    fun b() { return 42 }
-    IO.print(a())
+fun first(): Int {
+    fun helper(): Int { return 42 }
+    return helper()
 }
-test()
+fun second(): Int {
+    fun helper(): Int { return 10 }
+    return helper()
+}
+IO.println(first().to_string())    // 42
+IO.println(second().to_string())   // prints 42 — should be 10
 ```
 
-**Expected:** Works (b is defined before a is called).
-**Actual:** `Runtime error` — b is undefined when a's closure is compiled.
+**Severity: high** — silent wrong output, no diagnostic. A nested `fun` is
+hoisted and emitted with the unqualified symbol `@helper` (`current_prefix + name`
+in `gen_function`, with no parent qualifier). Two parents each declaring a nested
+`helper` therefore emit the same symbol; the second is dropped by the
+`defined_funcs` dedup at `output_body.sf`, and every `helper()` call binds to the
+first definition. `second()` returns 42.
 
-**Impact:** Can't write mutually recursive helper functions inside a parent scope.
-**Note:** Design choice — compile-time local resolution. Same as Lua/Python.
+Found while fixing #2 (nested forward references): the collision is independent of
+forward references — it reproduces with a single non-recursive nested fun per
+parent — but #2's regression test tripped it until the test's nested names were
+made distinct. The fix is to qualify a nested fun's emitted symbol by its
+enclosing function (e.g. `parent__helper`) and resolve calls to nested funcs
+against that qualified name, which is a deeper change to nested-fun naming and call
+resolution than #2 itself and was deliberately not folded in.
+
+---
 
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
