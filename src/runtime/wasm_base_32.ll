@@ -1049,6 +1049,55 @@ no:
 ; @generated-values:end
 
 ; =============================================================================
+; Export-boundary value normalization (BUGS #75)
+; =============================================================================
+;
+; A wasm export's i64 parameter is whatever JS handed it: a bare machine
+; integer (e.g. `1n` -> 0x0000000000000001), NOT the module's internal
+; NaN-boxed representation. Internally a Float `1` is stored as the f64 bit
+; pattern of 1.0 (0x3FF0000000000000), so a value that leaves the module as an
+; opaque id and comes back through an exported `fun __on_back(id: Float)` never
+; matches what was stored -- __map_key_cmp compares non-string keys by exact
+; bits, so a Map keyed by such an id silently misses (BUGS #75).
+;
+; Codegen calls this in the prologue of exported (`__on_*`/`__dispatch_*`)
+; functions for each Float/Number parameter, before the value is stored into
+; its alloca. It is idempotent: a value that already carries bits above bit 31
+; is either an f64 bit pattern produced inside the module or an already
+; NaN-boxed value, and is passed through untouched. Only a bare machine integer
+; (high 32 bits zero) is converted to the module's f64 Float representation,
+; matching how emit_tag_float stores a Float. This mirrors the tagged-vs-raw
+; discrimination __val_untag_int already performs.
+define i64 @__rt_normalize_incoming_float(i64 %v) {
+entry:
+  %high = lshr i64 %v, 32
+  %is_bare = icmp eq i64 %high, 0
+  br i1 %is_bare, label %convert, label %passthrough
+convert:
+  %f = sitofp i64 %v to double
+  %tagged = call i64 @__val_tag_float(double %f)
+  ret i64 %tagged
+passthrough:
+  ret i64 %v
+}
+
+; Int/Number counterpart of the above. An `Int`/`Number` value is stored
+; internally as a NaN-boxed TAG_INT (0x7FF9...). A bare machine integer from JS
+; (high 32 bits zero) is re-tagged; an already-tagged value (high bits set) is
+; passed through. Idempotent for both the bare and the already-tagged case.
+define i64 @__rt_normalize_incoming_int(i64 %v) {
+entry:
+  %high = lshr i64 %v, 32
+  %is_bare = icmp eq i64 %high, 0
+  br i1 %is_bare, label %convert, label %passthrough
+convert:
+  %tagged = call i64 @__val_tag_int(i64 %v)
+  ret i64 %tagged
+passthrough:
+  ret i64 %v
+}
+
+; =============================================================================
 ; to_string Helpers
 ; =============================================================================
 
