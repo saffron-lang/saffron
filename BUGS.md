@@ -2,8 +2,13 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #171. Next free number is **#173**.
+**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #171, #173. Next free number is **#174**.
+
+#173 (`try`/`catch`/`throw` traps on wasm32 — setjmp/longjmp are no-op stubs) was
+filed from the playground eval: exception handling works natively but the wasm32
+runtime cannot do the non-local jump, so a thrown value falls through to
+`unreachable`. Count 13 → 14.
 
 #172 (wasm32 `malloc` handing out pointers past memory when `memory.grow` is
 capped/fails) is fixed and moved to Resolved: `@malloc` now honors the grow
@@ -372,7 +377,42 @@ IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 
 
 Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
 
-### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
+### 173. OPEN — `try`/`catch`/`throw` traps on wasm32; setjmp/longjmp are no-op stubs
+
+**Severity: high on wasm32.** Any use of exceptions traps. Works natively.
+
+```saffron
+try { throw "boom" } catch (e) { IO.println("caught:" + e) }
+// native: caught:boom
+// wasm32: RuntimeError: unreachable (nothing is caught)
+```
+
+**Cause.** Exception handling is lowered to `setjmp`/`longjmp` (codegen emits
+`@setjmp` at the `try` and `@longjmp` at the `throw` — `expr_body.sf:717`,
+`stmts_body.sf:1789`, declared `returns_twice`/`noreturn` in `output_body.sf:1219`).
+Native links libc's real setjmp/longjmp. But `wasm_base_32.ll:645` defines them as
+**no-op stubs**:
+
+```llvm
+define i32 @setjmp(i8* %buf) { ret i32 0 }
+define void @longjmp(i8* %buf, i32 %val) {
+  ; In WASM we cannot truly longjmp. Return and hope for the best.
+  ret void
+}
+```
+
+So `throw` returns instead of jumping to the handler; execution falls through to
+code that assumes the jump happened and hits `unreachable`. The stub comment names
+the real fix: Emscripten-style setjmp/longjmp emulation.
+
+**Fixable with the current toolchain.** Homebrew clang 22 + wasm-ld accept
+`-mllvm -wasm-enable-sjlj` (verified). The fix is to build/link the wasm32 target
+with SjLj emulation enabled and drop the no-op stubs (or replace them with the
+emulated primitives), rather than the "hope for the best" `ret void`.
+
+**Scope note.** None of the 7 bundled playground examples use exceptions, so the
+example eval is green; this was found by a wider feature eval. It still blocks any
+user program that uses `try`/`catch`. wasm32 only — native is unaffected.
 
 **Severity: high — this is the reason the other entries survived.**
 
