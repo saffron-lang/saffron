@@ -40,6 +40,14 @@ function readCString(ptr) {
 
 const _eventStack = [];
 
+// Event callback ids cross back into the wasm as an i64 argument to a `Float`-
+// typed export (__dispatch_event / __dispatch_<name>). Codegen indexes the
+// callback list with __val_untag_int, so the id must arrive NaN-box TAG_INT
+// tagged, not as a raw integer — a raw BigInt untags to 0, so every event fired
+// handler index 0 instead of its own. This is the encode side of valToNumber.
+const TAG_INT = 0x7FF9000000000000n;
+function encodeId(id) { return (BigInt(id) & 0x0000FFFFFFFFFFFFn) | TAG_INT; }
+
 const imports = { env: new Proxy({
     js_log_str: (ptr) => console.log(readCString(ptr)),
     js_log_int: (n) => console.log(Number(n)),
@@ -102,7 +110,7 @@ const imports = { env: new Proxy({
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             try {
-                if (_genericDispatch) _genericDispatch(callbackId);
+                if (_genericDispatch) _genericDispatch(encodeId(callbackId));
             } catch (err) {
                 // Silently ignore null function errors from nil on_click defaults
                 if (!err.message || !err.message.includes('null function')) throw err;
@@ -118,8 +126,8 @@ const imports = { env: new Proxy({
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             const typed = _findExport(`__dispatch_${name}`);
-            if (typed) { typed(callbackId, 0n); }
-            else if (_genericDispatch) { _genericDispatch(callbackId); }
+            if (typed) { typed(encodeId(callbackId), 0n); }
+            else if (_genericDispatch) { _genericDispatch(encodeId(callbackId)); }
             _eventStack.pop();
         });
     },
@@ -131,8 +139,8 @@ const imports = { env: new Proxy({
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             const typed = _findExport(`__dispatch_${name}`);
-            if (typed) { typed(callbackId, 0n); }
-            else if (_genericDispatch) { _genericDispatch(callbackId); }
+            if (typed) { typed(encodeId(callbackId), 0n); }
+            else if (_genericDispatch) { _genericDispatch(encodeId(callbackId)); }
             _eventStack.pop();
         });
     },
