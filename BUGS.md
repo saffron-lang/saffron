@@ -2,8 +2,13 @@
 
 ## Open
 
-**13 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
-#165, #171. Next free number is **#172**.
+**14 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #155, #157, #158,
+#165, #171, #172. Next free number is **#173**.
+
+#172 (wasm32 `malloc` hands out pointers past memory when `memory.grow` is
+capped/fails) was filed from the playground: compiling a program returns a ~21 KB
+response the UI writes into wasm memory, and once the heap nears the module's
+memory cap the write traps with `offset is out of bounds`. Count 13 → 14.
 
 #170 (a `for-in` list loop trapping on wasm32) is fixed and moved to Resolved:
 the GC pointer-recognition floor in `__rt_gc_tag_of` was hardcoded to the native
@@ -366,6 +371,51 @@ IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 
 ```
 
 Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
+
+### 172. OPEN — wasm32 `malloc` returns pointers past the end of linear memory when `memory.grow` is capped or fails
+
+**Severity: high on wasm32.** Silent corruption / trap for any program whose heap
+grows past the module's memory cap. Surfaced in the playground: compiling a program
+returns a ~21 KB base64 response the UI writes into wasm memory with `writeCString`,
+and once the heap nears the cap the write throws `RangeError: offset is out of
+bounds` (in a pure-wasm host it is an out-of-bounds trap instead).
+
+**Two compounding defects, both in the wasm32 bump allocator (`wasm_base_32.ll:82`,
+`@malloc`):**
+
+1. **`memory.grow`'s result is discarded.** `@malloc` computes `new_heap`, calls
+   `@llvm.wasm.memory.grow.i32` when `new_heap > mem_bytes`, then unconditionally
+   `store i32 %new_heap, i32* @__heap_ptr` and returns the *old* heap pointer —
+   regardless of whether the grow succeeded. When grow returns -1 (failure), the
+   heap pointer still advances, so the next allocation hands back a pointer into
+   memory that was never mapped. The source comment at `wasm_base_32.ll:157`
+   already notes the allocator "discards memory.grow's result"; this is the
+   consequence.
+
+2. **The module's maximum memory is too low.** `memory.grow(198)` (the ~13 MB a
+   real growth needs) throws `Maximum memory size exceeded`, while `grow(2)`
+   succeeds — so the module is emitted with a small max-memory cap. Even a
+   grow-checking allocator would then fail these programs; the cap itself needs
+   raising (or removing) for the wasm32 target.
+
+**Deterministic repro** (Node host, any wasm32-built UI module):
+
+```js
+const inst = await WebAssembly.instantiate(mod, { env });
+inst.exports._start();
+inst.exports.malloc(4_000_000n);   // 64 -> 66 pages, grows fine
+inst.exports.malloc(13_000_000n);  // needs 264 pages; memory stays 66, ptr is past the end
+// inst.exports.memory.grow(198) directly => "Maximum memory size exceeded"
+```
+
+**Fix sketch.** `@malloc` must check the `memory.grow` result: on -1, do not advance
+`__heap_ptr` — trap with a clear OOM message (or grow in a retry loop). And the
+wasm32 link/emit path should declare a much larger (or unbounded) maximum memory so
+ordinary programs don't hit the cap. Both live on the wasm32 side only; native is
+unaffected.
+
+**Found via the playground**, the same way #170 was — running real programs through
+the compile→run pipeline surfaces target bugs the native suite cannot.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
