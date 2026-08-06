@@ -2,8 +2,8 @@
 
 ## Open
 
-**12 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158,
-#171, #172. Next free number is **#173**.
+**11 open entries:** #2, #49, #65, #75, #107, #131, #132, #154, #157, #158,
+#173. Next free number is **#174**.
 
 #155 and #165 were in this list and are now fixed together — a class-typed
 parameter or return that accepted an incompatible concrete type (a String where a
@@ -11,12 +11,21 @@ parameter or return that accepted an incompatible concrete type (a String where 
 respectively. One helper, `class_type_mismatch`, guarded on the class/enum
 registries rather than on name spelling (the discipline #143's `check_condition`
 already used), closed both; it turned out not to need the resolve pass #155's
-narrative had gated it on. Count 14 → 12, next-free unchanged, nothing else moved.
+narrative had gated it on. Count 13 → 11, next-free unchanged, nothing else moved.
 
-#172 (wasm32 `malloc` hands out pointers past memory when `memory.grow` is
-capped/fails) was filed from the playground: compiling a program returns a ~21 KB
-response the UI writes into wasm memory, and once the heap nears the module's
-memory cap the write traps with `offset is out of bounds`. Count 13 → 14.
+#171 (a type parameter used only inside a generic parameter never resolves) was
+filed as a two-layer defect and is now FIXED — both layers landed together, as its
+entry said they had to. Moved to Resolved; count 14 → 13, next-free stays 174.
+
+#173 (`try`/`catch`/`throw` traps on wasm32 — setjmp/longjmp are no-op stubs) was
+filed from the playground eval: exception handling works natively but the wasm32
+runtime cannot do the non-local jump, so a thrown value falls through to
+`unreachable`. Count 13 → 14.
+
+#172 (wasm32 `malloc` handing out pointers past memory when `memory.grow` is
+capped/fails) is fixed and moved to Resolved: `@malloc` now honors the grow
+result and the wasm32 max-memory cap was raised 16 MB → 2 GB. A browser eval of
+8 real compile→run rounds went 2/8 → 8/8. Count 14 → 13.
 
 #170 (a `for-in` list loop trapping on wasm32) is fixed and moved to Resolved:
 the GC pointer-recognition floor in `__rt_gc_tag_of` was hardcoded to the native
@@ -332,98 +341,42 @@ each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
 
-### 171. OPEN — a type parameter used only inside a generic parameter never resolves; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` is dropped
+### 173. OPEN — `try`/`catch`/`throw` traps on wasm32; setjmp/longjmp are no-op stubs
 
-**Severity: medium.** A generic function whose return type parameter appears
-*only* inside a container parameter — `fun unwrap<T>(xs: List<T>): T` — cannot have
-its result dispatched on without an explicit annotation. `unwrap(a).to_upper()`
-fails with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
-type 'T' — the call would be dropped.` The workaround is a typed intermediate:
-`var s: String = unwrap(a); s.to_upper()`.
-
-**This is two defects in two layers, and half-fixing it is worse than not, which
-is why it is filed rather than partly landed.**
-
-**Layer 1 — the checker (found and fix drafted, then reverted).** The checker's
-`resolve_type_params` has a "case 2" for exactly this shape (return param `T`
-buried in `List<T>`), guarded by `param_type.contains("<")`. But `param_type` was
-rendered through the LOSSY `AST.type_to_string`, which collapses `List<T>` to the
-bare `"List"` — no `<`, so the branch is dead. Rendering through `type_to_str`
-(which keeps the argument, `"List<T>"`) makes case-2 fire. That one-word change
-bootstraps green with zero regressions.
-
-**Layer 2 — codegen, the reason layer 1 alone does nothing observable.** Codegen
-carries its OWN receiver-type inference (`get_expr_type` in
-`codegen/methods_body.sf`) that does not consult the checker's type-parameter
-resolution for a `Call` receiver. So even with the checker resolving `T`→`String`,
-codegen still sees `"T"` at the dispatch site and drops the call. This is the same
-checker/codegen split documented in #169's write-up.
-
-**Why the checker half was reverted rather than landed.** With layer 2 open, the
-layer-1 fix has *no end-to-end observable effect*: every place the checker's
-resolution could be seen (a typed binding, a typed parameter) already supplies the
-type from its annotation, and `scalar_mismatch` lets an unresolved `"T"` through
-regardless — so a regression test written against the checker half asserts nothing
-it wouldn't assert on the buggy binary. The only observation that discriminates
-the fix is `unwrap(a).method()` with no annotation, which is exactly what layer 2
-drops. Landing layer 1 alone would be a speculative change with a non-discriminating
-test; the honest state is both layers filed together, fixed together, with the
-regression test being the un-annotated `.method()` call that requires both.
-
-**Reproduction:**
+**Severity: high on wasm32.** Any use of exceptions traps. Works natively.
 
 ```saffron
-fun unwrap<T>(xs: List<T>): T { return xs[0] }
-var a: List<String> = ["hello"]
-IO.println(unwrap(a).to_upper())   // [codegen] Error: unresolved receiver type 'T'
+try { throw "boom" } catch (e) { IO.println("caught:" + e) }
+// native: caught:boom
+// wasm32: RuntimeError: unreachable (nothing is caught)
 ```
 
-Control (works today): `var s: String = unwrap(a); IO.println(s.to_upper())`.
+**Cause.** Exception handling is lowered to `setjmp`/`longjmp` (codegen emits
+`@setjmp` at the `try` and `@longjmp` at the `throw` — `expr_body.sf:717`,
+`stmts_body.sf:1789`, declared `returns_twice`/`noreturn` in `output_body.sf:1219`).
+Native links libc's real setjmp/longjmp. But `wasm_base_32.ll:645` defines them as
+**no-op stubs**:
 
-### 172. OPEN — wasm32 `malloc` returns pointers past the end of linear memory when `memory.grow` is capped or fails
-
-**Severity: high on wasm32.** Silent corruption / trap for any program whose heap
-grows past the module's memory cap. Surfaced in the playground: compiling a program
-returns a ~21 KB base64 response the UI writes into wasm memory with `writeCString`,
-and once the heap nears the cap the write throws `RangeError: offset is out of
-bounds` (in a pure-wasm host it is an out-of-bounds trap instead).
-
-**Two compounding defects, both in the wasm32 bump allocator (`wasm_base_32.ll:82`,
-`@malloc`):**
-
-1. **`memory.grow`'s result is discarded.** `@malloc` computes `new_heap`, calls
-   `@llvm.wasm.memory.grow.i32` when `new_heap > mem_bytes`, then unconditionally
-   `store i32 %new_heap, i32* @__heap_ptr` and returns the *old* heap pointer —
-   regardless of whether the grow succeeded. When grow returns -1 (failure), the
-   heap pointer still advances, so the next allocation hands back a pointer into
-   memory that was never mapped. The source comment at `wasm_base_32.ll:157`
-   already notes the allocator "discards memory.grow's result"; this is the
-   consequence.
-
-2. **The module's maximum memory is too low.** `memory.grow(198)` (the ~13 MB a
-   real growth needs) throws `Maximum memory size exceeded`, while `grow(2)`
-   succeeds — so the module is emitted with a small max-memory cap. Even a
-   grow-checking allocator would then fail these programs; the cap itself needs
-   raising (or removing) for the wasm32 target.
-
-**Deterministic repro** (Node host, any wasm32-built UI module):
-
-```js
-const inst = await WebAssembly.instantiate(mod, { env });
-inst.exports._start();
-inst.exports.malloc(4_000_000n);   // 64 -> 66 pages, grows fine
-inst.exports.malloc(13_000_000n);  // needs 264 pages; memory stays 66, ptr is past the end
-// inst.exports.memory.grow(198) directly => "Maximum memory size exceeded"
+```llvm
+define i32 @setjmp(i8* %buf) { ret i32 0 }
+define void @longjmp(i8* %buf, i32 %val) {
+  ; In WASM we cannot truly longjmp. Return and hope for the best.
+  ret void
+}
 ```
 
-**Fix sketch.** `@malloc` must check the `memory.grow` result: on -1, do not advance
-`__heap_ptr` — trap with a clear OOM message (or grow in a retry loop). And the
-wasm32 link/emit path should declare a much larger (or unbounded) maximum memory so
-ordinary programs don't hit the cap. Both live on the wasm32 side only; native is
-unaffected.
+So `throw` returns instead of jumping to the handler; execution falls through to
+code that assumes the jump happened and hits `unreachable`. The stub comment names
+the real fix: Emscripten-style setjmp/longjmp emulation.
 
-**Found via the playground**, the same way #170 was — running real programs through
-the compile→run pipeline surfaces target bugs the native suite cannot.
+**Fixable with the current toolchain.** Homebrew clang 22 + wasm-ld accept
+`-mllvm -wasm-enable-sjlj` (verified). The fix is to build/link the wasm32 target
+with SjLj emulation enabled and drop the no-op stubs (or replace them with the
+emulated primitives), rather than the "hope for the best" `ret void`.
+
+**Scope note.** None of the 7 bundled playground examples use exceptions, so the
+example eval is green; this was found by a wider feature eval. It still blocks any
+user program that uses `try`/`catch`. wasm32 only — native is unaffected.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
@@ -1292,6 +1245,76 @@ test, which is the whole point of guarding on the registry rather than on whethe
 a name merely *looks* like a type.
 
 ---
+### 171. FIXED — a type parameter used only inside a generic parameter never resolved; `unwrap<T>(xs: List<T>): T` then `unwrap(a).m()` was dropped
+
+**Severity: medium.** A generic function whose return type parameter appeared
+*only* inside a container parameter — `fun unwrap<T>(xs: List<T>): T`,
+`fun find<T>(xs: List<T>): T` — could not have its result dispatched on without an
+explicit annotation. `unwrap(a).to_upper()` and `Iter.find(xs, ...).to_upper()`
+failed with `[codegen] Error: cannot dispatch 'to_upper' on unresolved receiver
+type 'T' — the call would be dropped.`
+
+**Two layers, fixed together — the entry was filed open with the note that
+half-fixing it was worse than not, because layer 1 alone has no observable effect.**
+
+**Layer 1 — the checker.** `resolve_type_params`' "case 2" (return param `T` buried
+in `List<T>`) was guarded by `param_type.contains("<")`, but `param_type` was
+rendered through the LOSSY `AST.type_to_string`, which collapses `List<T>` to the
+bare `"List"` — no `<`, so the branch was dead. Rendering through `type_to_str`
+(which keeps the argument, `"List<T>"`) makes case-2 fire.
+
+**Layer 2 — codegen.** Codegen carries its OWN receiver-type inference: a call sets
+`last_type` from `func_ret_types`, which for a generic function is the bare `"T"`.
+The fix resolves that type parameter from the call arguments at each call-emission
+site — the free-function path in `gen_call` (both the ordinary and the
+known-function branches) AND the module-qualified path in `gen_method_call`
+(`Iter.find`). A new codegen table `func_param_type_strs` records the parameter
+type spellings at registration; `resolve_call_ret_type_param` mirrors the checker's
+case-1 (`param IS the type parameter`) and case-2 (`param is Container<...T...>`),
+and `apply_ret_type_param_resolution` rewrites `last_type` to the concrete type so a
+dispatch on the result finds a real receiver.
+
+This duplicates a slice of the checker's inference, which stage 4 exists to delete —
+but with codegen's `get_expr_type` still the receiver-type authority, it is the only
+way to make the result dispatchable today. Noted in the code as stage-4 debt.
+
+Regression test: `test/pass/generic_param_resolved_from_container.sf`, five
+assertions, each dispatching a method on the un-annotated call result (the shape
+that used to fail) across the free-function and module-qualified paths and two type
+parameters. Bootstrap green including the gen4 fixed-point; suite 320 passed, 8
+failed, 14 skipped, failure set otherwise unchanged.
+
+### 172. FIXED — wasm32 `malloc` returned pointers past the end of linear memory when `memory.grow` was capped or failed
+
+**Was high on wasm32.** Silent corruption / trap for any program whose heap grew
+past the module's memory cap. Surfaced in the playground: compiling a program
+returns a ~21 KB base64 response the UI writes into wasm memory with `writeCString`,
+and once the UI module's long-lived heap neared the cap the write threw
+`RangeError: offset is out of bounds` (an out-of-bounds trap in a pure-wasm host).
+
+**Two compounding defects, both wasm32-only:**
+
+1. **`memory.grow`'s result was discarded** (`wasm_base_32.ll`, `@malloc`). It called
+   `@llvm.wasm.memory.grow.i32`, ignored the result, and unconditionally advanced
+   `__heap_ptr` + returned the old pointer. On a refused grow (-1) the next
+   allocation handed back unmapped memory.
+
+2. **The max-memory cap was too low.** `tools/saffron` linked wasm32 with
+   `--max-memory=16777216` (16 MB), so a ~13 MB grow was refused with "Maximum
+   memory size exceeded".
+
+**Fix.** `@malloc` now checks `%grow_result`: on -1 it branches to an `oom` block
+that traps (`__builtin_trap` + `unreachable`) instead of advancing the heap; on
+success it proceeds. `tools/saffron` raises `--max-memory` to 2 GB (initial stays
+4 MB). Native bases and the compiler are untouched — `.ll` runtime and link flags
+apply at build time, so no rebootstrap. The wasm64 base has no grow path at all
+(a separate pre-existing limitation, left as-is).
+
+**Verified.** A browser eval driving 8 real compile→run rounds against the live
+playground went from **2/8** (then every round trapping) to **8/8 with 0 page
+errors**. Node repro: `malloc(13_000_000)` now grows memory to fit (`ok=true`);
+an impossible `malloc(3_000_000_000)` traps cleanly rather than returning a bad
+pointer. Found via the playground, the same way #170 was.
 
 ### 170. FIXED — a `for-in` loop over a list/map/string trapped with IndexError on wasm32, though it worked natively and via direct indexing
 
