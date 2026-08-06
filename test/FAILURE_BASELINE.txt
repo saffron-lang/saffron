@@ -462,10 +462,15 @@
 # docstring reflection) or the #154 fieldless-enum representation problem
 # (oracle_enum_println) and the async scheduler auto-link question (async) — none
 # is a plain codegen regression.
+#
+# Updated 2026-08-06: pass/expressions.sf DELETED, not fixed. It exercised the pipe
+# operator (`|>`), Elixir-style atoms (`:atom`), and C-style `;` statement
+# terminators — none of which the language defines. The pipe operator and atoms
+# were explicitly dropped as language features, so the test tested syntax that will
+# never exist. Removed from the tree and from this list; 5 names remain.
 
 async
 docstrings
 oracle_enum_println
-pass/expressions
 pass/overloading
 pass/varargs

@@ -2663,8 +2663,17 @@ class Parser {
     }
 
     fun parse_one_param(params: List<AST.Param>, pattern_prepend: List<AST.Stmt>, idx: Float) {
+        // Variadic parameter `*nums: Int`. Rather than widen the Param node (a
+        // 76-site sweep), the `*` is carried IN THE NAME — `*nums` — which flows
+        // unchanged through params_to_string, func_param_names and the codegen
+        // prologue. Consumers that need the bare name strip a leading `*`; the
+        // call site and checker detect variadic by testing for it. `*` already
+        // lexes as one TkStar token.
+        var is_variadic: Bool = false
+        if (this.match_kind("*")) { is_variadic = true }
         var pname_span: AST.Span = this.ident_span()
         var pname: String = this.expect_ident()
+        if (is_variadic) { pname = "*" + pname }
         if (this.match_kind_check("(")) {
             this.advance()
             var pb: List<String> = []

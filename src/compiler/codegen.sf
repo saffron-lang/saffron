@@ -376,6 +376,11 @@ class Codegen {
             var ch: String = name.char_at(i)
             if (ch == "." or ch == "(" or ch == ")") {
                 sb.append("_")
+            } else if (ch == "*") {
+                // Variadic marker (`*nums`) — dropped from the emitted register
+                // name so `%nums.arg` / `%nums` are valid LLVM. The marker is kept
+                // in func_param_names for call-site variadic detection.
+                sb.append("")
             } else {
                 sb.append(ch)
             }
