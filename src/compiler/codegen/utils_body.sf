@@ -1416,6 +1416,12 @@
         this.func_defaults.set(emit_name, defaults)
         this.func_param_count.set(emit_name, params.length())
         this.func_param_names.set(emit_name, pnames)
+        // Record a real `///` docstring so gen_func_ref can stash it in the
+        // closure box for Reflect.doc. `@`-prefixed docs are directives
+        // (@extern handled above, @extend/@inline dispatch elsewhere), not text.
+        if (doc.length() > 0 and !doc.starts_with("@")) {
+            this.func_docs.set(emit_name, doc)
+        }
 
         // Return type too, or a call compiled before the callee's own
         // gen_function runs falls back to Int and misdispatches every method on
@@ -1465,6 +1471,14 @@
         }
         var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
             _ => []
+        }
+        var cdoc: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
+            _ => ""
+        }
+        // A class used as a value (e.g. Reflect.doc(Greeter)) routes through
+        // gen_func_ref like a function ref, so record its docstring the same way.
+        if (cname.length() > 0 and cdoc.length() > 0 and !cdoc.starts_with("@")) {
+            this.func_docs.set(prefix + cname, cdoc)
         }
         // BUGS #161: register the constructor's return type here, prefixed, so the
         // second global-var pass (prescan_global_call_types) can type an inferred

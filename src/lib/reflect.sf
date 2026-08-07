@@ -42,3 +42,16 @@ fun construct(klass: Any, data: Map<String, Any>): Any {
 fun number_to_string(value: Any): String {
     return __reflect_number_to_string(value)
 }
+
+/// Returns the docstring of a function or class value, or nil if it has none.
+/// A function/class used as a value carries its docstring in the closure box
+/// (codegen stores the doc-constant pointer in the box's second slot when the
+/// referenced declaration has a `///` comment); this reads it back.
+fun doc(target: Any): Any {
+    return __reflect_doc(target)
+}
+
+/// Returns this module's `//!` docstring, or nil if the module has none.
+fun module_doc(): Any {
+    return __reflect_module_doc()
+}

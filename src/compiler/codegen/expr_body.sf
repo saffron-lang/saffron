@@ -1640,7 +1640,22 @@
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
-        this.emit_indent("store i64 0, i64* " + env_slot)
+        // Slot 1 is the closure's env. For a plain (no-capture) function or class
+        // ref the trampoline ignores it, so when the referenced declaration has a
+        // `///` docstring we store the tagged doc-constant pointer here instead of
+        // 0. __reflect_doc reads it back; calling the ref is unaffected. Non-doc'd
+        // refs keep the 0, so this is inert everywhere else.
+        if (this.func_docs.has(fn_name)) {
+            var doc_str: String = this.func_docs.get(fn_name)
+            var doc_c: String = this.add_string_constant(doc_str)
+            var doc_len: Float = doc_str.length() + 1
+            var doc_gep: String = this.fresh_local()
+            this.emit_indent(doc_gep + " = getelementptr [" + doc_len.floor().to_string() + " x i8], [" + doc_len.floor().to_string() + " x i8]* " + doc_c + ", i64 0, i64 0")
+            var doc_val: String = this.emit_tag_ptr(doc_gep)
+            this.emit_indent("store i64 " + doc_val + ", i64* " + env_slot)
+        } else {
+            this.emit_indent("store i64 0, i64* " + env_slot)
+        }
         var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
