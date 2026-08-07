@@ -486,6 +486,36 @@ fun get_stmt_name(stmt: AST.Stmt): String {
     }
 }
 
+// True when compiling `program` as an entry will make codegen emit a C `main`
+// — i.e. it has a top-level statement (anything that is not a pure declaration)
+// or a top-level `fun main`. This mirrors codegen's `has_top_level or
+// __saffron_main defined` test (output_body.sf), which is precisely the
+// condition under which it also emits the scheduler's enqueue/scheduler_run, so
+// it is the exact condition under which the ambient scheduler is *needed*.
+//
+// Pure-declaration translation units — runtime.sf and every stdlib library —
+// return false here. That is what keeps the ambient scheduler out of runtime.ll:
+// its @stdlib_scheduler_* globals must be defined in exactly one TU (the
+// program's own), or they collide at link with any program that also defines
+// them. Collecting the scheduler for a non-program TU is not merely wasteful, it
+// is the duplicate-symbol bug. BUGS #181.
+fun _entry_emits_program(program: List<AST.Stmt>): Bool {
+    var i: Float = 0
+    while (i < program.length()) {
+        var trig: Bool = match (program[i]) {
+            FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => (n == "main")
+            EnumDecl(en, ev, ed, e_vis, __ens, __efs) => false
+            ClassDecl(cn, __tps, cps, cf, cm, cd, c_vis, __cns, __cfs, __intro) => false
+            TypeAlias(ta_n, ta_t, ta_vis) => false
+            VarDecl(vn, vt, vinit, vd, v_vis, __vns, __vfs) => !vd.starts_with("@import:")
+            _ => true
+        }
+        if (trig) { return true }
+        i = i + 1
+    }
+    return false
+}
+
 // Append one symbol's JSON to `acc`, prefixing a comma when `acc` is non-empty.
 // Drops the symbol silently when symbol_json returns "" (a synthetic span, no
 // jump target — see Diag.symbol_json), so `acc` never carries a stray comma or
@@ -1851,6 +1881,33 @@ fun main(): Int {
             di = di + 1
         }
         lpi = lpi + 1
+    }
+
+    // Always collect the cooperative scheduler (Elixir/BEAM parity: the scheduler
+    // is ambient runtime, never opted into). Codegen emits @stdlib_scheduler_*
+    // calls for any coroutine — in the entry OR any imported lib, directly or via
+    // a Task alias — and getting "which module triggered it" right is a nest of
+    // edge cases (transitive libs, `import "@async" as A` then A.spawn, the word
+    // "yield" in a comment). Collecting it unconditionally through the normal
+    // module path (the visited guard dedupes a later @async->@scheduler import, so
+    // the prelude and whole-program helpers still emit exactly once for the
+    // combined program) sidesteps all of them. Dead scheduler code is dropped by
+    // -O2 when no coroutine references it. BUGS #181.
+    //
+    // Gated on _entry_emits_program: only a translation unit that emits a C main
+    // (top-level code or a `fun main`) gets the scheduler. A pure-declaration TU
+    // — runtime.sf, or any stdlib library compiled on its own — must NOT define
+    // the @stdlib_scheduler_* globals, or they collide at link with the program
+    // TU that also defines them (the scheduler's own module has 18 top-level
+    // globals). runtime.sf has neither top-level code nor a main, so it declines
+    // here; that is what keeps runtime.ll clean and lets every async program own
+    // the single definition. BUGS #181.
+    var sched_auto: String = _find_in_lib_paths("scheduler", stdlib_dir)
+    if (_entry_emits_program(program) and OS.file_exists(sched_auto) and !visited.has(sched_auto)) {
+        if (!path_to_prefix.has(sched_auto)) {
+            path_to_prefix.set(sched_auto, path_based_prefix("@scheduler", sched_auto, stdlib_dir))
+        }
+        collect_modules(sched_auto, stdlib_dir, visited, module_stmts, module_prefixes_list, module_file_paths, resolved_aliases, path_to_prefix, scoped_aliases)
     }
 
     // Recursively collect modules (text-based extraction)

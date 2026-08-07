@@ -143,7 +143,13 @@ private fun _has_self_reviving_work(): Int {
     // dispatcher) parks on an fd for the whole program; counting it here would
     // make every program that ever called Signal.on() run forever. When the only
     // IO left is daemons, this reports no work and the loop winds down.
-    if (io_handles.length() - _io_daemon_count > 0) { return 1 }
+    // Bind the module-level global to a typed local before arithmetic: a
+    // module-scoped `var` reads as Any to codegen's get_expr_type (globals'
+    // types aren't tracked through the subtraction), so
+    // `io_handles.length() - _io_daemon_count` fell back to Int and tripped the
+    // gen4 fallback gate once the scheduler joined the compiler's own build.
+    var daemon_ct: Int = _io_daemon_count
+    if (io_handles.length() - daemon_ct > 0) { return 1 }
     return 0
 }
 
@@ -280,7 +286,13 @@ private fun _blocking_budget(timeout_ms: Int, now: Float): Int {
     var i: Int = 0
     while (i < io_deadlines.length()) {
         if (io_deadlines[i] >= 0.0) {
-            var remaining_ms: Int = ((io_deadlines[i] - now) * 1000.0).floor()
+            // Bind the list element to a typed local before arithmetic: a list
+            // subscript is Any to codegen's get_expr_type (element type isn't
+            // tracked through []), so `io_deadlines[i] - now` fell back to Int and
+            // tripped the gen4 fallback gate once the scheduler joined the
+            // compiler's own build. The annotation makes the type explicit.
+            var dl: Float = io_deadlines[i]
+            var remaining_ms: Int = ((dl - now) * 1000.0).floor()
             if (remaining_ms <= 0) { return 0 }
             if (remaining_ms < budget) { budget = remaining_ms }
         }

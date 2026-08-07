@@ -500,7 +500,8 @@
 # representation problem (#154) and the async scheduler-linking design (#181).
 #
 # 2026-08-06 async investigation (filed as BUGS #181, left open): the fix is a
-# build-system change, not a source patch. async.sf uses top-level `yield` without
+# build-system change, not a source patch. [RESOLVED 2026-08-07, see below.]
+# async.sf uses top-level `yield` without
 # `import "@async"`, so codegen emits @stdlib_scheduler_* calls the link can't
 # resolve. Two source-level fixes were tried and both fail — a text-scan for
 # `yield`/`Task.spawn` matches the compiler's own COMMENTS (dup symbols in the
@@ -521,8 +522,14 @@
 # bootstrap keeps the old `tag<<56` layout internally, so the fix is verified via
 # gen3 user programs, not the bootstrap). 346 passed, 1 failed. Only `async`
 # (BUGS #181, scheduler-linking design) remains.
-
-async
+#
+# 2026-08-07 (#181 FIXED — ambient scheduler): the coroutine runtime now links
+# like runtime.ll/gc.ll — main.sf always collects @scheduler when the entry
+# emits a program, gated by _entry_emits_program(), and codegen only emits
+# __mod_init_stdlib_scheduler when scheduler_used is set (a coroutine-free
+# program is byte-identical to before, zero cost). `async` uses top-level `yield`
+# with no `import "@async"` and now links + runs. Elixir/BEAM parity as planned.
+# `async` cleared from the failure set below.
 
 # 2026-08-06 (#175 nested-fun symbol qualification): a full suite run against
 # the fix surfaced pass/http_binary_response as a stale test — it calls
