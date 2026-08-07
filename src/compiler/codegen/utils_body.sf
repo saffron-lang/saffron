@@ -935,7 +935,35 @@
     // non-nested emission is untouched.
     fun nested_fun_symbol(enclosing: String, name: String): String {
         if (enclosing.length() == 0) { return this.current_prefix + name }
+        // BUGS #183: an intrinsic (store8/load8/...) is lowered INLINE by
+        // gen_intrinsic_call and is never emitted as a real function. When one is
+        // declared+called inside a private/nested fun (e.g. @net's _raw_read),
+        // #175's scope qualification would rewrite it to scope$$name and emit a
+        // `call @net__raw_read$$store8` against a symbol that does not exist. An
+        // intrinsic name must therefore route with its bare (prefix-only) symbol —
+        // exactly the form a top-level intrinsic call uses and the form registered
+        // in intrinsic_funcs — regardless of enclosing scope. Intrinsics are never
+        // user-defined nested funs, so this can never mask a genuine #175 collision.
+        if (this.is_intrinsic_name(name)) { return this.current_prefix + name }
         return this.current_prefix + enclosing + "$$" + name
+    }
+
+    // BUGS #183: mirrors gen_intrinsic_call's dispatch arms exactly (which match
+    // by suffix so a module-prefixed symbol like `net__store8` still routes). The
+    // single source of truth for "this name lowers inline, never as a real call",
+    // so nested_fun_symbol can keep intrinsics out of the $$-qualified namespace.
+    fun is_intrinsic_name(name: String): Bool {
+        if (name.ends_with("load64")) { return true }
+        if (name.ends_with("store64")) { return true }
+        if (name.ends_with("load8")) { return true }
+        if (name.ends_with("store8")) { return true }
+        if (name.ends_with("load_argc")) { return true }
+        if (name.ends_with("load_argv")) { return true }
+        if (name.ends_with("tag_ptr")) { return true }
+        if (name.ends_with("untag_ptr")) { return true }
+        if (name.ends_with("call_void_ptr")) { return true }
+        if (name.ends_with("__suspend")) { return true }
+        return false
     }
 
     fun is_known_name(name: String): Bool {
