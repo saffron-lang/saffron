@@ -2,7 +2,7 @@
 
 ## Open
 
-**6 open entries:** #49, #65, #107, #131, #132, #186.
+**5 open entries:** #49, #65, #107, #131, #132.
 Next free number is **#187**.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
@@ -488,41 +488,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 186. OPEN — `Task.spawn` of a bare named-coroutine reference traps `null function or function signature mismatch` on wasm32
-
-**Severity: medium** — the idiomatic `Task.spawn(fun () => worker())` lambda form
-works, so there is a clean workaround, but spawning a function reference directly
-is natural and silently traps at runtime on wasm32 (native is fine).
-
-**Repro** (both forms trap on wasm32; the lambda form is the contrast):
-
-```saffron
-fun worker(): Int { yield
-    return 42 }
-
-var t = Task.spawn(worker)               // wasm32: THREW null function ...
-// var fn = worker; Task.spawn(fn)       // also traps
-// Task.spawn(fun () => worker())        // WORKS — the workaround
-IO.println(t.await().to_string())        // native: 42
-```
-
-**Cause (from the #184 fix subagent's note).** A function reference lowers through
-`gen_func_ref` (`expr_body.sf:~1668`), whose trampoline is emitted as `i64(i64)`
-and does `call i64 @worker()` even when `worker` is a coroutine emitted as
-`ptr @worker() presplitcoroutine`. So the trampoline calls the coroutine with the
-wrong signature, and on wasm32's typed `call_indirect` table that is a signature
-mismatch → trap. (Native has no typed indirect-call table, so it does not trap —
-same wasm32-only shape as #184, but a distinct site: this is the func-ref
-trampoline, not the leaked `force_next_lambda_coro` flag #184 fixed.)
-
-**Fix direction.** `gen_func_ref` must emit a coroutine-aware trampoline when the
-referenced function is a coroutine (known via `mark_coroutines` / the coroutine
-set): call it as `ptr @worker()` and drive the frame (or forward to the same
-spawn/await machinery the lambda path uses) rather than a bare `call i64`. Match
-how `Task.spawn(fun () => worker())` already lowers the coroutine correctly.
-
----
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
