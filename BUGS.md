@@ -2,7 +2,7 @@
 
 ## Open
 
-**5 open entries:** #49, #65, #107, #131, #132.
+**4 open entries:** #65, #107, #131, #132.
 Next free number is **#187**.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
@@ -655,86 +655,6 @@ not a small fix — the error path itself allocates (`__runtime_error` calls
 (`wasm_base_32.ll:592-597`, `wasm_base.ll:503-508`), so `try`/`catch` cannot work
 on wasm at all. Decide whether fatal-by-design is the intended semantics before
 investing there.
-
-### 49. `Number` is one surface name for two representations
-
-`str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
-
-```saffron
-fun area(r: Number): Number { return 3.0 * r * r }
-IO.println(area(2.0).to_string())   // prints 0, should be 12
-```
-
-The declared type is relabelled `Int` at the boundary, so the caller's
-`.to_string()` untags a double as an integer and prints `0` (or garbage like
-`37357358909038`). Enum payloads had the same defect from the other end, and that
-half **is** fixed — see #45 and #43.
-
-Mapping `"Number"` to `FloatType` instead is the honest reading of the surface
-syntax and fixes the case above, but it is a worse lie in the other direction:
-stdlib code writes `Number` for values it then uses as list indices and integer
-counters. `src/lib/toml.sf:23`'s `fun peek_at(offset: Number)` is the clearest
-case — as a double, that offset breaks indexing. Measured both ways
-(2026-07-30):
-
-| mapping | `pantry_config` | `test_sorted_set` | `area(): Number` |
-|---|---|---|---|
-| `Number` → `Int` | 29/29 | 33/33 | `0` (wrong) |
-| `Number` → `Float` | 8 failed | `IndexError` | `12` (right) |
-
-Neither mapping is right, because `Number` itself is the defect: one surface name
-for two representations, so no single lattice entry can be correct for both uses.
-This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type")
-showing up as a genuine fork in the road rather than a one-line fix.
-
-**Real fix:** retire `Number` in favour of explicit `Int` and `Float` — the
-intended direction for the language. That means auditing every `Number` in
-`src/lib/*.sf` and deciding per site which one is meant (`peek_at(offset: Int)`,
-`number(key: String): Float`, etc.), then removing the surface spelling. Until
-then `Int` is the mapping that keeps the stdlib working, and it stays, with the
-trade-off documented at the mapping site.
-
-**Correction note.** An earlier version of this file recorded `Number` → `Float`
-as fixed and claimed the regression above did not exist ("`pantry_config` passes
-29/29 with the Float mapping"). That measurement was taken against a `saffronc`
-that did not yet contain the change, and was wrong; the regression is real and
-reproduces. The mapping was reverted to `Int`.
-
-**Progress (2026-07-30).** The retirement is underway; the mapping is unchanged
-but its blast radius is shrinking:
-
-- `src/lib/*.sf`: all 134 `Number` annotations converted. Bulk → `Int`
-  (indices, counters, ports, handles, lengths, byte values, char codes);
-  `scheduler.sleep_times` → `List<Float>`; `reflect.number_to_string`,
-  `toml.number`/`number_or` → `Any` (genuinely int-OR-float pass-throughs that
-  do no arithmetic). `toml.sf`'s `peek_at(offset: Number)` — the example cited
-  above — is now `offset: Int`.
-
-  **Correction (2026-08-01): "no `Number` annotation remains in `src/lib`" was
-  false when written.** Fourteen live annotations were left in
-  `src/lib/http/client.sf` and `src/lib/http/server.sf` — `var status`,
-  `max_redirects`, `redirect_count`, `port`, `body_start`, `_parse_hex(): Number`,
-  `_index_of_from(start: Number): Number`, `_is_redirect(status: Number)`, and
-  five `var i`/`var k` loop counters. All are indices, counts or HTTP status
-  codes, so all fourteen became `Int`. The five remaining hits in
-  `src/lib/llvm/test_codegen.sf` are inside comments and are left alone. `src/lib`
-  is now genuinely free of `Number` annotations.
-- `test/*.sf`: all 152 annotations → `Int` across 49 files. The 9 `is Number`
-  checks are kept deliberately: they cover the feature while it still exists.
-- `checker.sf` no longer collapses `Float` into `IntType` when parsing type
-  strings, so `Int` and `Float` are finally distinct in the checker. This alone
-  turned two `test/fail/` cases from "compiled cleanly" (itself a failure) into
-  correct rejections, taking the suite from 90/47 to 92/45.
-- A latent runtime bug surfaced and was fixed on the way: `__val_is_float`
-  called every raw untagged heap pointer a float, so rewriting `is Number` to
-  `is Int or is Float` made `JSON.to_string({...})` serialize a Map as an
-  integer. `is Number` had masked it by only ever checking the int tag — which
-  also means **`is Number` returns false for every float**, so all seven stdlib
-  `is Number` guards were already silently wrong. See the Fixed section.
-
-**Remaining:** user-facing docs, then removing the surface spelling from the
-lexer/parser/checker/codegen — which is a breaking change for user programs and
-wants its own decision.
 
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
