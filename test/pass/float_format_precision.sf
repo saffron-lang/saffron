@@ -1,0 +1,24 @@
+// BUGS #185: wasm32's __float_to_string used 6 FRACTIONAL digits while native's
+// %g uses 6 SIGNIFICANT digits, so the same float printed differently per target
+// (Math.pi: 3.14159 native vs 3.141593 wasm32). This test pins the %g-matching
+// output in the fixed-notation range [1e-4, 1e6); it is graded by
+// differential.sh across native and wasm32, which is where the divergence lived.
+// (Values >= 1e6 / < 1e-4, where %g switches to scientific notation, are a known
+// remaining divergence and deliberately not asserted here — see #185.)
+
+fun main() {
+    // The reported case: 1 integer digit, 5 fractional -> 6 significant.
+    IO.println(3.14159265)     // 3.14159
+    // Shrinking fractional budget as the integer part grows.
+    IO.println(123.456789)     // 123.457   (3 int + 3 frac)
+    IO.println(12345.678)      // 12345.7   (5 int + 1 frac)
+    // Trailing-zero trimming still applies.
+    IO.println(2.5)            // 2.5
+    IO.println(100.0)          // 100
+    // Sub-1 values keep up to 6 fractional digits (matches %g in [0.1, 1)).
+    IO.println(0.5)            // 0.5
+    IO.println(0.006)          // 0.006
+    // Negative sign path.
+    IO.println(-74.006)        // -74.006
+}
+main()

@@ -1188,12 +1188,45 @@ after_sign:
   %ipart0 = fptosi double %f to i64
   %ipd0 = sitofp i64 %ipart0 to double
   %frac = fsub double %f, %ipd0
-  ; scaled = round(frac * 1e6), as exact integer math from here on
-  %scaled_f = fmul double %frac, 1.000000e+06
+  ; BUGS #185: match C's %g — 6 SIGNIFICANT digits, not 6 fractional. The
+  ; fractional budget shrinks as the integer part grows: 3.14159 keeps 5 frac
+  ; digits (1 int + 5 = 6 sig), 123.456 keeps 3, 12345.6 keeps 1, >=1e5 keeps 0.
+  ; A value < 1 (ipart0 == 0) keeps all 6, which matches %g for [0.1, 1). Values
+  ; >= 1e6 or < 1e-4, where %g switches to scientific notation, are NOT handled
+  ; here and remain a known divergence — see #185.
+  %lt1    = icmp ult i64 %ipart0, 1
+  %lt10   = icmp ult i64 %ipart0, 10
+  %lt100  = icmp ult i64 %ipart0, 100
+  %lt1k   = icmp ult i64 %ipart0, 1000
+  %lt10k  = icmp ult i64 %ipart0, 10000
+  %lt100k = icmp ult i64 %ipart0, 100000
+  %fd_a = select i1 %lt100k, i64 1, i64 0
+  %fd_b = select i1 %lt10k,  i64 2, i64 %fd_a
+  %fd_c = select i1 %lt1k,   i64 3, i64 %fd_b
+  %fd_d = select i1 %lt100,  i64 4, i64 %fd_c
+  %fd_e = select i1 %lt10,   i64 5, i64 %fd_d
+  %frac_digits = select i1 %lt1, i64 6, i64 %fd_e
+  ; scale = 10 ^ frac_digits, as a double (for the fmul) and an i64 (carry
+  ; threshold). All values <= 1e6 are exact in double, so fptosi is exact.
+  %fd_is5 = icmp eq i64 %frac_digits, 5
+  %fd_is4 = icmp eq i64 %frac_digits, 4
+  %fd_is3 = icmp eq i64 %frac_digits, 3
+  %fd_is2 = icmp eq i64 %frac_digits, 2
+  %fd_is1 = icmp eq i64 %frac_digits, 1
+  %fd_is0 = icmp eq i64 %frac_digits, 0
+  %sd_5 = select i1 %fd_is5, double 1.000000e+05, double 1.000000e+06
+  %sd_4 = select i1 %fd_is4, double 1.000000e+04, double %sd_5
+  %sd_3 = select i1 %fd_is3, double 1.000000e+03, double %sd_4
+  %sd_2 = select i1 %fd_is2, double 1.000000e+02, double %sd_3
+  %sd_1 = select i1 %fd_is1, double 1.000000e+01, double %sd_2
+  %scale_d = select i1 %fd_is0, double 1.000000e+00, double %sd_1
+  %scale_i = fptosi double %scale_d to i64
+  ; scaled = round(frac * scale), as exact integer math from here on
+  %scaled_f = fmul double %frac, %scale_d
   %scaled_r = fadd double %scaled_f, 5.000000e-01
   %scaled0 = fptosi double %scaled_r to i64
   ; frac ~= 0.9999995 rounds up to a full unit: carry into the integer part
-  %carry = icmp sge i64 %scaled0, 1000000
+  %carry = icmp sge i64 %scaled0, %scale_i
   %ipart_inc = add i64 %ipart0, 1
   %ipart = select i1 %carry, i64 %ipart_inc, i64 %ipart0
   %scaled = select i1 %carry, i64 0, i64 %scaled0
@@ -1204,14 +1237,15 @@ after_sign:
   br i1 %no_frac, label %finish_int, label %digits
 
 digits:
-  ; Fill tmp[0..5] most-significant first by peeling off the low digit and
-  ; walking backwards.
+  ; Fill tmp[0..frac_digits-1] most-significant first by peeling off the low
+  ; digit and walking backwards. frac_digits is in [1,6] here (the no_frac path
+  ; already handled scaled==0, which is the only case a 0-digit budget reaches).
   %tmp = alloca [8 x i8]
   %tmpp = getelementptr [8 x i8], [8 x i8]* %tmp, i64 0, i64 0
   br label %dloop
 
 dloop:
-  %di = phi i64 [ 6, %digits ], [ %dinext, %dloop ]
+  %di = phi i64 [ %frac_digits, %digits ], [ %dinext, %dloop ]
   %sv = phi i64 [ %scaled, %digits ], [ %svnext, %dloop ]
   %dinext = sub i64 %di, 1
   %rem = urem i64 %sv, 10
@@ -1229,7 +1263,7 @@ trim:
 tloop:
   ; Walk back over trailing '0's. %scaled is nonzero here, so at least one
   ; significant digit survives and this cannot run off the front.
-  %tn = phi i64 [ 6, %trim ], [ %tnnext, %tcont ]
+  %tn = phi i64 [ %frac_digits, %trim ], [ %tnnext, %tcont ]
   %lastidx = sub i64 %tn, 1
   %lastp = getelementptr i8, i8* %tmpp, i64 %lastidx
   %lastc = load i8, i8* %lastp
