@@ -1,0 +1,51 @@
+// generic_close_before_eq.sf — BUGS #174, now FIXED: the lexer's maximal-munch
+// glued a generic type's closing `>` to a following `=` into one `>=` token, so a
+// typed binding with NO space before `=` (`var a:List<Int>=[1,2,3]`) failed to
+// parse — the generic never closed and `consume("=")` ran off to EOF. The parser
+// now splits a `>=` sitting in generic-close position back into a bare `=`.
+//
+// The regression is entirely about the missing space, so every binding below is
+// written tight (`>=` glued). The second half is the control the fix must not
+// disturb: the `>=` OPERATOR still has to work everywhere, tight-spaced included.
+
+import "@test" as Test
+
+// --- the broken shapes: generic close immediately followed by `=` ---
+
+// simple generic, no space before `=`
+var a: List<Int>=[1, 2, 3]
+Test.assert_eq(a.length(), 3, "List<Int>=[...] parses (length)")
+Test.assert_eq(a[0], 1, "List<Int>=[...] parses (first element)")
+
+// two type args, no space before `=`
+var m: Map<String, Int>={}
+m.set("k", 7)
+Test.assert_eq(m.get("k"), 7, "Map<String, Int>={} parses and works")
+
+// nested generic — closes two levels (`>>`) then `=`, still no space
+var n: Map<String, List<Int>>={}
+n.set("xs", [4, 5])
+var xs: List<Int> = n.get("xs")
+Test.assert_eq(xs.length(), 2, "Map<String, List<Int>>={} parses (nested build)")
+
+// --- control: the `>=` operator must still work everywhere ---
+
+var ge_if: Bool = false
+if (3 >= 2) { ge_if = true }
+Test.assert(ge_if, ">= operator works in an if")
+
+// tight-spaced operator: `x>=0`
+var x: Int = 5
+var tight: Bool = x>=0
+Test.assert(tight, "tight-spaced x>=0 is the >= operator")
+
+// `>=` in a while condition
+var count: Int = 0
+var d: Int = 3
+while (d >= 0) {
+    count = count + 1
+    d = d - 1
+}
+Test.assert_eq(count, 4, ">= operator works in a while condition")
+
+Test.summary()

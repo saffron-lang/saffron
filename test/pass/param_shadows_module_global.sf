@@ -1,0 +1,49 @@
+// BUGS #40 regression: a function PARAMETER must win over a like-named
+// module-level global.
+//
+// The defect: variable resolution consulted `module_globals` before locals, so
+// a parameter whose name collided with a user global (`x`, `n`, ...) loaded the
+// GLOBAL instead of the passed argument. `f(7)` returned the global (999), not
+// 7. Fixed by the resolve pass: every `Variable` read is rewritten to a
+// `Ref(kind, ...)` once, so `param` beats `global` with no ordering to get
+// wrong.
+//
+// The global's value (999) is chosen to be unmistakably different from any
+// argument passed below, so a misresolution yields a wrong NUMBER, not a link
+// error.
+import "@test" as Test
+
+var x = 999
+var n = 888
+
+// The parameter `x` shadows the global `x`. A direct read must return the
+// argument, not 999.
+fun f(x: Int): Int {
+    return x
+}
+
+// The parameter is read inside arithmetic; the result must reflect the argument.
+fun double_it(x: Int): Int {
+    return x + x
+}
+
+// Same collision, different name, to pin that it is not specific to `x`.
+fun add_one(n: Int): Int {
+    return n + 1
+}
+
+// A control: this function declares NO shadowing parameter and genuinely reads
+// the global `x`. The global must still resolve correctly when not shadowed.
+fun read_global(): Int {
+    return x
+}
+
+Test.assert_eq(f(7), 7, "parameter x wins over global 999")
+Test.assert_eq(f(0), 0, "parameter x wins even when argument is 0")
+Test.assert_eq(double_it(7), 14, "arithmetic on param reflects argument, not global")
+Test.assert_eq(add_one(41), 42, "differently-named param also wins over its global")
+
+// The global is genuinely readable where it is not shadowed.
+Test.assert_eq(read_global(), 999, "unshadowed global still resolves to 999")
+
+Test.summary()

@@ -9,6 +9,46 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 180. FIXED — plain assignment to a function-local `var` that shadows a module global wrote the global, not the local (and a shadowed loop counter hung forever)
+
+```saffron
+var g = 100
+fun f(): Int { var g = 0; g = 7; return g }
+f()   // returned 0 (the local read stale), and g became 7 (global clobbered)
+
+// worse — a shadowed loop counter never terminated:
+var i = 5
+fun sum(): Int { var i = 0; var t = 0; while (i < 3) { t = t + i; i = i + 1 } return t }
+sum()   // hung forever
+```
+
+**Severity: high** — silent wrong output in the mild case, an infinite loop in the
+loop-counter case (the shape the learnxinyminutes doc and the #59 regression test
+both hit).
+
+The assignment sibling of #59. #59 fixed the *declaration store*, variable *reads*,
+and the GC root to honour `current_fn_locals` — a local shadowing a like-named
+module global resolves to its own `%name` slot. But the `Assign` arm in codegen
+(`expr_body.sf`) still chose `@__g_<name>` storage whenever
+`module_globals.has(current_prefix + name)`, with **no** `current_fn_locals` guard.
+So `g = 7` inside `f` stored to the global `@__g_g` while the return read the
+untouched local `%g` (still 0). In a `while` loop the split is fatal: the condition
+reads the local (never advances) and the increment writes the global, so the loop
+never exits.
+
+**Fix.** One guard, mirroring the declaration store at `stmts_body.sf`'s
+`gen_var_decl_with_name`: reach for the `@__g_` reference only when the name is
+**not** in `current_fn_locals`. Reads, declaration, and now assignment all use the
+same rule, so a shadowed local is consistently its own slot.
+
+**Found by** a subagent writing #59's regression test: its first draft used
+reassignment (`count = count + 1`) and hung, which isolated the gap #59 had left.
+`test/pass/local_shadows_module_global.sf` now exercises reads, the declaration
+store, reassignment, a shadowed loop counter, and a nested-block shadow — 12
+assertions, and the loop case is the non-regression guard against the hang.
+
+---
+
 ### 179. FIXED — wasm32 `__sched_pump` returned a NaN-boxed value, so the JS scheduler loop never terminated
 
 **Was high on wasm32.** A program using `Task.spawn`/`Async.sleep` produced its

@@ -1,0 +1,30 @@
+// Regression test for BUGS #152: the lexer silently dropped the backslash of
+// every escape it did not know, so `"\x41"` decoded to the three characters
+// `x41` instead of the single byte `A`. The fix taught read_string to decode
+// `\xNN` hex escapes (plus `\e` and `\0`), alongside the standard escapes it
+// already handled (`\n`, `\r`, `\t`, `\\`, `\"`).
+import "@test" as T
+
+// --- Standard escapes decode to exactly one character each ---
+T.assert_eq("\n".length(), 1, "newline is one char")
+T.assert_eq("\t".length(), 1, "tab is one char")
+T.assert_eq("\r".length(), 1, "carriage return is one char")
+T.assert_eq("\\".length(), 1, "backslash is one char")
+T.assert_eq("\"".length(), 1, "escaped quote is one char")
+
+// Embedded standard escapes count correctly.
+T.assert_eq("a\nb".length(), 3, "embedded newline: a\\nb is 3 chars")
+T.assert_eq("tab\tend".length(), 7, "embedded tab: tab\\tend is 7 chars")
+
+// --- The #152 fix: \xNN hex escapes decode to their byte ---
+T.assert_eq("\x41", "A", "\\x41 decodes to A")
+T.assert_eq("\x7a", "z", "\\x7a decodes to z")
+T.assert_eq("\x41\x42\x43", "ABC", "\\x41\\x42\\x43 decodes to ABC")
+T.assert_eq("\x48\x69", "Hi", "\\x48\\x69 decodes to Hi")
+T.assert_eq("\x41".length(), 1, "a hex escape is a single character")
+
+// --- \e is the escape byte (0x1b) ---
+T.assert_eq("\e".length(), 1, "\\e is one char")
+T.assert_eq("\e", "\x1b", "\\e equals \\x1b (byte 27)")
+
+T.summary()
