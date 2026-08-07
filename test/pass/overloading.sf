@@ -17,7 +17,7 @@ Test.assert_eq(add(1, 2, 3), 6, "three-arg overload")
 // or String-vs-List pair is not two scalars, so it passes to codegen which picks
 // the right variant. An ALL-scalar overload set (e.g. show(Int)/show(String))
 // does not yet work — the checker rejects it against the wrong signature; that
-// gap is BUGS #176.
+// gap is BUGS #178.
 fun format(n: Int): String { return "num: " + n.to_string() }
 fun format(s: String): String { return "str: " + s }
 fun format(items: List<Any>): String { return "list of " + items.length().to_string() }
