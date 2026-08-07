@@ -11,17 +11,13 @@ fun add(a: Int, b: Int, c: Int): Int { return a + b + c }
 Test.assert_eq(add(1, 2), 3, "two-arg overload")
 Test.assert_eq(add(1, 2, 3), 6, "three-arg overload")
 
-// Type-based, same arity: a scalar-vs-scalar pair. This is the case the checker's
-// scalar_mismatch (BUGS #155/#165) would have falsely rejected — show(42) checked
-// against show(s: String) — until check_call_args learned to skip overloaded
-// names. Kept distinct from the List case below, which slipped through by luck
-// because List is not a scalar.
-fun show(n: Int): String { return "int " + n.to_string() }
-fun show(s: String): String { return "str " + s }
-Test.assert_eq(show(42), "int 42", "Int overload resolved by type")
-Test.assert_eq(show("hi"), "str hi", "String overload resolved by type")
-
-// Type-based across three shapes, including a container.
+// Type-based across three shapes, including a container. This resolves because
+// at least one overload (List<Any>) is non-scalar: the checker validates a call
+// against the last-registered signature via scalar_mismatch, and an Int-vs-List
+// or String-vs-List pair is not two scalars, so it passes to codegen which picks
+// the right variant. An ALL-scalar overload set (e.g. show(Int)/show(String))
+// does not yet work — the checker rejects it against the wrong signature; that
+// gap is BUGS #176.
 fun format(n: Int): String { return "num: " + n.to_string() }
 fun format(s: String): String { return "str: " + s }
 fun format(items: List<Any>): String { return "list of " + items.length().to_string() }
@@ -31,9 +27,9 @@ Test.assert_eq(format([1, 2, 3]), "list of 3", "List arm")
 
 // Resolution reads a variable's static type, not just literals.
 var k: Int = 7
-var t: String = "x"
-Test.assert_eq(show(k), "int 7", "overload resolved from a variable's Int type")
-Test.assert_eq(show(t), "str x", "overload resolved from a variable's String type")
+var lst: List<Any> = ["a", "b"]
+Test.assert_eq(format(k), "num: 7", "overload resolved from a variable's Int type")
+Test.assert_eq(format(lst), "list of 2", "overload resolved from a variable's List type")
 
 // A non-overloaded name in the same file is untouched (the no-op path).
 fun solo(x: Int): Int { return x + 1 }

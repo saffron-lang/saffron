@@ -241,10 +241,11 @@ fun area(w: Int, h: Int): Int { return w * h }
 IO.println(area(4))     // 16  (one-argument overload)
 IO.println(area(3, 5))  // 15  (two-argument overload)
 
-fun show(n: Int): String { return "int " + n.to_string() }
-fun show(s: String): String { return "str " + s }
-IO.println(show(42))     // int 42   (resolved by argument type)
-IO.println(show("hi"))   // str hi
+// Same arity, different argument types also resolve:
+fun describe(n: Int): String { return "the number " + n.to_string() }
+fun describe(items: List<Any>): String { return items.length().to_string() + " items" }
+IO.println(describe(7))          // the number 7
+IO.println(describe([1, 2, 3]))  // 3 items
 
 // A closure in the last argument position can go outside the parens.
 fun each(items: List<String>, f: (String) => Nil) {
