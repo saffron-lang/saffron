@@ -468,6 +468,28 @@ a half-finished version breaks the bootstrap, and the investigation that produce
 this entry is the argument for doing it as one planned build-system change rather
 than a source hack.
 
+**Progress 2026-08-06: the FOUNDATION landed (commit `bf95a54`).** Dedup-safe
+symbols — `Class__method` (including the prelude's interface methods like
+`Comparable__lt`) and the reflect helpers — now emit `linkonce_odr` on native, so
+two units that both pull the auto-imported prelude no longer collide on them.
+Verified: bootstrap green, suite 342/2 unchanged, and a two-unit link of those
+symbols succeeds where strong `define` failed. This resolves the *first* class of
+duplicate the always-link approach hit (the prelude/reflect dup in analysis point
+2 above). See `docs/design/build-and-linking.md`.
+
+**What still blocks the always-link, discovered by that work:** three
+whole-program hierarchy helpers are emitted unconditionally with bodies that
+switch on THIS unit's entire class set — `__class_parent_tag`, `__class_is_a`
+(`stmts_body.sf:2009/2093`) and `__val_to_string` (`:2203`) — plus per-module
+globals and `__mod_init_*`. These are NOT `linkonce_odr` candidates the way
+`Class__method` is: two units emit *different* bodies under the same name, so
+ODR-merging would silently drop one unit's classes. The scheduler unit declares
+no classes, so its versions are empty switches — the open question is whether an
+empty-switch `__val_to_string`/`__class_is_a` from `scheduler.ll` can coexist with
+a user program's full one (needs either: emit these only in the entry unit, or
+give the runtime-linked scheduler.ll a mode that suppresses them). That decision
+is the next step, and it is genuinely separate-compilation ABI design, not a patch.
+
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
 **Severity: high — this is the reason the other entries survived.**
