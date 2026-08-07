@@ -2398,17 +2398,6 @@
                 resolved_callee = this.current_prefix + callee_name
             }
         }
-        // Overloading (pass/overloading): if the resolved base names an overload
-        // set, pick the variant matching this call's arity and first-argument type.
-        // overload_variants is only populated for names with >= 2 definitions, so a
-        // non-overloaded call never enters this block. A no-match leaves
-        // resolved_callee alone, so the ordinary arity diagnostic still fires.
-        if (this.overload_variants.has(resolved_callee)) {
-            var ov_first_tag: String = "void"
-            if (args.length() > 0) { ov_first_tag = this.overload_type_tag(this.get_expr_type(args[0])) }
-            var ov_pick: String = this.resolve_overload(resolved_callee, args.length(), ov_first_tag)
-            if (ov_pick.length() > 0) { resolved_callee = ov_pick }
-        }
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")
         // before intrinsic/extern/coroutine checks
         if (resolved_callee.contains(".")) {
@@ -2423,6 +2412,16 @@
                     resolved_callee = this.func_prefix_map.get(resolved_callee)
                 }
             }
+        }
+        // Overload resolution: an overloaded callee resolves to one of its
+        // mangled per-definition symbols by matching arity, then (for arity > 0)
+        // the normalized static type of the first argument against each
+        // candidate's first declared parameter type. Runs before every downstream
+        // consumer of resolved_callee (intrinsic/extern/coroutine checks, the
+        // arity guard, the direct-call emit) so they all see the concrete symbol.
+        // Inert unless resolved_callee names an overload set of 2+ definitions.
+        if (this.is_overloaded(resolved_callee)) {
+            resolved_callee = this.resolve_overload(resolved_callee, args)
         }
         if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
