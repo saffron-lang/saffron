@@ -4,11 +4,56 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Saffron Playground</title>
+<!-- Apply the saved theme BEFORE the stylesheet paints, so there's no flash of
+     the wrong theme. Absence of data-theme = "auto" (follow the OS via the CSS
+     prefers-color-scheme media query). "light"/"dark" are explicit overrides. -->
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("saffron-theme");
+      if (t === "light" || t === "dark") {
+        document.documentElement.setAttribute("data-theme", t);
+      }
+    } catch (e) {}
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle color theme"></button>
     <div id="app"></div>
     <noscript>The playground needs JavaScript and WebAssembly.</noscript>
     <script type="module" src="app.js"></script>
+    <!-- Theme toggle: cycles auto -> light -> dark -> auto. "auto" clears the
+         override and follows the OS; the label shows the current mode. Kept in
+         plain JS (not the Saffron UI) because it's pure presentation and touches
+         <html>, which the mounted app does not own. -->
+    <script>
+      (function () {
+        var btn = document.getElementById("theme-toggle");
+        var root = document.documentElement;
+        function current() { return root.getAttribute("data-theme") || "auto"; }
+        function render() {
+          var m = current();
+          var icon = m === "light" ? "☀" : m === "dark" ? "☽" : "◑"; // sun / moon / half-circle
+          btn.textContent = icon + " " + m;
+        }
+        function set(mode) {
+          if (mode === "auto") {
+            root.removeAttribute("data-theme");
+            try { localStorage.removeItem("saffron-theme"); } catch (e) {}
+          } else {
+            root.setAttribute("data-theme", mode);
+            try { localStorage.setItem("saffron-theme", mode); } catch (e) {}
+          }
+          render();
+        }
+        btn.addEventListener("click", function () {
+          var next = { auto: "light", light: "dark", dark: "auto" }[current()];
+          set(next);
+        });
+        render();
+      })();
+    </script>
 </body>
 </html>
