@@ -2,8 +2,20 @@
 
 ## Open
 
-**7 open entries:** #49, #65, #107, #131, #132, #178, #181.
+**6 open entries:** #49, #65, #107, #131, #132, #181.
 Next free number is **#183**.
+
+#178 (an all-scalar overload set was rejected by the checker — every arm's first
+parameter a scalar, so `scalar_mismatch` compared `show(42)` to the last-registered
+`show(s: String)` and rejected a call codegen resolves fine) was fixed by teaching
+the checker to recognise a genuine overload set. It counts free-function
+definitions per `current_prefix + name` — scoped per file, exactly like codegen's
+`detect_overload_sets` — and a bare name reaching 2+ in one module enters
+`overload_names`; the free-function call site then skips the single-signature arg
+check for those. The stdlib's `parse`/`from` (declared once per file across many
+files) never enter, so the #155/#165 class-mismatch guard on that path stays intact
+for every non-overloaded call. Regression test
+`test/pass/overload_all_scalar.sf`. Lives in `BUGS_CLOSED.md`. Open set 7 → 6.
 
 #175 (same-named nested funcs in different parent functions collided on an
 unqualified symbol and silently returned the wrong body) was fixed by qualifying
@@ -718,41 +730,6 @@ but its blast radius is shrinking:
 **Remaining:** user-facing docs, then removing the surface spelling from the
 lexer/parser/checker/codegen — which is a breaking change for user programs and
 wants its own decision.
-
-### 178. OPEN — an all-scalar overload set is rejected by the checker; type-based overloading needs one non-scalar arm
-
-```saffron
-fun show(n: Int): String { return "int " }
-fun show(s: String): String { return "str " }
-show(42)   // Error: argument 1 of 'show' (parameter 's') expects String, got Int
-```
-
-Function overloading (implemented in `main` — codegen mangles a name with >= 2
-definitions to `name$arity$firsttype` and resolves the call by arity + first-arg
-type) is **codegen-only**. The checker's `check_call_args` still validates a call
-against the single, last-registered signature for that name, through
-`scalar_mismatch`. When every overload's first parameter is a *scalar*
-(`Int`/`String`/`Bool`/`Float`), that check fires: `show(42)` is compared to the
-last-registered `show(s: String)`, two different scalars, and rejected before
-codegen ever resolves the right variant.
-
-**Why it only bites the all-scalar case.** `scalar_mismatch` is one-sided: it
-fires only on two *different concrete scalars*. An overload set with at least one
-non-scalar arm (`format(Int)` / `format(String)` / `format(List<Any>)`, the shape
-`test/pass/overloading.sf` uses) escapes it, because the last-registered signature
-is `List<Any>` and `Int`-vs-`List` is not two scalars. So type-based overloading
-works today *unless* all arms are scalar-typed.
-
-**Why the obvious fix is wrong.** Marking an overloaded name in the checker and
-skipping its arg check misfires badly: the checker flattens every module into one
-namespace, and the stdlib defines `fun parse` in 10 files and `fun from` in 7.
-A global "overloaded → skip" would stop arg-checking those everywhere, silently
-weakening the #155/#165 guards across the whole stdlib. The real fix must scope
-"overloaded" to a single file/prescan slice — the same per-slice detection
-codegen already does — rather than the flattened name table the checker keeps.
-Tried and reverted for exactly this reason.
-
----
 
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 

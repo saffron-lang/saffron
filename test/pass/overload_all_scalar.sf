@@ -1,0 +1,27 @@
+// BUGS #178: an all-scalar overload set (every arm's first parameter is a
+// scalar: Int / String / Bool / Float) must type-check. The checker keeps one
+// last-writer-wins signature per bare name, so before the fix `show(42)` was
+// compared to whichever arm registered last (`show(s: String)`) and rejected by
+// scalar_mismatch before codegen ever resolved the right variant. Codegen
+// resolves type-based overloading by arity + first-arg type; the checker now
+// recognises a per-file 2+ overload set and skips its single-signature arg
+// check, so the two agree.
+import "@test" as Test
+
+fun show(n: Int): String { return "int:" + n.to_string() }
+fun show(s: String): String { return "str:" + s }
+fun show(b: Bool): String { return "bool:" + b.to_string() }
+
+// Two-arm scalar set with a different arity mix, to exercise arity-first then
+// type-based resolution.
+fun label(n: Int): String { return "one" }
+fun label(a: Int, b: Int): String { return "two" }
+
+fun main() {
+    Test.assert_eq(show(42), "int:42", "Int arm of all-scalar overload set")
+    Test.assert_eq(show("hi"), "str:hi", "String arm of all-scalar overload set")
+    Test.assert_eq(show(true), "bool:true", "Bool arm of all-scalar overload set")
+    Test.assert_eq(label(1), "one", "arity-1 arm")
+    Test.assert_eq(label(1, 2), "two", "arity-2 arm")
+    Test.summary()
+}
