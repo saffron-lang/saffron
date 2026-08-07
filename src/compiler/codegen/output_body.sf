@@ -195,7 +195,19 @@
                 pi3 = pi3 + 1
             }
             var linkage2: String = "define"
-            if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") { linkage2 = "define linkonce_odr" }
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                // Imported-module symbols (prefixed) and empty-prefix method-mangled
+                // names (Class__method — including the auto-imported prelude's
+                // interface methods like Comparable__lt) have a UNIQUE MANGLED NAME
+                // whose body is fully determined by that name, so ODR-merging two
+                // identical copies at link time is correct (BUGS #181). Lambdas
+                // (__lambda_N) and the entry symbols (__saffron_*) start with "__"
+                // and are excluded: lambda names are counter-allocated, so two units
+                // can carry the same name with different bodies — those stay strong
+                // define. WASM keeps plain define (function-table stability).
+                if (this.current_prefix.length() > 0) { linkage2 = "define linkonce_odr" }
+                else if (emit_name.contains("__") and !emit_name.starts_with("__")) { linkage2 = "define linkonce_odr" }
+            }
             this.emit("")
             this.emit(linkage2 + " " + ret_llvm2 + " @" + emit_name + "(" + param_strs2.join(", ") + ") {")
             this.emit("entry:")
@@ -397,11 +409,22 @@
 
         this.emit("")
         var linkage: String = "define"
-        if (this.current_prefix.length() > 0) {
-            // On WASM targets, linkonce_odr breaks indirect calls through function table
-            // index mismatch after linker deduplication. Use plain define with module-prefixed
-            // names to ensure each function has a stable table entry.
-            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+        // On WASM targets, linkonce_odr breaks indirect calls through function table
+        // index mismatch after linker deduplication. Use plain define with module-prefixed
+        // names to ensure each function has a stable table entry.
+        if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+            // Prefixed (imported-module) symbols were already linkonce_odr. Also make
+            // empty-prefix method-mangled names (Class__method — e.g. the auto-imported
+            // prelude's Comparable__lt) linkonce_odr: they have a UNIQUE MANGLED NAME
+            // whose body is fully determined by that name, so ODR-merging identical
+            // copies across two linked units is correct (BUGS #181). Excluded (kept
+            // strong `define`): lambdas (__lambda_N, counter-allocated so two units can
+            // carry the same name with different bodies) and entry symbols
+            // (__saffron_main / __saffron_boot / __saffron_entry / main) — both start
+            // with "__" or are the entry, so the name test below screens them out.
+            if (this.current_prefix.length() > 0) {
+                linkage = "define linkonce_odr"
+            } else if (emit_name.contains("__") and !emit_name.starts_with("__")) {
                 linkage = "define linkonce_odr"
             }
         }

@@ -9926,8 +9926,21 @@ class Codegen {
         this.emit_reflect_doc_helpers()
         var class_names: List<String> = this.class_type_ids.keys()
         if (class_names.length() == 0) { return }
+        // linkonce_odr on native so two separately-linked units both defining these
+        // reflect helpers link clean (BUGS #181). CAVEAT: __reflect_class_name /
+        // __reflect_get_fields / __reflect_construct_from_map switch on THIS unit's
+        // class set, so two units can emit bodies that differ. linkonce_odr keeps
+        // one copy arbitrarily — correct only because the scheduler unit declares no
+        // classes (empty switch) and the foundation link never merges two
+        // class-bearing units. Full separate compilation (the rest of #181) must
+        // revisit this — a unit-suffixed name or a shared reflect module. WASM keeps
+        // plain define (function-table stability).
+        var rh_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            rh_linkage = "define"
+        }
         this.emit("")
-        this.emit("define i64 @__reflect_class_name(i64 %val) {")
+        this.emit(rh_linkage + " i64 @__reflect_class_name(i64 %val) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -9968,7 +9981,7 @@ class Codegen {
         this.block_terminated = false
 
         this.emit("")
-        this.emit("define i64 @__reflect_is_class(i64 %val) {")
+        this.emit(rh_linkage + " i64 @__reflect_is_class(i64 %val) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -9983,7 +9996,7 @@ class Codegen {
         this.block_terminated = false
 
         this.emit("")
-        this.emit("define i64 @__reflect_number_to_string(i64 %val) {")
+        this.emit(rh_linkage + " i64 @__reflect_number_to_string(i64 %val) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -10001,7 +10014,7 @@ class Codegen {
 
         // __reflect_get_fields: returns a Map of field_name -> field_value for an instance
         this.emit("")
-        this.emit("define i64 @__reflect_get_fields(i64 %val) {")
+        this.emit(rh_linkage + " i64 @__reflect_get_fields(i64 %val) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -10075,7 +10088,7 @@ class Codegen {
         // (constructed) instance rather than 0, so an unrecognized tag can no longer
         // segfault. gen_func_ref and the closure ABI are untouched.
         this.emit("")
-        this.emit("define i64 @__reflect_construct_from_map(i64 %klass, i64 %map) {")
+        this.emit(rh_linkage + " i64 @__reflect_construct_from_map(i64 %klass, i64 %map) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -10158,8 +10171,16 @@ class Codegen {
     // __reflect_module_doc(): return this module's `//!` constant (module_doc_text),
     // or nil when the module had none.
     fun emit_reflect_doc_helpers() {
+        // linkonce_odr on native so two separately-linked units (e.g. a program and
+        // the scheduler, BUGS #181) that both pull the auto-imported reflect helpers
+        // do not collide with a duplicate-symbol error. WASM stays plain define
+        // (function-table stability). See the caveat in emit_reflect_helpers.
+        var rd_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            rd_linkage = "define"
+        }
         this.emit("")
-        this.emit("define i64 @__reflect_doc(i64 %val) {")
+        this.emit(rd_linkage + " i64 @__reflect_doc(i64 %val) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -10183,7 +10204,7 @@ class Codegen {
         this.block_terminated = false
 
         this.emit("")
-        this.emit("define i64 @__reflect_module_doc() {")
+        this.emit(rd_linkage + " i64 @__reflect_module_doc() {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -12129,7 +12150,19 @@ class Codegen {
                 pi3 = pi3 + 1
             }
             var linkage2: String = "define"
-            if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") { linkage2 = "define linkonce_odr" }
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                // Imported-module symbols (prefixed) and empty-prefix method-mangled
+                // names (Class__method — including the auto-imported prelude's
+                // interface methods like Comparable__lt) have a UNIQUE MANGLED NAME
+                // whose body is fully determined by that name, so ODR-merging two
+                // identical copies at link time is correct (BUGS #181). Lambdas
+                // (__lambda_N) and the entry symbols (__saffron_*) start with "__"
+                // and are excluded: lambda names are counter-allocated, so two units
+                // can carry the same name with different bodies — those stay strong
+                // define. WASM keeps plain define (function-table stability).
+                if (this.current_prefix.length() > 0) { linkage2 = "define linkonce_odr" }
+                else if (emit_name.contains("__") and !emit_name.starts_with("__")) { linkage2 = "define linkonce_odr" }
+            }
             this.emit("")
             this.emit(linkage2 + " " + ret_llvm2 + " @" + emit_name + "(" + param_strs2.join(", ") + ") {")
             this.emit("entry:")
@@ -12331,11 +12364,22 @@ class Codegen {
 
         this.emit("")
         var linkage: String = "define"
-        if (this.current_prefix.length() > 0) {
-            // On WASM targets, linkonce_odr breaks indirect calls through function table
-            // index mismatch after linker deduplication. Use plain define with module-prefixed
-            // names to ensure each function has a stable table entry.
-            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+        // On WASM targets, linkonce_odr breaks indirect calls through function table
+        // index mismatch after linker deduplication. Use plain define with module-prefixed
+        // names to ensure each function has a stable table entry.
+        if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+            // Prefixed (imported-module) symbols were already linkonce_odr. Also make
+            // empty-prefix method-mangled names (Class__method — e.g. the auto-imported
+            // prelude's Comparable__lt) linkonce_odr: they have a UNIQUE MANGLED NAME
+            // whose body is fully determined by that name, so ODR-merging identical
+            // copies across two linked units is correct (BUGS #181). Excluded (kept
+            // strong `define`): lambdas (__lambda_N, counter-allocated so two units can
+            // carry the same name with different bodies) and entry symbols
+            // (__saffron_main / __saffron_boot / __saffron_entry / main) — both start
+            // with "__" or are the entry, so the name test below screens them out.
+            if (this.current_prefix.length() > 0) {
+                linkage = "define linkonce_odr"
+            } else if (emit_name.contains("__") and !emit_name.starts_with("__")) {
                 linkage = "define linkonce_odr"
             }
         }
