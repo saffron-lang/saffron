@@ -1,0 +1,38 @@
+// @thread workstream A: spawn / join / detach / sleep under the GRL.
+
+import "@thread" as Thread
+import "@test" as T
+
+// --- spawn + join returns the closure's result ---
+var t: Thread.ThreadHandle = Thread.spawn(fun (): Int => 40 + 2)
+T.assert_eq(t.ok(), true, "spawn created a real thread")
+T.assert_eq(t.join(), 42, "join returns the closure result")
+
+// --- a captured immutable value is visible to the worker ---
+var base: Int = 100
+var t2: Thread.ThreadHandle = Thread.spawn(fun (): Int => base + 5)
+T.assert_eq(t2.join(), 105, "worker sees a captured scalar")
+
+// --- second join is nil, not a hang/crash ---
+T.assert_eq(t2.join(), nil, "double join returns nil")
+
+// --- several threads, each returns its own value ---
+var a: Thread.ThreadHandle = Thread.spawn(fun (): Int => 1)
+var b: Thread.ThreadHandle = Thread.spawn(fun (): Int => 2)
+var c: Thread.ThreadHandle = Thread.spawn(fun (): Int => 3)
+var sum: Int = a.join() + b.join() + c.join()
+T.assert_eq(sum, 6, "three threads each return their own result")
+
+// --- sleep runs without hanging (both the worker and this thread) ---
+var slept: Thread.ThreadHandle = Thread.spawn(fun (): Int {
+    Thread.sleep(0.02)
+    return 7
+})
+T.assert_eq(slept.join(), 7, "a thread that sleeps still returns")
+
+// --- detach: fire-and-forget must not crash; give it time to run ---
+Thread.detach(fun (): Int => 999)
+Thread.sleep(0.02)
+T.assert(true, "detach did not crash")
+
+T.summary()

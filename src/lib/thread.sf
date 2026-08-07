@@ -1,0 +1,102 @@
+//! OS threads (native only) — spawn, join, detach, sleep.
+//!
+//! ```saffron
+//! import "@thread" as Thread
+//!
+//! var t = Thread.spawn(fun (): Int => expensive_blocking_call())
+//! // ... do other work on this thread ...
+//! var result = t.join()
+//! ```
+//!
+//! ## The model: one runtime lock (v1)
+//!
+//! Saffron's garbage collector is not thread-safe (a single global heap and
+//! shadow stack, no locking). So v1 runs under a **Global Runtime Lock**: only
+//! one thread executes managed Saffron code at a time, and the lock is released
+//! only around genuinely-blocking native calls — `join`, `sleep`, and (later)
+//! mutex/channel waits. That buys **blocking-I/O and blocking-FFI concurrency**
+//! (a synchronous C call on a worker no longer freezes everything else), but not
+//! multi-core CPU parallelism for pure-Saffron compute. See
+//! `docs/design/threading-module-plan.md`.
+//!
+//! Because of the lock, this is not a way to make CPU-bound Saffron faster; it is
+//! a way to keep the program responsive while a thread is blocked in the OS or in
+//! C. For serialized shared state across concurrent tasks, actors remain the
+//! right tool.
+//!
+//! ## Sharing values
+//!
+//! A thread closure may freely capture immutable scalars and Strings. Capturing a
+//! mutable List/Map/Fun draws the same non-Sendable warning as `Task.spawn`:
+//! prefer passing data in and reading the result back out via `join()`.
+//!
+//! Native only. On wasm32 there are no OS threads; `spawn` runs the closure
+//! synchronously and returns an already-finished handle (see the wasm note in the
+//! design plan) — single-file source stays portable, with no parallelism.
+
+// Signatures are C `i64`, so a passed closure box (a tagged pointer) is untagged
+// to its raw address at the FFI boundary — exactly what the C trampoline reads as
+// [fn_ptr, env]. The Saffron-level `Fun`/`Int` annotations drive that untagging;
+// see gen_extern_call.
+@extern("i64 sf_thread_spawn(i64)")  fun _spawn(closure: Fun): Int
+@extern("i64 sf_thread_join(i64)")   fun _join(handle: Int): Any
+@extern("i64 sf_thread_detach(i64)") fun _detach(handle: Int): Int
+@extern("void sf_thread_sleep(double)") fun _sleep(seconds: Float)
+
+/// A running (or finished) OS thread. Returned by `Thread.spawn`; `join()` waits
+/// for it and yields the closure's return value.
+class ThreadHandle {
+    private var _handle: Int
+    // 1 once join() has run, so a second join returns nil rather than blocking on
+    // a freed handle. Detach also sets it (a detached thread is not joinable).
+    private var _consumed: Int
+
+    fun init(handle: Int) {
+        this._handle = handle
+        this._consumed = 0
+    }
+
+    /// True if the spawn actually created a thread. A false handle means the OS
+    /// refused (thread table full or pthread_create failed); `join()` on it is nil.
+    fun ok(): Bool {
+        return this._handle > 0
+    }
+
+    /// Block until the thread finishes and return the closure's result. The GRL
+    /// is released while blocked, so other threads run meanwhile. A second join,
+    /// or a join on a detached/failed handle, returns nil.
+    fun join(): Any {
+        if (this._consumed == 1 or this._handle <= 0) { return nil }
+        this._consumed = 1
+        return _join(this._handle)
+    }
+
+    /// Give up the right to join. The thread runs to completion on its own and
+    /// its slot is reclaimed automatically. After detach, `join()` returns nil.
+    fun detach() {
+        if (this._consumed == 1 or this._handle <= 0) { return }
+        this._consumed = 1
+        _detach(this._handle)
+    }
+}
+
+/// Start `fn` on a new OS thread and return a handle to it. `fn` takes no
+/// arguments; whatever it returns is delivered by `join()`. Check `handle.ok()`
+/// if you need to distinguish a real thread from an OS refusal.
+fun spawn(fn: Fun): ThreadHandle {
+    return ThreadHandle(_spawn(fn))
+}
+
+/// Spawn `fn` and immediately detach it — fire-and-forget. The thread runs to
+/// completion; its result is discarded. Returns nothing.
+fun detach(fn: Fun) {
+    var h: ThreadHandle = spawn(fn)
+    h.detach()
+}
+
+/// Sleep the CURRENT thread for `seconds` (a real OS sleep, releasing the GRL so
+/// other threads run). Distinct from `Async.sleep`, which yields a coroutine
+/// within the cooperative scheduler on a single thread.
+fun sleep(seconds: Float) {
+    _sleep(seconds)
+}
