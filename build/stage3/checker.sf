@@ -55,6 +55,12 @@ class TypeEnv {
     // constraint check) sees a byte-identical string and scalar_mismatch's #155
     // proof set is untouched. See get_func_params / get_func_param_nodes.
     var func_params: Map<String, List<AST.Param>>
+    // A name registered more than once is OVERLOADED (pass/overloading). The
+    // checker keeps only one signature per name in func_params, so it cannot pick
+    // which overload a given call targets — codegen resolves that. check_call_args
+    // therefore skips argument-type checking for these names rather than validating
+    // against the arbitrary last-registered signature.
+    var overloaded: Map<String, Bool>
     var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
@@ -69,6 +75,7 @@ class TypeEnv {
         this.scopes.push(Scope())
         this.funcs = {}
         this.func_params = {}
+        this.overloaded = {}
         this.func_type_params = {}
         this.enum_variants = {}
         this.enum_fields = {}
@@ -210,7 +217,15 @@ class TypeEnv {
     }
 
     fun define_func_params(name: String, params: List<AST.Param>) {
+        // A second registration of the same name marks it overloaded, so
+        // check_call_args stops validating calls against a single signature it
+        // cannot know is the targeted one. Set before overwriting func_params.
+        if (this.func_params.has(name)) { this.overloaded.set(name, true) }
         this.func_params.set(name, params)
+    }
+
+    fun is_overloaded(name: String): Bool {
+        return this.overloaded.has(name)
     }
 
     // The declared parameter nodes, or [] if unknown. The node accessor — prefer
@@ -1196,6 +1211,11 @@ class NullChecker {
     // through the lossy AST.type_to_string for scalar_mismatch — same bytes as
     // before, same #155 proof set untouched.
     fun check_call_args(key: String, disp: String, args: List<AST.Expr>) {
+        // Overloaded name: func_params holds only the last-registered signature,
+        // which is not necessarily the one this call targets, so checking against
+        // it produces false mismatches (e.g. `show(42)` against `show(s: String)`).
+        // Codegen resolves the right variant; leave the type check to it.
+        if (this.env.is_overloaded(key)) return
         var params: List<AST.Param> = this.env.get_func_param_nodes(key)
         if (params.length() == 0) return
         var i: Float = 0

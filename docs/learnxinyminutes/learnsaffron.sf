@@ -20,18 +20,18 @@ let language = "Saffron"
 
 // Type annotations go after a colon. They're optional when the type is
 // obvious from the initializer.
-var pi: Number = 3.14159
+var pi: Float = 3.14159
 var greeting = "hello"      // inferred as String
 var ready = true            // inferred as Bool
 var nothing = nil           // Nil
 
-// The primitive types are Number, String, Bool, and Nil. Int and Float
-// are also accepted, and kept distinct internally for optimization.
+// The primitive numeric types are Int and Float, kept distinct; the other
+// primitives are String, Bool, and Nil. (`Number` is a deprecated alias.)
 var tick: Int = 42
 var ratio: Float = 0.5
 
 // Types are checked at compile time. This would not compile:
-// var oops: Number = "hello"   // Error: expected Number, got String
+// var oops: Int = "hello"   // Error: expected Int, got String
 
 ////////////////////////////////////////////////
 // 2. Operators
@@ -61,11 +61,11 @@ IO.println(16 >> 2)      // 4
 IO.println(~0)           // -1
 
 // `is` tests a value's type at runtime. Types are first-class values.
-IO.println(42 is Number)   // true
+IO.println(42 is Int)   // true
 IO.println("hi" is String) // true
 IO.println(nil is Nil)     // true
 
-// Numbers and Bools have methods. Parenthesize a literal to call one.
+// Ints and Bools have methods. Parenthesize a literal to call one.
 IO.println((-5).abs())     // 5
 IO.println((3.7).floor())  // 3
 IO.println((3.2).ceil())   // 4
@@ -163,8 +163,8 @@ IO.println(ages.values())     // [36, 41, 45]
 // up by index instead.
 var who: List<String> = ages.keys()
 var how_old: List<Int> = ages.values()
-for (i = 0; i < who.length(); i = i + 1) {
-    IO.println("${who[i]} is ${how_old[i]}")
+for (var k = 0; k < who.length(); k = k + 1) {
+    IO.println("${who[k]} is ${how_old[k]}")
 }
 
 ////////////////////////////////////////////////
@@ -172,19 +172,19 @@ for (i = 0; i < who.length(); i = i + 1) {
 ////////////////////////////////////////////////
 
 // Annotate the parameters and the return type.
-fun add(a: Number, b: Number): Number {
+fun add(a: Int, b: Int): Int {
     return a + b
 }
 IO.println(add(2, 3))   // 5
 
 // The return type may be omitted, and is inferred from the body.
-fun triple(x: Number) {
+fun triple(x: Int) {
     return x * 3
 }
 IO.println(triple(5))   // 15
 
 // Lambdas use `fun` with `=>` for a single-expression body.
-var double = fun (x: Number): Number => x * 2
+var double = fun (x: Int): Int => x * 2
 IO.println(double(21))  // 42
 
 // Or a block body, when you need statements.
@@ -194,15 +194,15 @@ var shout = fun (s: String): String {
 IO.println(shout("hey"))  // HEY!
 
 // Functions are values. Function types are written (A, B) => C.
-fun apply(f: (Number) => Number, x: Number): Number {
+fun apply(f: (Int) => Int, x: Int): Int {
     return f(x)
 }
 IO.println(apply(double, 5))  // 10
 
 // Closures capture their enclosing scope by reference.
-fun make_counter(): () => Number {
+fun make_counter(): () => Int {
     var count = 0
-    return fun (): Number {
+    return fun (): Int {
         count = count + 1
         return count
     }
@@ -216,6 +216,35 @@ fun identity<T>(value: T): T {
     return value
 }
 IO.println(identity("generic"))  // generic
+
+// A `*` parameter is variadic: it collects the remaining arguments into a List.
+// It must be last, and fixed parameters may come before it.
+fun sum(*nums: Int): Int {
+    var total = 0
+    for (n in nums) { total = total + n }
+    return total
+}
+IO.println(sum(1, 2, 3))   // 6
+IO.println(sum())          // 0
+
+fun greet(greeting: String, *names: String): String {
+    var out = greeting
+    for (name in names) { out = out + " " + name }
+    return out
+}
+IO.println(greet("Hi", "Ada", "Alan"))  // Hi Ada Alan
+
+// Functions can be overloaded: several definitions may share a name, resolved by
+// the number and types of the arguments at the call site.
+fun area(side: Int): Int { return side * side }
+fun area(w: Int, h: Int): Int { return w * h }
+IO.println(area(4))     // 16  (one-argument overload)
+IO.println(area(3, 5))  // 15  (two-argument overload)
+
+fun show(n: Int): String { return "int " + n.to_string() }
+fun show(s: String): String { return "str " + s }
+IO.println(show(42))     // int 42   (resolved by argument type)
+IO.println(show("hi"))   // str hi
 
 // A closure in the last argument position can go outside the parens.
 fun each(items: List<String>, f: (String) => Nil) {
@@ -276,7 +305,7 @@ var label = match (heading) {
 IO.println(label)   // north
 
 // Matching a variant binds its fields.
-var maybe: Option<Number> = Option.Some(42)
+var maybe: Option<Int> = Option.Some(42)
 IO.println(match (maybe) {
     Some(v) => "got ${v}",
     None => "got nothing"
@@ -288,12 +317,12 @@ IO.println(unwrapped)   // 7
 
 // Recursive enums plus match give you tree walkers almost for free.
 enum Expr {
-    Num(value: Number),
+    Num(value: Int),
     Add(left: Expr, right: Expr),
     Mul(left: Expr, right: Expr)
 }
 
-fun eval(e: Expr): Number {
+fun eval(e: Expr): Int {
     return match (e) {
         Num(v) => v,
         Add(l, r) => eval(l) + eval(r),
@@ -310,11 +339,11 @@ IO.println(eval(tree))   // 7
 ////////////////////////////////////////////////
 
 class Point {
-    var x: Number
-    var y: Number
+    var x: Int
+    var y: Int
 
     // `init` is the constructor. Fields are assigned through `this`.
-    fun init(x: Number, y: Number) {
+    fun init(x: Int, y: Int) {
         this.x = x
         this.y = y
     }
@@ -358,14 +387,34 @@ IO.println(Box("boxed").get())   // boxed
 // Defining add/sub/mul/div/mod/lt/gt/eq overloads the matching operator,
 // so `a + b` calls a.add(b).
 class Vec2 {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) { this.x = x; this.y = y }
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
     fun add(other: Vec2): Vec2 { return Vec2(this.x + other.x, this.y + other.y) }
     fun eq(other: Vec2): Bool { return this.x == other.x and this.y == other.y }
     fun to_string(): String { return "<${this.x}, ${this.y}>" }
 }
 IO.println((Vec2(1, 2) + Vec2(3, 4)).to_string())   // <4, 6>
+
+// Members are PUBLIC by default. `private` restricts a field or method to the
+// class itself; `protected` also allows subclasses; `internal` allows the whole
+// module but not other modules. Reaching a private member from outside is a
+// compile error, not a runtime one.
+class Account {
+    private var balance: Int          // only Account's own methods may touch it
+    fun init(b: Int) { this.balance = b }
+    fun deposit(n: Int) { this.balance = this.balance + n }
+    fun total(): Int { return this.balance }
+}
+var acc = Account(100)
+acc.deposit(50)
+IO.println(acc.total())   // 150
+// acc.balance would not compile: "private field 'Account.balance' is not
+// accessible from outside the class".
+
+// The same modifiers apply to top-level declarations, controlling what a module
+// exports: a `private fun` or `private var` is visible only within its own file.
+//     private fun helper(): Int { return 42 }
 
 ////////////////////////////////////////////////
 // 10. Interfaces
@@ -432,7 +481,7 @@ for (t in Countdown(3).to_list()) {
 // 12. Error handling
 ////////////////////////////////////////////////
 
-// Any value can be thrown — a String, a Number, an object.
+// Any value can be thrown — a String, a Int, an object.
 try {
     throw "something broke"
 } catch (e) {
@@ -459,7 +508,7 @@ enum Result<T, E> {
     Err(error: E)
 }
 
-fun safe_divide(a: Number, b: Number): Result<Number, String> {
+fun safe_divide(a: Int, b: Int): Result<Int, String> {
     if (b == 0) {
         return Result.Err("division by zero")
     }
@@ -505,22 +554,22 @@ import { map, filter, reduce } from "@iter"
 
 var values = [1, 2, 3, 4, 5]
 
-IO.println(Iter.map(values, fun (x: Number): Number => x * 2))
-IO.println(Iter.filter(values, fun (x: Number): Bool => x % 2 == 0))
-IO.println(Iter.reduce(values, fun (acc: Number, x: Number): Number => acc + x, 0))
+IO.println(Iter.map(values, fun (x: Int): Int => x * 2))
+IO.println(Iter.filter(values, fun (x: Int): Bool => x % 2 == 0))
+IO.println(Iter.reduce(values, fun (acc: Int, x: Int): Int => acc + x, 0))
 IO.println(Iter.sum(values))
 
 // Also: any, all, each, count, find, flat_map, zip, enumerate, take, skip.
 
 // Every one of these takes any iterable, so they compose by nesting.
 IO.println(Iter.map(
-    Iter.filter(values, fun (x: Number): Bool => x > 2),
-    fun (x: Number): Number => x * x
+    Iter.filter(values, fun (x: Int): Bool => x > 2),
+    fun (x: Int): Int => x * x
 ))                   // [9, 16, 25]
 
 // Naming the steps usually reads better than deep nesting.
-var big = Iter.filter(values, fun (x: Number): Bool => x > 2)
-var squares = Iter.map(big, fun (x: Number): Number => x * x)
+var big = Iter.filter(values, fun (x: Int): Bool => x > 2)
+var squares = Iter.map(big, fun (x: Int): Int => x * x)
 IO.println(squares)  // [9, 16, 25]
 
 ////////////////////////////////////////////////
@@ -544,7 +593,7 @@ IO.println(t2.await())
 
 // `yield` hands control over without sleeping — useful for keeping a long
 // computation from starving the scheduler.
-fun long_computation(): Number {
+fun long_computation(): Int {
     var sum = 0
     for (var k = 0; k < 1000000; k = k + 1) {
         sum = sum + k
