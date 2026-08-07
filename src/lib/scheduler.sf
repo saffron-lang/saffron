@@ -1,6 +1,10 @@
 //! Cooperative task scheduler for native async.
 
 @extern("double sf_time_now()") fun time_now(): Float
+// Same suspend intrinsic async.sf uses. Declared here too because scheduler.sf
+// is the lower layer (async imports scheduler, not the reverse) and
+// `suspend_io_timeout` needs it directly.
+@intrinsic fun __suspend(reason: Int, arg: Int)
 @extern("void __sched_coro_resume(i64)") fun coro_resume(handle: Int)
 @extern("i64 __sched_coro_done(i64)") fun coro_done(handle: Int): Int
 @extern("void __sched_coro_destroy(i64)") fun coro_destroy(handle: Int)
@@ -42,6 +46,63 @@ var await_waiters: List<Int> = []
 var io_handles: List<Int> = []
 var io_fds: List<Int> = []
 var io_modes: List<Int> = []  // 0=read, 1=write
+// Absolute wake deadline (seconds, from time_now()) for an IO waiter, or -1.0
+// for "no deadline — park until the fd is ready, however long that takes". This
+// is what lets a task wake on *fd-ready OR timeout* without polling: an entry
+// with a deadline is revived by `_poll_io` the moment `now` passes it, exactly
+// as a ready fd would. Kept strictly parallel to io_handles/io_fds/io_modes —
+// every push and every remove touches all four, or the arrays desync and a
+// waiter wakes against the wrong fd. Yield reason 6 sets a real deadline; the
+// existing reasons 2 and 4 push -1.0.
+var io_deadlines: List<Float> = []
+
+// 1 if the IO waiter at the same index is a DAEMON — a background task that
+// parks on an fd for the life of the program (the @signal dispatcher is the only
+// one today). A daemon must not keep the scheduler alive: once the only work
+// left is daemons, the program is done and the loop should stop, abandoning them
+// cleanly. Kept parallel to the other io_* arrays. Reasons 2/4/6 push 0; the
+// dedicated daemon park pushes 1.
+var io_daemon: List<Int> = []
+
+// How many currently-parked IO waiters are daemons. Maintained alongside
+// io_daemon so the idle check is O(1) rather than rescanning the list every tick.
+var _io_daemon_count: Int = 0
+
+// The timeout (seconds) for the NEXT reason-6 suspend, stashed here because
+// __suspend carries only one arg (the fd) and adding a second would mean editing
+// all four .ll bases. `suspend_io_timeout()` sets this and suspends in one step,
+// so the window where it is live is a single yield with no other task running
+// (the runtime is single-threaded). <= 0.0 means "no deadline".
+var _pending_io_timeout: Float = -1.0
+
+// Whether the NEXT reason-6 suspend is a daemon park. Set with the timeout by
+// suspend_io_daemon(); cleared on consumption. Same single-yield lifetime as
+// _pending_io_timeout, and safe for the same reason (single-threaded runtime).
+var _pending_io_daemon: Int = 0
+
+/// Suspend the current task until `fd` is readable OR `timeout_secs` elapses.
+/// A `timeout_secs <= 0` waits with no deadline (identical to a plain IO-read
+/// park). This is the scheduler-level primitive behind `Signal.wait(timeout)`;
+/// it parks the task so the scheduler can poll the fd and honour the deadline
+/// with a bounded blocking poll — no busy-yield loop. Nothing here indicates
+/// WHICH woke it; the caller re-checks its fd and its own clock after resuming.
+fun suspend_io_timeout(fd: Int, timeout_secs: Float) {
+    _pending_io_timeout = timeout_secs
+    _pending_io_daemon = 0
+    __suspend(6, fd)
+}
+
+/// Like `suspend_io_timeout`, but marks the waiter a DAEMON: it parks on `fd`
+/// but does NOT keep the scheduler alive. Once every other task has finished and
+/// only daemon waiters remain, the scheduler stops and the program exits,
+/// abandoning them — which is exactly right for a background dispatcher (the
+/// @signal loop) that would otherwise `while(true)` forever and hang every
+/// program that used it. `timeout_secs <= 0` = no deadline.
+fun suspend_io_daemon(fd: Int, timeout_secs: Float) {
+    _pending_io_timeout = timeout_secs
+    _pending_io_daemon = 1
+    __suspend(6, fd)
+}
 
 // Actor waiters: tasks suspended waiting for an actor to become idle
 var actor_wait_handles: List<Int> = []
@@ -78,7 +139,11 @@ fun enqueue(handle: Int) {
 private fun _has_self_reviving_work(): Int {
     if (sleep_queue.length() > 0) { return 1 }
     if (await_waiters.length() > 0) { return 1 }
-    if (io_handles.length() > 0) { return 1 }
+    // Only NON-daemon IO waiters keep the scheduler alive. A daemon (the @signal
+    // dispatcher) parks on an fd for the whole program; counting it here would
+    // make every program that ever called Signal.on() run forever. When the only
+    // IO left is daemons, this reports no work and the loop winds down.
+    if (io_handles.length() - _io_daemon_count > 0) { return 1 }
     return 0
 }
 
@@ -127,6 +192,9 @@ internal fun _reset_for_test() {
     io_handles = []
     io_fds = []
     io_modes = []
+    io_deadlines = []
+    io_daemon = []
+    _io_daemon_count = 0
     actor_wait_handles = []
     actor_wait_targets = []
     deadlock_detected = 0
@@ -144,33 +212,81 @@ private fun _wake_waiters(finished_handle: Int) {
     }
 }
 
-// Poll all parked IO fds for readiness.
-// Moves ready tasks back to the run queue.
-// timeout_ms: how long to block if nothing is immediately ready.
-private fun _poll_io(timeout_ms: Int) {
-    // First pass: check each fd with 0ms timeout (non-blocking)
+// Remove the IO waiter at index `i` (all four parallel arrays) and return its
+// task handle to the run queue. One helper so no caller can drop an array.
+private fun _revive_io(i: Int) {
+    if (io_daemon[i] == 1) { _io_daemon_count = _io_daemon_count - 1 }
+    run_queue.push(io_handles[i])
+    io_handles.remove(i)
+    io_fds.remove(i)
+    io_modes.remove(i)
+    io_deadlines.remove(i)
+    io_daemon.remove(i)
+}
+
+// Park `hdl` on `fd` for read readiness. `daemon` = 1 marks a background waiter
+// that must not, on its own, keep the scheduler running. `deadline` is an
+// absolute wake time or -1.0 for none. One helper so io_daemon and the daemon
+// count cannot drift from the other four arrays.
+private fun _park_io(hdl: Int, fd: Int, mode: Int, deadline: Float, daemon: Int) {
+    io_handles.push(hdl)
+    io_fds.push(fd)
+    io_modes.push(mode)
+    io_deadlines.push(deadline)
+    io_daemon.push(daemon)
+    if (daemon == 1) { _io_daemon_count = _io_daemon_count + 1 }
+}
+
+// Poll all parked IO fds for readiness, and time out any whose deadline has
+// passed. Moves both kinds of ready task back to the run queue.
+//
+// timeout_ms: how long to block if nothing is immediately ready. This is capped
+// by the nearest waiter deadline so a blocking poll on one fd can never sleep
+// past another waiter's timeout — that would be the "spins/starves" failure the
+// deadline path exists to avoid.
+private fun _poll_io(timeout_ms: Int, now: Float) {
+    // First pass, non-blocking: revive on fd-ready OR expired deadline.
     var i: Int = io_handles.length() - 1
     while (i >= 0) {
-        var ready: Int = tcp_poll(io_fds[i], io_modes[i], 0)
-        if (ready == 1) {
-            run_queue.push(io_handles[i])
-            io_handles.remove(i)
-            io_fds.remove(i)
-            io_modes.remove(i)
+        var timed_out: Int = 0
+        if (io_deadlines[i] >= 0.0 and now >= io_deadlines[i]) { timed_out = 1 }
+        var ready: Int = 0
+        if (timed_out == 0) { ready = tcp_poll(io_fds[i], io_modes[i], 0) }
+        if (ready == 1 or timed_out == 1) {
+            _revive_io(i)
         }
         i = i - 1
     }
-    // If nothing was ready and we still have waiting tasks, do a blocking
-    // poll on the first fd to avoid busy-spinning
+
+    // Nothing ready now: block, but no longer than the nearest deadline so a
+    // timed waiter still wakes on time. `_blocking_budget` returns the capped
+    // wait; -1 means "a deadline already passed", so loop again immediately
+    // rather than blocking at all.
     if (run_queue.length() == 0 and io_handles.length() > 0 and timeout_ms > 0) {
-        var ready: Int = tcp_poll(io_fds[0], io_modes[0], timeout_ms)
-        if (ready == 1) {
-            run_queue.push(io_handles[0])
-            io_handles.remove(0)
-            io_fds.remove(0)
-            io_modes.remove(0)
+        var budget: Int = _blocking_budget(timeout_ms, now)
+        if (budget >= 0) {
+            var ready: Int = tcp_poll(io_fds[0], io_modes[0], budget)
+            if (ready == 1) { _revive_io(0) }
         }
     }
+}
+
+// The most this poll may block: the caller's `timeout_ms`, but never longer
+// than the time remaining until the soonest waiter deadline. Returns 0 when a
+// deadline is already due (so the next non-blocking pass revives it at once),
+// and `timeout_ms` unchanged when no waiter has a deadline.
+private fun _blocking_budget(timeout_ms: Int, now: Float): Int {
+    var budget: Int = timeout_ms
+    var i: Int = 0
+    while (i < io_deadlines.length()) {
+        if (io_deadlines[i] >= 0.0) {
+            var remaining_ms: Int = ((io_deadlines[i] - now) * 1000.0).floor()
+            if (remaining_ms <= 0) { return 0 }
+            if (remaining_ms < budget) { budget = remaining_ms }
+        }
+        i = i + 1
+    }
+    return budget
 }
 
 fun scheduler_tick(): Int {
@@ -187,7 +303,7 @@ fun scheduler_tick(): Int {
 
     // Poll IO fds when run queue is empty but IO tasks are waiting
     if (run_queue.length() == 0 and io_handles.length() > 0) {
-        _poll_io(10)
+        _poll_io(10, now)
     }
 
     if (run_queue.length() == 0) {
@@ -228,11 +344,9 @@ fun scheduler_tick(): Int {
             sleep_queue.push(hdl)
             sleep_times.push(now + duration)
         } else if (reason == 2) {
-            // IO read: park until fd is readable
+            // IO read: park until fd is readable (no deadline)
             var fd: Int = get_yield_arg()
-            io_handles.push(hdl)
-            io_fds.push(fd)
-            io_modes.push(0)
+            _park_io(hdl, fd, 0, -1.0, 0)
         } else if (reason == 3) {
             // Await: park this task until the target task finishes
             var target: Int = get_yield_arg()
@@ -244,16 +358,27 @@ fun scheduler_tick(): Int {
                 await_waiters.push(hdl)
             }
         } else if (reason == 4) {
-            // IO write: park until fd is writable
+            // IO write: park until fd is writable (no deadline)
             var fd: Int = get_yield_arg()
-            io_handles.push(hdl)
-            io_fds.push(fd)
-            io_modes.push(1)
+            _park_io(hdl, fd, 1, -1.0, 0)
         } else if (reason == 5) {
             // Actor wait: park until actor is idle
             var actor_ptr: Int = get_yield_arg()
             actor_wait_handles.push(hdl)
             actor_wait_targets.push(actor_ptr)
+        } else if (reason == 6) {
+            // IO read WITH a timeout: park until the fd is readable OR the
+            // deadline passes. __suspend carries one arg (the fd); the timeout
+            // seconds were stashed by `suspend_io_timeout()` just before the
+            // suspend, because a second yield arg would mean touching the .ll
+            // bases. A negative or zero timeout means "no deadline" (-1.0),
+            // matching a plain reason-2 park.
+            var fd: Int = get_yield_arg()
+            var deadline: Float = -1.0
+            if (_pending_io_timeout > 0.0) { deadline = now + _pending_io_timeout }
+            _park_io(hdl, fd, 0, deadline, _pending_io_daemon)
+            _pending_io_timeout = -1.0
+            _pending_io_daemon = 0
         }
         reset_yield()
     }

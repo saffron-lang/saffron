@@ -1,0 +1,40 @@
+// @signal: delivery via wait() and via on() callback, plus wait() timeout.
+//
+// Runs entirely in-process by raising signals to itself. Every wait()/park
+// happens inside a spawned task, since suspending is only legal in a coroutine.
+
+import "@signal" as Signal
+import "@async" as Async
+import "@test" as T
+
+// 1. wait() returns the signal that arrives before the timeout.
+var got_via_wait = Task.spawn(fun (): Int {
+    // Deliver to ourselves after a tick so the waiter is already parked.
+    Task.spawn(fun () {
+        Async.sleep(0.02)
+        Signal.raise(Signal.SIGUSR1)
+    })
+    return Signal.wait([Signal.SIGUSR1], 5.0)
+})
+T.assert_eq(got_via_wait.await(), Signal.SIGUSR1, "wait() returns the delivered signal")
+
+// 2. wait() times out to -1 when no signal comes.
+var timed_out = Task.spawn(fun (): Int {
+    return Signal.wait([Signal.SIGUSR2], 0.05)
+})
+T.assert_eq(timed_out.await(), -1, "wait() returns -1 on timeout")
+
+// 3. on() runs the registered callback when the signal is delivered.
+var hits: List<Int> = []
+Signal.on(Signal.SIGHUP, fun () {
+    hits.push(1)
+})
+var cb_done = Task.spawn(fun (): Int {
+    Signal.raise(Signal.SIGHUP)
+    // Give the dispatcher task room to run the callback.
+    Async.sleep(0.05)
+    return hits.length()
+})
+T.assert_eq(cb_done.await(), 1, "on() callback fired once for SIGHUP")
+
+T.summary()
