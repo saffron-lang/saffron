@@ -16,7 +16,8 @@ var ORDER: List<String> = [
     "enums_match.sf",
     "classes.sf",
     "closures.sf",
-    "async.sf"
+    "async.sf",
+    "learn.sf"
 ]
 
 class Example {

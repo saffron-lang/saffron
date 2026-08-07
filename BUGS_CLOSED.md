@@ -9,7 +9,7 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
-### 181. FIXED — a match binding of a generic-type-parameter payload field was typed `Int`, so a String payload printed a raw bit pattern under interpolation
+### 182. FIXED — a match binding of a generic-type-parameter payload field was typed `Int`, so a String payload printed a raw bit pattern under interpolation
 
 ```saffron
 enum Result<T, E> { Ok(value: T), Err(error: E) }

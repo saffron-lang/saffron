@@ -2,16 +2,23 @@
 
 ## Open
 
-**8 open entries:** #49, #65, #107, #131, #132, #154, #175, #178.
-Next free number is **#182**.
+**9 open entries:** #49, #65, #107, #131, #132, #154, #175, #178, #181.
+Next free number is **#183**.
 
-#181 (a match binding of a generic-type-parameter payload field was typed `Int`,
+#182 (a match binding of a generic-type-parameter payload field was typed `Int`,
 so a String payload printed a raw bit pattern under `"${msg}"`) was found running
 the learnxinyminutes doc's `Result` example — the same example `main` had just
 embedded in the playground, which would have shipped garbage output. Fixed at the
 type source: `get_variant_field_type` now resolves a type-parameter field to `Any`
 (runtime-dispatched) rather than the `Int` fallback, so every consumer is correct
-at once. Lives in `BUGS_CLOSED.md`. Open set unchanged; next-free 181 → 182.
+at once. It was written as #181, which `main` had taken for the coroutine-linking
+entry below, so it renumbered to #182. Lives in `BUGS_CLOSED.md`. Open set
+unchanged; next-free 182 → 183.
+
+#181 (a program that uses coroutines without importing `@async` fails to link —
+the scheduler symbols codegen emits are undefined) was investigated toward a fix
+and filed rather than landed, because the clean fix is a build-system change, not
+a source patch. Open set 8 → 9; next-free 181 → 182.
 
 #180 (plain assignment to a function-local `var` shadowing a module global wrote
 the global, not the local — and a shadowed loop counter hung forever) was found
@@ -406,6 +413,60 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 181. OPEN — coroutines without `import "@async"` fail to link; the scheduler is collected as a source module, not linked as ambient runtime
+
+**Severity: medium.** A program that uses a coroutine — a top-level `yield`, or
+`Task.spawn` — but does not `import "@async"` (which transitively imports
+`@scheduler`) fails to link: codegen emits calls to `@stdlib_scheduler_enqueue`
+and `@stdlib_scheduler_scheduler_run` whenever the entry is a coroutine, but with
+no scheduler module in the link those symbols are undefined. `test/async.sf` is
+the standing repro — it `yield`s at top level with no async import and fails as
+`invalid-ir` (opt rejects the undefined symbol). Workaround: add `import "@async"
+as Async`.
+
+**Target design: Elixir/BEAM parity — the scheduler is ambient runtime, always
+linked, never opted into.** That removes the whole detection question (which is a
+nest of edge cases: the coroutine use can be in the ENTRY or ANY imported lib,
+directly or via an aliased `Task` — `import "@async" as A` then `A.spawn` — and a
+naive `source.contains("yield")` also matches the word in a comment).
+
+**Why the obvious fixes fail (measured, not assumed):**
+
+1. *Text-scan the source for `yield`/`Task.spawn` and conditionally collect
+   `@scheduler`.* Rejected: the compiler's OWN source mentions `Task.spawn` in
+   comments, so the scan fires while compiling the compiler, injects `@scheduler`
+   into its build, and the bootstrap fails with duplicate `stdlib_scheduler_*`
+   symbols. A text scan cannot tell code from a comment.
+
+2. *Always collect `@scheduler` into the module set (unconditionally, via
+   `collect_modules`).* Rejected empirically: collecting it as a source module has
+   a second-order effect — it drags the prelude's interface types into
+   `class_type_ids`, which makes codegen emit the full reflect-helper suite
+   (`__reflect_class_name`/`is_class`/`get_fields`/`construct_from_map`), and those
+   reference `__val_class_tag`. The `[TEST]` example in `bootstrap.sh` links with
+   `base.ll` (the identity-mode base), which does not define `__val_class_tag`, so
+   the link fails. The coupling is: module-collection → class registration →
+   reflect emission → a runtime symbol the bootstrap base lacks.
+
+**The clean fix is a build-system change, not a source patch.** Treat the
+scheduler the way `runtime.ll`/`gc.ll`/`base_nanbox.ll` are treated: compile
+`src/lib/scheduler.sf` once to `build/stage3/scheduler.ll` in `bootstrap.sh`, and
+add that `.ll` to every link line (native + wasm32 + wasm64 in `tools/saffron`,
+and the bootstrap's own links). Then `main.sf` must STOP collecting `@scheduler`
+as a source module — when a program `import`s `@async`→`@scheduler`, the import
+resolves to symbols already present in the linked `.ll`, so collecting the source
+too would double-define them. That short-circuit in import resolution is the
+subtle half: 9 files import `@scheduler` today (`async.sf`, `net.sf`, and 7 tests)
+and every one becomes a validation surface.
+
+Scope: `bootstrap.sh` (compile + link scheduler.ll, four bases), `tools/saffron`
+(three target link lines), `main.sf` (exclude `@scheduler` from collection). Each
+of the 9 importers must be re-verified, plus the bootstrap's own build (which must
+NOT pull the reflect-emission coupling described above). Left open deliberately:
+a half-finished version breaks the bootstrap, and the investigation that produced
+this entry is the argument for doing it as one planned build-system change rather
+than a source hack.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
