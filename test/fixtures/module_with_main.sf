@@ -1,0 +1,17 @@
+// Fixture for test/pass/entry_main_vs_imported_main.sf (BUGS #71).
+//
+// This module deliberately defines its OWN top-level `fun main`. Before #71 was
+// fixed, codegen renamed EVERY function called `main` to `__saffron_main`
+// regardless of module, so this library `main` collapsed onto the entry point's
+// symbol and the program silently ran the library's `main` instead of the user's.
+//
+// It returns an identifiable string so the importing test can assert which
+// `main` actually ran, and also exports a normal function the entry program
+// calls, to prove the module is really imported and usable.
+fun main(): String {
+    return "LIBRARY MAIN"
+}
+
+fun greet(name: String): String {
+    return "hello " + name
+}

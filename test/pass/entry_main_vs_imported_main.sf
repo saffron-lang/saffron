@@ -1,0 +1,35 @@
+// BUGS #71 regression: an imported module that defines a top-level `fun main`
+// collided with the entry program's `main`. Both were renamed to `__saffron_main`
+// (codegen/output_body.sf) and the call-site redirect rewrote any `main(...)` to
+// `__saffron_main` on the pre-resolution name (codegen/expr_body.sf), so the two
+// collapsed onto one symbol. The entry point then silently called the LIBRARY's
+// `main` instead of the user's — no diagnostic, exit code 0.
+//
+// The fix: only the ENTRY module's `main` becomes `__saffron_main` (rename gated
+// on an empty current_prefix), and the call-site redirect tests the RESOLVED
+// callee == "main".
+//
+// This file must COMPILE AND RUN. If `entry_main()` below returns "LIBRARY MAIN"
+// the bug is back.
+
+import "@test" as Test
+import "../fixtures/module_with_main.sf" as Lib
+
+// Proof the module is really imported and usable: call its OTHER function.
+Test.assert_eq(Lib.greet("saffron"), "hello saffron", "imported module function is callable")
+
+// The core of #71. This file defines its OWN `fun main`. When we call `main()`
+// the call site must resolve to THIS function, not the library's `main`.
+fun main(): String {
+    return "ENTRY MAIN"
+}
+
+// The entry program's own top-level behavior ran (it is __saffron_entry).
+var entry_ran: Bool = true
+Test.assert(entry_ran, "entry program's own top-level code ran")
+
+// The load-bearing assertion: `main` resolves to the entry program's `main`, and
+// the library's `main` did NOT hijack the symbol.
+Test.assert_eq(main(), "ENTRY MAIN", "entry main wins; library main did not hijack the symbol")
+
+Test.summary()

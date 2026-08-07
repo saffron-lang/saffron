@@ -1,0 +1,48 @@
+// BUGS #142 regression: `==` on two Lists or two Maps must compare CONTENTS,
+// not the two malloc addresses. Before the fix `[1,2] == [1,2]` was false
+// because both-aggregate operands fell through gen_binary's `==` chain to a raw
+// `icmp eq i64` on the pointers; the fix routes them to __rt_val_eq (the deep
+// by-value comparison that already existed in runtime.sf but nothing reached).
+//
+// Every pair below is built from two SEPARATELY-constructed values, so an
+// address comparison would answer false for the equal cases. Content comparison
+// answers true. The unequal / different-length cases pin the other direction.
+import "@test" as Test
+
+fun main() {
+    // --- Lists: equal contents, distinct allocations.
+    var l1 = [1, 2, 3]
+    var l2 = [1, 2, 3]
+    Test.assert(l1 == l2, "equal lists compare == true")
+    Test.assert(!(l1 != l2), "and != is false for equal lists")
+
+    // Unequal same-length lists.
+    var l3 = [1, 2, 4]
+    Test.assert(!(l1 == l3), "lists differing in an element are not equal")
+    Test.assert(l1 != l3, "and != reports that difference")
+
+    // Control: different-length lists are not equal.
+    var l4 = [1, 2]
+    Test.assert(!(l1 == l4), "lists of different length are not equal")
+    Test.assert(l1 != l4, "and != reports the length difference")
+
+    // --- Maps: equal contents, same insertion order, distinct allocations.
+    var m1 = {"a": 1, "b": 2}
+    var m2 = {"a": 1, "b": 2}
+    Test.assert(m1 == m2, "equal maps compare == true")
+    Test.assert(!(m1 != m2), "and != is false for equal maps")
+
+    // Maps differing in a value.
+    var m3 = {"a": 1, "b": 99}
+    Test.assert(!(m1 == m3), "maps differing in a value are not equal")
+    Test.assert(m1 != m3, "and != reports that difference")
+
+    // --- Nested: a List of Lists compared by content, distinct allocations.
+    var n1 = [[1, 2], [3, 4]]
+    var n2 = [[1, 2], [3, 4]]
+    Test.assert(n1 == n2, "nested lists compare by content, all levels")
+    var n3 = [[1, 2], [3, 5]]
+    Test.assert(!(n1 == n3), "nested lists differing deep are not equal")
+
+    Test.summary()
+}

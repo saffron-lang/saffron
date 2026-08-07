@@ -1,0 +1,20 @@
+// Regression test for BUGS #55 (FIXED): an @extern function CALLED textually
+// ABOVE its own @extern declaration was emitted with the wrong signature
+// (a generic `call i64 @<saffron-name>` instead of the declared C signature
+// `double @sqrt(double)`), which then failed at link time with
+// `use of undefined value`. Pre-registration now registers externs up front,
+// so calling before the declaration must lower to the correct extern target.
+import "@test" as Test
+
+// The call site appears ABOVE the @extern declaration on purpose — that
+// ordering is the whole point of the regression.
+fun use_sqrt(x: Float): Float {
+    return c_sqrt(x)
+}
+
+@extern("double sqrt(double)")
+fun c_sqrt(x: Float): Float
+
+Test.assert_eq(use_sqrt(4.0), 2.0, "sqrt(4.0) == 2.0 via extern used before its declaration")
+Test.assert_eq(use_sqrt(9.0), 3.0, "sqrt(9.0) == 3.0 via extern used before its declaration")
+Test.summary()

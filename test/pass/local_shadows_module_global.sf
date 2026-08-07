@@ -1,0 +1,80 @@
+// BUGS #59 and its assignment sibling: a function-local `var` that shares a name
+// with a module-level global must use its OWN slot for reads, the declaration
+// store, AND plain assignment.
+//
+// #59 fixed reads and the declaration store. Assignment still targeted the global,
+// so `var count = 0; count = count + 1` inside a function with a global `count`
+// wrote the global and left the local stale — and a shadowed loop counter
+// (`while (i < 3) { i = i + 1 }`) hung forever, because the condition read the
+// never-advancing local while the increment stored the global. That assignment
+// case is fixed too; this file exercises both and must COMPILE AND RUN with no
+// hang.
+import "@test" as Test
+
+// Module globals. None may change from a function's own like-named local.
+var count = 100
+var label = "global"
+var i = 5
+
+// Initializer + read shadowing (the original #59).
+fun local_count(): Int {
+    var count = 2
+    return count            // 2 — the local, not 100
+}
+
+// A String-typed shadow, to show the fix is not Int-specific.
+fun local_label(): String {
+    var label = "local"
+    return label            // "local", not "global"
+}
+
+// Reassignment to a shadowed local (the sibling bug): mutate via `=`, and the
+// global must be untouched.
+fun bump(): Int {
+    var count = 0
+    count = count + 1
+    count = count + 1
+    return count            // 2 — reached through assignment, not the global
+}
+
+// A shadowed loop counter: this hung forever before the assignment fix.
+fun sum_to_three(): Int {
+    var i = 0
+    var total = 0
+    while (i < 3) {
+        total = total + i
+        i = i + 1
+    }
+    return total            // 0 + 1 + 2 = 3
+}
+
+// A nested-block shadow that wins over both the enclosing local and the global.
+fun nested_block(): Int {
+    var count = 10
+    if (true) {
+        var count = 25
+        return count        // 25 — the innermost local
+    }
+    return count
+}
+
+Test.assert_eq(local_count(), 2, "local count returns its own value")
+Test.assert_eq(count, 100, "global count unchanged after local_count()")
+
+Test.assert_eq(local_label(), "local", "local label returns its own value")
+Test.assert_eq(label, "global", "global label unchanged after local_label()")
+
+Test.assert_eq(bump(), 2, "reassignment to a shadowed local returns the local's value")
+Test.assert_eq(count, 100, "global count unchanged after bump()")
+
+Test.assert_eq(sum_to_three(), 3, "shadowed loop counter terminates and returns the local's total")
+Test.assert_eq(i, 5, "global i unchanged after sum_to_three()")
+
+Test.assert_eq(nested_block(), 25, "nested-block shadow returns the innermost local")
+Test.assert_eq(count, 100, "global count still unchanged after nested_block()")
+
+// Repeat to prove the earlier calls did not permanently corrupt the global.
+Test.assert_eq(bump(), 2, "second bump() is still local-scoped")
+Test.assert_eq(count, 100, "global count survives repeated shadowing")
+
+Test.summary()

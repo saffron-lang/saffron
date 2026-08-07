@@ -3,7 +3,14 @@
 ## Open
 
 **8 open entries:** #49, #65, #107, #131, #132, #154, #175, #178.
-Next free number is **#180**.
+Next free number is **#181**.
+
+#180 (plain assignment to a function-local `var` shadowing a module global wrote
+the global, not the local — and a shadowed loop counter hung forever) was found
+by a subagent writing #59's regression test: its reassignment draft hung, which
+isolated the gap #59 left. Fixed on sight — the `Assign` arm now honours
+`current_fn_locals` like the declaration store already did — and lives in
+`BUGS_CLOSED.md`. Open set unchanged; next-free 180 → 181.
 
 #179 (wasm32 `__sched_pump` returned a NaN-boxed value so the JS scheduler loop
 never terminated — async programs produced correct output then hung at the

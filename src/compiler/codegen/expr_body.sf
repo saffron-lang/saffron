@@ -216,7 +216,18 @@
                 // shuffle() spun forever.
                 if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
-                    if (this.module_globals.has(this.current_prefix + name)) {
+                    // A function-local `var` shadowing a like-named module global
+                    // must assign into its OWN slot (%name), not @__g_name. Reads
+                    // and the declaration store already honour current_fn_locals
+                    // (stmts_body.sf gen_var_decl_with_name, and the Variable read
+                    // arm); this assignment arm did not, so `var g = 0; g = 7`
+                    // inside a function with a global `g` wrote the global and left
+                    // the local stale — and a shadowed loop counter (`while (i<3){
+                    // i=i+1 }`) hung forever because the condition read the local
+                    // while the increment stored the global. Same guard as the
+                    // declaration store: only reach for the global when the name is
+                    // NOT a local here (BUGS #59's assignment sibling).
+                    if (!this.current_fn_locals.has(name) and this.module_globals.has(this.current_prefix + name)) {
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                     }
                     if (this.use_llvm_lib) {
