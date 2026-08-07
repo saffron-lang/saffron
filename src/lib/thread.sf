@@ -43,6 +43,19 @@
 @extern("i64 sf_thread_detach(i64)") fun _detach(handle: Int): Int
 @extern("void sf_thread_sleep(double)") fun _sleep(seconds: Float)
 
+@extern("i64 sf_mutex_new()")          fun _mutex_new(): Int
+@extern("void sf_mutex_lock(i64)")     fun _mutex_lock(handle: Int)
+@extern("i64 sf_mutex_trylock(i64)")   fun _mutex_trylock(handle: Int): Int
+@extern("void sf_mutex_unlock(i64)")   fun _mutex_unlock(handle: Int)
+@extern("void sf_mutex_free(i64)")     fun _mutex_free(handle: Int)
+
+@extern("i64 sf_atomic_new(i64)")          fun _atomic_new(initial: Int): Int
+@extern("i64 sf_atomic_load(i64)")         fun _atomic_load(handle: Int): Int
+@extern("void sf_atomic_store(i64, i64)")  fun _atomic_store(handle: Int, v: Int)
+@extern("i64 sf_atomic_add(i64, i64)")     fun _atomic_add(handle: Int, delta: Int): Int
+@extern("i64 sf_atomic_cas(i64, i64, i64)") fun _atomic_cas(handle: Int, expected: Int, desired: Int): Int
+@extern("void sf_atomic_free(i64)")        fun _atomic_free(handle: Int)
+
 /// A running (or finished) OS thread. Returned by `Thread.spawn`; `join()` waits
 /// for it and yields the closure's return value.
 class ThreadHandle {
@@ -99,4 +112,119 @@ fun detach(fn: Fun) {
 /// within the cooperative scheduler on a single thread.
 fun sleep(seconds: Float) {
     _sleep(seconds)
+}
+
+/// A mutual-exclusion lock for serializing a critical section across threads.
+///
+/// You need this — separately from the GRL — whenever a critical section spans a
+/// point where the GRL is dropped (a `join`, a `sleep`, another `lock`). The GRL
+/// alone serializes only *uninterrupted* managed execution; the moment a thread
+/// blocks, another can run, and a read-modify-write straddling that gap races
+/// unless a Mutex guards it.
+///
+/// ```saffron
+/// var m = Thread.Mutex()
+/// m.lock()
+/// // ... exclusive section ...
+/// m.unlock()
+/// ```
+///
+/// Non-recursive: locking twice on one thread without unlocking deadlocks. Call
+/// `free()` when done, or let it be dropped (the OS reclaims the mutex at exit).
+class Mutex {
+    private var _handle: Int
+
+    fun init() {
+        this._handle = _mutex_new()
+    }
+
+    /// Acquire the lock, blocking until it is available. Releases the GRL while
+    /// blocked so the holder can make progress and release it.
+    fun lock() {
+        _mutex_lock(this._handle)
+    }
+
+    /// Try to acquire without blocking. Returns true if the lock was taken, false
+    /// if another thread holds it.
+    fun try_lock(): Bool {
+        return _mutex_trylock(this._handle) == 1
+    }
+
+    /// Release the lock. Must be called by the thread that holds it.
+    fun unlock() {
+        _mutex_unlock(this._handle)
+    }
+
+    /// Run `body` with the lock held, releasing it even if `body` throws. The
+    /// structured way to use a mutex — there is no path that leaves it locked.
+    ///
+    /// Written as try/catch-rethrow rather than try/finally because the parser
+    /// requires a `catch` clause (there is no bare try/finally). The catch
+    /// unlocks and re-throws so an exception still propagates; the normal path
+    /// unlocks after `body` returns.
+    fun with(body: Fun): Any {
+        this.lock()
+        try {
+            var result: Any = body()
+            this.unlock()
+            return result
+        } catch (e) {
+            this.unlock()
+            throw e
+        }
+    }
+
+    /// Destroy the underlying OS mutex. Using this Mutex afterward is undefined.
+    fun free() {
+        _mutex_free(this._handle)
+    }
+}
+
+/// A single integer with atomic operations — a lock-free counter or flag shared
+/// across threads. Its value lives off the managed heap, so it is safe to touch
+/// while the GRL is dropped (which is the whole point: an atomic increment around
+/// a `sleep` needs no lock).
+///
+/// ```saffron
+/// var n = Thread.Atomic(0)
+/// n.add(1)          // returns the new value
+/// n.load()          // read
+/// ```
+///
+/// Values are the usual Saffron Int range (48-bit); intended for counters and
+/// flags, not for packing full 64-bit words.
+class Atomic {
+    private var _handle: Int
+
+    fun init(initial: Int) {
+        this._handle = _atomic_new(initial)
+    }
+
+    /// The current value.
+    fun load(): Int {
+        return _atomic_load(this._handle)
+    }
+
+    /// Set the value.
+    fun store(v: Int) {
+        _atomic_store(this._handle, v)
+    }
+
+    /// Atomically add `delta` and return the NEW value. `add(1)` is an atomic
+    /// increment; pass a negative delta to decrement.
+    fun add(delta: Int): Int {
+        return _atomic_add(this._handle, delta)
+    }
+
+    /// Compare-and-swap: if the current value equals `expected`, set it to
+    /// `desired` and return true; otherwise leave it and return false. The
+    /// primitive for lock-free update loops.
+    fun compare_and_set(expected: Int, desired: Int): Bool {
+        return _atomic_cas(this._handle, expected, desired) == 1
+    }
+
+    /// Release the slot. Using this Atomic afterward is undefined.
+    fun free() {
+        _atomic_free(this._handle)
+    }
 }
