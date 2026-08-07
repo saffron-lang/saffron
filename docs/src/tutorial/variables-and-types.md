@@ -32,7 +32,7 @@ var flag = true    // inferred as Bool
 
 Use `Int` for counters, indices, lengths, and anything you count; use `Float` for durations, measurements, ratios, and anything fractional.
 
-> **Deprecated: `Number`.** Older Saffron code annotates numeric values as `Number`, a single surface name that covered both integers and floats. Because the two have different runtime representations, one name for both was a source of bugs, so `Number` is deprecated in favour of the explicit `Int` and `Float`. It is still accepted (and behaves as `Int`) so existing code keeps compiling, but new code should not use it.
+> **Removed: `Number`.** Older Saffron code annotated numeric values as `Number`, a single surface name that covered both integers and floats. Because the two have different runtime representations, one name for both was a source of bugs, so `Number` has been **removed** in favour of the explicit `Int` and `Float`. It is no longer a valid type — `var x: Number` is now a compile error (`unknown type 'Number'`). Use `Int` or `Float`.
 
 ## Type checking
 
@@ -64,7 +64,7 @@ The `is` operator checks a value's type:
 nil is Nil        // true
 ```
 
-`42 is Number` also still works, but like the `Number` annotation it is deprecated — prefer `is Int` / `is Float`.
+Use `is Int` / `is Float` for numeric type checks. (`is Number` is no longer valid — `Number` has been removed; see above.)
 
 ## Destructuring
 

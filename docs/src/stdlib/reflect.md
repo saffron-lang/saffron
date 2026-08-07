@@ -40,5 +40,5 @@ IO.println(Reflect.number_to_string(42))  // "42"
 ## Notes
 
 - `Reflect.fields()` returns a `Map<String, Any>` (not a list of names), where keys are field names and values are current field values
-- The `is` operator can be used for type checks in user code: `42 is Int`, `3.14 is Float`, `"hi" is String`, `value is MyClass`. `is Number` still works but is deprecated along with the `Number` type.
+- The `is` operator can be used for type checks in user code: `42 is Int`, `3.14 is Float`, `"hi" is String`, `value is MyClass`. (`is Number` is no longer valid — the `Number` type has been removed; use `is Int` / `is Float`.)
 - These functions are implemented in the compiler's code generator, so they resolve at compile time rather than by runtime lookup
