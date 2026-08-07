@@ -94,7 +94,7 @@ var v = Vec(3) + Vec(4)
 T.assert_eq(v.x, 7, "operator overload")
 
 T.section("is-checks")
-T.assert(42 is Number, "number is Number")
+T.assert(42 is Int, "number is Int")
 T.assert("hi" is String, "string is String")
 T.assert(true is Bool, "bool is Bool")
 T.assert(nil is Nil, "nil is Nil")

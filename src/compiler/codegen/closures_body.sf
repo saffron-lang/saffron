@@ -18,7 +18,7 @@
             while (sci < captures.length()) {
                 var cap_name: String = captures[sci]
                 var cap_type: String = this.get_var_type_str(cap_name)
-                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String" and cap_type != "Number") {
+                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String") {
                     if (!this.actor_classes.has(cap_type) and !this.enum_defs.has(cap_type)) {
                         IO.println("[checker] Warning: Task.spawn closure captures non-Sendable variable '" + cap_name + "' (type " + cap_type + ")")
                     }

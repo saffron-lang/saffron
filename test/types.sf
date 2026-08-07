@@ -1,7 +1,7 @@
 var a: Int = 5
-var b: String | Number = "asd"
+var b: String | Int = "asd"
 var d: Atom = :asd
-var c: (Number) => Number = fun (x: Int): Int => { return x + 1; }
+var c: (Int) => Int = fun (x: Int): Int => { return x + 1; }
 var l: List<List<Int>> = [[1,2],[3,4]]
 IO.println(l[1])
 

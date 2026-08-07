@@ -223,7 +223,7 @@ class TypeEnv {
     // let a future caller reintroduce the string encoding one call at a time.
 
     fun parse_type_str(s: String): AST.Type {
-        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Int") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "String") return AST.Type.StringType
@@ -674,7 +674,7 @@ class NullChecker {
         // must not reach here with "", but answering Unknown makes a caller that
         // does say so, per invariant I2, instead of inventing a class.
         if (s.length() == 0) return AST.Type.UnknownType
-        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Int") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "String") return AST.Type.StringType
@@ -697,7 +697,7 @@ class NullChecker {
                 return AST.Type.UnionType(types)
             }
         }
-        // Generic: "List<String>" or "Map<String,Number>"
+        // Generic: "List<String>" or "Map<String,Int>"
         if (s.contains("<")) {
             var lt_pos: Float = 0
             var i: Float = 0
@@ -894,7 +894,7 @@ class NullChecker {
     }
 
     fun is_sendable(typ: String): Bool {
-        if (typ == "Int" or typ == "Float" or typ == "Number") return true
+        if (typ == "Int" or typ == "Float") return true
         if (typ == "Bool") return true
         if (typ == "String") return true
         if (typ == "Nil" or typ == "Any") return true
@@ -2243,11 +2243,12 @@ class NullChecker {
         // Module-qualified (`Mod.Type`) — accept; cross-module resolution is not
         // this pass's job and these are legitimate.
         if (name.contains(".")) { return true }
-        // Primitives and builtins. `Number` is retired (#49) but str_to_type still
-        // accepts it, so accept it here too rather than newly breaking it. `Void`,
-        // `Self` and `Fun` are surface spellings that carry no user type name.
+        // Primitives and builtins. `Number` is retired (#49): it is no longer a
+        // known type name, so it now falls through to the unknown-type error like
+        // any other unrecognized name. `Void`, `Self` and `Fun` are surface
+        // spellings that carry no user type name.
         if (name == "Int" or name == "Float" or name == "Bool" or name == "String") { return true }
-        if (name == "Nil" or name == "Any" or name == "Void" or name == "Number") { return true }
+        if (name == "Nil" or name == "Any" or name == "Void") { return true }
         if (name == "Self" or name == "StringBuilder") { return true }
         // Any function-type fragment. type_to_source spells an arrow type
         // "Fun(A,B):R" (its component types A/B/R are split out and validated on
@@ -4144,7 +4145,7 @@ class NullChecker {
 
     fun extract_generic_args(typ: String): String {
         // "List<String>" → "String"
-        // "Map<String,Number>" → "String,Number"
+        // "Map<String,Int>" → "String,Int"
         // "Map<String,List<Int>>" → "String,List<Int>"
         if (!typ.contains("<")) return ""
         // Find first < and matching >
@@ -4199,7 +4200,7 @@ class NullChecker {
     }
 
     fun extract_map_value_type(typ: String): String {
-        // "Map<String,Number>" → "Number" (second arg)
+        // "Map<String,Int>" → "Int" (second arg)
         // "Map<String>" → "String" (fallback: first arg)
         // "Map" → "Any"
         if (!typ.contains("<")) return "Any"
@@ -4209,7 +4210,7 @@ class NullChecker {
     }
 
     fun extract_map_key_type(typ: String): String {
-        // "Map<String,Number>" → "String"
+        // "Map<String,Int>" → "String"
         if (!typ.contains("<")) return "Any"
         return this.extract_nth_generic_arg(typ, 0)
     }
@@ -4876,7 +4877,7 @@ class NullChecker {
             if (method == "append") return "Nil"
             if (method == "to_string") return "String"
         }
-        // Number methods
+        // Int/Float methods
         if (obj_type == "Int" or obj_type == "Float") {
             if (method == "floor") return "Int"
             if (method == "to_string") return "String"

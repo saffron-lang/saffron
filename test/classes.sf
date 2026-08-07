@@ -35,7 +35,7 @@ scone.topping("berries", "cream");
 
 class CoffeeMaker {
   var coffee: String | Nil
-  var tube: (Number) => String
+  var tube: (Int) => String
 
   fun init(coffee: String) {
     this.tube = fun (a: Int) => { return "beans" }

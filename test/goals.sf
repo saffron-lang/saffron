@@ -109,7 +109,7 @@ fun get_dogs(): List<String> {
 Task.spawn(get_dogs)
 
 // --- Decorators ---
-fun logged(fn: (Number) => Number): (Number) => Number {
+fun logged(fn: (Int) => Int): (Int) => Int {
     return fun (x: Int) => {
         IO.println("calling...")
         return fn(x)
@@ -134,7 +134,7 @@ for (item in [10, 20, 30]) {
 }
 
 // --- Map iteration ---
-var scores: Map<String, Number> = {"alice": 95, "bob": 87}
+var scores: Map<String, Int> = {"alice": 95, "bob": 87}
 var iter = scores.iter()
 while (iter.next?()) {
     IO.println(iter.next())
@@ -143,7 +143,7 @@ while (iter.next?()) {
 // --- Match with type patterns ---
 // var x: Int | String = 42
 // var label = match (x) {
-//     Number(n) => "number: ${n}"
+//     Int(n) => "number: ${n}"
 //     String(s) => "string: ${s}"
 // }
 

@@ -59,7 +59,7 @@ fun test_break_continue() {
 
 @T.test
 fun test_map_access() {
-    var m: Map<String, Number> = {"x": 10, "y": 20}
+    var m: Map<String, Int> = {"x": 10, "y": 20}
     T.assert_eq(m["x"], 10, "map get x")
     T.assert_eq(m["y"], 20, "map get y")
     T.assert_eq(m.keys().length(), 2, "map keys count")

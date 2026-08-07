@@ -1,4 +1,4 @@
-var aMap: Map<String, Number> = {"a": 123, "b": 321, "c": 456}
+var aMap: Map<String, Int> = {"a": 123, "b": 321, "c": 456}
 IO.println(aMap["a"])
 IO.println(aMap["b"])
 IO.println(aMap["c"])

@@ -64,7 +64,7 @@ fun main() {
     // `in` as the for-in separator. A fallback arm that swallowed these would
     // pass every assertion above and still be wrong.
     var n: Int = 7
-    Test.assert(n is Number, "'is' still works as the type-test operator")
+    Test.assert(n is Int, "'is' still works as the type-test operator")
     var total: Int = 0
     var nums: List<Int> = [1, 2, 3]
     for (item in nums) { total = total + item }

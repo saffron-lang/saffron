@@ -4,21 +4,21 @@
 
 import "@test" as T
 
-// --- Test 1: Map<String, Number> (baseline) ---
-var counts: Map<String, Number> = {}
+// --- Test 1: Map<String, Int> (baseline) ---
+var counts: Map<String, Int> = {}
 counts.set("a", 42)
 counts.set("b", 100)
 counts.set("c", 7)
 
-T.assert_eq(counts.get("a"), 42, "Map<String,Number> get a")
-T.assert_eq(counts.get("b"), 100, "Map<String,Number> get b")
-T.assert_eq(counts.get("c"), 7, "Map<String,Number> get c")
+T.assert_eq(counts.get("a"), 42, "Map<String,Int> get a")
+T.assert_eq(counts.get("b"), 100, "Map<String,Int> get b")
+T.assert_eq(counts.get("c"), 7, "Map<String,Int> get c")
 
-// --- Test 2: Map<String, Number> — update existing key ---
+// --- Test 2: Map<String, Int> — update existing key ---
 counts.set("a", 99)
-T.assert_eq(counts.get("a"), 99, "Map<String,Number> update key")
+T.assert_eq(counts.get("a"), 99, "Map<String,Int> update key")
 
-// --- Test 3: Map<String, Number> — has / missing ---
+// --- Test 3: Map<String, Int> — has / missing ---
 T.assert(counts.has("b"), "Map has 'b'")
 T.assert(!counts.has("z"), "Map !has 'z'")
 
@@ -38,7 +38,7 @@ T.assert(!flags.get("debug"), "Map<String,Bool> false")
 var names: Map<String, String> = {}
 names.set("first", "Alice")
 names.set("second", "Bob")
-var nums2: Map<String, Number> = {}
+var nums2: Map<String, Int> = {}
 nums2.set("first", 1)
 nums2.set("second", 2)
 

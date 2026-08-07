@@ -538,7 +538,7 @@ class Parser {
             name = name + "." + part
         }
         // Generic args: collect tokens between < > respecting depth
-        // Produces "Map<String,Number>" or "List<Map<String,Number>>"
+        // Produces "Map<String,Int>" or "List<Map<String,Int>>"
         if (this.match_kind_check("<")) {
             this.advance()
             var args: String = ""
@@ -1437,7 +1437,7 @@ class Parser {
     // --- Type string to AST.Type conversion ---
 
     fun parse_type_ast(s: String): AST.Type {
-        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Int") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "String") return AST.Type.StringType
@@ -1484,7 +1484,7 @@ class Parser {
                 return AST.Type.UnionType(types)
             }
         }
-        // Generic: "List<String>" or "Map<String,Number>"
+        // Generic: "List<String>" or "Map<String,Int>"
         if (s.contains("<")) {
             var lt_pos: Float = 0
             var i: Float = 0

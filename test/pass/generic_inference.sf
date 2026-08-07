@@ -3,7 +3,7 @@ fun identity<T>(x: T): T { return x }
 
 // T inferred from argument
 var n = identity(42)
-IO.println(n.abs())  // Works if n is inferred as Number
+IO.println(n.abs())  // Works if n is inferred as Int
 
 var s = identity("hello")
 IO.println(s.length())  // Works if s is inferred as String
@@ -16,4 +16,4 @@ IO.println(result.length())  // Works if result is inferred as String
 
 // Type mismatch correctly detected
 var annotated: Int = identity(100)
-IO.println(annotated.abs())  // Should work: T=Number, return is Number
+IO.println(annotated.abs())  // Should work: T=Int, return is Int

@@ -53,16 +53,14 @@
     fun str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
-        // `Number` is deprecated: it is one surface name for two representations,
-        // so no mapping of it can be right. `fun area(): Number` returning 12.0 is
-        // relabelled Int and the caller's `.to_string()` untags a double as an
-        // integer and prints 0; mapping it to Float instead breaks every `Number`
-        // used as a list index. Int is kept because it is the integer-ish reading
-        // that user code overwhelmingly means, and because src/lib no longer writes
-        // `Number` at all — the remaining users are user programs and test/.
-        // Retire the spelling rather than re-tune this line. See BUGS.md #49 and
-        // M2 in docs/design/compiler-rewrite.md ("Int is the bottom type").
-        if (s == "Int" or s == "Number") return AST.Type.IntType
+        // `Number` is removed (#49): it was one surface name for two
+        // representations, so no mapping of it could be right. `fun area(): Number`
+        // returning 12.0 was relabelled Int and the caller's `.to_string()` untagged
+        // a double as an integer and printed 0. The spelling is gone — user code
+        // must write `Int` or `Float` explicitly, and `Number` now falls through to
+        // the unknown-type path. See BUGS.md #49 and M2 in
+        // docs/design/compiler-rewrite.md ("Int is the bottom type").
+        if (s == "Int") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
@@ -712,15 +710,12 @@
     }
 
     /// Normalize a type spelling to the key used for overload dispatch. Strips
-    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`) and
-    /// folds the `Number` spelling onto `Int` so that a declared `Int` parameter
-    /// and an inferred `Number`/`Int` argument agree. Everything else passes
-    /// through unchanged. Both the mangling site (gen_function / prescan) and the
-    /// call-site resolver run every candidate and every argument through this, so
-    /// they compare like against like.
+    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`).
+    /// Everything else passes through unchanged. Both the mangling site
+    /// (gen_function / prescan) and the call-site resolver run every candidate and
+    /// every argument through this, so they compare like against like.
     fun overload_norm_type(typ: String): String {
         var base: String = this.generic_base_name(typ)
-        if (base == "Number") { return "Int" }
         return base
     }
 

@@ -547,7 +547,7 @@
         var val_type_str: String = this.type_to_string(val_type)
         if (this.is_undecidable_type(val_type)) {
             var rt_func: String = ""
-            if (type_name == "Int" or type_name == "Number") {
+            if (type_name == "Int") {
                 rt_func = "__val_is_int"
             } else if (type_name == "Float") {
                 rt_func = "__val_is_float"
@@ -588,7 +588,7 @@
 
         // Compile-time resolution when type is statically known
         var matches: String = "0"
-        if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
+        if (type_name == "Int" or type_name == "Float") {
             if (this.is_int_type(val_type)) { matches = "1" }
         } else if (type_name == "String") {
             if (this.is_string_type(val_type)) { matches = "1" }
@@ -789,7 +789,7 @@
     /// on the boxed bit pattern is not its order. It falls to the runtime helper
     /// along with everything else.
     fun is_ordered_primitive(t: String): Bool {
-        return t == "Int" or t == "Number" or t == "Float"
+        return t == "Int" or t == "Float"
     }
 
     /// The runtime helper implementing `op` for operands whose static types do
@@ -3923,8 +3923,8 @@
             return sc
         }
 
-        if (base == "Float" or base == "Number") {
-            // gen_enum_construct normalises a Float/Number payload to a double
+        if (base == "Float") {
+            // gen_enum_construct normalises a Float payload to a double
             // on construction, so both slots hold the same representation here.
             // Comparing at double level is still the right lowering rather than
             // a bit compare: it is what makes -0.0 equal 0.0, and it matches the

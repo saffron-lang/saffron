@@ -50,20 +50,20 @@ run_json() {
 cat > "$TMP/sample.sf" <<'SF'
 var greeting: String = "hello"
 
-fun add(a: Number, b: Number): Number {
+fun add(a: Int, b: Int): Int {
     return a + b
 }
 
 enum Shape {
-    Circle(r: Number),
-    Square(side: Number)
+    Circle(r: Int),
+    Square(side: Int)
 }
 
 class Point {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) { this.x = x; this.y = y }
-    fun dist(): Number { return this.x + this.y }
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
+    fun dist(): Int { return this.x + this.y }
 }
 
 var bad: Int = "not an int"
