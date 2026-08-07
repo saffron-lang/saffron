@@ -2,8 +2,16 @@
 
 ## Open
 
-**6 open entries:** #49, #65, #107, #131, #132, #184.
-Next free number is **#185**.
+**7 open entries:** #49, #65, #107, #131, #132, #184, #185.
+Next free number is **#186**.
+
+#185 (`__float_to_string` formats a float to a DIFFERENT precision on wasm32 than
+on native — native's `%g` gives 6 significant digits, wasm32's hand-written
+formatter gives 6 *fractional* digits, so `Math.pi` prints `3.14159` natively and
+`3.141593` on wasm32) was found by `tools/differential.sh --record` refusing to
+freeze `test/pass/math.sf`: native-O0 and native-O2 agree, but native != wasm32.
+Same program, different number — a real cross-target inconsistency. Filed from the
+#107 surface (math.sf asserts nothing). Full entry below. Open set 6 → 7.
 
 #184 (a `Task.spawn`/coroutine closure traps with `null function or function
 signature mismatch` on wasm32 when the module also contains a large amount of
@@ -470,6 +478,44 @@ each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
 
+### 185. OPEN — `__float_to_string` uses a different precision on wasm32 than native (6 fractional digits vs `%g`'s 6 significant digits)
+
+```saffron
+import "math" as Math
+IO.println(Math.pi)   // native: 3.14159    wasm32: 3.141593
+```
+
+**Severity: medium** — the same program prints a different number depending on the
+target. Not garbage, but a silent cross-target inconsistency: any float whose
+integer part is nonzero renders with a different digit count on wasm32.
+
+**Root cause.** The two runtime bases format a float differently:
+
+- `base_nanbox.ll` (native) calls C's `snprintf(buf, 32, "%g", f)`. `%g` prints
+  **6 significant digits total**, so `3.14159265…` → `3.14159` (1 integer digit +
+  5 fractional).
+- `wasm_base_32.ll` has a hand-written `__float_to_string` (there is no libc
+  `snprintf` on wasm32 — its `snprintf` shim just `strcpy`s the format string).
+  It emits the integer part in full via `__wasm_uint_to_str`, then scales the
+  fraction by `1e6` and emits **6 fractional digits**, trimming trailing zeros.
+  So `3.14159265…` → `3.141593` (6 fractional digits, independent of the integer
+  part's width).
+
+Found by `tools/differential.sh --record` refusing to freeze `test/pass/math.sf`:
+`native-O2 == native-O0` but `native-O2 != wasm32` (`3.14159` vs `3.141593`). The
+determinism/cross-config gate is exactly the mechanism meant to catch this — it is
+why `math.sf` has no `.expected` while its siblings now do.
+
+**Fix direction.** Make the wasm32 formatter match `%g`'s "6 significant digits"
+convention (count the integer part's digits and reduce the fractional digit budget
+accordingly, or reproduce `%g`'s shortest-round-trip-ish rule). Whichever base is
+chosen as canonical, both must agree; the native `%g` output is the reference the
+rest of the suite's `.expected` files were recorded against, so wasm32 should move
+to match native. wasm64 (`wasm_base.ll`) prints nothing for floats at all (#131),
+so it is out of scope until that is addressed.
+
+---
+
 ### 184. OPEN — a `Task.spawn`/coroutine closure traps `null function or function signature mismatch` on wasm32 when the module also has many earlier closures
 
 **Severity: high** for real programs — it silently kills execution partway through
@@ -630,6 +676,16 @@ false/true, is usable in a condition, and formats correctly beside Int/String
 fields). This entry stays open: the broader hygiene problem (positive tests
 asserting nothing) is what let both hide, and the tail of assertion-free tests
 remains.
+
+**2026-08-07 — third find, plus hygiene.** Recorded `.expected` files (via
+`tools/differential.sh --record`) for five verified-clean assertion-free tests
+(`oracle_stringify`, `iterators`, `inheritance`, `varargs`, `data_equality`), so
+their output is now frozen against silent rot — the actual repair this entry
+tracks. The recording gate ALSO surfaced a real bug: it refused `test/pass/math.sf`
+because `Math.pi` prints `3.14159` on native but `3.141593` on wasm32 — a float
+formatter precision divergence, filed as #185. So this surface produced three
+codegen/runtime bugs (function-value printing, Bool match binding, #185's float
+formatting) plus five newly-frozen oracles.
 
 ---
 
