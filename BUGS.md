@@ -2,14 +2,15 @@
 
 ## Open
 
-**7 open entries:** #49, #65, #107, #131, #132, #181, #184.
+**6 open entries:** #49, #65, #107, #131, #132, #184.
 Next free number is **#185**.
 
 #184 (a `Task.spawn`/coroutine closure traps with `null function or function
 signature mismatch` on wasm32 when the module also contains a large amount of
 earlier closure/function-defining code — works natively, and works on wasm32 in
 isolation) blocks the learnxinyminutes doc from running to completion in the
-playground. Count 6 → 7.
+playground. #184 arrived as #181 was closed upstream in the same window, so the
+open count nets to 6.
 
 #183 (a `store8`/`load8` intrinsic called inside a nested/private function was
 `$$`-qualified by #175's nested-fun naming and emitted as an undefined function
