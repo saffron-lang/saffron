@@ -2795,7 +2795,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.2791 = private unnamed_addr constant [7 x i8] c"Number\00"
 @.str.2792 = private unnamed_addr constant [6 x i8] c"Float\00"
 @.str.2793 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.2794 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.2794 = private unnamed_addr constant [5 x i8] c"Bool\00"
 @.str.2795 = private unnamed_addr constant [5 x i8] c"List\00"
 @.str.2796 = private unnamed_addr constant [13 x i8] c"List<String>\00"
 @.str.2797 = private unnamed_addr constant [4 x i8] c"Any\00"
@@ -85220,7 +85220,7 @@ endif4319:
   %t334 = trunc i64 %t333 to i1
   br i1 %t334, label %then4327, label %else4328
 then4327:
-  %t335 = getelementptr [4 x i8], [4 x i8]* @.str.2794, i64 0, i64 0
+  %t335 = getelementptr [5 x i8], [5 x i8]* @.str.2794, i64 0, i64 0
   %t336 = ptrtoint i8* %t335 to i64
   ret i64 %t336
 else4328:
