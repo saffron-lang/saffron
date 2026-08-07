@@ -83,6 +83,16 @@ class Codegen {
     // keys the signature maps by the mangled name, and gen_call resolves an
     // overloaded callee to the mangled symbol by matching arity + first arg type.
     var overload_sets: Map<String, List<String>>
+    // Docstrings of top-level functions and classes, keyed by emit_name (module
+    // prefix + bare name). Populated in prescan from the FunDecl/ClassDecl
+    // docstring field. gen_func_ref reads it: when a named function/class is used
+    // as a VALUE and has a docstring, the closure box's second slot (unused env
+    // for a no-capture ref) holds the doc-constant pointer instead of 0, so
+    // Reflect.doc can read it back. Empty/absent means no docstring.
+    var func_docs: Map<String, String>
+    // This module's `//!` docstring, threaded from parse_program via main.sf.
+    // Emitted as the constant __reflect_module_doc returns. Empty = nil.
+    var module_doc_text: String
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var global_var_types: Map<String, String>
@@ -215,6 +225,8 @@ class Codegen {
         this.func_param_names = {}
         this.func_param_type_strs = {}
         this.overload_sets = {}
+        this.func_docs = {}
+        this.module_doc_text = ""
         this.current_prefix = ""
         this.module_globals = {}
         this.global_var_types = {}
@@ -1281,6 +1293,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__reflect_is_class")
     gen.known_functions.push("__reflect_construct_from_map")
     gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__reflect_doc")
+    gen.known_functions.push("__reflect_module_doc")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     // `IO` keeps a hard-wired prefix because it is implicit: a file with no
@@ -2010,6 +2024,8 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__reflect_is_class")
     gen.known_functions.push("__reflect_construct_from_map")
     gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__reflect_doc")
+    gen.known_functions.push("__reflect_module_doc")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     // `IO` keeps a hard-wired prefix because it is implicit: a file with no

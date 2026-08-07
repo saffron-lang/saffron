@@ -83,6 +83,16 @@ class Codegen {
     // keys the signature maps by the mangled name, and gen_call resolves an
     // overloaded callee to the mangled symbol by matching arity + first arg type.
     var overload_sets: Map<String, List<String>>
+    // Docstrings of top-level functions and classes, keyed by emit_name (module
+    // prefix + bare name). Populated in prescan from the FunDecl/ClassDecl
+    // docstring field. gen_func_ref reads it: when a named function/class is used
+    // as a VALUE and has a docstring, the closure box's second slot (unused env
+    // for a no-capture ref) holds the doc-constant pointer instead of 0, so
+    // Reflect.doc can read it back. Empty/absent means no docstring.
+    var func_docs: Map<String, String>
+    // This module's `//!` docstring, threaded from parse_program via main.sf.
+    // Emitted as the constant __reflect_module_doc returns. Empty = nil.
+    var module_doc_text: String
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var global_var_types: Map<String, String>
@@ -215,6 +225,8 @@ class Codegen {
         this.func_param_names = {}
         this.func_param_type_strs = {}
         this.overload_sets = {}
+        this.func_docs = {}
+        this.module_doc_text = ""
         this.current_prefix = ""
         this.module_globals = {}
         this.global_var_types = {}
@@ -3326,7 +3338,22 @@ class Codegen {
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
-        this.emit_indent("store i64 0, i64* " + env_slot)
+        // Slot 1 is the closure's env. For a plain (no-capture) function or class
+        // ref the trampoline ignores it, so when the referenced declaration has a
+        // `///` docstring we store the tagged doc-constant pointer here instead of
+        // 0. __reflect_doc reads it back; calling the ref is unaffected. Non-doc'd
+        // refs keep the 0, so this is inert everywhere else.
+        if (this.func_docs.has(fn_name)) {
+            var doc_str: String = this.func_docs.get(fn_name)
+            var doc_c: String = this.add_string_constant(doc_str)
+            var doc_len: Float = doc_str.length() + 1
+            var doc_gep: String = this.fresh_local()
+            this.emit_indent(doc_gep + " = getelementptr [" + doc_len.floor().to_string() + " x i8], [" + doc_len.floor().to_string() + " x i8]* " + doc_c + ", i64 0, i64 0")
+            var doc_val: String = this.emit_tag_ptr(doc_gep)
+            this.emit_indent("store i64 " + doc_val + ", i64* " + env_slot)
+        } else {
+            this.emit_indent("store i64 0, i64* " + env_slot)
+        }
         var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
@@ -9870,6 +9897,12 @@ class Codegen {
     }
 
     fun emit_reflect_helpers() {
+        // Docstring reflection. Emitted first and unconditionally (a program can
+        // call Reflect.doc without declaring any class). __reflect_doc reads the
+        // closure box's second slot, where gen_func_ref stashed the tagged doc
+        // constant for a doc'd function/class value (0 → nil). __reflect_module_doc
+        // returns this module's `//!` constant, or nil when there is none.
+        this.emit_reflect_doc_helpers()
         var class_names: List<String> = this.class_type_ids.keys()
         if (class_names.length() == 0) { return }
         this.emit("")
@@ -10090,6 +10123,61 @@ class Codegen {
         }
         this.start_block(rc_end)
         this.emit_terminator("ret i64 " + rc_inst)
+        this.emit("}")
+        this.block_terminated = false
+    }
+
+    // Emit __reflect_doc and __reflect_module_doc.
+    //
+    // __reflect_doc(%val): %val is the closure box a function/class value lowers
+    // to (gen_func_ref). Its second slot holds the tagged doc-constant pointer
+    // when the referenced declaration had a `///` comment, else 0. Read slot 1;
+    // return it, or nil when it is 0. Untag the box to a [2 x i64]* first.
+    //
+    // __reflect_module_doc(): return this module's `//!` constant (module_doc_text),
+    // or nil when the module had none.
+    fun emit_reflect_doc_helpers() {
+        this.emit("")
+        this.emit("define i64 @__reflect_doc(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var box: String = this.val_to_typed_ptr("%val", "[2 x i64]*")
+        var dslot: String = this.fresh_local()
+        this.emit_indent(dslot + " = getelementptr [2 x i64], [2 x i64]* " + box + ", i64 0, i64 1")
+        var dval: String = this.fresh_local()
+        this.emit_indent(dval + " = load i64, i64* " + dslot)
+        var is_zero: String = this.fresh_local()
+        this.emit_indent(is_zero + " = icmp eq i64 " + dval + ", 0")
+        var lbl_nil: String = this.fresh_label("rdoc.nil")
+        var lbl_has: String = this.fresh_label("rdoc.has")
+        this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_nil + ", label %" + lbl_has)
+        this.start_block(lbl_has)
+        this.emit_terminator("ret i64 " + dval)
+        this.start_block(lbl_nil)
+        var nil_v: String = this.fresh_local()
+        this.emit_indent(nil_v + " = call i64 @__val_nil()")
+        this.emit_terminator("ret i64 " + nil_v)
+        this.emit("}")
+        this.block_terminated = false
+
+        this.emit("")
+        this.emit("define i64 @__reflect_module_doc() {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        if (this.module_doc_text.length() > 0) {
+            var mc: String = this.add_string_constant(this.module_doc_text)
+            var mlen: Float = this.module_doc_text.length() + 1
+            var mgep: String = this.fresh_local()
+            this.emit_indent(mgep + " = getelementptr [" + mlen.floor().to_string() + " x i8], [" + mlen.floor().to_string() + " x i8]* " + mc + ", i64 0, i64 0")
+            var mval: String = this.emit_tag_ptr(mgep)
+            this.emit_terminator("ret i64 " + mval)
+        } else {
+            var mnil: String = this.fresh_local()
+            this.emit_indent(mnil + " = call i64 @__val_nil()")
+            this.emit_terminator("ret i64 " + mnil)
+        }
         this.emit("}")
         this.block_terminated = false
     }
@@ -11513,6 +11601,12 @@ class Codegen {
         this.func_defaults.set(emit_name, defaults)
         this.func_param_count.set(emit_name, params.length())
         this.func_param_names.set(emit_name, pnames)
+        // Record a real `///` docstring so gen_func_ref can stash it in the
+        // closure box for Reflect.doc. `@`-prefixed docs are directives
+        // (@extern handled above, @extend/@inline dispatch elsewhere), not text.
+        if (doc.length() > 0 and !doc.starts_with("@")) {
+            this.func_docs.set(emit_name, doc)
+        }
 
         // Return type too, or a call compiled before the callee's own
         // gen_function runs falls back to Int and misdispatches every method on
@@ -11562,6 +11656,14 @@ class Codegen {
         }
         var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => m
             _ => []
+        }
+        var cdoc: String = match (stmt) { ClassDecl(n, __tps, ps, f, m, d, c_vis, __ns, __fs, __intro) => d
+            _ => ""
+        }
+        // A class used as a value (e.g. Reflect.doc(Greeter)) routes through
+        // gen_func_ref like a function ref, so record its docstring the same way.
+        if (cname.length() > 0 and cdoc.length() > 0 and !cdoc.starts_with("@")) {
+            this.func_docs.set(prefix + cname, cdoc)
         }
         // BUGS #161: register the constructor's return type here, prefixed, so the
         // second global-var pass (prescan_global_call_types) can type an inferred
@@ -18232,6 +18334,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__reflect_is_class")
     gen.known_functions.push("__reflect_construct_from_map")
     gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__reflect_doc")
+    gen.known_functions.push("__reflect_module_doc")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     // `IO` keeps a hard-wired prefix because it is implicit: a file with no
@@ -18961,6 +19065,8 @@ fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__reflect_is_class")
     gen.known_functions.push("__reflect_construct_from_map")
     gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__reflect_doc")
+    gen.known_functions.push("__reflect_module_doc")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     // `IO` keeps a hard-wired prefix because it is implicit: a file with no
