@@ -1485,8 +1485,39 @@
         }
     }
 
+    // BUGS #107 (function-value printing): allocate the 16-byte closure pair
+    // { fn_ptr@0, env_ptr@8 } through the GC with type tag 4 (the tag gc.ll's
+    // trace_closure already expects) instead of a bare __sf_malloc. The pointer
+    // stays UNTAGGED — the call path (`inttoptr` on the raw i64, no untag) and
+    // trace_closure both read a bare pointer — but it now carries a GC header, so
+    // __val_class_tag reads back 4 and __any_to_string can print `<function>`
+    // instead of the raw address. Mirrors emit_enum_payload_alloc's identity/
+    // wasm64 gate: identity_mode and the unheadered wasm64 __gc_alloc keep the old
+    // __sf_malloc, so those targets print the pointer exactly as before (they were
+    // never nanbox-correct there anyway — see #131).
+    fun emit_closure_alloc(): String {
+        if (this.identity_mode or this.target == "wasm64" or this.target == "wasm") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 16)")
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw + " to [2 x i64]*")
+            return ptr
+        }
+        var gc_raw: String = this.fresh_local()
+        this.emit_indent(gc_raw + " = call i64 @__gc_alloc(i64 16, i64 4)")
+        return this.val_to_typed_ptr(gc_raw, "[2 x i64]*")
+    }
+
     fun gen_func_ref(fn_name: String): String {
-        this.last_type = AST.Type.IntType
+        // BUGS #107: a function value's static type is Any, not Int. It used to be
+        // IntType, which made string interpolation (`"${greet}"`) format the
+        // closure pointer through __int_to_string at compile time — printing the
+        // raw address as a decimal — instead of the runtime __any_to_string that
+        // now recognises the closure's GC tag 4 and prints `<function>`. The
+        // closure pair is an i64 value either way; only the formatter dispatch and
+        // an untyped var's inferred type change, and Any is the honest answer for
+        // a first-class function whose signature codegen does not track here.
+        this.last_type = AST.Type.AnyType
         var nparams: Float = 0
         if (this.func_param_count.has(fn_name)) {
             nparams = this.func_param_count.get(fn_name)
@@ -1596,10 +1627,7 @@
             }
             fn_type_str = fn_type_str + ")*"
 
-            var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-            var closure_ptr: String = this.fresh_local()
-            this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+            var closure_ptr: String = this.emit_closure_alloc()
             var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
             var fn_slot: String = this.fresh_local()
             this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
@@ -1657,10 +1685,7 @@
         }
         fn_type_str = fn_type_str + ")*"
 
-        var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        var closure_ptr: String = this.emit_closure_alloc()
         var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")

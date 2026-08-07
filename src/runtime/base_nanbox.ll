@@ -42,6 +42,8 @@ declare void @exit(i32)
 @.str.false_nl = private unnamed_addr constant [6 x i8] c"false\00"
 @.str.nil_nl = private unnamed_addr constant [4 x i8] c"nil\00"
 @.str.pct_s = private unnamed_addr constant [3 x i8] c"%s\00"
+; BUGS #107: a function value (closure pair, GC tag 4) reaching a formatter.
+@.str.function = private unnamed_addr constant [11 x i8] c"<function>\00"
 
 define void @__io_println_str(i64 %s) {
 entry:
@@ -1380,6 +1382,21 @@ check_ptr:
   ; returns a raw char*, matching every arm below, and 0 for anything it cannot
   ; name — a non-class value, or a class that declares no to_string — so those
   ; keep falling through to exactly the behaviour they had before.
+  ; BUGS #107: a closure carries GC type tag 4 (see gen_func_ref / gc.ll's
+  ; trace_closure). It has no user to_string, so __val_to_string would return 0
+  ; and it would fall through to do_ptr and print its raw address. Detect the tag
+  ; first and hand back a static "<function>". __val_class_tag safely rejects
+  ; non-pointers, so this is inert for ints, floats, enums and everything else.
+  %clos_tag = call i64 @__val_class_tag(i64 %val)
+  %is_clos = icmp eq i64 %clos_tag, 4
+  br i1 %is_clos, label %do_function, label %check_class
+
+do_function:
+  %fn_str = getelementptr [11 x i8], [11 x i8]* @.str.function, i64 0, i64 0
+  %fn_ptr = ptrtoint i8* %fn_str to i64
+  ret i64 %fn_ptr
+
+check_class:
   %cls_str = call i64 @__val_to_string(i64 %val)
   %has_cls = icmp ne i64 %cls_str, 0
   br i1 %has_cls, label %do_class, label %check_ptr_tag

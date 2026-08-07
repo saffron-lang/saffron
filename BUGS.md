@@ -552,6 +552,20 @@ scale was not.
 `tools/differential.sh --record` writes `.expected` from the reference run and
 refuses when configurations disagree.
 
+**2026-08-07 — a real bug surfaced by this surface and fixed.** Running the
+assertion-free feature tests and eyeballing their output found `test/functions.sf`
+printing `5.21502e-310...` for `IO.print(areWeHavingItYet)` — a *function value*
+reaching a formatter printed its raw closure-pair pointer, the same #115/#154
+family (a value with no runtime-identifiable type hitting `__any_to_string`). Now
+fixed: closures allocate through `__gc_alloc(16, 4)` (GC tag 4, the tag `gc.ll`'s
+`trace_closure` already expected), `gen_func_ref`/`gen_lambda` type a function
+value as `Any`, and `__any_to_string` prints `<function>` for tag 4 — so lists and
+maps recurse into it (`[<function>, <function>]`, `{f: <function>}`) for free.
+Regression test `test/pass/function_value_printing.sf` asserts the exact rendered
+strings across named refs, stored vars, capturing lambdas, lists and maps. This
+entry stays open: the broader hygiene problem (positive tests asserting nothing)
+is what let this hide, and the tail of assertion-free tests remains.
+
 ---
 
 **LARGELY CLOSED (2026-08-02).** The blind set was re-derived independently rather

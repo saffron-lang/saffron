@@ -3191,8 +3191,39 @@ class Codegen {
         }
     }
 
+    // BUGS #107 (function-value printing): allocate the 16-byte closure pair
+    // { fn_ptr@0, env_ptr@8 } through the GC with type tag 4 (the tag gc.ll's
+    // trace_closure already expects) instead of a bare __sf_malloc. The pointer
+    // stays UNTAGGED — the call path (`inttoptr` on the raw i64, no untag) and
+    // trace_closure both read a bare pointer — but it now carries a GC header, so
+    // __val_class_tag reads back 4 and __any_to_string can print `<function>`
+    // instead of the raw address. Mirrors emit_enum_payload_alloc's identity/
+    // wasm64 gate: identity_mode and the unheadered wasm64 __gc_alloc keep the old
+    // __sf_malloc, so those targets print the pointer exactly as before (they were
+    // never nanbox-correct there anyway — see #131).
+    fun emit_closure_alloc(): String {
+        if (this.identity_mode or this.target == "wasm64" or this.target == "wasm") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 16)")
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw + " to [2 x i64]*")
+            return ptr
+        }
+        var gc_raw: String = this.fresh_local()
+        this.emit_indent(gc_raw + " = call i64 @__gc_alloc(i64 16, i64 4)")
+        return this.val_to_typed_ptr(gc_raw, "[2 x i64]*")
+    }
+
     fun gen_func_ref(fn_name: String): String {
-        this.last_type = AST.Type.IntType
+        // BUGS #107: a function value's static type is Any, not Int. It used to be
+        // IntType, which made string interpolation (`"${greet}"`) format the
+        // closure pointer through __int_to_string at compile time — printing the
+        // raw address as a decimal — instead of the runtime __any_to_string that
+        // now recognises the closure's GC tag 4 and prints `<function>`. The
+        // closure pair is an i64 value either way; only the formatter dispatch and
+        // an untyped var's inferred type change, and Any is the honest answer for
+        // a first-class function whose signature codegen does not track here.
+        this.last_type = AST.Type.AnyType
         var nparams: Float = 0
         if (this.func_param_count.has(fn_name)) {
             nparams = this.func_param_count.get(fn_name)
@@ -3302,10 +3333,7 @@ class Codegen {
             }
             fn_type_str = fn_type_str + ")*"
 
-            var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-            var closure_ptr: String = this.fresh_local()
-            this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+            var closure_ptr: String = this.emit_closure_alloc()
             var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
             var fn_slot: String = this.fresh_local()
             this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
@@ -3363,10 +3391,7 @@ class Codegen {
         }
         fn_type_str = fn_type_str + ")*"
 
-        var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        var closure_ptr: String = this.emit_closure_alloc()
         var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
@@ -6584,11 +6609,9 @@ class Codegen {
                 }
                 ci = ci + 1
             }
-            // Heap-allocate closure pair: [fn_ptr, env_ptr]
-            var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-            var closure_ptr: String = this.fresh_local()
-            this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+            // Heap-allocate closure pair: [fn_ptr, env_ptr]. BUGS #107: through
+            // emit_closure_alloc so it carries GC tag 4 and prints `<function>`.
+            var closure_ptr: String = this.emit_closure_alloc()
             // Store fn ptr
             var num_params: Float = param_names.length() + 1
             var ret_ty: String = "i64"
@@ -6616,6 +6639,10 @@ class Codegen {
             if (this.use_llvm_lib and !this.identity_mode) {
                 this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
             }
+            // BUGS #107: a lambda value's static type is Any, so `"${f}"` formats
+            // via __any_to_string (which prints `<function>` for GC tag 4) rather
+            // than __int_to_string. Mirrors gen_func_ref.
+            this.last_type = AST.Type.AnyType
             return result
         }
 
@@ -6654,11 +6681,9 @@ class Codegen {
         this.local_counter = saved_counter2
         this.typed_vars = saved_typed_vars2b
 
-        // Heap-allocate closure pair: [fn_ptr, 0]
-        var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        // Heap-allocate closure pair: [fn_ptr, 0]. BUGS #107: through
+        // emit_closure_alloc so it carries GC tag 4 and prints `<function>`.
+        var closure_ptr: String = this.emit_closure_alloc()
         var num_total_params: Float = param_names.length() + 1
         var nocap_ret_ty: String = "i64"
         if (this.str_in_list(this.coroutine_funcs,lambda_name)) { nocap_ret_ty = "ptr" }
@@ -6682,6 +6707,8 @@ class Codegen {
         if (this.use_llvm_lib and !this.identity_mode) {
             this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
         }
+        // BUGS #107: see the capture path above — lambda value's static type is Any.
+        this.last_type = AST.Type.AnyType
         return result
     }
 
@@ -11273,7 +11300,35 @@ class Codegen {
     // non-nested emission is untouched.
     fun nested_fun_symbol(enclosing: String, name: String): String {
         if (enclosing.length() == 0) { return this.current_prefix + name }
+        // BUGS #183: an intrinsic (store8/load8/...) is lowered INLINE by
+        // gen_intrinsic_call and is never emitted as a real function. When one is
+        // declared+called inside a private/nested fun (e.g. @net's _raw_read),
+        // #175's scope qualification would rewrite it to scope$$name and emit a
+        // `call @net__raw_read$$store8` against a symbol that does not exist. An
+        // intrinsic name must therefore route with its bare (prefix-only) symbol —
+        // exactly the form a top-level intrinsic call uses and the form registered
+        // in intrinsic_funcs — regardless of enclosing scope. Intrinsics are never
+        // user-defined nested funs, so this can never mask a genuine #175 collision.
+        if (this.is_intrinsic_name(name)) { return this.current_prefix + name }
         return this.current_prefix + enclosing + "$$" + name
+    }
+
+    // BUGS #183: mirrors gen_intrinsic_call's dispatch arms exactly (which match
+    // by suffix so a module-prefixed symbol like `net__store8` still routes). The
+    // single source of truth for "this name lowers inline, never as a real call",
+    // so nested_fun_symbol can keep intrinsics out of the $$-qualified namespace.
+    fun is_intrinsic_name(name: String): Bool {
+        if (name.ends_with("load64")) { return true }
+        if (name.ends_with("store64")) { return true }
+        if (name.ends_with("load8")) { return true }
+        if (name.ends_with("store8")) { return true }
+        if (name.ends_with("load_argc")) { return true }
+        if (name.ends_with("load_argv")) { return true }
+        if (name.ends_with("tag_ptr")) { return true }
+        if (name.ends_with("untag_ptr")) { return true }
+        if (name.ends_with("call_void_ptr")) { return true }
+        if (name.ends_with("__suspend")) { return true }
+        return false
     }
 
     fun is_known_name(name: String): Bool {
@@ -16991,6 +17046,25 @@ class Codegen {
         return local
     }
     if (!is_user_class and method == "to_string") {
+        // BUGS #107: a function value's static type is "Fun" (get_expr_type) or a
+        // spelled-out "Fun[...]:R". It is an i64 closure pointer with GC tag 4, so
+        // it must format through the runtime dispatch (__any_to_string prints
+        // `<function>` for tag 4), not fall to the final __int_to_string arm that
+        // would print the raw address. A Fun value is well-typed, so this routes
+        // to __any_to_string WITHOUT the "inference failed" warning the Any arm
+        // emits.
+        if (obj_type == "Fun" or obj_type.starts_with("Fun[") or obj_type.starts_with("Fun<")) {
+            var fn_raw: String = this.fresh_local()
+            this.emit_indent(fn_raw + " = call i64 @__any_to_string(i64 " + obj + ")")
+            if (this.identity_mode) {
+                this.last_type = AST.Type.StringType
+                return fn_raw
+            }
+            var fn_local: String = this.fresh_local()
+            this.emit_indent(fn_local + " = call i64 @__rt_tag_ptr(i64 " + fn_raw + ")")
+            this.last_type = AST.Type.StringType
+            return fn_local
+        }
         if (obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'to_string' on untyped value (type inference failed)")
         }

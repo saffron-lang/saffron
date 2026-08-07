@@ -3231,6 +3231,25 @@
         return local
     }
     if (!is_user_class and method == "to_string") {
+        // BUGS #107: a function value's static type is "Fun" (get_expr_type) or a
+        // spelled-out "Fun[...]:R". It is an i64 closure pointer with GC tag 4, so
+        // it must format through the runtime dispatch (__any_to_string prints
+        // `<function>` for tag 4), not fall to the final __int_to_string arm that
+        // would print the raw address. A Fun value is well-typed, so this routes
+        // to __any_to_string WITHOUT the "inference failed" warning the Any arm
+        // emits.
+        if (obj_type == "Fun" or obj_type.starts_with("Fun[") or obj_type.starts_with("Fun<")) {
+            var fn_raw: String = this.fresh_local()
+            this.emit_indent(fn_raw + " = call i64 @__any_to_string(i64 " + obj + ")")
+            if (this.identity_mode) {
+                this.last_type = AST.Type.StringType
+                return fn_raw
+            }
+            var fn_local: String = this.fresh_local()
+            this.emit_indent(fn_local + " = call i64 @__rt_tag_ptr(i64 " + fn_raw + ")")
+            this.last_type = AST.Type.StringType
+            return fn_local
+        }
         if (obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'to_string' on untyped value (type inference failed)")
         }

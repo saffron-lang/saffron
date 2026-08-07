@@ -1,0 +1,43 @@
+// BUGS #107 (function-value printing): a function value reaching a formatter
+// printed its raw closure-pair pointer — as a decimal under interpolation
+// (gen_func_ref typed the ref Int, so `"${f}"` went through __int_to_string)
+// and as a subnormal double inside a list/map (__any_to_string had no arm for
+// it). Closures now carry GC type tag 4 (the tag gc.ll's trace_closure already
+// expected), gen_func_ref types a ref as Any, and __any_to_string prints
+// "<function>" for tag 4 — so lists and maps recurse into it for free.
+//
+// This is an ORACLE-style test: the point is the exact rendered string, which is
+// what regressed silently for the life of the bug. The value is opaque
+// (`<function>`, not an address), so equality on the rendered text is the check.
+import "@test" as Test
+
+fun greet(): Int { return 1 }
+fun other(): Int { return 2 }
+
+fun main() {
+    // Named function reference, direct interpolation.
+    Test.assert_eq("${greet}", "<function>", "named fn ref interpolates as <function>")
+
+    // Stored in a variable.
+    var f = greet
+    Test.assert_eq("${f}", "<function>", "fn value in a var interpolates as <function>")
+
+    // Inside a list — recursive element formatting.
+    var fns = [greet, other]
+    Test.assert_eq("${fns}", "[<function>, <function>]", "fn values in a list render recursively")
+
+    // Inside a map value.
+    var m = {"a": greet}
+    Test.assert_eq("${m}", "{a: <function>}", "fn value as a map value renders as <function>")
+
+    // A capturing lambda (goes through gen_lambda, not gen_func_ref) — both the
+    // call and the rendering must work.
+    var x = 10
+    var add = fun (n: Int): Int => n + x
+    Test.assert_eq(add(5), 15, "capturing lambda still calls correctly")
+    Test.assert_eq("${add}", "<function>", "capturing lambda renders as <function>")
+    Test.assert_eq("${[add]}", "[<function>]", "capturing lambda in a list renders as <function>")
+
+    Test.summary()
+}
+main()
