@@ -1,0 +1,75 @@
+// @copy: shallow/deep for collections, primitives, Cloneable instances, cycles.
+
+import "@copy" as Copy
+import { Cloneable } from "@copy"
+import "@test" as T
+
+// --- primitives are their own copy ---
+T.assert_eq(Copy.deep(42), 42, "deep of int")
+T.assert_eq(Copy.deep("hi"), "hi", "deep of string")
+T.assert_eq(Copy.shallow(true), true, "shallow of bool")
+
+// --- deep list: nested lists are independent ---
+var a: List<Any> = [[1, 2], [3, 4]]
+var b: List<Any> = Copy.deep(a)
+var inner: List<Any> = b[0]
+inner.push(99)
+var a0: List<Any> = a[0]
+T.assert_eq(a0.length(), 2, "deep: original nested list untouched")
+var b0: List<Any> = b[0]
+T.assert_eq(b0.length(), 3, "deep: copy's nested list grew")
+
+// --- shallow list: top copied, elements shared ---
+var s0: List<Any> = [1, 2]
+var src: List<Any> = [s0]
+var sh: List<Any> = Copy.shallow(src)
+sh.push([7])                          // shape change: not seen by src
+T.assert_eq(src.length(), 1, "shallow: original shape unchanged")
+var shared: List<Any> = sh[0]
+shared.push(3)                        // element mutation: seen by both
+T.assert_eq(s0.length(), 3, "shallow: shared element mutation visible in original")
+
+// --- deep map: nested value independent ---
+var m: Map<String, Any> = {"nums": [1, 2]}
+var mc: Map<String, Any> = Copy.deep(m)
+var mc_nums: List<Any> = mc.get("nums")
+mc_nums.push(3)
+var m_nums: List<Any> = m.get("nums")
+T.assert_eq(m_nums.length(), 2, "deep map: original nested list untouched")
+
+// --- cycle: a list containing itself must terminate and stay cyclic ---
+var cyc: List<Any> = [1]
+cyc.push(cyc)
+var cc: List<Any> = Copy.deep(cyc)
+T.assert_eq(cc.length(), 2, "cycle: copy has same length")
+var cc1: Any = cc[1]
+T.assert_eq(cc1 == cc, true, "cycle: copy's self-reference points at the copy")
+
+// --- Cloneable instance: copied via clone() ---
+var box: Box = Box(5)
+var boxc: Box = Copy.deep(box)
+boxc.v = 99
+T.assert_eq(box.v, 5, "Cloneable: original instance independent of copy")
+T.assert_eq(boxc.v, 99, "Cloneable: copy is a distinct instance")
+
+// --- non-Cloneable instance: throws rather than sharing silently ---
+var threw: Int = 0
+try {
+    Copy.deep(Plain(1))
+} catch (e) {
+    threw = 1
+}
+T.assert_eq(threw, 1, "non-Cloneable instance throws")
+
+T.summary()
+
+class Box extends Cloneable {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+    fun clone(): Any { return Box(this.v) }
+}
+
+class Plain {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}

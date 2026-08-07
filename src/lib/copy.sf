@@ -1,0 +1,195 @@
+//! Shallow and deep copying of values.
+//!
+//! ```saffron
+//! import "@copy" as Copy
+//!
+//! var a = [[1, 2], [3, 4]]
+//! var b = Copy.deep(a)      // nested lists copied too
+//! b[0].push(99)             // a[0] is unchanged
+//!
+//! var s = Copy.shallow({"k": [1, 2]})   // top level copied, [1,2] shared
+//! ```
+//!
+//! To make a class copyable, import the `Cloneable` interface by name (a module
+//! qualifier is not accepted after `extends`) and implement `clone()`:
+//!
+//! ```saffron
+//! import { Cloneable } from "@copy"
+//!
+//! class Box extends Cloneable {
+//!     var v: Int
+//!     fun init(v: Int) { this.v = v }
+//!     fun clone(): Any { return Box(this.v) }
+//! }
+//! ```
+//!
+//! ## What copies, and how
+//!
+//! - **Primitives** (Int, Float, Bool, Nil) and **String** are immutable values;
+//!   both `shallow` and `deep` return them unchanged. There is nothing to alias.
+//! - **List** and **Map** are copied: `shallow` makes a new container holding the
+//!   same elements; `deep` recurses into every element.
+//! - **Class instances are opt-in.** An instance is copied only if its class
+//!   `extends Cloneable` (below); `Copy.deep`/`Copy.shallow` then call its
+//!   `clone()`. An instance that is not Cloneable is a thrown error, never a
+//!   silent shallow share — copying a socket or file handle by memory is almost
+//!   never what you want, so the language makes you say you meant it. This is the
+//!   Rust/Java stance (`derive(Clone)` / `implements Cloneable`), not Python's
+//!   copy-anything default.
+//!
+//! ## Cycles
+//!
+//! `deep` handles cyclic **List/Map** graphs (`a.push(a)`): a value already being
+//! copied is recorded and the same copy is reused, so the result mirrors the
+//! input's sharing instead of looping forever. Cycles *through a class instance*
+//! are the instance's own `clone()` to handle — see `Cloneable`.
+
+import "@reflect" as Reflect
+
+// A boxed value's raw pointer, as an Int, for identity. Two references to the
+// same List/Map untag to the same Int; two distinct-but-equal ones do not (unlike
+// `==`, which is structural). This is the only reliable object identity available
+// to stdlib, and it is what makes cycle detection possible without a codegen
+// change. Primitives/strings are never put in the identity table, so their
+// (meaningless here) untagged bits are never consulted.
+@intrinsic fun untag_ptr(v: Any): Int
+
+/// Implemented by any class that wants to be copyable by `@copy`.
+///
+/// `clone()` must return an independent copy of the receiver — as independent as
+/// the caller needs. A class holding only value fields can return a fresh
+/// instance with the same field values; a class owning a resource (an fd, a
+/// socket, a cache) decides for itself what "a copy" means (reopen it, share it,
+/// or drop it). `@copy` never reaches inside an instance, so this method is the
+/// entire contract.
+interface Cloneable {
+    fun clone(): Any
+}
+
+/// A shallow copy: one level deep.
+///
+/// Lists and maps become new containers holding the *same* element references;
+/// mutating the copy's shape (push/pop/set) does not affect the original, but
+/// mutating a shared element is visible through both. Primitives and strings are
+/// returned as-is. A Cloneable instance is cloned via `clone()`; a non-Cloneable
+/// instance throws.
+fun shallow(value: Any): Any {
+    if (_is_primitive(value) == 1) { return value }
+
+    if (value is List) {
+        var out: List<Any> = []
+        var i: Int = 0
+        while (i < value.length()) {
+            out.push(value[i])
+            i = i + 1
+        }
+        return out
+    }
+
+    if (value is Map) {
+        var out: Map<String, Any> = {}
+        var keys: List<Any> = value.keys()
+        var i: Int = 0
+        while (i < keys.length()) {
+            out.set(keys[i], value.get(keys[i]))
+            i = i + 1
+        }
+        return out
+    }
+
+    return _clone_instance(value)
+}
+
+/// A deep copy: every nested list, map, and (Cloneable) instance is copied, so
+/// the result shares no mutable structure with the input. Cyclic list/map graphs
+/// are handled — a value already in progress is reused rather than re-copied, so
+/// `deep` terminates and preserves the input's sharing shape.
+fun deep(value: Any): Any {
+    // Identity tables: parallel lists of "source pointer" -> "its copy". A Map
+    // keyed by Int would be cleaner, but Map keys are strings here, and Int->Any
+    // parallel lists are the idiom the rest of the stdlib uses for this. The
+    // table only ever holds Lists and Maps (the only cyclic-capable values);
+    // instances are delegated to clone(), which owns its own cycle handling.
+    var seen_ids: List<Int> = []
+    var seen_copies: List<Any> = []
+    return _deep(value, seen_ids, seen_copies)
+}
+
+private fun _deep(value: Any, seen_ids: List<Int>, seen_copies: List<Any>): Any {
+    if (_is_primitive(value) == 1) { return value }
+
+    if (value is List) {
+        var id: Int = untag_ptr(value)
+        var hit: Int = _index_of(seen_ids, id)
+        if (hit >= 0) { return seen_copies[hit] }
+
+        var out: List<Any> = []
+        // Record BEFORE recursing, so a self-reference reaches the in-progress
+        // copy rather than recursing forever. The copy is mutated in place as
+        // elements are filled, so the cyclic reference points at the same growing
+        // list — exactly mirroring the input.
+        seen_ids.push(id)
+        seen_copies.push(out)
+        var i: Int = 0
+        while (i < value.length()) {
+            out.push(_deep(value[i], seen_ids, seen_copies))
+            i = i + 1
+        }
+        return out
+    }
+
+    if (value is Map) {
+        var id: Int = untag_ptr(value)
+        var hit: Int = _index_of(seen_ids, id)
+        if (hit >= 0) { return seen_copies[hit] }
+
+        var out: Map<String, Any> = {}
+        seen_ids.push(id)
+        seen_copies.push(out)
+        var keys: List<Any> = value.keys()
+        var i: Int = 0
+        while (i < keys.length()) {
+            out.set(keys[i], _deep(value.get(keys[i]), seen_ids, seen_copies))
+            i = i + 1
+        }
+        return out
+    }
+
+    // A class instance: its clone() is the whole contract. We do not recurse into
+    // it — the author decides how deep a clone goes and how to handle any cycle
+    // through it. (Threading a shared identity table into clone() would require a
+    // second interface method; deferred until a real need appears.)
+    return _clone_instance(value)
+}
+
+// Clone a class instance via Cloneable, or throw if it does not opt in. Shared by
+// shallow and deep, so the "must be Cloneable" rule is stated once.
+private fun _clone_instance(value: Any): Any {
+    if (value is Cloneable) {
+        return value.clone()
+    }
+    // Not a primitive, not a collection, not Cloneable. `type_name` gives the
+    // class so the message names the offending type.
+    throw "Copy: value of type '" + Reflect.type_name(value) + "' is not Cloneable; have its class `extends Cloneable` and implement clone()"
+}
+
+// True (1) for values that are their own copy: nil, booleans, numbers, strings.
+// `nil`/`true`/`false` are matched by identity; Int/Float/String by `is`. Kept as
+// one predicate so shallow and deep agree on what "nothing to copy" means.
+private fun _is_primitive(value: Any): Int {
+    if (value == nil) { return 1 }
+    if (value == true) { return 1 }
+    if (value == false) { return 1 }
+    if (value is Int or value is Float) { return 1 }
+    if (value is String) { return 1 }
+    return 0
+}
+
+private fun _index_of(xs: List<Int>, x: Int): Int {
+    var i: Int = 0
+    while (i < xs.length()) {
+        if (xs[i] == x) { return i }
+        i = i + 1
+    }
+    return -1
+}
