@@ -64,14 +64,6 @@ class Codegen {
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
     var func_param_names: Map<String, List<String>>
-    // Function overloading. `overload_count` maps an unmangled emit name to how
-    // many top-level `fun`s in the module share it; a name is OVERLOADED iff its
-    // count is >= 2. `overload_variants` maps an emit name to the list of its
-    // per-signature mangled symbols (name$sig), populated in the same prescan.
-    // Everything keyed here is a strict addition: a name with a single definition
-    // never enters these maps, so non-overloaded code is byte-for-byte unchanged.
-    var overload_count: Map<String, Float>
-    var overload_variants: Map<String, List<String>>
     // Declared parameter TYPE spellings, parallel to func_param_names. Populated in
     // gen_function from the same param CSV. Used to resolve a free generic
     // function's return type parameter from its call arguments (BUGS #171): given
@@ -79,6 +71,18 @@ class Codegen {
     // ["List<T>"], so a call `find(words)` can bind T to the element type of
     // `words` and dispatch on the result.
     var func_param_type_strs: Map<String, List<String>>
+    // Function overloading (arity- and first-param-type-based). Keyed by the
+    // *emit_name* (module prefix + bare name), value is the list of mangled
+    // per-definition symbols `<emit_name>$<arity>$<firstparamtype>`. Only names
+    // with >= 2 definitions in a single prescan slice get an entry, so the whole
+    // mechanism is inert for every non-overloaded name — which is mandatory:
+    // the compiler self-hosts entirely on non-overloaded names, and cross-module
+    // same-name free functions (from/new/parse/...) live in different modules,
+    // hence different emit_names and different prescan slices, so they never
+    // collide here. gen_function mangles the symbol it emits, prescan_fun_decl
+    // keys the signature maps by the mangled name, and gen_call resolves an
+    // overloaded callee to the mangled symbol by matching arity + first arg type.
+    var overload_sets: Map<String, List<String>>
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var global_var_types: Map<String, String>
@@ -209,9 +213,8 @@ class Codegen {
         this.func_defaults = {}
         this.func_param_count = {}
         this.func_param_names = {}
-        this.overload_count = {}
-        this.overload_variants = {}
         this.func_param_type_strs = {}
+        this.overload_sets = {}
         this.current_prefix = ""
         this.module_globals = {}
         this.global_var_types = {}
@@ -1347,6 +1350,31 @@ class Codegen {
     fun generic_base_name(typ: String): String {
         if (!typ.contains("<")) { return typ }
         return typ.slice(0, typ.index_of("<"))
+    }
+
+    /// Normalize a type spelling to the key used for overload dispatch. Strips
+    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`) and
+    /// folds the `Number` spelling onto `Int` so that a declared `Int` parameter
+    /// and an inferred `Number`/`Int` argument agree. Everything else passes
+    /// through unchanged. Both the mangling site (gen_function / prescan) and the
+    /// call-site resolver run every candidate and every argument through this, so
+    /// they compare like against like.
+    fun overload_norm_type(typ: String): String {
+        var base: String = this.generic_base_name(typ)
+        if (base == "Number") { return "Int" }
+        return base
+    }
+
+    /// The overload-mangled symbol for a definition:
+    /// `<emit_name>$<arity>$<first-param-type-normalized>`. A zero-arg definition
+    /// has no first parameter, so its slot is the literal `void` — an arity-only
+    /// overload set (e.g. `f()` vs `f(x)`) still gets distinct symbols.
+    fun overload_mangle(emit_name: String, arity: Float, first_ptype: String): String {
+        var slot: String = "void"
+        if (arity > 0 and first_ptype.length() > 0) {
+            slot = this.overload_norm_type(first_ptype)
+        }
+        return emit_name + "$" + arity.floor().to_string() + "$" + slot
     }
 
     /// `typ` with the receiver's class type arguments substituted in:
@@ -4056,17 +4084,6 @@ class Codegen {
                 resolved_callee = this.current_prefix + callee_name
             }
         }
-        // Overloading (pass/overloading): if the resolved base names an overload
-        // set, pick the variant matching this call's arity and first-argument type.
-        // overload_variants is only populated for names with >= 2 definitions, so a
-        // non-overloaded call never enters this block. A no-match leaves
-        // resolved_callee alone, so the ordinary arity diagnostic still fires.
-        if (this.overload_variants.has(resolved_callee)) {
-            var ov_first_tag: String = "void"
-            if (args.length() > 0) { ov_first_tag = this.overload_type_tag(this.get_expr_type(args[0])) }
-            var ov_pick: String = this.resolve_overload(resolved_callee, args.length(), ov_first_tag)
-            if (ov_pick.length() > 0) { resolved_callee = ov_pick }
-        }
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")
         // before intrinsic/extern/coroutine checks
         if (resolved_callee.contains(".")) {
@@ -4081,6 +4098,16 @@ class Codegen {
                     resolved_callee = this.func_prefix_map.get(resolved_callee)
                 }
             }
+        }
+        // Overload resolution: an overloaded callee resolves to one of its
+        // mangled per-definition symbols by matching arity, then (for arity > 0)
+        // the normalized static type of the first argument against each
+        // candidate's first declared parameter type. Runs before every downstream
+        // consumer of resolved_callee (intrinsic/extern/coroutine checks, the
+        // arity guard, the direct-call emit) so they all see the concrete symbol.
+        // Inert unless resolved_callee names an overload set of 2+ definitions.
+        if (this.is_overloaded(resolved_callee)) {
+            resolved_callee = this.resolve_overload(resolved_callee, args)
         }
         if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
@@ -11500,108 +11527,30 @@ class Codegen {
         if (prefix.length() > 0) {
             this.func_ret_types.set(name, ret)
         }
-        // Function overloading (pass/overloading): if this emit name has >= 2
-        // definitions, ALSO register this signature's variant under a mangled
-        // symbol, and remember it in overload_variants. The bare-name registration
-        // above is left untouched — non-overloaded code never consults these maps,
-        // so it is byte-identical. gen_function emits under the same mangled name
-        // (it recomputes the tag from its own params), and a call site resolves to
-        // it by the argument types (see resolve_overload).
-        var oc: Float = 0
-        if (this.overload_count.has(emit_name)) { oc = this.overload_count.get(emit_name) }
-        if (oc >= 2) {
-            var mangled: String = this.overload_mangle(emit_name, params.length(), this.overload_first_tag_params(params))
+
+        // Overloaded name: ALSO register this definition's signature under its
+        // mangled symbol, so the call-site resolver can read a per-definition
+        // arity, param names, defaults, return type and first-param type. The
+        // bare emit_name entries above are left as last-wins (harmless: the
+        // resolver rebinds resolved_callee to the mangled symbol before any of
+        // these maps is consulted downstream). Inert for a single-definition
+        // name — is_overloaded() is false and this block never runs.
+        if (this.is_overloaded(emit_name)) {
+            var ptypes: List<String> = []
+            var qpi: Float = 0
+            while (qpi < params.length()) {
+                ptypes.push(match (params[qpi]) { Param(n, t, d, p_vis, __ns) => this.type_to_string(t) })
+                qpi = qpi + 1
+            }
+            var first_pt: String = ""
+            if (ptypes.length() > 0) { first_pt = ptypes[0] }
+            var mangled: String = this.overload_mangle(emit_name, params.length(), first_pt)
             this.func_defaults.set(mangled, defaults)
             this.func_param_count.set(mangled, params.length())
             this.func_param_names.set(mangled, pnames)
+            this.func_param_type_strs.set(mangled, ptypes)
             this.func_ret_types.set(mangled, ret)
-            var variants: List<String> = []
-            if (this.overload_variants.has(emit_name)) { variants = this.overload_variants.get(emit_name) }
-            if (!this.str_in_list(variants, mangled)) { variants.push(mangled) }
-            this.overload_variants.set(emit_name, variants)
         }
-    }
-
-    /// Coarse type bucket for overload resolution. Must agree between the
-    /// declaration side (param declared type) and the call side (inferred arg
-    /// type): a generic is stripped to its base, a user class/enum keeps its name,
-    /// and anything unresolved collapses to "Any" so an untyped call still lands on
-    /// an arity match rather than a spurious distinct signature.
-    fun overload_type_tag(t: String): String {
-        if (t.length() == 0) return "Any"
-        var base: String = t
-        if (base.contains("<")) { base = base.slice(0, base.index_of("<")) }
-        if (base.contains("|")) { return "Any" }   // a union arg is not a single bucket
-        if (base == "Int" or base == "Number") return "Int"
-        if (base == "Float") return "Float"
-        if (base == "Bool") return "Bool"
-        if (base == "String") return "String"
-        if (base == "Nil") return "Nil"
-        if (base == "List" or base == "Map" or base == "StringBuilder") return base
-        if (this.class_fields.has(base) or this.enum_defs.has(base)) return base
-        return "Any"
-    }
-
-    /// The mangled symbol for one overload variant: base$<arity>_<first-param tag>.
-    /// Arity separates the arity-based overloads; the first parameter's type tag
-    /// separates same-arity ones. Deliberately coarse (first param only) — enough
-    /// for the common cases, and identical on both the decl and call sides so they
-    /// resolve to the same symbol.
-    fun overload_mangle(base: String, arity: Float, first_tag: String): String {
-        return base + "$" + arity.floor().to_string() + "_" + first_tag
-    }
-
-    /// First-parameter type tag from a declaration's Param list ("" arity → "void").
-    fun overload_first_tag_params(params: List<AST.Param>): String {
-        if (params.length() == 0) return "void"
-        var pt: AST.Type = match (params[0]) { Param(n, t, d, p_vis, __ns) => t }
-        return this.overload_type_tag(this.type_to_string(pt))
-    }
-
-    /// Same tag, but from gen_function's params CSV ("name:Type,name:Type").
-    /// Must agree with overload_first_tag_params so the emit name matches the one
-    /// prescan_fun_decl registered.
-    fun overload_first_tag_csv(params: String): String {
-        if (params.length() == 0) return "void"
-        var pl: List<String> = this.split_respecting_generics(params, ",")
-        if (pl.length() == 0) return "void"
-        var first: String = pl[0]
-        var colon: Float = first.index_of(":")
-        if (colon < 0) return "Any"
-        return this.overload_type_tag(first.slice(colon + 1, first.length()))
-    }
-
-    /// Arity of a params CSV.
-    fun overload_csv_arity(params: String): Float {
-        if (params.length() == 0) return 0
-        return this.split_respecting_generics(params, ",").length()
-    }
-
-    /// Resolve an overloaded call to its mangled variant, or return "" if `base`
-    /// names no overload set or no variant matches. `arg_types` are the inferred
-    /// call-site argument types (first-element tag is what discriminates same-arity
-    /// variants). Resolution: prefer an exact (arity, first-tag) match; then fall
-    /// back to the (arity, "Any") variant if one was declared; then to any variant
-    /// of the right arity, so an untyped argument still lands on the sole overload
-    /// of that arity rather than failing.
-    fun resolve_overload(base: String, argc: Float, first_arg_tag: String): String {
-        if (!this.overload_variants.has(base)) return ""
-        var variants: List<String> = this.overload_variants.get(base)
-        var exact: String = this.overload_mangle(base, argc, first_arg_tag)
-        if (this.str_in_list(variants, exact)) { return exact }
-        var any_variant: String = this.overload_mangle(base, argc, "Any")
-        if (this.str_in_list(variants, any_variant)) { return any_variant }
-        // Sole variant of this arity: unique arity match regardless of tag.
-        var arity_prefix: String = base + "$" + argc.floor().to_string() + "_"
-        var found: String = ""
-        var n: Float = 0
-        var vi: Float = 0
-        while (vi < variants.length()) {
-            if (variants[vi].starts_with(arity_prefix)) { found = variants[vi]; n = n + 1 }
-            vi = vi + 1
-        }
-        if (n == 1) { return found }
-        return ""
     }
 
     /// Pre-register every method of a class declaration. Methods take an implicit
@@ -11665,25 +11614,14 @@ class Codegen {
     /// class declaration. One call site per corpus — modules and main program
     /// alike — so the four copies cannot drift again.
     fun prescan_decls(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
-        // Overloading: count how many `fun`s share each emit name FIRST, so
-        // prescan_fun_decl below already knows whether a name is overloaded (>= 2)
-        // when it decides to register a mangled variant. A single-definition name
-        // never reaches count 2, so it is never mangled and nothing downstream
-        // changes for it.
-        var ci: Float = start
-        while (ci < end) {
-            if (this.classify_stmt(stmts[ci]) == "fun") {
-                var cn: String = this.get_fun_name(stmts[ci])
-                var cdoc: String = this.get_fun_doc(stmts[ci])
-                if (cn.length() > 0 and !cdoc.starts_with("@intrinsic") and !cdoc.starts_with("@extern:")) {
-                    var cem: String = prefix + cn
-                    var prev: Float = 0
-                    if (this.overload_count.has(cem)) { prev = this.overload_count.get(cem) }
-                    this.overload_count.set(cem, prev + 1)
-                }
-            }
-            ci = ci + 1
-        }
+        // First, detect overload sets in this slice: any ordinary free function
+        // whose emit_name is declared 2+ times. Only ordinary functions
+        // participate — @intrinsic / @extern / @extend have their own dispatch
+        // and must never be mangled. Populated before per-decl registration so
+        // prescan_fun_decl below (and gen_function later) can mangle consistently.
+        // The whole feature is inert for a name that appears exactly once: it
+        // gets no overload_sets entry and every downstream gate reads BARE.
+        this.detect_overload_sets(stmts, start, end, prefix)
         var si: Float = start
         while (si < end) {
             var kind: String = this.classify_stmt(stmts[si])
@@ -11694,6 +11632,117 @@ class Codegen {
             }
             si = si + 1
         }
+    }
+
+    /// True when `stmt` is a FunDecl that dispatches through the ordinary
+    /// call path (not @intrinsic / @extern / @extend). Only these participate in
+    /// overloading; the special forms keep their bare, unmangled symbols.
+    fun is_ordinary_fun_decl(stmt: AST.Stmt): Bool {
+        if (this.classify_stmt(stmt) != "fun") { return false }
+        var doc: String = this.get_fun_doc(stmt)
+        if (doc.starts_with("@intrinsic")) { return false }
+        if (doc.starts_with("@extern:")) { return false }
+        if (doc.starts_with("@extend:")) { return false }
+        return true
+    }
+
+    /// Populate overload_sets for this prescan slice. Counts ordinary free
+    /// functions by emit_name; a name with 2+ declarations becomes an overload
+    /// set whose value is the list of mangled per-definition symbols, in source
+    /// order. A name declared once is left absent, so is_overloaded() answers
+    /// false and nothing about its lowering changes.
+    fun detect_overload_sets(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var counts: Map<String, Float> = {}
+        var si: Float = start
+        while (si < end) {
+            if (this.is_ordinary_fun_decl(stmts[si])) {
+                var nm: String = prefix + this.get_fun_name(stmts[si])
+                if (counts.has(nm)) {
+                    var prev: Float = counts.get(nm)
+                    counts.set(nm, prev + 1)
+                } else { counts.set(nm, 1) }
+            }
+            si = si + 1
+        }
+        si = start
+        while (si < end) {
+            if (this.is_ordinary_fun_decl(stmts[si])) {
+                var emit_name: String = prefix + this.get_fun_name(stmts[si])
+                var emit_count: Float = counts.get(emit_name)
+                if (emit_count >= 2) {
+                    var params: List<AST.Param> = this.get_fun_params(stmts[si])
+                    var first_pt: String = ""
+                    if (params.length() > 0) {
+                        first_pt = match (params[0]) { Param(n, t, d, p_vis, __ns) => this.type_to_string(t) }
+                    }
+                    var mangled: String = this.overload_mangle(emit_name, params.length(), first_pt)
+                    if (!this.overload_sets.has(emit_name)) {
+                        this.overload_sets.set(emit_name, [])
+                    }
+                    var lst: List<String> = this.overload_sets.get(emit_name)
+                    lst.push(mangled)
+                }
+            }
+            si = si + 1
+        }
+    }
+
+    /// True when `emit_name` names an overload set (2+ definitions). The one
+    /// gate every new overloading code path is guarded on.
+    fun is_overloaded(emit_name: String): Bool {
+        if (!this.overload_sets.has(emit_name)) { return false }
+        var lst: List<String> = this.overload_sets.get(emit_name)
+        return lst.length() >= 2
+    }
+
+    /// Resolve an overloaded callee `emit_name` to one of its mangled symbols
+    /// given the call arguments. Two-stage match: first narrow to candidates
+    /// whose declared arity equals args.length(); if exactly one survives, take
+    /// it (arity-based overloading). If several share the arity (type-based
+    /// overloading), pick the one whose first declared parameter type — normalized
+    /// through overload_norm_type — equals the normalized static type of the first
+    /// argument. Falls back to the first arity match, then to the bare name, so a
+    /// callee that matches nothing still lowers to *something* rather than an
+    /// empty symbol; the checker is responsible for rejecting genuinely
+    /// unresolvable calls.
+    fun resolve_overload(emit_name: String, args: List<AST.Expr>): String {
+        var cands: List<String> = this.overload_sets.get(emit_name)
+        var argc: Float = args.length()
+        // Stage 1: arity matches.
+        var arity_matches: List<String> = []
+        var ci: Float = 0
+        while (ci < cands.length()) {
+            var cand: String = cands[ci]
+            if (this.func_param_count.has(cand) and this.func_param_count.get(cand) == argc) {
+                arity_matches.push(cand)
+            }
+            ci = ci + 1
+        }
+        if (arity_matches.length() == 0) {
+            // No arity match at all — leave as the bare name and let the arity
+            // guard downstream report it against the (last-wins) bare entry.
+            return emit_name
+        }
+        if (arity_matches.length() == 1) {
+            return arity_matches[0]
+        }
+        // Stage 2: type match on the first argument.
+        var arg0_type: String = "Any"
+        if (argc > 0) { arg0_type = this.overload_norm_type(this.get_expr_type(args[0])) }
+        var ti: Float = 0
+        while (ti < arity_matches.length()) {
+            var tc: String = arity_matches[ti]
+            if (this.func_param_type_strs.has(tc)) {
+                var pts: List<String> = this.func_param_type_strs.get(tc)
+                if (pts.length() > 0 and this.overload_norm_type(pts[0]) == arg0_type) {
+                    return tc
+                }
+            }
+            ti = ti + 1
+        }
+        // No first-type match (e.g. argument type is Any / unresolved): default to
+        // the first arity-compatible definition.
+        return arity_matches[0]
     }
 
     /// Second pass over global `var`s, typing the ones the FIRST pass had to give
@@ -11825,15 +11874,27 @@ class Codegen {
         } else if (name.contains("__lambda")) {
             emit_name = name
         }
-        // Overloading (pass/overloading): a name with >= 2 top-level definitions
-        // emits each under a per-signature mangled symbol, so the second body no
-        // longer overwrites the first on the shared `emit_name` (the `defined_funcs`
-        // dedup below would otherwise drop it). The mangle must match what
-        // prescan_fun_decl registered — same arity, same first-param tag. Only the
-        // unprefixed/prefixed top-level case: `main` and lambdas are handled above
-        // and are never overload sets.
-        if (this.overload_count.has(emit_name) and this.overload_count.get(emit_name) >= 2) {
-            emit_name = this.overload_mangle(emit_name, this.overload_csv_arity(params), this.overload_first_tag_csv(params))
+        // Overloaded name: mangle the symbol this definition emits to
+        // `<emit_name>$<arity>$<firstparamtype>`, so the redefinition guard below
+        // no longer collapses two bodies with the same bare name onto one symbol.
+        // The call-site resolver picks the matching mangled symbol. Inert for a
+        // single-definition name (is_overloaded false), and `main`/lambdas never
+        // reach here as overload sets. Derives arity + first-param type from the
+        // `params` CSV, matching how prescan_fun_decl and detect_overload_sets
+        // spell them.
+        if (this.is_overloaded(emit_name)) {
+            var ov_arity: Float = 0
+            var ov_first: String = ""
+            if (params.length() > 0) {
+                var ov_pl: List<String> = this.split_respecting_generics(params, ",")
+                ov_arity = ov_pl.length()
+                if (ov_pl.length() > 0) {
+                    var ov_p0: String = ov_pl[0]
+                    var ov_c: Float = ov_p0.index_of(":")
+                    if (ov_c >= 0) { ov_first = ov_p0.slice(ov_c + 1, ov_p0.length()) }
+                }
+            }
+            emit_name = this.overload_mangle(emit_name, ov_arity, ov_first)
         }
         this.known_functions.push(emit_name)
         // Same collapse as everywhere else, except that an unannotated *lambda*
