@@ -1,0 +1,66 @@
+true
+false
+interp true=true false=false
+true
+false
+var interp bt=true bf=false
+true
+false
+true
+false
+branch-on-bt: taken
+branch-on-bf: NOT taken
+0
+1
+-1
+42
+-42
+1000000
+0
+0.5
+-0.5
+3.25
+interp int=7 float=2.5 neg=-3
+
+plain
+with spaces and, punctuation!
+bound
+interp str=bound
+nil
+[]
+[1, 2, 3]
+[1.5, 2.5]
+[a, b]
+[true, false]
+[[1, 2], [3]]
+Red
+Green
+Blue
+OI(0)
+OI(7)
+OI(-7)
+OF(1.5)
+OF(0)
+OS(payload)
+OS()
+OB(true)
+OB(false)
+OL([1, 2])
+Circle(2.5)
+Square(4)
+Named(box)
+P(1, 2)
+M(1, two, 3.5)
+Empty
+One(9)
+Two(9, nine)
+W(Blue)
+Named(stored)
+OB(true)
+OS(explicit)
+Square(11)
+Blue
+matched Square 4
+outer s after match: bound
+matched OB false
+oracle_stringify done
