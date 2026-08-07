@@ -138,6 +138,18 @@ class Codegen {
     var coroutine_funcs: List<String>
     var inline_funcs: List<String>
     var is_coroutine: Bool
+    // True once codegen emits anything that makes the ambient scheduler's queues
+    // reachable at runtime: a Task.spawn/enqueue, or a boot wrapper that runs the
+    // scheduler because the entry (or main) is a coroutine. The scheduler is
+    // ALWAYS linked (ambient runtime, BUGS #181), but its module-init — which
+    // allocates ~13 global collections — is only CALLED when this is set. A
+    // coroutine-free program leaves the scheduler globals at their static `0`
+    // (nil), makes zero startup allocations, and -O2 drops the dead scheduler
+    // code, so it is byte-for-byte the pre-#181 program. Without this gate every
+    // program paid 28 startup allocations, which shifted the GC threshold and
+    // broke gc_test/gc_api_test (allocation counts) and enum_payload_any (a
+    // collection landing mid-format on an unrooted temporary).
+    var scheduler_used: Bool
     var use_llvm_lib: Bool
     var emit_llvm_lib: Bool
     var gc_root_count: Float
@@ -257,6 +269,7 @@ class Codegen {
         this.coroutine_funcs = []
         this.inline_funcs = []
         this.is_coroutine = false
+        this.scheduler_used = false
         this.use_llvm_lib = true
         this.emit_llvm_lib = false
         this.gc_root_count = 0
@@ -12956,6 +12969,22 @@ class Codegen {
         return this.is_nil_expr(e)
     }
 
+    // Whether to actually CALL a module's init at boot. Everything is emitted
+    // (the init function exists in the IR either way); this only decides whether
+    // it runs. The ambient scheduler (BUGS #181) is always linked but its init
+    // allocates ~13 global collections, so a coroutine-free program must not call
+    // it — its queues are unreachable there and the extra startup allocations
+    // shift the GC threshold (breaking gc_test / gc_api_test / enum_payload_any).
+    // scheduler_used is set at the boot wrapper's own scheduler-run decision, so
+    // this can only skip the scheduler when the wrapper also skips running it.
+    // Every other module's init is unconditional.
+    fun should_emit_mod_init(init_name: String): Bool {
+        if (init_name == "__mod_init_stdlib_scheduler") {
+            return this.scheduler_used
+        }
+        return true
+    }
+
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
             FunDecl(n, p, r, b, d, f_vis, __ns, __fs) => true
@@ -13342,6 +13371,15 @@ class Codegen {
                     ec_i = ec_i + 1
                 }
             }
+            // entry_is_coro is the boot wrapper's own test for "this program runs
+            // the scheduler": it deep-scans the top-level statements (into lambda
+            // bodies) for a yield or a call to a transitively-marked coroutine
+            // function — i.e. exactly Task.spawn(fun () => ...coroutine...) and
+            // top-level await/yield. When it is false the boot wrapper never calls
+            // scheduler_run and no Task is ever enqueued, so the scheduler's queues
+            // are unreachable and its module-init (which allocates them) must be
+            // skipped. See scheduler_used's declaration. BUGS #181.
+            if (entry_is_coro) { this.scheduler_used = true }
             this.emit("")
             if (entry_is_coro) {
                 this.is_coroutine = true
@@ -13395,7 +13433,9 @@ class Codegen {
             // Call module init functions before user code
             var mi2: Float = 0
             while (mi2 < this.module_init_names.length()) {
-                this.emit_indent("call i64 @" + this.module_init_names[mi2] + "()")
+                if (this.should_emit_mod_init(this.module_init_names[mi2])) {
+                    this.emit_indent("call i64 @" + this.module_init_names[mi2] + "()")
+                }
                 mi2 = mi2 + 1
             }
             i = 0
@@ -13693,9 +13733,14 @@ class Codegen {
                     // native wrapper emits them in this case: when has_top_level
                     // they run inside __saffron_entry, and with no entry there is
                     // nowhere else for them to run.
+                    // A `fun main` that is itself a coroutine reaches the scheduler
+                    // (it is enqueued below), so its init must run. BUGS #181.
+                    if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) { this.scheduler_used = true }
                     var mi4: Float = 0
                     while (mi4 < this.module_init_names.length()) {
-                        out.append("  call i64 @" + this.module_init_names[mi4] + "()\n")
+                        if (this.should_emit_mod_init(this.module_init_names[mi4])) {
+                            out.append("  call i64 @" + this.module_init_names[mi4] + "()\n")
+                        }
                         mi4 = mi4 + 1
                     }
                     if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) {
@@ -13762,9 +13807,14 @@ class Codegen {
                 } else {
                     // Call module init functions before __saffron_main
                     // (when has_top_level is true, inits are called inside __saffron_entry)
+                    // A coroutine `fun main` is enqueued+run below, so it uses the
+                    // scheduler and its init must run. BUGS #181.
+                    if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) { this.scheduler_used = true }
                     var mi3: Float = 0
                     while (mi3 < this.module_init_names.length()) {
-                        out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
+                        if (this.should_emit_mod_init(this.module_init_names[mi3])) {
+                            out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
+                        }
                         mi3 = mi3 + 1
                     }
                     if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) {

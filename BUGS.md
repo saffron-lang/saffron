@@ -2,8 +2,14 @@
 
 ## Open
 
-**6 open entries:** #49, #65, #107, #131, #132, #181.
-Next free number is **#184**.
+**7 open entries:** #49, #65, #107, #131, #132, #181, #184.
+Next free number is **#185**.
+
+#184 (a `Task.spawn`/coroutine closure traps with `null function or function
+signature mismatch` on wasm32 when the module also contains a large amount of
+earlier closure/function-defining code — works natively, and works on wasm32 in
+isolation) blocks the learnxinyminutes doc from running to completion in the
+playground. Count 6 → 7.
 
 #183 (a `store8`/`load8` intrinsic called inside a nested/private function was
 `$$`-qualified by #175's nested-fun naming and emitted as an undefined function
@@ -450,7 +456,41 @@ each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
 
-### 181. OPEN — coroutines without `import "@async"` fail to link; the scheduler is collected as a source module, not linked as ambient runtime
+### 184. OPEN — a `Task.spawn`/coroutine closure traps `null function or function signature mismatch` on wasm32 when the module also has many earlier closures
+
+**Severity: high** for real programs — it silently kills execution partway through
+(no diagnostic, no crash trace, just a wasm trap). Found running the
+learnxinyminutes doc in the playground: it compiles, prints ~30 correct lines,
+then traps the moment execution reaches the `Task.spawn`/`.await()` section.
+
+**wasm32 only.** The identical program runs correctly and to completion **natively**.
+Each part runs fine on wasm32 in isolation — the async section alone works, the
+first ~560 lines alone work. The trap needs BOTH: a `Task.spawn`/coroutine closure
+AND a large amount of earlier closure/function-defining code in the same module.
+
+**Repro** (deterministic): take the async section (a `fetch` coroutine +
+`Task.spawn(fun () => fetch(...))` + `.await()`) and prepend the first ~300 lines
+of `docs/learnxinyminutes/learnsaffron.sf` (many lambdas, nested funs, methods).
+Build `--target wasm32` and run: correct output through the prepended code, then
+`THREW: null function or function signature mismatch` at the first `.await()`.
+Standalone async section, or a smaller prefix, does not trap. Native never traps.
+
+**Likely cause.** `null function or function signature mismatch` is a wasm
+`call_indirect` against a function-table slot whose stored index is wrong or whose
+signature does not match the call site. `Task.spawn(fun () => ...)` stores a
+closure/coroutine function pointer into the wasm indirect-call table; something
+about that index or its type signature goes wrong once the table is large / has
+many closures registered ahead of it. Suspect the wasm32 codegen for closure /
+coroutine function-pointer emission and the `call_indirect` type index — a
+collision, an off-by-one in table slot assignment, or a signature-index mismatch
+that only manifests past some table size. Native uses real function pointers (no
+typed indirect-call table), which is why it is wasm32-specific.
+
+**Investigation aids.** `/tmp/combo.sf` (head[:560] + async section) reproduces;
+so does head[:300] + async. Compare the emitted wasm's `call_indirect` type index
+and the `elem`/table entry for the spawned closure against a working standalone
+build. The trap is at the `.await()` / coroutine-drive path, so also check how the
+coroutine frame's resume function pointer is registered vs called.
 
 **Severity: medium.** A program that uses a coroutine — a top-level `yield`, or
 `Task.spawn` — but does not `import "@async"` (which transitively imports
