@@ -9,6 +9,72 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 178. FIXED — an all-scalar overload set was rejected by the checker; type-based overloading needed one non-scalar arm
+
+```saffron
+fun show(n: Int): String { return "int " }
+fun show(s: String): String { return "str " }
+show(42)   // was: Error: argument 1 of 'show' (parameter 's') expects String, got Int
+```
+
+Function overloading (implemented in `main` — codegen mangles a name with >= 2
+definitions to `name$arity$firsttype` and resolves the call by arity + first-arg
+type) is **codegen-only**. The checker's `check_call_args` validated a call
+against the single, last-registered signature for that name, through
+`scalar_mismatch`. When every overload's first parameter was a *scalar*
+(`Int`/`String`/`Bool`/`Float`), that check fired: `show(42)` was compared to the
+last-registered `show(s: String)`, two different scalars, and rejected before
+codegen ever resolved the right variant.
+
+**Why it only bit the all-scalar case.** `scalar_mismatch` is one-sided: it fires
+only on two *different concrete scalars*. An overload set with at least one
+non-scalar arm (`format(Int)` / `format(String)` / `format(List<Any>)`, the shape
+`test/pass/overloading.sf` uses) escaped it, because the last-registered signature
+was `List<Any>` and `Int`-vs-`List` is not two scalars. So type-based overloading
+worked *unless* all arms were scalar-typed.
+
+**Why the naive fix is wrong, and what the real one does.** Marking an overloaded
+name in the checker and skipping its arg check misfires if "overloaded" is judged
+against the flattened name table the checker keeps: the stdlib defines `fun parse`
+in 10 files and `fun from` in 7, and a global "overloaded → skip" would stop
+arg-checking those everywhere, silently weakening the #155/#165 guards across the
+whole stdlib. The fix scopes "overloaded" **per file**, exactly like codegen's
+`detect_overload_sets`:
+
+- `TypeEnv.overload_counts: Map<String, Float>` counts free-function definitions
+  keyed on `current_prefix + name`. `current_prefix` is already set per module
+  during registration (`check_errors_with_module_packages` walks module by
+  module, restoring each prefix first), so this is genuinely per-file.
+- A name whose per-file count reaches 2 enters `TypeEnv.overload_names:
+  Map<String, Bool>` — a set of bare names that are a real, single-module overload
+  set. `parse` declared once in each of 10 files never enters (each file's count
+  is 1).
+- The free-function call site (`infer_call_str`) skips `check_call_args` when the
+  bare name is in `overload_names`. Constructors (`Class__init`) and methods
+  (`Class__method`) pass mangled keys and are never bare overloaded names, so they
+  keep their checks. A non-overloaded scalar mismatch (`only(42)` against
+  `fun only(s: String)`) still errors — verified — so the #155/#165 guard on this
+  path is intact for every call that is not a genuine overload.
+
+Extension methods (`@extend:`), intrinsics and externs are excluded from the count
+(matching `is_ordinary_fun_decl`) — they are not overload arms.
+
+A note for the next reader: the first cut declared these fields on `TypeEnv` but
+wrote them through `this.overload_counts` from inside `NullChecker.register_decl`,
+where the field does not exist. That is the silent nonexistent-field hazard, not a
+type error — gen3 built and then **segfaulted on every input** (even a five-line
+program), and the bootstrap failed at the stage-2 gen4 fixed point with a
+`Segmentation fault` rather than a diagnostic. The fix routes through `this.env.`
+consistently. Worth remembering that a checker-only edit that crashes the compiler
+at runtime is almost always a field on the wrong `this`.
+
+Regression test `test/pass/overload_all_scalar.sf` (5 assertions: three scalar arms
+of one set resolve by first-arg type, and a separate arity-1/arity-2 set resolves
+by arity). Full suite: 347 passed, 2 failed (`async`, `http_binary_response` — both
+pre-existing baseline), zero regressions.
+
+---
+
 ### 154. FIXED — an enum inside a printed collection printed a bit pattern (both halves now fixed)
 
 **Closed 2026-08-06.** The payload half was fixed 2026-08-04 (GC-header +

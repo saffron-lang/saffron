@@ -55,6 +55,27 @@ class TypeEnv {
     // constraint check) sees a byte-identical string and scalar_mismatch's #155
     // proof set is untouched. See get_func_params / get_func_param_nodes.
     var func_params: Map<String, List<AST.Param>>
+    // BUGS #178: how many times each PREFIX-QUALIFIED free-function name was
+    // declared within one module. Type-based overloading is codegen-only — a
+    // name with 2+ definitions in one file is mangled by
+    // `<name>$<arity>$<firsttype>` and resolved at the call site. The checker
+    // keeps one (last-writer-wins) signature per bare name, so it cannot
+    // validate a call against the right arm and `scalar_mismatch` rejects
+    // `show(42)` against `show(s: String)`. This count is keyed on
+    // `current_prefix + name` so it is SCOPED PER FILE, exactly like codegen's
+    // detect_overload_sets: the stdlib's `parse` (declared once in each of 10
+    // files) never counts as overloaded, so its arg checks — and the #155/#165
+    // class-mismatch guard riding the same path — stay intact. See
+    // is_local_overload / check_call_args.
+    var overload_counts: Map<String, Float>
+    // BUGS #178: bare names that reached 2+ definitions WITHIN A SINGLE module —
+    // i.e. genuine type-based overload sets. A call to such a name is skipped by
+    // the single-signature arg check, because the checker cannot tell which arm
+    // it binds to and codegen resolves it correctly anyway. Populated from
+    // overload_counts the instant a per-file count hits 2, so a name declared
+    // once per file across many files (the stdlib's `parse`, `from`) never
+    // enters and keeps its full arg check.
+    var overload_names: Map<String, Bool>
     var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
@@ -69,6 +90,8 @@ class TypeEnv {
         this.scopes.push(Scope())
         this.funcs = {}
         this.func_params = {}
+        this.overload_counts = {}
+        this.overload_names = {}
         this.func_type_params = {}
         this.enum_variants = {}
         this.enum_fields = {}
@@ -1515,6 +1538,23 @@ class NullChecker {
                 // concrete type must infer it rather than read a sentinel.
                 this.env.define_func(name, ret_type)
                 this.env.define_func_params(name, params)
+                // BUGS #178: count per-file free-function definitions so an
+                // all-scalar overload set is recognised as overloaded and its
+                // single-signature arg check is skipped. Extension methods
+                // (`@extend:`), intrinsics and externs are excluded, matching
+                // codegen's is_ordinary_fun_decl — they are not overload arms.
+                if (!doc.starts_with("@extend:") and !doc.starts_with("@intrinsic") and !doc.starts_with("@extern:")) {
+                    var ov_key: String = this.current_prefix + name
+                    var ov_prev: Float = 0
+                    if (this.env.overload_counts.has(ov_key)) {
+                        ov_prev = this.env.overload_counts.get(ov_key)
+                    }
+                    var ov_next: Float = ov_prev + 1
+                    this.env.overload_counts.set(ov_key, ov_next)
+                    if (ov_prev >= 1) {
+                        this.env.overload_names.set(name, true)
+                    }
+                }
                 // Module-level identity + visibility, so a cross-module reference
                 // to this function can be checked (§6a path 1/2/3). Public is not
                 // stored; register_module_decl records the module either way so
@@ -4496,7 +4536,18 @@ class NullChecker {
             // #145). Placed before the return-type work below because that path
             // has several early returns, and an argument mismatch has to be
             // reported whatever the return type turns out to be.
-            this.check_call_args(name, "'" + name + "'", args)
+            //
+            // BUGS #178: skip for a genuine (per-file 2+) overload set. The
+            // checker holds one last-writer-wins signature per bare name, so it
+            // would validate `show(42)` against whatever arm registered last —
+            // rejecting a call codegen resolves correctly. Only names that
+            // overloaded within a single module are exempt; a name declared once
+            // per file across many files is not in overload_names and keeps its
+            // check, so the #155/#165 class-mismatch guard on this path is intact
+            // for every non-overloaded call.
+            if (!this.env.overload_names.has(name)) {
+                this.check_call_args(name, "'" + name + "'", args)
+            }
             var ret: String = this.env.get_func_ret(name)
             if (ret != "Any") {
                 // If return type contains a type parameter, try to resolve it
