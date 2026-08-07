@@ -1,0 +1,91 @@
+// @thread workstream C: Thread.Channel — cross-thread message passing.
+
+import "@thread" as Thread
+import "@test" as T
+
+// --- producer/consumer: every item arrives once, in order ---
+var ch: Thread.Channel = Thread.Channel(4)
+var producer: Thread.ThreadHandle = Thread.spawn(fun (): Int {
+    var i: Int = 0
+    while (i < 20) {
+        ch.send(i)
+        i = i + 1
+    }
+    ch.close()
+    return 0
+})
+
+var received: List<Int> = []
+var v: Any = ch.recv()
+while (v != nil) {
+    received.push(v)
+    v = ch.recv()
+}
+producer.join()
+
+T.assert_eq(received.length(), 20, "received every item")
+var ordered: Int = 1
+var k: Int = 0
+while (k < received.length()) {
+    if (received[k] != k) { ordered = 0 }
+    k = k + 1
+}
+T.assert_eq(ordered, 1, "items arrived in FIFO order")
+
+// --- recv after close-and-drain returns nil ---
+T.assert_eq(ch.recv(), nil, "recv on a closed, drained channel is nil")
+T.assert_eq(ch.is_closed(), true, "channel reports closed")
+
+// --- Strings survive the trip (GC-managed buffer keeps them rooted) ---
+var sch: Thread.Channel = Thread.Channel(0)   // unbounded
+var sp: Thread.ThreadHandle = Thread.spawn(fun (): Int {
+    sch.send("alpha")
+    sch.send("beta")
+    // force some GC pressure to prove the buffered strings are not swept
+    var j: Int = 0
+    while (j < 500) { var junk: String = "garbage" + j.to_string(); j = j + 1 }
+    sch.send("gamma")
+    sch.close()
+    return 0
+})
+var got: List<Any> = []
+var s: Any = sch.recv()
+while (s != nil) { got.push(s); s = sch.recv() }
+sp.join()
+T.assert_eq(got.length(), 3, "three strings received")
+T.assert_eq(got[0], "alpha", "first string intact after GC pressure")
+T.assert_eq(got[2], "gamma", "last string intact after GC pressure")
+
+// --- bounded channel applies backpressure: length never exceeds capacity ---
+var bch: Thread.Channel = Thread.Channel(2)
+var overflowed: Thread.Atomic = Thread.Atomic(0)
+var bp: Thread.ThreadHandle = Thread.spawn(fun (): Int {
+    var i: Int = 0
+    while (i < 10) {
+        bch.send(i)
+        // Sampling length right after send can legitimately read up to cap.
+        if (bch.length() > 2) { overflowed.store(1) }
+        i = i + 1
+    }
+    bch.close()
+    return 0
+})
+// Drain slowly so the producer must block on the bound.
+var bcount: Int = 0
+var bv: Any = bch.recv()
+while (bv != nil) {
+    bcount = bcount + 1
+    Thread.sleep(0.002)
+    bv = bch.recv()
+}
+bp.join()
+T.assert_eq(bcount, 10, "bounded channel delivered all items")
+T.assert_eq(overflowed.load(), 0, "bounded channel never exceeded its capacity")
+
+// --- try_recv on an empty channel is nil, and non-blocking ---
+var tch: Thread.Channel = Thread.Channel(1)
+T.assert_eq(tch.try_recv(), nil, "try_recv on empty channel returns nil immediately")
+tch.send(7)
+T.assert_eq(tch.try_recv(), 7, "try_recv returns a buffered item")
+
+T.summary()

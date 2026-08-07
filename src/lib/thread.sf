@@ -56,6 +56,13 @@
 @extern("i64 sf_atomic_cas(i64, i64, i64)") fun _atomic_cas(handle: Int, expected: Int, desired: Int): Int
 @extern("void sf_atomic_free(i64)")        fun _atomic_free(handle: Int)
 
+@extern("i64 sf_chan_ws_new()")              fun _ws_new(): Int
+@extern("void sf_chan_wait_readable(i64)")   fun _ws_wait_readable(handle: Int)
+@extern("void sf_chan_wait_writable(i64)")   fun _ws_wait_writable(handle: Int)
+@extern("void sf_chan_notify_readable(i64)") fun _ws_notify_readable(handle: Int)
+@extern("void sf_chan_notify_writable(i64)") fun _ws_notify_writable(handle: Int)
+@extern("void sf_chan_ws_free(i64)")         fun _ws_free(handle: Int)
+
 /// A running (or finished) OS thread. Returned by `Thread.spawn`; `join()` waits
 /// for it and yields the closure's return value.
 class ThreadHandle {
@@ -226,5 +233,113 @@ class Atomic {
     /// Release the slot. Using this Atomic afterward is undefined.
     fun free() {
         _atomic_free(this._handle)
+    }
+}
+
+/// A thread-safe FIFO channel for passing values between threads — the
+/// recommended way to move data across a `Thread.spawn` boundary.
+///
+/// ```saffron
+/// var ch = Thread.Channel(4)              // capacity 4 (0 = unbounded)
+/// Thread.spawn(fun (): Int {
+///     ch.send("hello")
+///     ch.close()
+///     return 0
+/// })
+/// var msg = ch.recv()                     // blocks until an item arrives
+/// ```
+///
+/// `send` blocks when the channel is full, `recv` blocks when it is empty, and
+/// both wake without busy-looping (a mutex + condition variables in the runtime).
+/// After `close()`, `send` is rejected and `recv` drains any buffered items then
+/// returns nil forever — the standard "no more values" signal.
+///
+/// ## What is safe to send
+///
+/// The buffer is a managed List, so any value is stored safely (Strings and other
+/// GC objects included — they stay rooted). But a *mutable* container you also
+/// keep using on the sender side is shared, not copied: mutating it after sending
+/// races with the receiver. Send immutable values (scalars, Strings), a fresh
+/// container you then drop, or a `@copy` deep copy.
+class Channel {
+    // The buffer IS a Saffron List (GC-managed), touched only while holding the
+    // GRL, so it needs no C-side locking for coherence — see the runtime note.
+    private var _buf: List<Any>
+    private var _cap: Int        // <= 0 means unbounded
+    private var _ws: Int         // waitset handle (mutex + condvars) for blocking
+    private var _closed: Int
+
+    /// Create a channel with buffer capacity `cap` (0 or negative = unbounded, so
+    /// `send` never blocks). A bounded channel applies backpressure: a fast
+    /// producer waits for the consumer once `cap` items are queued.
+    fun init(cap: Int) {
+        this._buf = []
+        this._cap = cap
+        this._ws = _ws_new()
+        this._closed = 0
+    }
+
+    /// Send `value`. Blocks while the channel is full (bounded only). Throws if
+    /// the channel is closed — sending to a closed channel is a bug, not a
+    /// no-op, and silently dropping the value would hide it.
+    fun send(value: Any) {
+        // Wait for space. The check + wait runs under the GRL; wait_writable
+        // drops the GRL while blocked and a recv() signals writable on drain.
+        while (this._cap > 0 and this._buf.length() >= this._cap and this._closed == 0) {
+            _ws_wait_writable(this._ws)
+        }
+        if (this._closed == 1) {
+            throw "Channel.send: channel is closed"
+        }
+        this._buf.push(value)
+        _ws_notify_readable(this._ws)   // wake a waiting recv
+    }
+
+    /// Receive the next value, blocking until one is available. Returns nil when
+    /// the channel is closed AND drained — loop `while ((v = ch.recv()) != nil)`
+    /// or check `is_closed()` to distinguish end-of-stream from a nil payload.
+    fun recv(): Any {
+        while (this._buf.length() == 0) {
+            if (this._closed == 1) { return nil }   // closed and drained
+            _ws_wait_readable(this._ws)             // drops GRL until an item lands
+        }
+        var value: Any = this._buf.remove(0)        // FIFO
+        _ws_notify_writable(this._ws)               // wake a waiting send
+        return value
+    }
+
+    /// Try to receive without blocking. Returns nil if the channel is currently
+    /// empty (whether or not it is closed). Cannot distinguish "empty" from "nil
+    /// was sent"; use for polling, not for streams that carry nil.
+    fun try_recv(): Any {
+        if (this._buf.length() == 0) { return nil }
+        var value: Any = this._buf.remove(0)
+        _ws_notify_writable(this._ws)
+        return value
+    }
+
+    /// Number of items currently buffered.
+    fun length(): Int {
+        return this._buf.length()
+    }
+
+    /// Close the channel: no more sends, and every blocked sender/receiver wakes.
+    /// Buffered items remain receivable until drained.
+    fun close() {
+        this._closed = 1
+        // Wake everyone so blocked recv()s see the close and blocked send()s stop.
+        _ws_notify_readable(this._ws)
+        _ws_notify_writable(this._ws)
+    }
+
+    /// True once `close()` has been called.
+    fun is_closed(): Bool {
+        return this._closed == 1
+    }
+
+    /// Release the underlying OS synchronization resources. Using the channel
+    /// afterward is undefined.
+    fun free() {
+        _ws_free(this._ws)
     }
 }
