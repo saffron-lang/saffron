@@ -3345,7 +3345,17 @@ class Parser {
         }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
-        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "", "public", AST.span_none(), AST.span_none())
+        // Marked "@for_reuse", unlike the `var`-keyword form above. A bare-init
+        // C-style `for (i = 0; ...)` REBINDS an existing variable when one is in
+        // scope (a module global or an enclosing local) rather than declaring a
+        // fresh binding that shadows it — the `var`-less spelling is an
+        // assignment, not a declaration. resolve.sf reads this marker to decide
+        // whether to introduce a new local: shadowing a module global here made
+        // the loop's reads resolve to a `%i` alloca the store never targeted
+        // (it stores to `@__g_i`), which is invalid IR (BUGS #176). When no such
+        // variable is in scope it still declares one, so the standalone form
+        // keeps working.
+        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "@for_reuse", "public", AST.span_none(), AST.span_none())
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
