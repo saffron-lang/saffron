@@ -1,3 +1,11 @@
+/* Theme tokens. The dark palette is the default (declared on :root so it also
+   applies when no theme is chosen and the system is dark). The light palette
+   lives in one place and is applied two ways:
+     - automatically, when the OS prefers light AND the user hasn't chosen
+       (`prefers-color-scheme: light` with no [data-theme] override), and
+     - explicitly, via [data-theme="light"] on <html> (the manual toggle).
+   [data-theme="dark"] forces dark regardless of system. The mixin below keeps
+   the two application paths in sync — edit the light values once, here. */
 :root {
     --bg: #12100e;
     --panel: #1b1815;
@@ -7,8 +15,46 @@
     --muted: #9b8f81;
     --saffron: #e8a33d;
     --saffron-dim: #b57c25;
+    --saffron-hover: #f0b054;
     --error: #e86a5a;
+    --btn-run-text: #1a1408;
+    --faint: #5d534a;          /* placeholder text, idle output */
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+    /* Auto: system is light and the user has not forced a theme. */
+    :root:not([data-theme="dark"]):not([data-theme="light"]) {
+        --bg: #fbf8f3;
+        --panel: #ffffff;
+        --panel-2: #f3ede3;
+        --border: #e0d6c7;
+        --text: #2b2620;
+        --muted: #6f6455;
+        --saffron: #c07d1e;
+        --saffron-dim: #a9701d;
+        --saffron-hover: #d68f2e;
+        --btn-run-text: #fff6e6;
+        --faint: #b3a794;
+        color-scheme: light;
+    }
+}
+
+/* Explicit light choice — wins over system preference. */
+:root[data-theme="light"] {
+    --bg: #fbf8f3;
+    --panel: #ffffff;
+    --panel-2: #f3ede3;
+    --border: #e0d6c7;
+    --text: #2b2620;
+    --muted: #6f6455;
+    --saffron: #c07d1e;
+    --saffron-dim: #a9701d;
+    --saffron-hover: #d68f2e;
+    --btn-run-text: #fff6e6;
+    --faint: #b3a794;
+    color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -141,7 +187,7 @@ html, body {
     min-height: 0;
 }
 
-.editor::placeholder { color: #5d534a; }
+.editor::placeholder { color: var(--faint); }
 
 /* --- Toolbar --- */
 
@@ -167,10 +213,10 @@ html, body {
 
 .btn-run {
     background: var(--saffron);
-    color: #1a1408;
+    color: var(--btn-run-text);
 }
 
-.btn-run:hover:not(:disabled) { background: #f0b054; }
+.btn-run:hover:not(:disabled) { background: var(--saffron-hover); }
 
 .btn:disabled {
     opacity: 0.5;
@@ -202,7 +248,7 @@ html, body {
 }
 
 .output-idle {
-    color: #5d534a;
+    color: var(--faint);
     font-size: 13px;
 }
 
@@ -217,3 +263,25 @@ html, body {
 }
 
 .output-error { color: var(--error); }
+
+/* --- Theme toggle (added to index.html, driven by a tiny inline script) --- */
+.theme-toggle {
+    position: fixed;
+    top: 12px;
+    right: 16px;
+    z-index: 10;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.12s, border-color 0.12s;
+}
+.theme-toggle:hover { color: var(--saffron); border-color: var(--saffron-dim); }
