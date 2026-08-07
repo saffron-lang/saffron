@@ -632,7 +632,7 @@
             // The runtime helpers are idempotent against an already-tagged value.
             var arg_reg: String = "%" + this.sanitize_name(pname) + ".arg"
             if (this.target == "wasm32" and !this.identity_mode and (emit_name.contains("__on_") or emit_name.contains("__dispatch_"))) {
-                if (ptype == "Float" or ptype == "Number") {
+                if (ptype == "Float") {
                     var norm_f: String = this.fresh_local()
                     this.emit_indent(norm_f + " = call i64 @__rt_normalize_incoming_float(i64 " + arg_reg + ")")
                     arg_reg = norm_f

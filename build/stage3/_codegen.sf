@@ -727,16 +727,14 @@ class Codegen {
     fun str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
-        // `Number` is deprecated: it is one surface name for two representations,
-        // so no mapping of it can be right. `fun area(): Number` returning 12.0 is
-        // relabelled Int and the caller's `.to_string()` untags a double as an
-        // integer and prints 0; mapping it to Float instead breaks every `Number`
-        // used as a list index. Int is kept because it is the integer-ish reading
-        // that user code overwhelmingly means, and because src/lib no longer writes
-        // `Number` at all — the remaining users are user programs and test/.
-        // Retire the spelling rather than re-tune this line. See BUGS.md #49 and
-        // M2 in docs/design/compiler-rewrite.md ("Int is the bottom type").
-        if (s == "Int" or s == "Number") return AST.Type.IntType
+        // `Number` is removed (#49): it was one surface name for two
+        // representations, so no mapping of it could be right. `fun area(): Number`
+        // returning 12.0 was relabelled Int and the caller's `.to_string()` untagged
+        // a double as an integer and printed 0. The spelling is gone — user code
+        // must write `Int` or `Float` explicitly, and `Number` now falls through to
+        // the unknown-type path. See BUGS.md #49 and M2 in
+        // docs/design/compiler-rewrite.md ("Int is the bottom type").
+        if (s == "Int") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
@@ -1386,15 +1384,12 @@ class Codegen {
     }
 
     /// Normalize a type spelling to the key used for overload dispatch. Strips
-    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`) and
-    /// folds the `Number` spelling onto `Int` so that a declared `Int` parameter
-    /// and an inferred `Number`/`Int` argument agree. Everything else passes
-    /// through unchanged. Both the mangling site (gen_function / prescan) and the
-    /// call-site resolver run every candidate and every argument through this, so
-    /// they compare like against like.
+    /// generic arguments (`List<Any>` → `List`, `Map<String,Int>` → `Map`).
+    /// Everything else passes through unchanged. Both the mangling site
+    /// (gen_function / prescan) and the call-site resolver run every candidate and
+    /// every argument through this, so they compare like against like.
     fun overload_norm_type(typ: String): String {
         var base: String = this.generic_base_name(typ)
-        if (base == "Number") { return "Int" }
         return base
     }
 
@@ -2270,7 +2265,7 @@ class Codegen {
         var val_type_str: String = this.type_to_string(val_type)
         if (this.is_undecidable_type(val_type)) {
             var rt_func: String = ""
-            if (type_name == "Int" or type_name == "Number") {
+            if (type_name == "Int") {
                 rt_func = "__val_is_int"
             } else if (type_name == "Float") {
                 rt_func = "__val_is_float"
@@ -2311,7 +2306,7 @@ class Codegen {
 
         // Compile-time resolution when type is statically known
         var matches: String = "0"
-        if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
+        if (type_name == "Int" or type_name == "Float") {
             if (this.is_int_type(val_type)) { matches = "1" }
         } else if (type_name == "String") {
             if (this.is_string_type(val_type)) { matches = "1" }
@@ -2512,7 +2507,7 @@ class Codegen {
     /// on the boxed bit pattern is not its order. It falls to the runtime helper
     /// along with everything else.
     fun is_ordered_primitive(t: String): Bool {
-        return t == "Int" or t == "Number" or t == "Float"
+        return t == "Int" or t == "Float"
     }
 
     /// The runtime helper implementing `op` for operands whose static types do
@@ -5646,8 +5641,8 @@ class Codegen {
             return sc
         }
 
-        if (base == "Float" or base == "Number") {
-            // gen_enum_construct normalises a Float/Number payload to a double
+        if (base == "Float") {
+            // gen_enum_construct normalises a Float payload to a double
             // on construction, so both slots hold the same representation here.
             // Comparing at double level is still the right lowering rather than
             // a bit compare: it is what makes -0.0 equal 0.0, and it matches the
@@ -6423,7 +6418,7 @@ class Codegen {
         // match binding emit integer ops against a NaN-boxed double, so
         // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
         // wants Int, and type_to_string_for_target already applies that.
-        if (ftype == "Float" or ftype == "Number") return "Float"
+        if (ftype == "Float") return "Float"
         // A Bool payload must stay Bool. Collapsing it to Int (the old answer)
         // made a match binding of a Bool field format through __int_to_string, so
         // `match (OB(false)) { OB(v) => "${v}" }` printed `0` instead of `false`
@@ -6526,7 +6521,7 @@ class Codegen {
             while (sci < captures.length()) {
                 var cap_name: String = captures[sci]
                 var cap_type: String = this.get_var_type_str(cap_name)
-                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String" and cap_type != "Number") {
+                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String") {
                     if (!this.actor_classes.has(cap_type) and !this.enum_defs.has(cap_type)) {
                         IO.println("[checker] Warning: Task.spawn closure captures non-Sendable variable '" + cap_name + "' (type " + cap_type + ")")
                     }
@@ -9141,7 +9136,7 @@ class Codegen {
                         var b_raw: String = this.emit_untag_bool(field_val)
                         field_str = this.fresh_local()
                         this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + b_raw + ")")
-                    } else if (field_type == "Float" or field_type == "Number") {
+                    } else if (field_type == "Float") {
                         // __float_to_string takes the tagged value: it untags
                         // internally and its int-tagged path is a sitofp, so a
                         // whole-number Float that happens to be int-tagged still
@@ -10520,9 +10515,9 @@ class Codegen {
 
     // Determine if a type requires GC root tracking.
     // Heap types: String, List, Map, StringBuilder, Any, class instances, closures.
-    // Value types: Int, Float, Bool, Nil, Number — no tracking needed.
+    // Value types: Int, Float, Bool, Nil — no tracking needed.
     fun is_gc_root_type(type_str: String): Bool {
-        if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "Number" or type_str == "void") {
+        if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "void") {
             return false
         }
         // Everything else is heap-allocated: String, List, Map, Any, class types
@@ -12808,7 +12803,7 @@ class Codegen {
             // The runtime helpers are idempotent against an already-tagged value.
             var arg_reg: String = "%" + this.sanitize_name(pname) + ".arg"
             if (this.target == "wasm32" and !this.identity_mode and (emit_name.contains("__on_") or emit_name.contains("__dispatch_"))) {
-                if (ptype == "Float" or ptype == "Number") {
+                if (ptype == "Float") {
                     var norm_f: String = this.fresh_local()
                     this.emit_indent(norm_f + " = call i64 @__rt_normalize_incoming_float(i64 " + arg_reg + ")")
                     arg_reg = norm_f

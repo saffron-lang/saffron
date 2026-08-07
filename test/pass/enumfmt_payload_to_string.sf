@@ -2,7 +2,7 @@
 //
 // An enum's generated to_string() formats each payload field by its declared
 // type. The per-type chain in emit_enum_to_string had arms for String, Bool and
-// Float/Number and nothing else, so a List, a Map or a nested enum payload fell
+// Float/Int and nothing else, so a List, a Map or a nested enum payload fell
 // through to the integer default and printed the heap address of the payload —
 // a different number on every run, which is how the differential oracle caught
 // it (its nondeterminism gate fired).

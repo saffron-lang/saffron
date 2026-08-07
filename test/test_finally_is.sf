@@ -46,7 +46,7 @@ var s = "hello"
 var b = true
 var list = [1, 2, 3]
 
-T.assert(n is Number, "42 is Number")
+T.assert(n is Int, "42 is Int")
 T.assert(s is String, "hello is String")
 T.assert(b is Bool, "true is Bool")
 

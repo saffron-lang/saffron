@@ -41,7 +41,7 @@ IO.println(result)
 var n: Int = 42
 var s: String = "hello"
 
-if (n is Number) {
+if (n is Int) {
     IO.println(1)
 } else {
     IO.println(0)
@@ -53,7 +53,7 @@ if (s is String) {
     IO.println(0)
 }
 
-if (s is Number) {
+if (s is Int) {
     IO.println(0)
 } else {
     IO.println(1)

@@ -37,14 +37,14 @@
 import "@test" as Test
 
 class Pt {
-    var x: Number
-    fun init(x: Number) { this.x = x }
+    var x: Int
+    fun init(x: Int) { this.x = x }
     fun to_string(): String { return "Pt(${this.x})" }
 }
 
 class Base {
-    var n: Number
-    fun init(n: Number) { this.n = n }
+    var n: Int
+    fun init(n: Int) { this.n = n }
     fun to_string(): String { return "Base(${this.n})" }
 }
 class Mid extends Base {

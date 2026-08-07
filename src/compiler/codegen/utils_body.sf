@@ -113,9 +113,9 @@
 
     // Determine if a type requires GC root tracking.
     // Heap types: String, List, Map, StringBuilder, Any, class instances, closures.
-    // Value types: Int, Float, Bool, Nil, Number — no tracking needed.
+    // Value types: Int, Float, Bool, Nil — no tracking needed.
     fun is_gc_root_type(type_str: String): Bool {
-        if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "Number" or type_str == "void") {
+        if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "void") {
             return false
         }
         // Everything else is heap-allocated: String, List, Map, Any, class types

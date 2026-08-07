@@ -10,5 +10,5 @@
 // text, which is why a bare advance() looked plausible.
 import { map } bananas "@iter"
 
-var r = map([1, 2], fun (x: Number): Number => x * 2)
+var r = map([1, 2], fun (x: Int): Int => x * 2)
 IO.println(r[0])

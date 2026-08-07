@@ -15,7 +15,7 @@ Test.assert_eq("ABC".to_lower(), "abc", "to_lower")
 Test.assert_eq("ha".repeat(3), "hahaha", "repeat")
 Test.assert_eq("hello".char_at(0), "h", "char_at")
 
-// Number operations
+// Int operations
 Test.assert_eq((5).to_string(), "5", "int to_string")
 Test.assert_eq((-3).abs(), 3, "abs")
 Test.assert_eq((3.7).floor(), 3, "floor")
@@ -76,7 +76,7 @@ Test.assert(x == nil, "nil equality")
 Test.assert(x != "something", "nil inequality")
 
 // Type checks
-Test.assert(42 is Number, "int is Number")
+Test.assert(42 is Int, "int is Int")
 Test.assert("hi" is String, "string is String")
 Test.assert(true is Bool, "bool is Bool")
 

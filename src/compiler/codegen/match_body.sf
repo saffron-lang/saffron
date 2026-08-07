@@ -651,7 +651,7 @@
         // match binding emit integer ops against a NaN-boxed double, so
         // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
         // wants Int, and type_to_string_for_target already applies that.
-        if (ftype == "Float" or ftype == "Number") return "Float"
+        if (ftype == "Float") return "Float"
         // A Bool payload must stay Bool. Collapsing it to Int (the old answer)
         // made a match binding of a Bool field format through __int_to_string, so
         // `match (OB(false)) { OB(v) => "${v}" }` printed `0` instead of `false`
