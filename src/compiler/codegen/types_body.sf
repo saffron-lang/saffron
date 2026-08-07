@@ -817,7 +817,11 @@
     fun strip_nil_type_str(typ: String): String {
         if (typ == "Nil") { return typ }
         if (!typ.contains("|")) { return typ }
-        var parts: List<String> = typ.split("|")
+        // Depth-aware split: a naive split("|") on `List<Int|Nil>` would tear it
+        // into "List<Int" + "Nil>" and then drop neither Nil while corrupting the
+        // generic — split_type_union keeps a nested `|` intact so only a
+        // top-level Nil is stripped.
+        var parts: List<String> = this.split_type_union(typ)
         var kept: List<String> = []
         var i: Float = 0
         while (i < parts.length()) {

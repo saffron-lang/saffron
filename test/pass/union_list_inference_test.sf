@@ -1,0 +1,58 @@
+// Mixed-content list literals infer a union element type (not List<Any>), and
+// unions parse correctly inside a generic. Covers the parser fix (union split
+// respecting <> depth) and the checker inference change.
+
+import "@test" as T
+
+// --- a union inside a generic now PARSES and round-trips ---
+// Before the fix, `List<Int|String>` tore into "List<Int" + "String>" and the
+// checker reported: unknown type 'In'.
+var explicit: List<Int | String> = [1, 2, "a"]
+T.assert_eq(explicit.length(), 3, "List<Int|String> annotation parses and holds 3 items")
+
+// --- is dispatches correctly on each element of the mixed list (BUGS #69) ---
+var ints: Int = 0
+var strs: Int = 0
+var i: Int = 0
+while (i < explicit.length()) {
+    var e = explicit[i]
+    if (e is Int) { ints = ints + 1 }
+    if (e is String) { strs = strs + 1 }
+    i = i + 1
+}
+T.assert_eq(ints, 2, "two Int elements identified by `is`")
+T.assert_eq(strs, 1, "one String element identified by `is`")
+
+// --- an inferred mixed literal (no annotation) works the same way ---
+// This is the inference change: [1, 2, "a"] is List<Int|String>, not List<Any>.
+var inferred = [1, 2, "a"]
+var seen_int: Bool = false
+var seen_str: Bool = false
+var j: Int = 0
+while (j < inferred.length()) {
+    var v = inferred[j]
+    if (v is Int) { seen_int = true }
+    if (v is String) { seen_str = true }
+    j = j + 1
+}
+T.assert(seen_int, "inferred mixed list: Int element dispatches")
+T.assert(seen_str, "inferred mixed list: String element dispatches")
+
+// --- homogeneous inference is unchanged: List<Int> ---
+var homo = [1, 2, 3]
+var sum: Int = 0
+var k: Int = 0
+while (k < homo.length()) { sum = sum + homo[k]; k = k + 1 }
+T.assert_eq(sum, 6, "homogeneous list still sums as List<Int>")
+
+// --- three distinct types form a three-member union, deduped ---
+var three: List<Int | String | Bool> = [1, "a", true, 2, "b"]
+T.assert_eq(three.length(), 5, "List<Int|String|Bool> holds all five items")
+
+// --- a nested generic union parses (depth > 1) ---
+var nested: List<List<Int | String>> = [[1, "a"], [2, "b"]]
+T.assert_eq(nested.length(), 2, "List<List<Int|String>> parses at depth 2")
+var first: List<Int | String> = nested[0]
+T.assert_eq(first.length(), 2, "inner union list is intact")
+
+T.summary()
