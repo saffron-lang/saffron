@@ -2,13 +2,15 @@
 
 ## Open
 
-**7 open entries:** #49, #65, #107, #131, #132, #181, #183.
+**6 open entries:** #49, #65, #107, #131, #132, #181.
 Next free number is **#184**.
 
-#183 (a `store8`/`load8` intrinsic called inside a nested/private function is
+#183 (a `store8`/`load8` intrinsic called inside a nested/private function was
 `$$`-qualified by #175's nested-fun naming and emitted as an undefined function
-call — breaks ALL of `@net`/`@ssl`) was found rebuilding the playground service,
-which imports `@net`. Regression from #175. Count 6 → 7.
+call — broke ALL of `@net`/`@ssl`) was found rebuilding the playground service and
+is now FIXED: `nested_fun_symbol` no longer qualifies intrinsic names. Regression
+from #175. Filed and closed in the same window; lives in `BUGS_CLOSED.md`. Open set
+7 → 6.
 
 #178 (an all-scalar overload set was rejected by the checker — every arm's first
 parameter a scalar, so `scalar_mismatch` compared `show(42)` to the last-registered
@@ -447,43 +449,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 183. OPEN — a `store8`/`load8` intrinsic call inside a nested/private function is `$$`-qualified and emitted as an undefined call, breaking all of `@net`/`@ssl`
-
-**Severity: high.** Any program importing `@net` (and thus `@ssl`, `@http`, the
-playground service, anything networked) fails to build: `opt` rejects the IR with
-`use of undefined value '@net__raw_read$$store8'`. Trivial programs are fine; the
-break is specifically an intrinsic called inside a `private`/nested function.
-
-**Minimal repro:**
-
-```saffron
-import "net" as Net
-IO.println("x")   // fails: @net__raw_read$$store8 undefined
-```
-
-`@net`'s `private fun _raw_read` (`src/lib/net.sf:95`) calls the `store8`
-byte-write intrinsic. The intrinsic is normally routed inline by
-`intrinsics_body.sf` (`name.ends_with("store8")`), never emitted as a real call.
-
-**Cause — regression from #175.** #175 added `nested_fun_symbol`
-(`utils_body.sf:938`): a name with an enclosing scope becomes
-`current_prefix + enclosing + "$$" + name`. A `store8` call inside `_raw_read`
-gets qualified to `net__raw_read$$store8` and emitted as a `call` **before** the
-intrinsic check runs — so it links against a function that does not exist. The
-qualification must not apply to intrinsic names (`store8`, `load8`, and any other
-`intrinsic_funcs` entry): those route inline regardless of enclosing scope.
-
-**Note:** origin's *checked-in* `build/stage3/*.ll` does not contain the bad
-symbol — it was generated before #175's naming reached the net stdlib — so the
-committed gen3 links, but the moment the current compiler recompiles a
-net-importing program the bug appears. That is why a green bootstrap did not catch
-it: the bootstrap compiles the compiler's own source, which does not import `@net`.
-
-**Fix direction.** In `nested_fun_symbol` (or at the call-emission site that uses
-it), skip qualification when the callee is an intrinsic — check `intrinsic_funcs`
-/ the `ends_with("load8"|"store8"|...)` set first, and route to the inline
-intrinsic path with the bare name.
 
 ### 181. OPEN — coroutines without `import "@async"` fail to link; the scheduler is collected as a source module, not linked as ambient runtime
 

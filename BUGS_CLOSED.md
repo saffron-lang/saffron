@@ -9,6 +9,60 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 183. FIXED — a `store8`/`load8` intrinsic call inside a nested/private function was `$$`-qualified into an undefined call, breaking all of `@net`/`@ssl`
+
+**FIXED 2026-08-07.** #175's `nested_fun_symbol` (`utils_body.sf`) qualified any
+name with an enclosing scope to `prefix + enclosing + "$$" + name`; a `store8`
+call inside `@net`'s `private _raw_read` became `net__raw_read$$store8` and was
+emitted as a call to a symbol that never exists (the intrinsic is lowered inline
+by `gen_intrinsic_call`). Fix: guard `nested_fun_symbol` — an intrinsic name
+returns the bare `prefix+name` form regardless of scope, routing to the inline
+intrinsic path. Added `is_intrinsic_name` mirroring `gen_intrinsic_call`'s dispatch
+arms (load64/store64/load8/store8/load_argc/load_argv/tag_ptr/untag_ptr/
+call_void_ptr/__suspend). Single choke point covers all four call sites. Verified:
+`import "net"` builds+runs; `_raw_read` emits inline `store i8` (0 calls to
+store8); #175's regression test still 7/7; bootstrap green STAGE 2 (0 fallbacks);
+suite 349 passed / 0 failed. Source fix committed `af4461d`; the committed gen3
+picks it up on the next clean rebootstrap. Found rebuilding the playground service.
+
+--- original entry ---
+**Severity: high.** Any program importing `@net` (and thus `@ssl`, `@http`, the
+playground service, anything networked) fails to build: `opt` rejects the IR with
+`use of undefined value '@net__raw_read$$store8'`. Trivial programs are fine; the
+break is specifically an intrinsic called inside a `private`/nested function.
+
+**Minimal repro:**
+
+```saffron
+import "net" as Net
+IO.println("x")   // fails: @net__raw_read$$store8 undefined
+```
+
+`@net`'s `private fun _raw_read` (`src/lib/net.sf:95`) calls the `store8`
+byte-write intrinsic. The intrinsic is normally routed inline by
+`intrinsics_body.sf` (`name.ends_with("store8")`), never emitted as a real call.
+
+**Cause — regression from #175.** #175 added `nested_fun_symbol`
+(`utils_body.sf:938`): a name with an enclosing scope becomes
+`current_prefix + enclosing + "$$" + name`. A `store8` call inside `_raw_read`
+gets qualified to `net__raw_read$$store8` and emitted as a `call` **before** the
+intrinsic check runs — so it links against a function that does not exist. The
+qualification must not apply to intrinsic names (`store8`, `load8`, and any other
+`intrinsic_funcs` entry): those route inline regardless of enclosing scope.
+
+**Note:** origin's *checked-in* `build/stage3/*.ll` does not contain the bad
+symbol — it was generated before #175's naming reached the net stdlib — so the
+committed gen3 links, but the moment the current compiler recompiles a
+net-importing program the bug appears. That is why a green bootstrap did not catch
+it: the bootstrap compiles the compiler's own source, which does not import `@net`.
+
+**Fix direction.** In `nested_fun_symbol` (or at the call-emission site that uses
+it), skip qualification when the callee is an intrinsic — check `intrinsic_funcs`
+/ the `ends_with("load8"|"store8"|...)` set first, and route to the inline
+intrinsic path with the bare name.
+
+---
+
 ### 178. FIXED — an all-scalar overload set was rejected by the checker; type-based overloading needed one non-scalar arm
 
 ```saffron
