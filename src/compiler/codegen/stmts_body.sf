@@ -2267,6 +2267,12 @@
     }
 
     fun emit_reflect_helpers() {
+        // Docstring reflection. Emitted first and unconditionally (a program can
+        // call Reflect.doc without declaring any class). __reflect_doc reads the
+        // closure box's second slot, where gen_func_ref stashed the tagged doc
+        // constant for a doc'd function/class value (0 → nil). __reflect_module_doc
+        // returns this module's `//!` constant, or nil when there is none.
+        this.emit_reflect_doc_helpers()
         var class_names: List<String> = this.class_type_ids.keys()
         if (class_names.length() == 0) { return }
         this.emit("")
@@ -2487,6 +2493,61 @@
         }
         this.start_block(rc_end)
         this.emit_terminator("ret i64 " + rc_inst)
+        this.emit("}")
+        this.block_terminated = false
+    }
+
+    // Emit __reflect_doc and __reflect_module_doc.
+    //
+    // __reflect_doc(%val): %val is the closure box a function/class value lowers
+    // to (gen_func_ref). Its second slot holds the tagged doc-constant pointer
+    // when the referenced declaration had a `///` comment, else 0. Read slot 1;
+    // return it, or nil when it is 0. Untag the box to a [2 x i64]* first.
+    //
+    // __reflect_module_doc(): return this module's `//!` constant (module_doc_text),
+    // or nil when the module had none.
+    fun emit_reflect_doc_helpers() {
+        this.emit("")
+        this.emit("define i64 @__reflect_doc(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var box: String = this.val_to_typed_ptr("%val", "[2 x i64]*")
+        var dslot: String = this.fresh_local()
+        this.emit_indent(dslot + " = getelementptr [2 x i64], [2 x i64]* " + box + ", i64 0, i64 1")
+        var dval: String = this.fresh_local()
+        this.emit_indent(dval + " = load i64, i64* " + dslot)
+        var is_zero: String = this.fresh_local()
+        this.emit_indent(is_zero + " = icmp eq i64 " + dval + ", 0")
+        var lbl_nil: String = this.fresh_label("rdoc.nil")
+        var lbl_has: String = this.fresh_label("rdoc.has")
+        this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_nil + ", label %" + lbl_has)
+        this.start_block(lbl_has)
+        this.emit_terminator("ret i64 " + dval)
+        this.start_block(lbl_nil)
+        var nil_v: String = this.fresh_local()
+        this.emit_indent(nil_v + " = call i64 @__val_nil()")
+        this.emit_terminator("ret i64 " + nil_v)
+        this.emit("}")
+        this.block_terminated = false
+
+        this.emit("")
+        this.emit("define i64 @__reflect_module_doc() {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        if (this.module_doc_text.length() > 0) {
+            var mc: String = this.add_string_constant(this.module_doc_text)
+            var mlen: Float = this.module_doc_text.length() + 1
+            var mgep: String = this.fresh_local()
+            this.emit_indent(mgep + " = getelementptr [" + mlen.floor().to_string() + " x i8], [" + mlen.floor().to_string() + " x i8]* " + mc + ", i64 0, i64 0")
+            var mval: String = this.emit_tag_ptr(mgep)
+            this.emit_terminator("ret i64 " + mval)
+        } else {
+            var mnil: String = this.fresh_local()
+            this.emit_indent(mnil + " = call i64 @__val_nil()")
+            this.emit_terminator("ret i64 " + mnil)
+        }
         this.emit("}")
         this.block_terminated = false
     }
