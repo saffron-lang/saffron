@@ -2,8 +2,15 @@
 
 ## Open
 
-**7 open entries:** #49, #65, #107, #131, #132, #154, #175.
-Next free number is **#176**.
+**8 open entries:** #49, #65, #107, #131, #132, #154, #175, #176.
+Next free number is **#177**.
+
+#176 (an all-scalar overload set is rejected by the checker) was filed while
+adding a scalar-vs-scalar case to `test/pass/overloading.sf`: `main`'s
+codegen-only overloading resolves the variant correctly, but the checker's
+single-signature `scalar_mismatch` rejects the call first. A non-scalar arm
+escapes it, so type-based overloading works otherwise. Count 7 → 8, next-free
+176 → 177.
 
 #2 (forward references in nested funcs) was in this list and is now closed as
 **FIXED** — it was never the runtime error / design limitation it claimed. The
@@ -615,6 +622,41 @@ made distinct. The fix is to qualify a nested fun's emitted symbol by its
 enclosing function (e.g. `parent__helper`) and resolve calls to nested funcs
 against that qualified name, which is a deeper change to nested-fun naming and call
 resolution than #2 itself and was deliberately not folded in.
+
+---
+
+### 176. OPEN — an all-scalar overload set is rejected by the checker; type-based overloading needs one non-scalar arm
+
+```saffron
+fun show(n: Int): String { return "int " }
+fun show(s: String): String { return "str " }
+show(42)   // Error: argument 1 of 'show' (parameter 's') expects String, got Int
+```
+
+Function overloading (implemented in `main` — codegen mangles a name with >= 2
+definitions to `name$arity$firsttype` and resolves the call by arity + first-arg
+type) is **codegen-only**. The checker's `check_call_args` still validates a call
+against the single, last-registered signature for that name, through
+`scalar_mismatch`. When every overload's first parameter is a *scalar*
+(`Int`/`String`/`Bool`/`Float`), that check fires: `show(42)` is compared to the
+last-registered `show(s: String)`, two different scalars, and rejected before
+codegen ever resolves the right variant.
+
+**Why it only bites the all-scalar case.** `scalar_mismatch` is one-sided: it
+fires only on two *different concrete scalars*. An overload set with at least one
+non-scalar arm (`format(Int)` / `format(String)` / `format(List<Any>)`, the shape
+`test/pass/overloading.sf` uses) escapes it, because the last-registered signature
+is `List<Any>` and `Int`-vs-`List` is not two scalars. So type-based overloading
+works today *unless* all arms are scalar-typed.
+
+**Why the obvious fix is wrong.** Marking an overloaded name in the checker and
+skipping its arg check misfires badly: the checker flattens every module into one
+namespace, and the stdlib defines `fun parse` in 10 files and `fun from` in 7.
+A global "overloaded → skip" would stop arg-checking those everywhere, silently
+weakening the #155/#165 guards across the whole stdlib. The real fix must scope
+"overloaded" to a single file/prescan slice — the same per-slice detection
+codegen already does — rather than the flattened name table the checker keeps.
+Tried and reverted for exactly this reason.
 
 ---
 
