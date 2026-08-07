@@ -2202,7 +2202,13 @@ entry:
   %absent = icmp eq ptr @stdlib_scheduler_scheduler_tick, null
   br i1 %absent, label %no_sched, label %tick
 tick:
-  %more = call i64 @stdlib_scheduler_scheduler_tick()
+  ; scheduler_tick returns a Saffron `Int`, i.e. a NaN-box TAG_INT value
+  ; (0x7FF9_0000_0000_0000 | payload). The JS pump driver checks `!Number(more)`
+  ; to stop, but a tagged 0 is 0x7FF9... — never falsy — so the pump spun forever
+  ; after all work was done (the program produced correct output, then the sandbox
+  ; hit its 20000-step cap). Untag to a raw 0/1 so JS sees a real integer.
+  %more_tagged = call i64 @stdlib_scheduler_scheduler_tick()
+  %more = call i64 @__val_untag_int(i64 %more_tagged)
   ret i64 %more
 no_sched:
   ret i64 0

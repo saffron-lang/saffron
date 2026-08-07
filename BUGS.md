@@ -3,7 +3,12 @@
 ## Open
 
 **8 open entries:** #49, #65, #107, #131, #132, #154, #175, #178.
-Next free number is **#179**.
+Next free number is **#180**.
+
+#179 (wasm32 `__sched_pump` returned a NaN-boxed value so the JS scheduler loop
+never terminated — async programs produced correct output then hung at the
+20000-step cap) was found via the playground and fixed on sight; it lives in
+`BUGS_CLOSED.md`. Open set unchanged.
 
 #178 (an all-scalar overload set is rejected by the checker) was filed while
 adding a scalar-vs-scalar case to `test/pass/overloading.sf`: `main`'s

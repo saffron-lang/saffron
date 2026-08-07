@@ -9,6 +9,28 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 179. FIXED — wasm32 `__sched_pump` returned a NaN-boxed value, so the JS scheduler loop never terminated
+
+**Was high on wasm32.** A program using `Task.spawn`/`Async.sleep` produced its
+correct output and then *hung*: the JS pump driver spun to its 20000-step cap and
+printed `[stopped: program still had pending tasks after 20000 scheduler steps]`.
+Native was unaffected (it uses a different driver and does not define `__sched_pump`).
+
+**Cause.** `__sched_pump` (`wasm_base_32.ll`) returned `stdlib_scheduler_scheduler_tick()`'s
+value directly. `scheduler_tick(): Int` returns a Saffron `Int` — a NaN-box TAG_INT
+value (`0x7FF9000000000000 | payload`). The JS driver stops when `!Number(more)`, but a
+tagged 0 is `0x7FF9...` (≈9.22e18), never falsy, so the loop never ended even though
+`scheduler_tick` was returning 0 (no work left). Verified: after all work, pump returned
+`9221401712017801000` every call.
+
+**Fix.** `__sched_pump` now `__val_untag_int`s the tick result before returning, so JS
+sees a raw 0/1. Runtime `.ll` only — no rebootstrap. After the fix pump returns `0` once
+work is done; the async example runs `task-B finished / task-A finished / both done` and
+exits the loop cleanly. Found via the playground async example and the learnxinyminutes doc.
+Same class as #75/#170/#172 — a wasm32 value crossing to JS still carrying its NaN-box tag.
+
+---
+
 ### 176. FIXED — a C-style `for (i = 0; ...)` reusing an `i` from an earlier `var i` emitted invalid IR (`use of undefined value '%i'`)
 
 **FIXED 2026-08-06.** The parser desugars both `for (var i=...)` and bare `for (i=...)` to the same VarDecl; at module scope the bare form reused a global, so `gen_var_decl` stored to `@__g_i` while the loop's reads resolved to a `%i` alloca the top-level prepass (which skips module globals) never emitted. Fix: `parser.sf` marks the bare-init VarDecl with doc `"@for_reuse"`; `resolve.sf` honors it — when the name is an existing module global with no enclosing local, it rebinds rather than declaring a fresh local, so reads and the store agree. Doc-field only, no AST shape change. Verified: repro runs; bootstrap green; suite failure set unchanged. Found running the learnxinyminutes doc.
