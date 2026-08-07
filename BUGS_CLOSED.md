@@ -9,6 +9,58 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 185. FIXED (fixed-notation range) — `__float_to_string` used a different precision on wasm32 than native
+
+```saffron
+import "math" as Math
+IO.println(Math.pi)   // was: native 3.14159, wasm32 3.141593; now both 3.14159
+```
+
+**Severity: medium** — the same program printed a different number depending on
+the target. Not garbage, but a silent cross-target inconsistency.
+
+**Root cause.** The two runtime bases format a float differently:
+
+- `base_nanbox.ll` (native) calls C's `snprintf(buf, 32, "%g", f)`. `%g` prints
+  **6 significant digits total**, so `3.14159265...` -> `3.14159` (1 integer
+  digit + 5 fractional).
+- `wasm_base_32.ll` has a hand-written `__float_to_string` (there is no libc
+  `snprintf` on wasm32 — its `snprintf` shim just `strcpy`s the format string).
+  It emitted the integer part in full, then scaled the fraction by a hardcoded
+  `1e6` and emitted **6 fractional digits**, so `3.14159265...` -> `3.141593` (6
+  fractional, independent of the integer part's width).
+
+Found by `tools/differential.sh --record` refusing to freeze `test/pass/math.sf`:
+`native-O2 == native-O0` but `native-O2 != wasm32`. That cross-config gate is
+exactly the mechanism meant to catch it (BUGS #107 surface: math.sf asserted
+nothing).
+
+**Fix.** The wasm32 formatter now computes a per-value fractional-digit budget
+`frac_digits = 6 - intdigits` (clamped: 6 when `ipart == 0`, down to 0 at
+`ipart >= 1e5`), and generalises the hardcoded `1e6` scale to `10^frac_digits`
+for both the `fmul` and the carry threshold. The digit-emission loop and the
+trailing-zero trim are driven by `frac_digits` instead of a literal `6`. This
+reproduces `%g`'s 6-significant-digits rule for the fixed-notation range. Only
+`wasm_base_32.ll` changed — a runtime base linked at build time, not compiled by
+gen3 — so no bootstrap or gen3 change was involved; native output is provably
+unaffected (it never links this file).
+
+Verified with `tools/differential.sh`: `test/pass/math.sf` and the new
+`test/pass/float_format_precision.sf` both agree `native-O2 == native-O0 ==
+wasm32`, and both now have recorded `.expected` files. Native output matches
+`%g` exactly (`3.14159`, `123.457`, `12345.7`, `2.5`, `100`, `0.5`, `0.006`,
+`-74.006`).
+
+**Known remaining divergence (not fixed here).** `%g` switches to scientific
+notation for `|f| >= 1e6` or `0 < |f| < 1e-4` (e.g. `1234567.89` -> `1.23457e+06`).
+The wasm32 formatter still prints those in fixed notation, so that range remains
+a cross-target divergence. It is a separate, larger piece of work (reproducing
+`%g`'s notation-selection and exponent formatting in hand-written IR) and is
+called out in `test/pass/float_format_precision.sf`'s header; reopen under a new
+number if a program needs it.
+
+---
+
 ### 184. FIXED — a `Task.spawn`/coroutine closure trapped `null function or function signature mismatch` on wasm32 when the module also had earlier closures
 
 **FIXED 2026-08-07.** Root cause was a stale-flag leak, not table sizing. The

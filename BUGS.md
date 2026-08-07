@@ -2,7 +2,7 @@
 
 ## Open
 
-**7 open entries:** #49, #65, #107, #131, #132, #185, #186.
+**6 open entries:** #49, #65, #107, #131, #132, #186.
 Next free number is **#187**.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
@@ -10,15 +10,18 @@ Next free number is **#187**.
 mismatch` on wasm32; the `fun () => worker()` lambda form works) was found by the
 #184 fix subagent and is the sibling of #184: same wasm32 call_indirect signature
 mismatch, but via the `gen_func_ref` trampoline rather than a leaked coro flag.
-Count 6 → 7.
+Count 6 → 7, then 7 → 6 as #185 closed below.
 
-#185 (`__float_to_string` formats a float to a DIFFERENT precision on wasm32 than
-on native — native's `%g` gives 6 significant digits, wasm32's hand-written
-formatter gives 6 *fractional* digits, so `Math.pi` prints `3.14159` natively and
-`3.141593` on wasm32) was found by `tools/differential.sh --record` refusing to
-freeze `test/pass/math.sf`: native-O0 and native-O2 agree, but native != wasm32.
-Same program, different number — a real cross-target inconsistency. Filed from the
-#107 surface (math.sf asserts nothing). Full entry below. Open set 6 → 7.
+#185 (`__float_to_string` formatted a float to a different precision on wasm32
+than native — native's `%g` gives 6 significant digits, wasm32's hand-written
+formatter gave 6 *fractional* digits, so `Math.pi` printed `3.14159` natively and
+`3.141593` on wasm32) is now FIXED in the fixed-notation range: the wasm32
+formatter shrinks its fractional-digit budget by the integer part's width
+(`6 - intdigits`), matching `%g`'s 6-significant-digits rule. `test/pass/math.sf`
+now agrees native == wasm32 and has an `.expected`; regression test
+`test/pass/float_format_precision.sf`. The scientific-notation tail (`|f| >= 1e6`
+or `< 1e-4`, where `%g` switches to `e` notation) is a known remaining divergence,
+noted in the closed entry. Lives in `BUGS_CLOSED.md`. Open set 6 → 5.
 
 #184 (a `Task.spawn`/coroutine closure trapped `null function or function
 signature mismatch` on wasm32 when the module also had earlier closures) is now
@@ -518,42 +521,6 @@ referenced function is a coroutine (known via `mark_coroutines` / the coroutine
 set): call it as `ptr @worker()` and drive the frame (or forward to the same
 spawn/await machinery the lambda path uses) rather than a bare `call i64`. Match
 how `Task.spawn(fun () => worker())` already lowers the coroutine correctly.
-
-### 185. OPEN — `__float_to_string` uses a different precision on wasm32 than native (6 fractional digits vs `%g`'s 6 significant digits)
-
-```saffron
-import "math" as Math
-IO.println(Math.pi)   // native: 3.14159    wasm32: 3.141593
-```
-
-**Severity: medium** — the same program prints a different number depending on the
-target. Not garbage, but a silent cross-target inconsistency: any float whose
-integer part is nonzero renders with a different digit count on wasm32.
-
-**Root cause.** The two runtime bases format a float differently:
-
-- `base_nanbox.ll` (native) calls C's `snprintf(buf, 32, "%g", f)`. `%g` prints
-  **6 significant digits total**, so `3.14159265…` → `3.14159` (1 integer digit +
-  5 fractional).
-- `wasm_base_32.ll` has a hand-written `__float_to_string` (there is no libc
-  `snprintf` on wasm32 — its `snprintf` shim just `strcpy`s the format string).
-  It emits the integer part in full via `__wasm_uint_to_str`, then scales the
-  fraction by `1e6` and emits **6 fractional digits**, trimming trailing zeros.
-  So `3.14159265…` → `3.141593` (6 fractional digits, independent of the integer
-  part's width).
-
-Found by `tools/differential.sh --record` refusing to freeze `test/pass/math.sf`:
-`native-O2 == native-O0` but `native-O2 != wasm32` (`3.14159` vs `3.141593`). The
-determinism/cross-config gate is exactly the mechanism meant to catch this — it is
-why `math.sf` has no `.expected` while its siblings now do.
-
-**Fix direction.** Make the wasm32 formatter match `%g`'s "6 significant digits"
-convention (count the integer part's digits and reduce the fractional digit budget
-accordingly, or reproduce `%g`'s shortest-round-trip-ish rule). Whichever base is
-chosen as canonical, both must agree; the native `%g` output is the reference the
-rest of the suite's `.expected` files were recorded against, so wasm32 should move
-to match native. wasm64 (`wasm_base.ll`) prints nothing for floats at all (#131),
-so it is out of scope until that is addressed.
 
 ---
 
