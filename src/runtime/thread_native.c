@@ -479,3 +479,130 @@ void sf_atomic_free(int64_t handle) {
     }
     pthread_mutex_unlock(&atomic_table_lock);
 }
+
+/* ===== Channel waitset (Workstream C) ===== */
+
+/*
+ * A channel's BUFFER is a Saffron List, not C memory — deliberately. The GRL
+ * already serializes all managed execution, so a List touched only while holding
+ * the GRL cannot be corrupted by another thread, and being GC-managed its
+ * elements (which may be Strings — GC pointers) stay rooted and cannot be swept
+ * out from under the channel. So C owns none of the data; it owns only the
+ * BLOCKING: a mutex and two condition variables (readable / writable) that let a
+ * consumer sleep until an item arrives and a producer sleep until space frees,
+ * with no busy-loop.
+ *
+ * ── Lock ordering (the part that is easy to get wrong) ──────────────────────
+ * There are two locks in play: the GRL and this waitset mutex. To avoid
+ * deadlock they are ALWAYS acquired GRL-first-then-mutex. Managed code always
+ * holds the GRL, so a waiter takes the waitset mutex while still holding the GRL
+ * (consistent order), drops the GRL, then cond_wait atomically releases the
+ * mutex and blocks. On wakeup cond_wait re-holds the mutex — so we must release
+ * the mutex BEFORE retaking the GRL, or we would hold mutex-then-want-GRL while
+ * a producer holds GRL-and-wants-mutex: a deadlock. Releasing the mutex first
+ * keeps every "hold both" moment in GRL→mutex order.
+ *
+ * ── No lost wakeups ─────────────────────────────────────────────────────────
+ * A consumer checks "buffer empty" while holding the GRL (so no producer can
+ * push meanwhile — a push needs the GRL), then takes the waitset mutex BEFORE
+ * dropping the GRL. A producer that then runs will block on that mutex when it
+ * tries to notify, until the consumer's cond_wait atomically releases it — by
+ * which point the consumer is provably blocked on the condvar and the notify
+ * will wake it. The caller still re-checks the buffer in a loop after waking, so
+ * a spurious wakeup just re-blocks.
+ */
+
+#define SF_MAX_WAITSETS 256
+
+typedef struct {
+    int in_use;
+    pthread_mutex_t mtx;
+    pthread_cond_t readable;   /* signaled when an item is available to recv */
+    pthread_cond_t writable;   /* signaled when space is available to send */
+} sf_waitset_entry_t;
+
+static sf_waitset_entry_t waitset_table[SF_MAX_WAITSETS];
+static int waitset_table_initialized = 0;
+static pthread_mutex_t waitset_table_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int64_t sf_chan_ws_new(void) {
+    int64_t h = -1;
+    pthread_mutex_lock(&waitset_table_lock);
+    if (!waitset_table_initialized) {
+        memset(waitset_table, 0, sizeof(waitset_table));
+        waitset_table_initialized = 1;
+    }
+    for (int i = 0; i < SF_MAX_WAITSETS; i++) {
+        if (!waitset_table[i].in_use) {
+            if (pthread_mutex_init(&waitset_table[i].mtx, NULL) == 0) {
+                pthread_cond_init(&waitset_table[i].readable, NULL);
+                pthread_cond_init(&waitset_table[i].writable, NULL);
+                waitset_table[i].in_use = 1;
+                h = i + 1;
+            }
+            break;
+        }
+    }
+    pthread_mutex_unlock(&waitset_table_lock);
+    return h;
+}
+
+static sf_waitset_entry_t *waitset_ptr(int64_t handle) {
+    if (handle < 1 || handle > SF_MAX_WAITSETS) return NULL;
+    if (!waitset_table[handle - 1].in_use) return NULL;
+    return &waitset_table[handle - 1];
+}
+
+/* Block until another thread signals `readable`. Caller holds the GRL and has
+ * just observed the buffer empty. See the lock-ordering note above. */
+void sf_chan_wait_readable(int64_t handle) {
+    sf_waitset_entry_t *w = waitset_ptr(handle);
+    if (!w) return;
+    pthread_mutex_lock(&w->mtx);   /* GRL still held: GRL→mutex order */
+    sf_grl_unlock();
+    pthread_cond_wait(&w->readable, &w->mtx);  /* atomically unlock mtx + block */
+    pthread_mutex_unlock(&w->mtx); /* release mutex BEFORE retaking GRL */
+    sf_grl_lock();
+}
+
+/* Block until another thread signals `writable` (space freed). Same discipline. */
+void sf_chan_wait_writable(int64_t handle) {
+    sf_waitset_entry_t *w = waitset_ptr(handle);
+    if (!w) return;
+    pthread_mutex_lock(&w->mtx);
+    sf_grl_unlock();
+    pthread_cond_wait(&w->writable, &w->mtx);
+    pthread_mutex_unlock(&w->mtx);
+    sf_grl_lock();
+}
+
+/* Wake all consumers waiting for an item. Broadcast, not signal: several may be
+ * parked and a close must release every one of them. Caller holds the GRL; this
+ * takes the mutex briefly (GRL→mutex, consistent) and never blocks on the GRL. */
+void sf_chan_notify_readable(int64_t handle) {
+    sf_waitset_entry_t *w = waitset_ptr(handle);
+    if (!w) return;
+    pthread_mutex_lock(&w->mtx);
+    pthread_cond_broadcast(&w->readable);
+    pthread_mutex_unlock(&w->mtx);
+}
+
+/* Wake all producers waiting for space. */
+void sf_chan_notify_writable(int64_t handle) {
+    sf_waitset_entry_t *w = waitset_ptr(handle);
+    if (!w) return;
+    pthread_mutex_lock(&w->mtx);
+    pthread_cond_broadcast(&w->writable);
+    pthread_mutex_unlock(&w->mtx);
+}
+
+void sf_chan_ws_free(int64_t handle) {
+    pthread_mutex_lock(&waitset_table_lock);
+    if (handle >= 1 && handle <= SF_MAX_WAITSETS && waitset_table[handle - 1].in_use) {
+        pthread_cond_destroy(&waitset_table[handle - 1].readable);
+        pthread_cond_destroy(&waitset_table[handle - 1].writable);
+        pthread_mutex_destroy(&waitset_table[handle - 1].mtx);
+        waitset_table[handle - 1].in_use = 0;
+    }
+    pthread_mutex_unlock(&waitset_table_lock);
+}
