@@ -9,6 +9,77 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 176. FIXED — a C-style `for (i = 0; ...)` reusing an `i` from an earlier `var i` emitted invalid IR (`use of undefined value '%i'`)
+
+**FIXED 2026-08-06.** The parser desugars both `for (var i=...)` and bare `for (i=...)` to the same VarDecl; at module scope the bare form reused a global, so `gen_var_decl` stored to `@__g_i` while the loop's reads resolved to a `%i` alloca the top-level prepass (which skips module globals) never emitted. Fix: `parser.sf` marks the bare-init VarDecl with doc `"@for_reuse"`; `resolve.sf` honors it — when the name is an existing module global with no enclosing local, it rebinds rather than declaring a fresh local, so reads and the store agree. Doc-field only, no AST shape change. Verified: repro runs; bootstrap green; suite failure set unchanged. Found running the learnxinyminutes doc.
+
+--- original entry ---
+**Severity: high.** The compiler emits invalid LLVM IR — `opt` rejects it with
+`use of undefined value '%i'` and the build fails with "the compiler emitted
+invalid LLVM IR ... this is a compiler bug." No native binary / wasm module is
+produced.
+
+**Minimal repro:**
+
+```saffron
+var i = 0
+while (i < 3) { IO.println("w ${i}"); i = i + 1 }
+var who: List<String> = ["a", "b", "c"]
+for (i = 0; i < who.length(); i = i + 1) {   // bare `i`, no `var` — reuses the one above
+    IO.println("${who[i]}")
+}
+```
+
+The C-style for's init is `i = 0` (an *assignment* to the existing `i`), not
+`var i = 0` (a declaration). Codegen for the C-style for apparently treats the
+loop variable as loop-local and emits `load i64, i64* %i` against a `%i` alloca it
+never created in that scope, so the reference is undefined.
+
+**Scope, from bisection:**
+- `for (var i = 0; ...)` (declaring form) — builds fine.
+- `for (i = 0; ...)` with NO earlier `i` in scope — builds fine on its own.
+- `for (i = 0; ...)` reusing an `i` declared earlier by `var i` — **invalid IR.**
+
+So the trigger is specifically the bare-init C-style for *rebinding an
+already-declared* variable. Found running `docs/learnxinyminutes/learnsaffron.sf`
+through the playground (its line ~166 pairs `keys()`/`values()` this way, after a
+`var i` while-loop earlier in the file). Target-independent (native and wasm32).
+
+**Fix direction.** The C-style for's init clause needs to distinguish a `VarDecl`
+init from a plain assignment: an assignment init must resolve `i` to the existing
+alloca (like any other assignment) rather than referencing a fresh loop-local
+`%i`. Look at how the C-style-for codegen lowers its init/condition/step and where
+`%i` is assumed to exist.
+
+---
+
+### 177. FIXED — an unknown type name in an annotation or signature was silently accepted (no checker error)
+
+**FIXED 2026-08-06.** Added a checker pass `check_unknown_types` (run after all registration so forward references resolve) + `is_known_type_name` predicate: validates every type spelling in the module's own var/param/return/field/type-alias annotations, splitting nested generics so `Map<String, Bogus>` catches its argument. Known set = primitives/builtins, declared classes/enums/interfaces, type aliases, functions, and in-scope type params (from class `type_params` and each FunDecl's `@generic` docstring). One-sided — accepts anything not provably a typo — so it does not reject type params, forward refs, or generic args. Verified: `Bogus`/`Nope`/`Map<_,Bogus>` now error with clear diagnostics; generics/forward-refs/function-types still compile; suite failure set unchanged.
+
+--- original entry ---
+**Severity: medium.** A typo'd or nonexistent type name compiles clean instead of
+being rejected, and can lead to wrong codegen downstream.
+
+```saffron
+var x: Bogus = 5          // builds; no error
+fun f(x: Nope): Nope { return x }   // builds; no error
+```
+
+Both compile and (for the var case) run, printing `5`. The checker never
+validates that a type annotation names a real type (a primitive, or a declared
+class/enum/interface/type parameter). It should reject an unknown type name with a
+diagnostic (`unknown type 'Bogus'`) the way it rejects other undeclared names.
+
+Found while fixing the learnxiny doc — a mistyped type is exactly the error a
+newcomer makes, and getting silence (or later invalid IR) instead of "unknown type
+'X'" is the worst failure mode. The fix is a checker pass over type annotations
+resolving each name against the known-types table; unresolved → error. Be careful
+not to reject legitimate type parameters (`T` in `fun f<T>(...)`) or forward
+references to types declared later in the file.
+
+---
+
 ### 2. FIXED — a forward reference to a later-declared sibling nested `fun` printed a false warning (and was mislabeled a design limitation)
 
 **Reproduction:**

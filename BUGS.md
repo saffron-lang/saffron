@@ -2,7 +2,7 @@
 
 ## Open
 
-**10 open entries:** #49, #65, #107, #131, #132, #154, #175, #176, #177, #178.
+**8 open entries:** #49, #65, #107, #131, #132, #154, #175, #178.
 Next free number is **#179**.
 
 #178 (an all-scalar overload set is rejected by the checker) was filed while
@@ -386,67 +386,6 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
-
-### 176. OPEN — a C-style `for (i = 0; ...)` reusing an `i` from an earlier `var i` emits invalid IR (`use of undefined value '%i'`)
-
-**Severity: high.** The compiler emits invalid LLVM IR — `opt` rejects it with
-`use of undefined value '%i'` and the build fails with "the compiler emitted
-invalid LLVM IR ... this is a compiler bug." No native binary / wasm module is
-produced.
-
-**Minimal repro:**
-
-```saffron
-var i = 0
-while (i < 3) { IO.println("w ${i}"); i = i + 1 }
-var who: List<String> = ["a", "b", "c"]
-for (i = 0; i < who.length(); i = i + 1) {   // bare `i`, no `var` — reuses the one above
-    IO.println("${who[i]}")
-}
-```
-
-The C-style for's init is `i = 0` (an *assignment* to the existing `i`), not
-`var i = 0` (a declaration). Codegen for the C-style for apparently treats the
-loop variable as loop-local and emits `load i64, i64* %i` against a `%i` alloca it
-never created in that scope, so the reference is undefined.
-
-**Scope, from bisection:**
-- `for (var i = 0; ...)` (declaring form) — builds fine.
-- `for (i = 0; ...)` with NO earlier `i` in scope — builds fine on its own.
-- `for (i = 0; ...)` reusing an `i` declared earlier by `var i` — **invalid IR.**
-
-So the trigger is specifically the bare-init C-style for *rebinding an
-already-declared* variable. Found running `docs/learnxinyminutes/learnsaffron.sf`
-through the playground (its line ~166 pairs `keys()`/`values()` this way, after a
-`var i` while-loop earlier in the file). Target-independent (native and wasm32).
-
-**Fix direction.** The C-style for's init clause needs to distinguish a `VarDecl`
-init from a plain assignment: an assignment init must resolve `i` to the existing
-alloca (like any other assignment) rather than referencing a fresh loop-local
-`%i`. Look at how the C-style-for codegen lowers its init/condition/step and where
-`%i` is assumed to exist.
-
-### 177. OPEN — an unknown type name in an annotation or signature is silently accepted (no checker error)
-
-**Severity: medium.** A typo'd or nonexistent type name compiles clean instead of
-being rejected, and can lead to wrong codegen downstream.
-
-```saffron
-var x: Bogus = 5          // builds; no error
-fun f(x: Nope): Nope { return x }   // builds; no error
-```
-
-Both compile and (for the var case) run, printing `5`. The checker never
-validates that a type annotation names a real type (a primitive, or a declared
-class/enum/interface/type parameter). It should reject an unknown type name with a
-diagnostic (`unknown type 'Bogus'`) the way it rejects other undeclared names.
-
-Found while fixing the learnxiny doc — a mistyped type is exactly the error a
-newcomer makes, and getting silence (or later invalid IR) instead of "unknown type
-'X'" is the worst failure mode. The fix is a checker pass over type annotations
-resolving each name against the known-types table; unresolved → error. Be careful
-not to reject legitimate type parameters (`T` in `fun f<T>(...)`) or forward
-references to types declared later in the file.
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 
