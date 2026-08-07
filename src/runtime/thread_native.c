@@ -290,3 +290,192 @@ void sf_thread_sleep(double seconds) {
     }
     sf_grl_lock();
 }
+
+/* ===== Mutex (Workstream B) ===== */
+
+/*
+ * A user-facing lock, distinct from the GRL. Why both exist: the GRL only
+ * serializes threads while they run managed code; it is DROPPED around every
+ * blocking call (join/sleep/here). So two threads can both be "not holding the
+ * GRL" at the same time — inside a blocking section — and a critical section that
+ * spans such a section (increment, sleep, store) is NOT protected by the GRL. A
+ * Thread.Mutex is how you serialize those.
+ *
+ * The pthread_mutex_t must outlive the Saffron-side handle and must not move
+ * (pthread mutexes are not relocatable), so it is malloc'd off-GC and tracked in
+ * a handle table, like sockets/processes. The table lock is a plain mutex, never
+ * the GRL, for the same reason as the thread table.
+ */
+
+#define SF_MAX_MUTEXES 256
+
+typedef struct {
+    int in_use;
+    pthread_mutex_t mtx;
+} sf_mutex_entry_t;
+
+static sf_mutex_entry_t mutex_table[SF_MAX_MUTEXES];
+static int mutex_table_initialized = 0;
+static pthread_mutex_t mutex_table_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/*
+ * sf_mutex_new — Create a mutex, returning a 1-based handle or -1 if the table
+ * is full. The mutex is plain (non-recursive): a thread that locks it twice
+ * without unlocking deadlocks, which is the standard contract.
+ */
+int64_t sf_mutex_new(void) {
+    int64_t h = -1;
+    pthread_mutex_lock(&mutex_table_lock);
+    if (!mutex_table_initialized) {
+        memset(mutex_table, 0, sizeof(mutex_table));
+        mutex_table_initialized = 1;
+    }
+    for (int i = 0; i < SF_MAX_MUTEXES; i++) {
+        if (!mutex_table[i].in_use) {
+            if (pthread_mutex_init(&mutex_table[i].mtx, NULL) == 0) {
+                mutex_table[i].in_use = 1;
+                h = i + 1;
+            }
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_table_lock);
+    return h;
+}
+
+static pthread_mutex_t *mutex_ptr(int64_t handle) {
+    if (handle < 1 || handle > SF_MAX_MUTEXES) return NULL;
+    if (!mutex_table[handle - 1].in_use) return NULL;
+    return &mutex_table[handle - 1].mtx;
+}
+
+/*
+ * sf_mutex_lock — Acquire the mutex, DROPPING the GRL while blocked.
+ *
+ * Same discipline as join: if we held the GRL while waiting, the thread that
+ * currently owns this mutex could not re-enter managed code to release it, so we
+ * would wait forever. Drop the GRL, block on the mutex, then re-take the GRL —
+ * so the critical section that follows runs as managed code, holding both the
+ * mutex (excluding other lockers) and the GRL (excluding all managed execution).
+ */
+void sf_mutex_lock(int64_t handle) {
+    pthread_mutex_t *m = mutex_ptr(handle);
+    if (!m) return;
+    sf_grl_unlock();
+    pthread_mutex_lock(m);
+    sf_grl_lock();
+}
+
+/* Try to acquire without blocking. Returns 1 on success, 0 if already held.
+ * No GRL dance: trylock never blocks, so it cannot deadlock on the GRL. */
+int64_t sf_mutex_trylock(int64_t handle) {
+    pthread_mutex_t *m = mutex_ptr(handle);
+    if (!m) return 0;
+    return pthread_mutex_trylock(m) == 0 ? 1 : 0;
+}
+
+void sf_mutex_unlock(int64_t handle) {
+    pthread_mutex_t *m = mutex_ptr(handle);
+    if (m) pthread_mutex_unlock(m);
+}
+
+/* Destroy the mutex and free its slot. Undefined to use the handle after. */
+void sf_mutex_free(int64_t handle) {
+    pthread_mutex_lock(&mutex_table_lock);
+    if (handle >= 1 && handle <= SF_MAX_MUTEXES && mutex_table[handle - 1].in_use) {
+        pthread_mutex_destroy(&mutex_table[handle - 1].mtx);
+        mutex_table[handle - 1].in_use = 0;
+    }
+    pthread_mutex_unlock(&mutex_table_lock);
+}
+
+/* ===== Atomic integer (Workstream B) ===== */
+
+/*
+ * A single 64-bit integer with atomic operations, for lock-free counters and
+ * flags shared across threads. The value lives OFF-GC (in this table), not in a
+ * Saffron object field, precisely because atomics are used while the GRL is
+ * dropped — a thread mid-blocking-section must be able to touch the counter
+ * without touching the managed heap. The Saffron side passes and receives the
+ * untagged 48-bit payload of a NaN-boxed Int and re-tags on the way out.
+ */
+
+#define SF_MAX_ATOMICS 256
+
+/* The value is a plain int64_t, not _Atomic: the GCC/Clang __atomic_* builtins
+ * used below operate on ordinary integer lvalues and reject an _Atomic-qualified
+ * pointer. Atomicity comes from the builtins' memory-order argument, not the
+ * type. */
+typedef struct {
+    int in_use;
+    int64_t value;
+} sf_atomic_entry_t;
+
+static sf_atomic_entry_t atomic_table[SF_MAX_ATOMICS];
+static int atomic_table_initialized = 0;
+static pthread_mutex_t atomic_table_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int64_t sf_atomic_new(int64_t initial) {
+    int64_t h = -1;
+    pthread_mutex_lock(&atomic_table_lock);
+    if (!atomic_table_initialized) {
+        memset(atomic_table, 0, sizeof(atomic_table));
+        atomic_table_initialized = 1;
+    }
+    for (int i = 0; i < SF_MAX_ATOMICS; i++) {
+        if (!atomic_table[i].in_use) {
+            atomic_table[i].in_use = 1;
+            atomic_table[i].value = initial;
+            h = i + 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&atomic_table_lock);
+    return h;
+}
+
+static int64_t *atomic_ptr(int64_t handle) {
+    if (handle < 1 || handle > SF_MAX_ATOMICS) return NULL;
+    if (!atomic_table[handle - 1].in_use) return NULL;
+    return &atomic_table[handle - 1].value;
+}
+
+/* All operations are seq_cst (the default for __atomic with __ATOMIC_SEQ_CST):
+ * the simplest correct memory ordering, and these are not hot enough to need a
+ * weaker one. Each returns a plain int64_t the Saffron side re-tags as an Int. */
+
+int64_t sf_atomic_load(int64_t handle) {
+    int64_t *p = atomic_ptr(handle);
+    return p ? __atomic_load_n(p, __ATOMIC_SEQ_CST) : 0;
+}
+
+void sf_atomic_store(int64_t handle, int64_t v) {
+    int64_t *p = atomic_ptr(handle);
+    if (p) __atomic_store_n(p, v, __ATOMIC_SEQ_CST);
+}
+
+/* Add `delta` and return the NEW value (fetch-and-add + delta). */
+int64_t sf_atomic_add(int64_t handle, int64_t delta) {
+    int64_t *p = atomic_ptr(handle);
+    return p ? __atomic_add_fetch(p, delta, __ATOMIC_SEQ_CST) : 0;
+}
+
+/*
+ * Compare-and-swap. If the current value equals `expected`, set it to `desired`
+ * and return 1; otherwise leave it and return 0. The building block for
+ * lock-free loops. Uses the strong form (no spurious failures).
+ */
+int64_t sf_atomic_cas(int64_t handle, int64_t expected, int64_t desired) {
+    int64_t *p = atomic_ptr(handle);
+    if (!p) return 0;
+    return __atomic_compare_exchange_n(p, &expected, desired, 0,
+                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST) ? 1 : 0;
+}
+
+void sf_atomic_free(int64_t handle) {
+    pthread_mutex_lock(&atomic_table_lock);
+    if (handle >= 1 && handle <= SF_MAX_ATOMICS && atomic_table[handle - 1].in_use) {
+        atomic_table[handle - 1].in_use = 0;
+    }
+    pthread_mutex_unlock(&atomic_table_lock);
+}

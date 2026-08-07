@@ -1,0 +1,86 @@
+// @thread workstream B: Mutex and Atomic.
+//
+// The mutex test is designed to actually exercise the mutex, not the GRL: each
+// worker's critical section spans a Thread.sleep (a GRL release point). Under the
+// GRL alone a read-modify-write would still race across that sleep; only the
+// mutex serializes it. Without the lock this test fails; with it the final count
+// is exact.
+
+import "@thread" as Thread
+import "@test" as T
+
+// --- Mutex: serialize a counter whose critical section drops the GRL ---
+var m: Thread.Mutex = Thread.Mutex()
+var counter: Thread.Atomic = Thread.Atomic(0)   // holds the shared count off-GC
+
+fun bump() {
+    m.lock()
+    // Read, yield the GRL mid-section, then write-back. The sleep is what makes
+    // this a real mutex test: two unlocked threads would interleave here.
+    var cur: Int = counter.load()
+    Thread.sleep(0.005)
+    counter.store(cur + 1)
+    m.unlock()
+}
+
+var handles: List<Thread.ThreadHandle> = []
+var i: Int = 0
+while (i < 10) {
+    handles.push(Thread.spawn(fun (): Int { bump(); return 0 }))
+    i = i + 1
+}
+var j: Int = 0
+while (j < handles.length()) {
+    var h: Thread.ThreadHandle = handles[j]
+    h.join()
+    j = j + 1
+}
+T.assert_eq(counter.load(), 10, "mutex serialized 10 increments across a GRL-release section")
+
+// --- Atomic: lock-free increments from many threads ---
+var n: Thread.Atomic = Thread.Atomic(0)
+fun spin() {
+    var k: Int = 0
+    while (k < 1000) {
+        n.add(1)
+        k = k + 1
+    }
+}
+var ah: List<Thread.ThreadHandle> = []
+var a: Int = 0
+while (a < 8) {
+    ah.push(Thread.spawn(fun (): Int { spin(); return 0 }))
+    a = a + 1
+}
+var b: Int = 0
+while (b < ah.length()) {
+    var hh: Thread.ThreadHandle = ah[b]
+    hh.join()
+    b = b + 1
+}
+T.assert_eq(n.load(), 8000, "8 threads x 1000 atomic increments = 8000, no lost updates")
+
+// --- Atomic basics: store/load/add-return/CAS ---
+var x: Thread.Atomic = Thread.Atomic(5)
+T.assert_eq(x.load(), 5, "atomic initial value")
+T.assert_eq(x.add(3), 8, "add returns the new value")
+x.store(20)
+T.assert_eq(x.load(), 20, "store then load")
+T.assert_eq(x.compare_and_set(20, 99), true, "CAS succeeds when expected matches")
+T.assert_eq(x.load(), 99, "CAS applied the new value")
+T.assert_eq(x.compare_and_set(20, 0), false, "CAS fails when expected does not match")
+T.assert_eq(x.load(), 99, "CAS left the value unchanged on failure")
+
+// --- Mutex.with: lock is released even on the happy path ---
+var guarded: Thread.Atomic = Thread.Atomic(0)
+var gm: Thread.Mutex = Thread.Mutex()
+gm.with(fun (): Int {
+    guarded.store(42)
+    return 0
+})
+T.assert_eq(guarded.load(), 42, "Mutex.with ran the body under the lock")
+// If .with failed to unlock, this second acquire would deadlock (test would hang).
+T.assert_eq(gm.try_lock(), true, "lock was released after with()")
+gm.unlock()
+
+T.summary()
