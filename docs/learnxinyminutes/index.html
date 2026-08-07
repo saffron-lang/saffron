@@ -153,10 +153,6 @@
 <span class="c">// var narrowed: Int = ratio     // Error: cannot assign Float to Int</span>
 <span class="k">var</span> narrowed: <span class="t">Int</span> = ratio.floor()
 
-<span class="c">// `Number` is still accepted as a spelling, but it is an ALIAS FOR Int,</span>
-<span class="c">// not a supertype of both numeric types. `var x: Number = 1.5` therefore</span>
-<span class="c">// annotates x as an Int. Prefer writing Int or Float — say which you mean.</span>
-
 <span class="c">// Types are checked at compile time. This would not compile:</span>
 <span class="c">// var oops: Int = &quot;hello&quot;   // Error: cannot assign String to Int</span>
 
@@ -310,19 +306,19 @@ ages.set(<span class="s">"grace"</span>, <span class="n">45</span>)
 <span class="c">////////////////////////////////////////////////</span>
 
 <span class="c">// Annotate the parameters and the return type.</span>
-<span class="k">fun</span> add(a: <span class="t">Number</span>, b: <span class="t">Number</span>): <span class="t">Number</span> {
+<span class="k">fun</span> add(a: <span class="t">Float</span>, b: <span class="t">Float</span>): <span class="t">Float</span> {
     <span class="k">return</span> a + b
 }
 <span class="t">IO</span>.println(add(<span class="n">2</span>, <span class="n">3</span>))   <span class="c">// 5</span>
 
 <span class="c">// The return type may be omitted, and is inferred from the body.</span>
-<span class="k">fun</span> triple(x: <span class="t">Number</span>) {
+<span class="k">fun</span> triple(x: <span class="t">Float</span>) {
     <span class="k">return</span> x * <span class="n">3</span>
 }
 <span class="t">IO</span>.println(triple(<span class="n">5</span>))   <span class="c">// 15</span>
 
 <span class="c">// Lambdas use `fun` with `=&gt;` for a single-expression body.</span>
-<span class="k">var</span> double = <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * <span class="n">2</span>
+<span class="k">var</span> double = <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Float</span> =&gt; x * <span class="n">2</span>
 <span class="t">IO</span>.println(double(<span class="n">21</span>))  <span class="c">// 42</span>
 
 <span class="c">// Or a block body, when you need statements.</span>
@@ -332,15 +328,15 @@ ages.set(<span class="s">"grace"</span>, <span class="n">45</span>)
 <span class="t">IO</span>.println(shout(<span class="s">"hey"</span>))  <span class="c">// HEY!</span>
 
 <span class="c">// Functions are values. Function types are written (A, B) =&gt; C.</span>
-<span class="k">fun</span> apply(f: (<span class="t">Number</span>) =&gt; <span class="t">Number</span>, x: <span class="t">Number</span>): <span class="t">Number</span> {
+<span class="k">fun</span> apply(f: (<span class="t">Float</span>) =&gt; <span class="t">Float</span>, x: <span class="t">Float</span>): <span class="t">Float</span> {
     <span class="k">return</span> f(x)
 }
 <span class="t">IO</span>.println(apply(double, <span class="n">5</span>))  <span class="c">// 10</span>
 
 <span class="c">// Closures capture their enclosing scope by reference.</span>
-<span class="k">fun</span> make_counter(): () =&gt; <span class="t">Number</span> {
+<span class="k">fun</span> make_counter(): () =&gt; <span class="t">Float</span> {
     <span class="k">var</span> count = <span class="n">0</span>
-    <span class="k">return</span> <span class="k">fun</span> (): <span class="t">Number</span> {
+    <span class="k">return</span> <span class="k">fun</span> (): <span class="t">Float</span> {
         count = count + <span class="n">1</span>
         <span class="k">return</span> count
     }
@@ -414,7 +410,7 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 <span class="t">IO</span>.println(label)   <span class="c">// north</span>
 
 <span class="c">// Matching a variant binds its fields.</span>
-<span class="k">var</span> maybe: <span class="t">Option</span>&lt;<span class="t">Number</span>&gt; = <span class="t">Option</span>.Some(<span class="n">42</span>)
+<span class="k">var</span> maybe: <span class="t">Option</span>&lt;<span class="t">Float</span>&gt; = <span class="t">Option</span>.Some(<span class="n">42</span>)
 <span class="t">IO</span>.println(<span class="k">match</span> (maybe) {
     Some(v) =&gt; <span class="s">"got </span><span class="i">${v}</span><span class="s">"</span>,
     None =&gt; <span class="s">"got nothing"</span>
@@ -426,12 +422,12 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 
 <span class="c">// Recursive enums plus match give you tree walkers almost for free.</span>
 <span class="k">enum</span> Expr {
-    Num(value: <span class="t">Number</span>),
+    Num(value: <span class="t">Float</span>),
     Add(left: Expr, right: Expr),
     Mul(left: Expr, right: Expr)
 }
 
-<span class="k">fun</span> eval(e: Expr): <span class="t">Number</span> {
+<span class="k">fun</span> eval(e: Expr): <span class="t">Float</span> {
     <span class="k">return</span> <span class="k">match</span> (e) {
         Num(v) =&gt; v,
         Add(l, r) =&gt; eval(l) + eval(r),
@@ -448,11 +444,11 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 <span class="c">////////////////////////////////////////////////</span>
 
 <span class="k">class</span> Point {
-    <span class="k">var</span> x: <span class="t">Number</span>
-    <span class="k">var</span> y: <span class="t">Number</span>
+    <span class="k">var</span> x: <span class="t">Float</span>
+    <span class="k">var</span> y: <span class="t">Float</span>
 
     <span class="c">// `init` is the constructor. Fields are assigned through `this`.</span>
-    <span class="k">fun</span> init(x: <span class="t">Number</span>, y: <span class="t">Number</span>) {
+    <span class="k">fun</span> init(x: <span class="t">Float</span>, y: <span class="t">Float</span>) {
         <span class="k">this</span>.x = x
         <span class="k">this</span>.y = y
     }
@@ -496,9 +492,9 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 <span class="c">// Defining add/sub/mul/div/mod/lt/gt/eq overloads the matching operator,</span>
 <span class="c">// so `a + b` calls a.add(b).</span>
 <span class="k">class</span> Vec2 {
-    <span class="k">var</span> x: <span class="t">Number</span>
-    <span class="k">var</span> y: <span class="t">Number</span>
-    <span class="k">fun</span> init(x: <span class="t">Number</span>, y: <span class="t">Number</span>) { <span class="k">this</span>.x = x; <span class="k">this</span>.y = y }
+    <span class="k">var</span> x: <span class="t">Float</span>
+    <span class="k">var</span> y: <span class="t">Float</span>
+    <span class="k">fun</span> init(x: <span class="t">Float</span>, y: <span class="t">Float</span>) { <span class="k">this</span>.x = x; <span class="k">this</span>.y = y }
     <span class="k">fun</span> add(other: Vec2): Vec2 { <span class="k">return</span> Vec2(<span class="k">this</span>.x + other.x, <span class="k">this</span>.y + other.y) }
     <span class="k">fun</span> eq(other: Vec2): <span class="t">Bool</span> { <span class="k">return</span> <span class="k">this</span>.x == other.x <span class="k">and</span> <span class="k">this</span>.y == other.y }
     <span class="k">fun</span> to_string(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"&lt;</span><span class="i">${this.x}</span><span class="s">, </span><span class="i">${this.y}</span><span class="s">&gt;"</span> }
@@ -570,7 +566,7 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 <span class="c">// 12. Error handling</span>
 <span class="c">////////////////////////////////////////////////</span>
 
-<span class="c">// Any value can be thrown — a String, a Number, an object.</span>
+<span class="c">// Any value can be thrown — a String, an Int, an object.</span>
 <span class="k">try</span> {
     <span class="k">throw</span> <span class="s">"something broke"</span>
 } <span class="k">catch</span> (e) {
@@ -597,7 +593,7 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
     Err(error: E)
 }
 
-<span class="k">fun</span> safe_divide(a: <span class="t">Number</span>, b: <span class="t">Number</span>): <span class="t">Result</span>&lt;<span class="t">Number</span>, <span class="t">String</span>&gt; {
+<span class="k">fun</span> safe_divide(a: <span class="t">Float</span>, b: <span class="t">Float</span>): <span class="t">Result</span>&lt;<span class="t">Float</span>, <span class="t">String</span>&gt; {
     <span class="k">if</span> (b == <span class="n">0</span>) {
         <span class="k">return</span> <span class="t">Result</span>.Err(<span class="s">"division by zero"</span>)
     }
@@ -643,22 +639,22 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 
 <span class="k">var</span> values = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>]
 
-<span class="t">IO</span>.println(Iter.map(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * <span class="n">2</span>))
-<span class="t">IO</span>.println(Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x % <span class="n">2</span> == <span class="n">0</span>))
-<span class="t">IO</span>.println(Iter.reduce(values, <span class="k">fun</span> (acc: <span class="t">Number</span>, x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; acc + x, <span class="n">0</span>))
+<span class="t">IO</span>.println(Iter.map(values, <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Float</span> =&gt; x * <span class="n">2</span>))
+<span class="t">IO</span>.println(Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Bool</span> =&gt; x % <span class="n">2</span> == <span class="n">0</span>))
+<span class="t">IO</span>.println(Iter.reduce(values, <span class="k">fun</span> (acc: <span class="t">Float</span>, x: <span class="t">Float</span>): <span class="t">Float</span> =&gt; acc + x, <span class="n">0</span>))
 <span class="t">IO</span>.println(Iter.sum(values))
 
 <span class="c">// Also: any, all, each, count, find, flat_map, zip, enumerate, take, skip.</span>
 
 <span class="c">// Every one of these takes any iterable, so they compose by nesting.</span>
 <span class="t">IO</span>.println(Iter.map(
-    Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>),
-    <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * x
+    Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>),
+    <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Float</span> =&gt; x * x
 ))                   <span class="c">// [9, 16, 25]</span>
 
 <span class="c">// Naming the steps usually reads better than deep nesting.</span>
-<span class="k">var</span> big = Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>)
-<span class="k">var</span> squares = Iter.map(big, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * x)
+<span class="k">var</span> big = Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>)
+<span class="k">var</span> squares = Iter.map(big, <span class="k">fun</span> (x: <span class="t">Float</span>): <span class="t">Float</span> =&gt; x * x)
 <span class="t">IO</span>.println(squares)  <span class="c">// [9, 16, 25]</span>
 
 <span class="c">////////////////////////////////////////////////</span>
@@ -682,7 +678,7 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 
 <span class="c">// `yield` hands control over without sleeping — useful for keeping a long</span>
 <span class="c">// computation from starving the scheduler.</span>
-<span class="k">fun</span> long_computation(): <span class="t">Number</span> {
+<span class="k">fun</span> long_computation(): <span class="t">Float</span> {
     <span class="k">var</span> sum = <span class="n">0</span>
     <span class="k">for</span> (<span class="k">var</span> k = <span class="n">0</span>; k &lt; <span class="n">1000000</span>; k = k + <span class="n">1</span>) {
         sum = sum + k

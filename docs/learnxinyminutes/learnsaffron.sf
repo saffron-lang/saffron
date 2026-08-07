@@ -65,7 +65,7 @@ IO.println(42 is Int)      // true
 IO.println("hi" is String) // true
 IO.println(nil is Nil)     // true
 
-// Numbers and Bools have methods. Parenthesize a literal to call one.
+// Ints, Floats and Bools have methods. Parenthesize a literal to call one.
 IO.println((-5).abs())     // 5
 IO.println((3.7).floor())  // 3
 IO.println((3.2).ceil())   // 4
