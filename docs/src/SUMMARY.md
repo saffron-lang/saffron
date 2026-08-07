@@ -67,6 +67,8 @@
 - [Component Lifecycle](./turmeric/lifecycle.md)
 - [Router](./turmeric/router.md)
 - [Styling](./turmeric/styling.md)
+- [Basil (Data Fetching)](./turmeric/basil.md)
+- [Parsley (API Framework)](./turmeric/parsley.md)
 
 # Guides
 
