@@ -677,6 +677,16 @@
                 return this.current_prefix + vft_bare
             }
         }
+        // A generic type PARAMETER (`T`, `E`): its concrete type is not knowable
+        // at the enum declaration — it depends on the instantiation — so the honest
+        // codegen type is `Any`, which routes every consumer through runtime tag
+        // inspection. Returning `Int` here (the old fallback) was the bug behind a
+        // String payload of `enum Result<T,E> { Err(error: E) }` printing a raw bit
+        // pattern under `"${msg}"`: the match binding was typed Int, so to_string,
+        // interpolation and arithmetic all untagged a string pointer as an integer.
+        // Fixing it HERE, at the binding's type source, fixes every downstream
+        // consumer at once rather than patching each (to_string was one such site).
+        if (this.is_type_param_spelling(ftype)) { return "Any" }
         // Genuinely unknown: a type name no table in codegen has heard of. This
         // is the residue stage 1 is meant to leave visible rather than paper over.
         Diag.record_unresolved("get_variant_field_type: unknown declared type '" + ftype + "'", "field " + field_idx.floor().to_string() + " of " + key, "Int")

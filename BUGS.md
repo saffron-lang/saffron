@@ -3,7 +3,15 @@
 ## Open
 
 **8 open entries:** #49, #65, #107, #131, #132, #154, #175, #178.
-Next free number is **#181**.
+Next free number is **#182**.
+
+#181 (a match binding of a generic-type-parameter payload field was typed `Int`,
+so a String payload printed a raw bit pattern under `"${msg}"`) was found running
+the learnxinyminutes doc's `Result` example — the same example `main` had just
+embedded in the playground, which would have shipped garbage output. Fixed at the
+type source: `get_variant_field_type` now resolves a type-parameter field to `Any`
+(runtime-dispatched) rather than the `Int` fallback, so every consumer is correct
+at once. Lives in `BUGS_CLOSED.md`. Open set unchanged; next-free 181 → 182.
 
 #180 (plain assignment to a function-local `var` shadowing a module global wrote
 the global, not the local — and a shadowed loop counter hung forever) was found

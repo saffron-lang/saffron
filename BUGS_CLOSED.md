@@ -9,6 +9,45 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 181. FIXED — a match binding of a generic-type-parameter payload field was typed `Int`, so a String payload printed a raw bit pattern under interpolation
+
+```saffron
+enum Result<T, E> { Ok(value: T), Err(error: E) }
+match (Result.Err("division by zero")) {
+    Ok(v)  => "= ${v}"
+    Err(msg) => "error: ${msg}"   // printed "error: 4371343728" — the pointer as an int
+}
+```
+
+**Severity: high** — silent wrong output (a raw address instead of the string) on
+the idiomatic `Result<T,E>` / `Option<T>` pattern. This is the learnxinyminutes
+doc's `Result` example and would have shipped garbage in the embedded playground
+sample.
+
+**Root cause, and why the fix is at the source rather than the symptom.**
+`get_variant_field_type` (`match_body.sf`) resolves a variant field's codegen type
+to type a match arm's binding. For a field declared with a generic type PARAMETER
+(`error: E`, `x: T`) it fell through every concrete case to the bottom `Int`
+fallback — so the binding `msg` was typed `Int`. Everything downstream then
+trusted that: `${msg}` lowers to `to_string`, which took the Int untag path and
+read the string pointer as an integer. A first attempt patched only `to_string`'s
+fall-through to detect a type-param receiver; that was a *site* fix — it would have
+left the same wrong `Int` type flowing into arithmetic, dispatch, `==`, and every
+other consumer of the binding. Reverted in favour of fixing the one place the type
+is decided.
+
+**Fix.** In `get_variant_field_type`, a type-parameter spelling now resolves to
+`Any` instead of `Int`. `Any` is the honest codegen type — a type parameter's
+concrete type is not knowable at the enum declaration, it depends on the
+instantiation — and every consumer already routes `Any` through runtime tag
+inspection (`to_string` → `__any_to_string`, dispatch, arithmetic). So the String
+payload now interpolates correctly, an Int payload still prints as an int (the
+runtime picks the formatter), and no per-consumer patch is needed.
+`test/pass/generic_payload_to_string.sf` covers String and Int payloads under
+interpolation, direct return, and both one- and two-parameter generic enums.
+
+---
+
 ### 180. FIXED — plain assignment to a function-local `var` that shadows a module global wrote the global, not the local (and a shadowed loop counter hung forever)
 
 ```saffron

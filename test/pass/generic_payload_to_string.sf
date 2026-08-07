@@ -1,0 +1,45 @@
+// A payload field typed as a generic type PARAMETER (T/E), bound in a `match`
+// and then interpolated, must print its actual runtime value — not a raw bit
+// pattern. `to_string` on a receiver whose static type is an unresolved type
+// parameter used to fall through to the Int untag path, so a String payload
+// (`enum Result<T,E> { Err(error: E) }` with `"error: ${msg}"`) printed the
+// string pointer as an integer. It now routes through the runtime tag-inspecting
+// converter, like `Any`. Found running the learnxinyminutes doc's Result example.
+import "@test" as Test
+
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+
+// The exact doc shape: a String in the E slot, interpolated in the Err arm.
+fun describe(r: Result<Float, String>): String {
+    return match (r) {
+        Ok(v) => "= ${v}"
+        Err(msg) => "error: ${msg}"
+    }
+}
+Test.assert_eq(describe(Result.Err("division by zero")), "error: division by zero", "String payload of a generic type param interpolates correctly")
+Test.assert_eq(describe(Result.Ok(5.0)), "= 5", "Float payload of a generic type param still interpolates")
+
+// A one-parameter generic enum, both a String and an Int payload, to show the
+// runtime dispatch picks the right formatter per value.
+enum Box<T> { Val(x: T), None }
+fun show(b: Box<String>): String {
+    return match (b) { Val(x) => "got: ${x}"  None => "none" }
+}
+Test.assert_eq(show(Box.Val("hello")), "got: hello", "String type-param payload")
+
+fun showi(b: Box<Int>): String {
+    return match (b) { Val(x) => "got: ${x}"  None => "none" }
+}
+Test.assert_eq(showi(Box.Val(42)), "got: 42", "Int type-param payload (the control that always worked)")
+
+// Direct return of the payload (no interpolation) — was already correct; kept as
+// a control so a regression in either path is distinguishable.
+fun raw_msg(r: Result<Float, String>): String {
+    return match (r) { Ok(v) => "ok"  Err(msg) => msg }
+}
+Test.assert_eq(raw_msg(Result.Err("plain")), "plain", "payload returned directly is unaffected")
+
+Test.summary()
