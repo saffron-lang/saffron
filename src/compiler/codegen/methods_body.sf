@@ -766,7 +766,7 @@
         }
         if (full_type.starts_with("Tuple<") and full_type.ends_with(">")) {
             var tuple_inner: String = full_type.slice(6, full_type.length() - 1)
-            var tuple_args: List<String> = this.split_type_args(tuple_inner)
+            var tuple_args: List<String> = AST.split_type_args(tuple_inner)
             var ct_idx: Float = -1
             var idx_ek: String = this.classify_expr(index)
             if (idx_ek == "int") {
@@ -3926,7 +3926,7 @@
         var gft_rest: String = field.slice(1, field.length())
         var gft_idx: Float = gft_rest.to_number()
         var gft_inner: String = class_name.slice(6, class_name.length() - 1)
-        var gft_args: List<String> = this.split_type_args(gft_inner)
+        var gft_args: List<String> = AST.split_type_args(gft_inner)
         if (gft_idx >= 0 and gft_idx < gft_args.length()) {
             return gft_args[gft_idx]
         }

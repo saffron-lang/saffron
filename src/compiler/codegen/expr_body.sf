@@ -286,7 +286,7 @@
                         var tf_result: String = this.fresh_local()
                         this.emit_indent(tf_result + " = call i64 @__list_get(i64 " + tf_obj + ", i64 " + tf_idx_val + ")")
                         var tf_inner: String = tf_vtype.slice(6, tf_vtype.length() - 1)
-                        var tf_args: List<String> = this.split_type_args(tf_inner)
+                        var tf_args: List<String> = AST.split_type_args(tf_inner)
                         if (tf_idx >= 0 and tf_idx < tf_args.length()) {
                             this.last_type = this.str_to_type(tf_args[tf_idx])
                         } else {
@@ -2043,7 +2043,7 @@
                     var tf_result2: String = this.fresh_local()
                     this.emit_indent(tf_result2 + " = call i64 @__list_get(i64 " + tf_obj2 + ", i64 " + tf_idx_val2 + ")")
                     var tf_inner2: String = tf_vtype2.slice(6, tf_vtype2.length() - 1)
-                    var tf_args2: List<String> = this.split_type_args(tf_inner2)
+                    var tf_args2: List<String> = AST.split_type_args(tf_inner2)
                     if (tf_idx2 >= 0 and tf_idx2 < tf_args2.length()) {
                         this.last_type = this.str_to_type(tf_args2[tf_idx2])
                     } else {
