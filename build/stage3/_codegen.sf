@@ -16206,10 +16206,26 @@ class Codegen {
             }
         }
         // Get the lambda as a function pointer (i64)
-        // Force the lambda to be a coroutine (Task.spawn expects a coro handle)
-        this.force_next_lambda_coro = true
-        this.check_spawn_sendable = true
+        // Force the lambda to be a coroutine (Task.spawn expects a coro handle),
+        // but ONLY when the argument is a lambda literal. gen_lambda is what
+        // *consumes* and clears force_next_lambda_coro; if the spawn argument is a
+        // function reference (a variable, `fns[i]`, etc.) no gen_lambda runs, so
+        // the flag would leak and miscompile the NEXT lambda emitted anywhere in
+        // the module as a coroutine — giving it a `ptr(i64)` signature that then
+        // clashes with its `i64(i64)` call sites in the wasm function table
+        // (BUGS #184). A spawned function reference already carries its own
+        // coroutine classification (mark_coroutines / gen_function), so it needs
+        // no forcing here.
+        if (spawn_expr_kind == "lambda") {
+            this.force_next_lambda_coro = true
+            this.check_spawn_sendable = true
+        }
         var spawn_arg: String = this.gen_arg_value(args[0])
+        // Belt-and-suspenders: never let these flags survive this call. gen_lambda
+        // clears them when it runs, but a non-lambda arg (guarded out above) or an
+        // arg whose codegen never reaches gen_lambda must not poison a later lambda.
+        this.force_next_lambda_coro = false
+        this.check_spawn_sendable = false
         // Check if the lambda/function is a coroutine
         // Lambda names start with __lambda — check if in coroutine_funcs
         var spawn_fn_name: String = this.get_variable_name(args[0])
