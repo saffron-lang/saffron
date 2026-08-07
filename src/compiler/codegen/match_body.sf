@@ -233,10 +233,20 @@
         // Extract tag based on encoding
         var tag_val: String = this.fresh_local()
         if (max_fields == 0) {
-            // No-data enum: tag << 56 encoding
-            var tag_shifted: String = this.fresh_local()
-            this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
-            this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
+            // No-data enum. Under the TAG_ENUM immediate (BUGS #154) the variant
+            // lives in the low 32 bits: `(0x7FFB<<48)|(type_id<<32)|variant`, so
+            // mask it out. identity_mode keeps the old `tag << 56` layout — it
+            // never constructs a TAG_ENUM value (see gen_enum_construct), so its
+            // decode must match its own construction.
+            if (this.identity_mode) {
+                var tag_shifted: String = this.fresh_local()
+                this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
+                this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
+            } else {
+                var tag_masked: String = this.fresh_local()
+                this.emit_indent(tag_masked + " = and i64 " + subj + ", 4294967295")
+                this.emit_indent(tag_val + " = trunc i64 " + tag_masked + " to i8")
+            }
         } else {
             // Enum with data: heap-allocated array encoding, tag at array[0]
             var arr_ptr: String = this.val_to_typed_ptr(subj, "i64*")

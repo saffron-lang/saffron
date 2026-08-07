@@ -510,6 +510,16 @@
 # Elixir/BEAM parity is the target: link scheduler.ll as ambient runtime (like
 # runtime.ll/gc.ll) and stop collecting @scheduler as a module. See #181 for the
 # full plan and the 9 importers that become the validation surface.
+#
+# Updated 2026-08-06: dropped oracle_enum_println — BUGS #154 fieldless half fixed.
+# An entirely-fieldless enum variant was the bare immediate `tag << 56`, a
+# subnormal double indistinguishable from a real double, so runtime formatters
+# printed garbage inside a collection. Fixed with a new NaN-box tag TAG_ENUM
+# (0x7FFB): the variant is now `(0x7FFB<<48)|(type_id<<32)|variant`, an immediate
+# (no allocation, no GC, no equality change) that __val_class_tag decodes so
+# __val_to_string routes it to Enum__to_string. Gated !identity_mode (the
+# bootstrap keeps the old `tag<<56` layout internally, so the fix is verified via
+# gen3 user programs, not the bootstrap). 346 passed, 1 failed. Only `async`
+# (BUGS #181, scheduler-linking design) remains.
 
 async
-oracle_enum_println

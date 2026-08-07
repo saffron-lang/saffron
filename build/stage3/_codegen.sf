@@ -5191,11 +5191,33 @@ class Codegen {
         var max_fields: Float = this.get_max_fields(enum_name)
 
         if (max_fields == 0) {
-            // Simple encoding for enums with no data fields at all: tag << 56
+            // Enum with no data fields at all. Outside identity mode this is the
+            // TAG_ENUM immediate `(0x7FFB<<48)|(type_id<<32)|variant` (BUGS #154),
+            // which __val_class_tag decodes to the type_id so a printed element
+            // routes to <Enum>__to_string. The value stays an immediate — no
+            // allocation, no GC, and bit-identical per variant, so emit_bit_eq's
+            // `==` is unchanged. The full base constant 0x7FFB<<48 exceeds a
+            // double's exact integer range, so emit shl/or and let LLVM fold it
+            // rather than compute it in Float.
             if (args.length() == 0) {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
-                this.last_type = AST.Type.EnumType(enum_name); return local
+                if (this.identity_mode or !this.enum_type_ids.has(enum_name)) {
+                    // identity mode (or an unregistered enum, e.g. the >255
+                    // refusal): keep the old `tag << 56` layout. Identity is
+                    // untagged and self-consistent — construct and decode agree.
+                    var local: String = this.fresh_local()
+                    this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
+                    this.last_type = AST.Type.EnumType(enum_name); return local
+                }
+                var etype_id: Float = this.enum_type_ids.get(enum_name)
+                var base_tag: String = this.fresh_local()
+                this.emit_indent(base_tag + " = shl i64 32763, 48")
+                var tid_shifted: String = this.fresh_local()
+                this.emit_indent(tid_shifted + " = shl i64 " + etype_id.floor().to_string() + ", 32")
+                var enc0: String = this.fresh_local()
+                this.emit_indent(enc0 + " = or i64 " + base_tag + ", " + tid_shifted)
+                var enc: String = this.fresh_local()
+                this.emit_indent(enc + " = or i64 " + enc0 + ", " + tag.floor().to_string())
+                this.last_type = AST.Type.EnumType(enum_name); return enc
             }
             // Shouldn't happen (max_fields==0 but args>0), fall through to array encoding
         }
@@ -5872,10 +5894,20 @@ class Codegen {
         // Extract tag based on encoding
         var tag_val: String = this.fresh_local()
         if (max_fields == 0) {
-            // No-data enum: tag << 56 encoding
-            var tag_shifted: String = this.fresh_local()
-            this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
-            this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
+            // No-data enum. Under the TAG_ENUM immediate (BUGS #154) the variant
+            // lives in the low 32 bits: `(0x7FFB<<48)|(type_id<<32)|variant`, so
+            // mask it out. identity_mode keeps the old `tag << 56` layout — it
+            // never constructs a TAG_ENUM value (see gen_enum_construct), so its
+            // decode must match its own construction.
+            if (this.identity_mode) {
+                var tag_shifted: String = this.fresh_local()
+                this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
+                this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
+            } else {
+                var tag_masked: String = this.fresh_local()
+                this.emit_indent(tag_masked + " = and i64 " + subj + ", 4294967295")
+                this.emit_indent(tag_val + " = trunc i64 " + tag_masked + " to i8")
+            }
         } else {
             // Enum with data: heap-allocated array encoding, tag at array[0]
             var arr_ptr: String = this.val_to_typed_ptr(subj, "i64*")
@@ -8567,15 +8599,18 @@ class Codegen {
     // Requires enum_variant_fields to be populated first, since get_max_fields
     // reads it — every caller does that immediately before.
     //
-    // A fieldless enum gets NO tag, and that is the whole shape of the
-    // half-fix: its value is the bare immediate `tag << 56`, with no allocation
-    // to carry a header, so there is nothing for __val_class_tag to read. It
-    // keeps printing its bit pattern. Guessing from the bit pattern was
-    // deliberately rejected for #115 and is rejected here for the same reason —
-    // mistaking a real double for an enum is worse than visible garbage.
+    // Both payload enums and entirely-fieldless enums get a tag (BUGS #154).
+    // A payload enum carries it in a GC header on its heap array; a fieldless
+    // enum carries it in the immediate itself under a dedicated NaN-box tag,
+    // TAG_ENUM 0x7FFB: `(0x7FFB << 48) | (type_id << 32) | variant`. Either way
+    // __val_class_tag can name the value and __val_to_string can route it to
+    // <Enum>__to_string, which is what fixes an enum printed inside a
+    // collection. The old half-fix left fieldless enums as the bare immediate
+    // `tag << 56` — a subnormal double with no identity — so they kept printing
+    // their bit pattern. The immediate encoding avoids the bit-pattern-guessing
+    // that #115 rejected: TAG_ENUM is unambiguous, not a heuristic.
     fun register_enum_tag(name: String) {
         if (this.enum_type_ids.has(name)) { return }
-        if (this.get_max_fields(name) == 0) { return }
         // The tag is 8 bits wide: __gc_pack_info stores `tag << 8` and
         // __gc_info_tag reads it back with `and 255`, so 256 would come back as
         // 0 and 266 as 10 — a silent collision with the first class. Refuse to
@@ -8780,7 +8815,14 @@ class Codegen {
         var tag_val: String = ""
         if (max_fields == 0) {
             tag_val = this.fresh_local()
-            this.emit_indent(tag_val + " = lshr i64 %self, 56")
+            // Fieldless enum: the TAG_ENUM immediate holds the variant in its
+            // low 32 bits (BUGS #154). identity_mode keeps the old `tag << 56`
+            // layout, so its decode must match — see gen_enum_construct.
+            if (this.identity_mode or !this.enum_type_ids.has(name)) {
+                this.emit_indent(tag_val + " = lshr i64 %self, 56")
+            } else {
+                this.emit_indent(tag_val + " = and i64 %self, 4294967295")
+            }
         } else {
             var arr_ptr: String = this.val_to_typed_ptr("%self", "i64*")
             tag_val = this.fresh_local()

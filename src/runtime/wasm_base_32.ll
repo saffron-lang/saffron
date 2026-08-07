@@ -941,6 +941,17 @@ is_string:
 define i64 @__val_class_tag(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
+  ; TAG_ENUM 0x7FFB: a fieldless enum immediate carries its type_id in bits
+  ; 32..47 and the variant in bits 0..31 (BUGS #154). No heap read — the id is
+  ; in the value itself. Answer with the type_id so __val_to_string's switch
+  ; dispatches it to <Enum>__to_string, exactly as a payload enum's GC tag does.
+  %is_enum = icmp eq i64 %upper, 32763         ; TAG_ENUM
+  br i1 %is_enum, label %enum_tag, label %check_ptrlike
+enum_tag:
+  %etid_shifted = lshr i64 %v, 32
+  %etid = and i64 %etid_shifted, 65535         ; type_id in bits 32..47
+  ret i64 %etid
+check_ptrlike:
   %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
   %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
   %ptr_like = or i1 %is_tagged, %is_raw

@@ -3493,11 +3493,33 @@
         var max_fields: Float = this.get_max_fields(enum_name)
 
         if (max_fields == 0) {
-            // Simple encoding for enums with no data fields at all: tag << 56
+            // Enum with no data fields at all. Outside identity mode this is the
+            // TAG_ENUM immediate `(0x7FFB<<48)|(type_id<<32)|variant` (BUGS #154),
+            // which __val_class_tag decodes to the type_id so a printed element
+            // routes to <Enum>__to_string. The value stays an immediate — no
+            // allocation, no GC, and bit-identical per variant, so emit_bit_eq's
+            // `==` is unchanged. The full base constant 0x7FFB<<48 exceeds a
+            // double's exact integer range, so emit shl/or and let LLVM fold it
+            // rather than compute it in Float.
             if (args.length() == 0) {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
-                this.last_type = AST.Type.EnumType(enum_name); return local
+                if (this.identity_mode or !this.enum_type_ids.has(enum_name)) {
+                    // identity mode (or an unregistered enum, e.g. the >255
+                    // refusal): keep the old `tag << 56` layout. Identity is
+                    // untagged and self-consistent — construct and decode agree.
+                    var local: String = this.fresh_local()
+                    this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
+                    this.last_type = AST.Type.EnumType(enum_name); return local
+                }
+                var etype_id: Float = this.enum_type_ids.get(enum_name)
+                var base_tag: String = this.fresh_local()
+                this.emit_indent(base_tag + " = shl i64 32763, 48")
+                var tid_shifted: String = this.fresh_local()
+                this.emit_indent(tid_shifted + " = shl i64 " + etype_id.floor().to_string() + ", 32")
+                var enc0: String = this.fresh_local()
+                this.emit_indent(enc0 + " = or i64 " + base_tag + ", " + tid_shifted)
+                var enc: String = this.fresh_local()
+                this.emit_indent(enc + " = or i64 " + enc0 + ", " + tag.floor().to_string())
+                this.last_type = AST.Type.EnumType(enum_name); return enc
             }
             // Shouldn't happen (max_fields==0 but args>0), fall through to array encoding
         }
