@@ -497,7 +497,19 @@
 # parser+main+codegen was out of proportion to a test judged by compile+run+exit0
 # (nil is a valid result). doc(fn)/doc(class) return the real docstrings, doc(nodoc)
 # returns nil. 332 passed, 2 failed. The 2 below are the fieldless-enum
-# representation problem (#154) and the async scheduler auto-link design question.
+# representation problem (#154) and the async scheduler-linking design (#181).
+#
+# 2026-08-06 async investigation (filed as BUGS #181, left open): the fix is a
+# build-system change, not a source patch. async.sf uses top-level `yield` without
+# `import "@async"`, so codegen emits @stdlib_scheduler_* calls the link can't
+# resolve. Two source-level fixes were tried and both fail — a text-scan for
+# `yield`/`Task.spawn` matches the compiler's own COMMENTS (dup symbols in the
+# bootstrap), and collecting @scheduler as a source module drags prelude interfaces
+# into class_type_ids → emits reflect helpers referencing __val_class_tag, which
+# the identity-mode base.ll (used for the bootstrap test link) does not define.
+# Elixir/BEAM parity is the target: link scheduler.ll as ambient runtime (like
+# runtime.ll/gc.ll) and stop collecting @scheduler as a module. See #181 for the
+# full plan and the 9 importers that become the validation surface.
 
 async
 oracle_enum_println
