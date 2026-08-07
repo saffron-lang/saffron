@@ -88,7 +88,14 @@
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                // BUGS #175: a nested fun is emitted under a per-scope symbol
+                // (scope$$name), so a reference to it by bare name is "known" only
+                // via that qualified symbol. Without this term the undefined-var
+                // check below fires before the nested-fun ref path is reached, so
+                // `return uncollided` (a nested fun returned as a value) wrongly
+                // errored "undefined variable 'uncollided'".
+                var __nf_ref_known: Bool = this.current_fn_locals.has("__nestedfn:" + name) and this.nested_scope.length() > 0 and this.str_in_list(this.known_functions, this.nested_fun_symbol(this.nested_scope, name))
+                if (!__nf_ref_known and !this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     // Error, not a warning (BUGS #37). Emitting a load from an
                     // undeclared %name produces invalid LLVM, so the compile
                     // fails regardless — just with "use of undefined value
@@ -101,6 +108,15 @@
                 // the module_globals guards below would otherwise divert to a load
                 // from @__g_. Tested first for exactly that reason (BUGS #80).
                 if (this.current_fn_locals.has("__nestedfn:" + name) and !this.typed_vars.has(name) and !this.named_imports.has(name)) {
+                    // BUGS #175: prefer the per-scope symbol (scope$$name) so a
+                    // reference binds to THIS scope's nested fun, not a same-named
+                    // one elsewhere.
+                    if (this.nested_scope.length() > 0) {
+                        var __nfr: String = this.nested_fun_symbol(this.nested_scope, name)
+                        if (this.str_in_list(this.known_functions, __nfr)) {
+                            return this.gen_func_ref(__nfr)
+                        }
+                    }
                     if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                         return this.gen_func_ref(this.current_prefix + name)
                     }
@@ -1914,8 +1930,22 @@
             // Undefined variable check. Kept as an error (BUGS #37): the load
             // emitted below references %name, which llc rejects anyway, so a
             // warning only delays the same failure into an opaque IR error.
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+            // BUGS #175: same qualified-symbol exemption as the Variable arm — a
+            // nested fun referenced by bare name is known via scope$$vname.
+            var __nf_vref_known: Bool = this.current_fn_locals.has("__nestedfn:" + vname) and this.nested_scope.length() > 0 and this.str_in_list(this.known_functions, this.nested_fun_symbol(this.nested_scope, vname))
+            if (!__nf_vref_known and !this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 this.codegen_error("undefined variable '" + vname + "'")
+            }
+            // BUGS #175/#80: a nested fun referenced as a VALUE (`return collide_b`)
+            // reaches this arm, which otherwise emits a plain `load %collide_b` — or,
+            // when a module global shares the name, `load @__g_collide_b`, the wrong
+            // storage (the #80 shadowing bug). A nested fun in scope SHADOWS a
+            // like-named global, so the marker takes precedence over the global
+            // diversion below — matching the first Variable arm at :103. Emit a
+            // function reference (a closure, if it captures) to @scope$$name. Guarded
+            // to fire only when the name is not a local variable (a real local wins).
+            if (__nf_vref_known and this.current_fn_locals.has("__nestedfn:" + vname) and !this.typed_vars.has(vname) and !this.named_imports.has(vname)) {
+                return this.gen_func_ref(this.nested_fun_symbol(this.nested_scope, vname))
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -2422,6 +2452,17 @@
         } else if (this.current_prefix.length() > 0) {
             if (this.str_in_list(this.known_functions,this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
+            }
+        }
+        // BUGS #175: a call to a nested fun of the enclosing scope resolves to its
+        // per-scope symbol (scope$$callee). Keyed on nested_scope (the top-level
+        // ancestor, correct even inside a sibling nested fun) and on the qualified
+        // symbol actually existing in known_functions — so it only ever redirects a
+        // genuine nested call and leaves everything else alone.
+        if (this.nested_scope.length() > 0) {
+            var __nfc: String = this.nested_fun_symbol(this.nested_scope, callee_name)
+            if (this.str_in_list(this.known_functions, __nfc)) {
+                resolved_callee = __nfc
             }
         }
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")

@@ -925,6 +925,19 @@
         return this.current_prefix + "|" + name
     }
 
+    // BUGS #175: the emitted symbol for a nested `fun`, qualified by the function
+    // whose body declares it, so two parents can each declare a `helper` without
+    // colliding on one `@helper` (the defined_funcs dedup dropped all but the
+    // first, and every call bound to it — a silent wrong result). Single source of
+    // truth: definition, call/reference sites, forward-ref preregister, and capture
+    // metadata all route through it. `enclosing` is nested_scope (the top-level
+    // ancestor). A top-level fun (enclosing == "") is prefix+name unchanged, so
+    // non-nested emission is untouched.
+    fun nested_fun_symbol(enclosing: String, name: String): String {
+        if (enclosing.length() == 0) { return this.current_prefix + name }
+        return this.current_prefix + enclosing + "$$" + name
+    }
+
     fun is_known_name(name: String): Bool {
         if (name == "self" or name == "this" or name == "super") { return true }
         if (name == "IO" or name == "OS" or name == "GC" or name == "Task" or name == "Reflect") { return true }

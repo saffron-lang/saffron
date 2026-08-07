@@ -1,0 +1,54 @@
+// BUGS #175: two (or more) different parent functions may each declare a nested
+// `fun` with the SAME name. Each parent's nested fun is emitted under a per-parent
+// symbol (parent$$name), so they no longer collide on one `@name` where the
+// defined_funcs dedup dropped all but the first and every call bound to it — a
+// silent wrong result (`second()` returned `first`'s 42).
+import "@test" as Test
+
+// The core collision: three parents, each with its own `helper`.
+fun first(): Int {
+    fun helper(): Int { return 42 }
+    return helper()
+}
+fun second(): Int {
+    fun helper(): Int { return 10 }
+    return helper()
+}
+fun third(): Int {
+    fun helper(): Int { return 7 }
+    return helper()
+}
+Test.assert_eq(first(), 42, "first's nested helper")
+Test.assert_eq(second(), 10, "second's nested helper is its own, not first's")
+Test.assert_eq(third(), 7, "third's nested helper is its own")
+
+// Collision AND capture: each `mk`'s nested `add` closes over a different base.
+fun mk_a(): Int {
+    var base = 100
+    fun add(n: Int): Int { return base + n }
+    return add(5)
+}
+fun mk_b(): Int {
+    var base = 200
+    fun add(n: Int): Int { return base + n }
+    return add(5)
+}
+Test.assert_eq(mk_a(), 105, "captured base in mk_a")
+Test.assert_eq(mk_b(), 205, "captured base in mk_b uses its own base, not mk_a's")
+
+// Collision AND forward reference within a parent: `run`'s `step` calls its own
+// `helper` declared later; a sibling parent has same-named nested funs.
+fun run(): Int {
+    fun step(): Int { return helper() + 1 }
+    fun helper(): Int { return 40 }
+    return step()
+}
+fun run2(): Int {
+    fun step(): Int { return helper() + 1 }
+    fun helper(): Int { return 10 }
+    return step()
+}
+Test.assert_eq(run(), 41, "run's step forward-calls run's helper (40)")
+Test.assert_eq(run2(), 11, "run2's step forward-calls run2's helper (10), not run's")
+
+Test.summary()

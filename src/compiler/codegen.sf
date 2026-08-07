@@ -44,6 +44,13 @@ class Codegen {
     var current_class: String
     var current_parent: String
     var current_function_name: String
+    // BUGS #175: the function whose nested-fun definitions are currently in scope.
+    // While emitting a nested fun `step` declared in `run`, current_function_name
+    // is `step` but nested_scope stays `run`, because step's *sibling* nested funs
+    // belong to run. This is the qualifier for a nested fun's emitted symbol
+    // (run$$helper), so sibling/forward calls resolve to the right one. Empty at
+    // module top level.
+    var nested_scope: String
     var string_vars: List<String>
     var last_type: AST.Type
     var typed_vars: Map<String, AST.Type>
@@ -208,6 +215,7 @@ class Codegen {
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
+        this.nested_scope = ""
         this.string_vars = []
         this.last_type = AST.Type.IntType
         this.typed_vars = {}

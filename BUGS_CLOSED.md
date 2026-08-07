@@ -184,6 +184,88 @@ NaN-box tag, not another formatter arm.
 
 ---
 
+### 175. FIXED — same-named nested funcs in different parent functions collided on an unqualified symbol and silently returned the wrong body
+
+```saffron
+fun first(): Int {
+    fun helper(): Int { return 42 }
+    return helper()
+}
+fun second(): Int {
+    fun helper(): Int { return 10 }
+    return helper()
+}
+IO.println(first().to_string())    // 42
+IO.println(second().to_string())   // printed 42 — should be 10
+```
+
+**Severity: high** — silent wrong output, no diagnostic. A nested `fun` was
+hoisted and emitted with the unqualified symbol `@helper` (`current_prefix + name`
+in `gen_function`, with no parent qualifier). Two parents each declaring a nested
+`helper` therefore emitted the same symbol; the second was dropped by the
+`defined_funcs` dedup at `output_body.sf`, and every `helper()` call bound to the
+first definition. `second()` returned 42.
+
+Found while fixing #2 (nested forward references): the collision is independent
+of forward references — it reproduces with a single non-recursive nested fun per
+parent — but #2's regression test tripped it until the test's nested names were
+made distinct.
+
+**Fix — qualify a nested fun's emitted symbol by its enclosing top-level
+ancestor, everywhere the symbol is used, from a single source of truth.**
+A codegen state field `nested_scope` records the *top-level* ancestor whose body
+is currently being compiled (not the immediate parent — a recursive descent into
+a sibling nested fun would set `current_function_name` to the sibling's name and
+qualify the wrong scope). A `nested_fun_symbol(enclosing, name)` helper
+(`utils_body.sf`) is the single source of truth for the qualified spelling
+`<current_prefix><enclosing>$$<name>` — everything else routes through it:
+
+- **Definition** (`output_body.sf` `gen_function`): if we're inside a function
+  and the fun is not a lambda body, mangle `emit_name` via `nested_fun_symbol`.
+  Save/restore `current_function_name` around the recursion so a nested body
+  doesn't leave its own name pointing at the parent's remaining statements.
+  Save/restore `nested_scope` too on the non-nested (top-level) path, and set
+  it to the current fun's name for its whole body, so children see the correct
+  ancestor.
+- **Preregistration** (`output_body.sf` `preregister_nested_funcs`): the same
+  qualified symbol is pushed to `known_functions` up-front, and the
+  `__nestedfn:<name>` marker is set in `current_fn_locals` — a forward call to
+  a sibling is emitted before its FunDecl runs, so without the up-front marker
+  the call-site would not know the identifier names a nested fun.
+- **Sibling FunDecl** (`stmts_body.sf`): the per-scope FunDecl arm mangles
+  through the same helper before registering its arity/param/default metadata,
+  so sibling siblings share one naming convention.
+- **Call resolution** (`expr_body.sf`, in the Variable/Call/Ref arms): before
+  falling back to the bare global lookup, prefer the qualified symbol if
+  `known_functions` contains it. Same helper.
+- **Nested-fun-as-value** (`expr_body.sf` value-ref path): a plain
+  `Variable(n)` that names a nested fun is a func ref, not a `load`. The
+  `!module_globals` conditions on this branch were removed so a nested fun
+  shadows a same-named global (#80 precedence).
+- **Undefined-var exemption** (both Variable arms): the "unknown identifier"
+  checker-esque diagnostic emits before the value-ref path decides. Exempt
+  only when both (a) `current_fn_locals` has the `__nestedfn:` marker AND
+  (b) the qualified symbol is in `known_functions` — a name that merely
+  coincides with an unrelated `nested_scope$$name` symbol still errors.
+- **Transitive captures** (`closures_body.sf` `find_free_vars_expr`): when a
+  sibling calls another sibling, the callee's captures are forwarded so the
+  caller sees them as free vars and adds them to its own capture list. The
+  lookup key MUST match how the captures were registered — the sibling's caps
+  are stored under `__caps_` + qualified symbol, so this path also routes
+  through `nested_fun_symbol` when `nested_scope` is set. Without this, JSON's
+  `consume` (nested in `parse`) called sibling `peek` (also nested in `parse`,
+  captures `pos` and `source`) but only picked up `pos` — the emitted IR
+  referenced `%source` with no definition, and `test_regressions` failed with
+  `use of undefined value '%source'`.
+
+Regression tests: `test/pass/nested_fun_name_collision.sf` (7 assertions covering
+three parents with own `helper`, collision + capture, collision + forward-ref)
+and `test/pass/nested_forward_ref.sf` (3 assertions covering simple forward ref,
+mutual recursion, forward ref + capture). Full suite delta vs. baseline: 0
+regressions (`http_binary_response` is a stale test independent of codegen —
+calls an `internal` helper across a package boundary; recorded in
+`FAILURE_BASELINE.txt`).
+
 ---
 
 ### 182. FIXED — a match binding of a generic-type-parameter payload field was typed `Int`, so a String payload printed a raw bit pattern under interpolation

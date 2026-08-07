@@ -94,8 +94,16 @@
                     this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
-                    // Register default values for optional params
+                    // Register default values for optional params. BUGS #175: a
+                    // NESTED fun is emitted under a per-scope symbol (scope$$name),
+                    // so its param metadata must be keyed the same way or the call
+                    // site (which reads func_param_count / func_defaults under the
+                    // resolved qualified symbol) misses. in_function marks a nested
+                    // fun here; nested_scope names the enclosing scope.
                     var emit_name: String = this.current_prefix + name
+                    if (this.in_function and this.nested_scope.length() > 0) {
+                        emit_name = this.nested_fun_symbol(this.nested_scope, name)
+                    }
                     var defaults: List<AST.Expr> = []
                     var param_names: List<String> = []
                     var pi: Float = 0
