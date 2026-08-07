@@ -1,0 +1,229 @@
+//! POSIX signal handling for the native runtime.
+//!
+//! Register a callback that runs when the process receives a signal, or block
+//! (cooperatively) until one arrives. Sending signals lives in `@process`
+//! (`Subprocess.kill` / `.terminate`); this is the receiving half.
+//!
+//! ```saffron
+//! import "@signal" as Signal
+//! import "@async" as Async
+//!
+//! Signal.on(Signal.SIGINT, fun () {
+//!     IO.println("shutting down cleanly")
+//!     // ... release resources ...
+//! })
+//!
+//! // spawn your work; the scheduler runs after main() and delivers the
+//! // callback between ticks
+//! var server = Task.spawn(fun () => serve())
+//! server.await()
+//! ```
+//!
+//! Or wait for one inline, with an optional timeout:
+//!
+//! ```saffron
+//! var sig = Signal.wait([Signal.SIGINT, Signal.SIGTERM], 30.0)
+//! if (sig == -1) { IO.println("timed out") }
+//! else { IO.println("got signal ${sig}") }
+//! ```
+//!
+//! ## How it works (and why it is safe)
+//!
+//! A POSIX signal handler may call only async-signal-safe functions, so it can
+//! never run Saffron code directly — the handler in `signal_native.c` does the
+//! one safe thing, `write()` a byte into a self-pipe. That turns "a signal
+//! arrived" into "a byte is readable on an fd", which the cooperative scheduler
+//! already knows how to park on. So delivery happens as ORDINARY Saffron code
+//! between scheduler ticks, never inside the interrupt.
+//!
+//! Native only. A wasm32 build has no process signals; importing this there and
+//! calling `init`/`on`/`wait` returns failure/-1 rather than delivering.
+
+import "@scheduler" as Scheduler
+
+@extern("i64 sf_signal_init()") fun _signal_init(): Int
+@extern("i64 sf_signal_register(i64)") fun _signal_register(signum: Int): Int
+@extern("i64 sf_signal_read_fd()") fun _signal_read_fd(): Int
+@extern("i64 sf_signal_next()") fun _signal_next(): Int
+// SIGUSR1/SIGUSR2 resolved in C, which knows its own platform via #ifdef, so
+// the numbers stay correct on both macOS (30/31) and Linux (10/12).
+@extern("i64 sf_signal_sigusr(i64)") fun _signal_sigusr(which: Int): Int
+@extern("i64 sf_signal_raise(i64)") fun _signal_raise(signum: Int): Int
+
+// The common signals, by their standard numbers. These are the portable values
+// shared by macOS and Linux; the ones that differ between platforms (SIGUSR1/2
+// especially) are NOT among them, so they are given their Linux/BSD-common
+// values and documented as such.
+let SIGHUP: Int = 1     // terminal hangup / reload convention
+let SIGINT: Int = 2     // interrupt (Ctrl-C)
+let SIGQUIT: Int = 3    // quit (Ctrl-\)
+let SIGTERM: Int = 15   // polite termination request
+// SIGUSR1/SIGUSR2 are application-defined and their NUMBERS differ across
+// platforms (10/12 on Linux, 30/31 on macOS/BSD). Resolved in C at import so the
+// same source is correct on both — pass Signal.SIGUSR1, never a literal.
+let SIGUSR1: Int = _signal_sigusr(1)
+let SIGUSR2: Int = _signal_sigusr(2)
+
+// Registered callbacks, kept as parallel lists (no Map<Int,Fun>: unverified in
+// this compiler, see CLAUDE.md on Map union caveats). A given signal number
+// appears at most once; re-registering replaces.
+var _handled_signums: List<Int> = []
+var _handlers: List<Fun> = []
+
+// 1 once the self-pipe exists and the dispatch task is running, so `on()` is
+// idempotent about setup.
+var _started: Int = 0
+
+/// Ensure the self-pipe exists. Returns the read fd, or -1 if the platform has
+/// no signal support (wasm32). Idempotent.
+fun init(): Int {
+    return _signal_init()
+}
+
+/// Send `signum` to the current process (raise(3)). Returns true on success.
+/// The counterpart to receiving: a process can ask itself to reload or quit,
+/// and the test suite uses it to exercise delivery.
+fun raise(signum: Int): Bool {
+    return _signal_raise(signum) == 0
+}
+
+/// Register `callback` to run when the process receives `signum`. The callback
+/// runs as ordinary Saffron code between scheduler ticks — it may allocate, call
+/// other functions, and suspend. Registering the same signal again replaces the
+/// previous callback. Returns true on success, false if the platform cannot
+/// install the handler.
+fun on(signum: Int, callback: Fun): Bool {
+    if (init() < 0) { return false }
+    if (_signal_register(signum) != 0) { return false }
+
+    // Replace an existing entry for this signum, else append.
+    var i: Int = 0
+    var found: Int = 0
+    while (i < _handled_signums.length()) {
+        if (_handled_signums[i] == signum) {
+            _handlers[i] = callback
+            found = 1
+            break
+        }
+        i = i + 1
+    }
+    if (found == 0) {
+        _handled_signums.push(signum)
+        _handlers.push(callback)
+    }
+
+    _ensure_dispatcher()
+    return true
+}
+
+// Start the background task that parks on the pipe and runs callbacks. Started
+// once, on the first `on()`; a second call is a no-op.
+private fun _ensure_dispatcher() {
+    if (_started == 1) { return }
+    _started = 1
+    Task.spawn(fun () => _dispatch_loop())
+}
+
+// Park on the signal fd; when a byte lands, drain every pending signal and run
+// its callback. Loops for the life of the program. Parks with no deadline
+// (reason 2), so it costs nothing while idle — the scheduler only revives it
+// when the fd is readable.
+private fun _dispatch_loop() {
+    var fd: Int = _signal_read_fd()
+    if (fd < 0) { return }
+    while (true) {
+        // Wait until the pipe is readable (no busy-loop; no deadline). DAEMON:
+        // this loop never returns, so it must not keep the scheduler alive on
+        // its own — once real work is done, the program exits and this is
+        // abandoned. Otherwise every program that called Signal.on() would hang.
+        Scheduler.suspend_io_daemon(fd, -1.0)
+        // Drain every coalesced signal, not just one.
+        var sig: Int = _signal_next()
+        while (sig > 0) {
+            _run_handler(sig)
+            sig = _signal_next()
+        }
+    }
+}
+
+private fun _run_handler(signum: Int) {
+    var i: Int = 0
+    while (i < _handled_signums.length()) {
+        if (_handled_signums[i] == signum) {
+            var cb: Fun = _handlers[i]
+            cb()
+            return
+        }
+        i = i + 1
+    }
+}
+
+/// Block the current task until any of `signums` is received, or until
+/// `timeout_secs` elapses. Returns the signal number received, or -1 on timeout.
+/// A `timeout_secs <= 0` waits forever (no deadline).
+///
+/// This does NOT run registered callbacks — it is the direct, inline
+/// alternative to `on()` for "set up, then wait for shutdown". It parks on the
+/// signal fd with a deadline, so it neither spins nor blocks the whole runtime:
+/// other tasks keep running while it waits.
+fun wait(signums: List<Int>, timeout_secs: Float): Int {
+    if (init() < 0) { return -1 }
+    // Make sure each requested signal is actually trapped, else the pipe never
+    // sees it. Registering here is harmless alongside any `on()` handler.
+    var i: Int = 0
+    while (i < signums.length()) {
+        _signal_register(signums[i])
+        i = i + 1
+    }
+
+    var fd: Int = _signal_read_fd()
+    if (fd < 0) { return -1 }
+
+    var deadline: Float = -1.0
+    if (timeout_secs > 0.0) { deadline = Scheduler.time_now() + timeout_secs }
+
+    while (true) {
+        // First, drain anything already pending and see if it is one we want.
+        var got: Int = _drain_for(signums)
+        if (got > 0) { return got }
+
+        // Nothing wanted yet. If the deadline passed, time out.
+        if (deadline >= 0.0 and Scheduler.time_now() >= deadline) { return -1 }
+
+        // Park until the fd is readable OR the deadline — no spin. Recompute the
+        // remaining budget so a wake that found the wrong signal re-waits only
+        // the time that is left.
+        var remaining: Float = -1.0
+        if (deadline >= 0.0) { remaining = deadline - Scheduler.time_now() }
+        Scheduler.suspend_io_timeout(fd, remaining)
+    }
+    return -1
+}
+
+// Drain pending signals; return the first that is in `wanted`, or -1. A drained
+// signal that is NOT wanted is still dispatched to its registered callback if
+// there is one, so `wait()` never silently swallows a signal `on()` cares about.
+private fun _drain_for(wanted: List<Int>): Int {
+    var result: Int = -1
+    var sig: Int = _signal_next()
+    while (sig > 0) {
+        if (result < 0 and _contains(wanted, sig) == 1) {
+            result = sig
+        } else {
+            // Not the one we are waiting for (or we already have ours): hand it
+            // to any registered handler so it is not lost.
+            _run_handler(sig)
+        }
+        sig = _signal_next()
+    }
+    return result
+}
+
+private fun _contains(xs: List<Int>, x: Int): Int {
+    var i: Int = 0
+    while (i < xs.length()) {
+        if (xs[i] == x) { return 1 }
+        i = i + 1
+    }
+    return 0
+}
