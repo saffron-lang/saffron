@@ -474,8 +474,12 @@
 # implemented upstream (c084dc2), so the test now passes. This is a real fix, not
 # a skip: it left the failure set because the feature it needed was built. 4 names
 # remain. Suite 330 passed / 4 failed / 14 skipped.
+#
+# Updated 2026-08-06: dropped pass/overloading — function overloading (arity- and
+# type-based) was implemented here (mangle a name only when it has >= 2 defs; a
+# checker guard so an overloaded name skips single-signature arg checking). The
+# test now passes with 10 assertions. Real fix, not a skip. 3 names remain.
 
 async
 docstrings
 oracle_enum_println
-pass/overloading

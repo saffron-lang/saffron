@@ -2398,6 +2398,17 @@
                 resolved_callee = this.current_prefix + callee_name
             }
         }
+        // Overloading (pass/overloading): if the resolved base names an overload
+        // set, pick the variant matching this call's arity and first-argument type.
+        // overload_variants is only populated for names with >= 2 definitions, so a
+        // non-overloaded call never enters this block. A no-match leaves
+        // resolved_callee alone, so the ordinary arity diagnostic still fires.
+        if (this.overload_variants.has(resolved_callee)) {
+            var ov_first_tag: String = "void"
+            if (args.length() > 0) { ov_first_tag = this.overload_type_tag(this.get_expr_type(args[0])) }
+            var ov_pick: String = this.resolve_overload(resolved_callee, args.length(), ov_first_tag)
+            if (ov_pick.length() > 0) { resolved_callee = ov_pick }
+        }
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")
         // before intrinsic/extern/coroutine checks
         if (resolved_callee.contains(".")) {

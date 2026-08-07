@@ -63,6 +63,16 @@
         } else if (name.contains("__lambda")) {
             emit_name = name
         }
+        // Overloading (pass/overloading): a name with >= 2 top-level definitions
+        // emits each under a per-signature mangled symbol, so the second body no
+        // longer overwrites the first on the shared `emit_name` (the `defined_funcs`
+        // dedup below would otherwise drop it). The mangle must match what
+        // prescan_fun_decl registered — same arity, same first-param tag. Only the
+        // unprefixed/prefixed top-level case: `main` and lambdas are handled above
+        // and are never overload sets.
+        if (this.overload_count.has(emit_name) and this.overload_count.get(emit_name) >= 2) {
+            emit_name = this.overload_mangle(emit_name, this.overload_csv_arity(params), this.overload_first_tag_csv(params))
+        }
         this.known_functions.push(emit_name)
         // Same collapse as everywhere else, except that an unannotated *lambda*
         // registered `Int` under the old encoding rather than `Nil`, and call-site

@@ -64,6 +64,14 @@ class Codegen {
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
     var func_param_names: Map<String, List<String>>
+    // Function overloading. `overload_count` maps an unmangled emit name to how
+    // many top-level `fun`s in the module share it; a name is OVERLOADED iff its
+    // count is >= 2. `overload_variants` maps an emit name to the list of its
+    // per-signature mangled symbols (name$sig), populated in the same prescan.
+    // Everything keyed here is a strict addition: a name with a single definition
+    // never enters these maps, so non-overloaded code is byte-for-byte unchanged.
+    var overload_count: Map<String, Float>
+    var overload_variants: Map<String, List<String>>
     // Declared parameter TYPE spellings, parallel to func_param_names. Populated in
     // gen_function from the same param CSV. Used to resolve a free generic
     // function's return type parameter from its call arguments (BUGS #171): given
@@ -201,6 +209,8 @@ class Codegen {
         this.func_defaults = {}
         this.func_param_count = {}
         this.func_param_names = {}
+        this.overload_count = {}
+        this.overload_variants = {}
         this.func_param_type_strs = {}
         this.current_prefix = ""
         this.module_globals = {}

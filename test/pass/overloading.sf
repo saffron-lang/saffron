@@ -1,15 +1,42 @@
-// Arity-based overloading
+// Function overloading (pass/overloading): several top-level `fun`s may share a
+// name, resolved at the call site by argument count and first-argument type.
+// Implemented as a no-op for non-overloaded names — a name is only mangled when
+// it has >= 2 definitions. Asserted, not just printed, so a mis-resolution fails
+// rather than passing silently.
+import "@test" as Test
+
+// Arity-based: same first-arg type, different counts.
 fun add(a: Int, b: Int): Int { return a + b }
 fun add(a: Int, b: Int, c: Int): Int { return a + b + c }
+Test.assert_eq(add(1, 2), 3, "two-arg overload")
+Test.assert_eq(add(1, 2, 3), 6, "three-arg overload")
 
-IO.println(add(1, 2))
-IO.println(add(1, 2, 3))
+// Type-based, same arity: a scalar-vs-scalar pair. This is the case the checker's
+// scalar_mismatch (BUGS #155/#165) would have falsely rejected — show(42) checked
+// against show(s: String) — until check_call_args learned to skip overloaded
+// names. Kept distinct from the List case below, which slipped through by luck
+// because List is not a scalar.
+fun show(n: Int): String { return "int " + n.to_string() }
+fun show(s: String): String { return "str " + s }
+Test.assert_eq(show(42), "int 42", "Int overload resolved by type")
+Test.assert_eq(show("hi"), "str hi", "String overload resolved by type")
 
-// Type-based overloading (same arity, different first param type)
+// Type-based across three shapes, including a container.
 fun format(n: Int): String { return "num: " + n.to_string() }
 fun format(s: String): String { return "str: " + s }
 fun format(items: List<Any>): String { return "list of " + items.length().to_string() }
+Test.assert_eq(format(42), "num: 42", "Int arm")
+Test.assert_eq(format("hello"), "str: hello", "String arm")
+Test.assert_eq(format([1, 2, 3]), "list of 3", "List arm")
 
-IO.println(format(42))
-IO.println(format("hello"))
-IO.println(format([1, 2, 3]))
+// Resolution reads a variable's static type, not just literals.
+var k: Int = 7
+var t: String = "x"
+Test.assert_eq(show(k), "int 7", "overload resolved from a variable's Int type")
+Test.assert_eq(show(t), "str x", "overload resolved from a variable's String type")
+
+// A non-overloaded name in the same file is untouched (the no-op path).
+fun solo(x: Int): Int { return x + 1 }
+Test.assert_eq(solo(41), 42, "a single-definition name still works normally")
+
+Test.summary()
