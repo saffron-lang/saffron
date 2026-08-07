@@ -9,6 +9,139 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 184. FIXED — a `Task.spawn`/coroutine closure trapped `null function or function signature mismatch` on wasm32 when the module also had earlier closures
+
+**FIXED 2026-08-07.** Root cause was a stale-flag leak, not table sizing. The
+`Task.spawn` handler (`methods_body.sf`) unconditionally set
+`this.force_next_lambda_coro` before `gen_arg_value`, but that flag is only
+consumed/cleared inside `gen_lambda`. When the spawn argument is NOT a lambda
+literal (`Task.spawn(fn)` / `Task.spawn(fns[i])`, as in stdlib `async.sf`'s
+`timeout`/`parallel`), no `gen_lambda` runs, so the flag leaked to the NEXT lambda
+compiled anywhere in the module. Merely `import "@async"` sufficed: async.sf's
+`Task.spawn(fn)` left it set, and the next real closure was emitted as
+`ptr(i64) presplitcoroutine` — whose wasm32 `call_indirect` signature then
+mismatched its `i64(i64)` call sites and trapped. Native has no typed
+indirect-call table, hence wasm32-only. Fix: only set the flag when the spawn arg
+is a lambda literal, and clear it unconditionally after `gen_arg_value`. Fixed in
+an isolated worktree off origin/main (avoiding a colleague's then-uncommitted #181
+WIP), patch applied clean to main. Verified: the learnxinyminutes doc now runs to
+completion on wasm32 (ends `180 / Done!`); standalone async/native/many-closures
+unregressed; bootstrap green; suite 349 passed, baseline failure set. **Separate
+pre-existing bug noted:** `Task.spawn` of a bare named-coroutine reference (`var
+fn = worker; Task.spawn(fn)`) still traps (`gen_func_ref` trampoline) — out of
+scope, to be filed.
+
+--- original entry ---
+**Severity: high** for real programs — it silently kills execution partway through
+(no diagnostic, no crash trace, just a wasm trap). Found running the
+learnxinyminutes doc in the playground: it compiles, prints ~30 correct lines,
+then traps the moment execution reaches the `Task.spawn`/`.await()` section.
+
+**wasm32 only.** The identical program runs correctly and to completion **natively**.
+Each part runs fine on wasm32 in isolation — the async section alone works, the
+first ~560 lines alone work. The trap needs BOTH: a `Task.spawn`/coroutine closure
+AND a large amount of earlier closure/function-defining code in the same module.
+
+**Repro** (deterministic): take the async section (a `fetch` coroutine +
+`Task.spawn(fun () => fetch(...))` + `.await()`) and prepend the first ~300 lines
+of `docs/learnxinyminutes/learnsaffron.sf` (many lambdas, nested funs, methods).
+Build `--target wasm32` and run: correct output through the prepended code, then
+`THREW: null function or function signature mismatch` at the first `.await()`.
+Standalone async section, or a smaller prefix, does not trap. Native never traps.
+
+**Likely cause.** `null function or function signature mismatch` is a wasm
+`call_indirect` against a function-table slot whose stored index is wrong or whose
+signature does not match the call site. `Task.spawn(fun () => ...)` stores a
+closure/coroutine function pointer into the wasm indirect-call table; something
+about that index or its type signature goes wrong once the table is large / has
+many closures registered ahead of it. Suspect the wasm32 codegen for closure /
+coroutine function-pointer emission and the `call_indirect` type index — a
+collision, an off-by-one in table slot assignment, or a signature-index mismatch
+that only manifests past some table size. Native uses real function pointers (no
+typed indirect-call table), which is why it is wasm32-specific.
+
+**Investigation aids.** `/tmp/combo.sf` (head[:560] + async section) reproduces;
+so does head[:300] + async. Compare the emitted wasm's `call_indirect` type index
+and the `elem`/table entry for the spawned closure against a working standalone
+build. The trap is at the `.await()` / coroutine-drive path, so also check how the
+coroutine frame's resume function pointer is registered vs called.
+
+**Severity: medium.** A program that uses a coroutine — a top-level `yield`, or
+`Task.spawn` — but does not `import "@async"` (which transitively imports
+`@scheduler`) fails to link: codegen emits calls to `@stdlib_scheduler_enqueue`
+and `@stdlib_scheduler_scheduler_run` whenever the entry is a coroutine, but with
+no scheduler module in the link those symbols are undefined. `test/async.sf` is
+the standing repro — it `yield`s at top level with no async import and fails as
+`invalid-ir` (opt rejects the undefined symbol). Workaround: add `import "@async"
+as Async`.
+
+**Target design: Elixir/BEAM parity — the scheduler is ambient runtime, always
+linked, never opted into.** That removes the whole detection question (which is a
+nest of edge cases: the coroutine use can be in the ENTRY or ANY imported lib,
+directly or via an aliased `Task` — `import "@async" as A` then `A.spawn` — and a
+naive `source.contains("yield")` also matches the word in a comment).
+
+**Why the obvious fixes fail (measured, not assumed):**
+
+1. *Text-scan the source for `yield`/`Task.spawn` and conditionally collect
+   `@scheduler`.* Rejected: the compiler's OWN source mentions `Task.spawn` in
+   comments, so the scan fires while compiling the compiler, injects `@scheduler`
+   into its build, and the bootstrap fails with duplicate `stdlib_scheduler_*`
+   symbols. A text scan cannot tell code from a comment.
+
+2. *Always collect `@scheduler` into the module set (unconditionally, via
+   `collect_modules`).* Rejected empirically: collecting it as a source module has
+   a second-order effect — it drags the prelude's interface types into
+   `class_type_ids`, which makes codegen emit the full reflect-helper suite
+   (`__reflect_class_name`/`is_class`/`get_fields`/`construct_from_map`), and those
+   reference `__val_class_tag`. The `[TEST]` example in `bootstrap.sh` links with
+   `base.ll` (the identity-mode base), which does not define `__val_class_tag`, so
+   the link fails. The coupling is: module-collection → class registration →
+   reflect emission → a runtime symbol the bootstrap base lacks.
+
+**The clean fix is a build-system change, not a source patch.** Treat the
+scheduler the way `runtime.ll`/`gc.ll`/`base_nanbox.ll` are treated: compile
+`src/lib/scheduler.sf` once to `build/stage3/scheduler.ll` in `bootstrap.sh`, and
+add that `.ll` to every link line (native + wasm32 + wasm64 in `tools/saffron`,
+and the bootstrap's own links). Then `main.sf` must STOP collecting `@scheduler`
+as a source module — when a program `import`s `@async`→`@scheduler`, the import
+resolves to symbols already present in the linked `.ll`, so collecting the source
+too would double-define them. That short-circuit in import resolution is the
+subtle half: 9 files import `@scheduler` today (`async.sf`, `net.sf`, and 7 tests)
+and every one becomes a validation surface.
+
+Scope: `bootstrap.sh` (compile + link scheduler.ll, four bases), `tools/saffron`
+(three target link lines), `main.sf` (exclude `@scheduler` from collection). Each
+of the 9 importers must be re-verified, plus the bootstrap's own build (which must
+NOT pull the reflect-emission coupling described above). Left open deliberately:
+a half-finished version breaks the bootstrap, and the investigation that produced
+this entry is the argument for doing it as one planned build-system change rather
+than a source hack.
+
+**Progress 2026-08-06: the FOUNDATION landed (commit `bf95a54`).** Dedup-safe
+symbols — `Class__method` (including the prelude's interface methods like
+`Comparable__lt`) and the reflect helpers — now emit `linkonce_odr` on native, so
+two units that both pull the auto-imported prelude no longer collide on them.
+Verified: bootstrap green, suite 342/2 unchanged, and a two-unit link of those
+symbols succeeds where strong `define` failed. This resolves the *first* class of
+duplicate the always-link approach hit (the prelude/reflect dup in analysis point
+2 above). See `docs/design/build-and-linking.md`.
+
+**What still blocks the always-link, discovered by that work:** three
+whole-program hierarchy helpers are emitted unconditionally with bodies that
+switch on THIS unit's entire class set — `__class_parent_tag`, `__class_is_a`
+(`stmts_body.sf:2009/2093`) and `__val_to_string` (`:2203`) — plus per-module
+globals and `__mod_init_*`. These are NOT `linkonce_odr` candidates the way
+`Class__method` is: two units emit *different* bodies under the same name, so
+ODR-merging would silently drop one unit's classes. The scheduler unit declares
+no classes, so its versions are empty switches — the open question is whether an
+empty-switch `__val_to_string`/`__class_is_a` from `scheduler.ll` can coexist with
+a user program's full one (needs either: emit these only in the entry unit, or
+give the runtime-linked scheduler.ll a mode that suppresses them). That decision
+is the next step, and it is genuinely separate-compilation ABI design, not a patch.
+
+---
+
 ### 183. FIXED — a `store8`/`load8` intrinsic call inside a nested/private function was `$$`-qualified into an undefined call, breaking all of `@net`/`@ssl`
 
 **FIXED 2026-08-07.** #175's `nested_fun_symbol` (`utils_body.sf`) qualified any
