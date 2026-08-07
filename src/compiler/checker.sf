@@ -680,16 +680,22 @@ class NullChecker {
         if (s == "String") return AST.Type.StringType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
-        // Union: "String|Nil" or "Int|String"
+        // Union: "String|Nil" or "Int|String". Top-level `|` only — see the same
+        // fix in parser.sf::parse_type_ast: a naive split("|") tore
+        // `List<Int|String>` into "List<Int" + "String>" and then sliced "In" as
+        // the generic arg. split_type_union respects `<>`/`()` depth, so a nested
+        // `|` falls through to the generic branch; only a real union (>1 part) is one.
         if (s.contains("|")) {
-            var parts: List<String> = s.split("|")
-            var types: List<AST.Type> = []
-            var i: Float = 0
-            while (i < parts.length()) {
-                types.push(this.parse_type_node(parts[i]))
-                i = i + 1
+            var parts: List<String> = this.split_type_union(s)
+            if (parts.length() > 1) {
+                var types: List<AST.Type> = []
+                var i: Float = 0
+                while (i < parts.length()) {
+                    types.push(this.parse_type_node(parts[i]))
+                    i = i + 1
+                }
+                return AST.Type.UnionType(types)
             }
-            return AST.Type.UnionType(types)
         }
         // Generic: "List<String>" or "Map<String,Number>"
         if (s.contains("<")) {
@@ -742,6 +748,37 @@ class NullChecker {
             args.push(current)
         }
         return args
+    }
+
+    // Split on a TOP-LEVEL `|` only, respecting `<>`/`()` depth, so `Int|String`
+    // splits but the `|` inside `List<Int|String>` does not. Used by
+    // parse_type_node to distinguish a real union from a generic that contains a
+    // nested union. Mirrors parser.sf and codegen's helper of the same name.
+    fun split_type_union(s: String): List<String> {
+        var parts: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<" or ch == "(" or ch == "[") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">" or ch == ")" or ch == "]") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "|" and depth == 0) {
+                parts.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            parts.push(current)
+        }
+        return parts
     }
 
     fun type_node_to_string(t: AST.Type): String {
@@ -882,9 +919,15 @@ class NullChecker {
         if (typ == "Any") return false
         // Shorthand: "String?" means nullable
         if (typ.ends_with("?")) return true
-        // Check for "Nil" component in union types
+        // Check for a top-level "Nil" component in a union type. Depth-aware split
+        // so `List<Int|Nil>` is not mis-read: a naive split("|") yields
+        // "List<Int" + "Nil>", the latter never equals "Nil", so a nested Nil was
+        // missed and the whole `List<Int|Nil>` was reported non-nullable. (The
+        // list ITSELF is not nullable — only its element is — which is exactly why
+        // this must look at top-level parts only, where a bare "Nil" is a real
+        // nullable and a nested one is not.)
         if (typ.contains("|")) {
-            var parts: List<String> = typ.split("|")
+            var parts: List<String> = this.split_type_union(typ)
             var i: Float = 0
             while (i < parts.length()) {
                 if (parts[i] == "Nil") return true
@@ -3793,39 +3836,50 @@ class NullChecker {
             // was the workaround, which is why `oracle_println_class_not_bits.sf`
             // annotates its lists.
             //
-            // Mirror the element type instead, exactly as the TupleLit arm below
-            // already does. Homogeneity is required: the type is taken from the
-            // first element and every other element must agree, because a `List<T>`
-            // that lies is worse than `List<Any>` — Any at least routes to the
-            // runtime dispatch that handles scalars correctly today, while a wrong
-            // T would statically dispatch to the wrong class. Mixed lists therefore
-            // stay Any, which is also what the checker can honestly say about them
-            // until there is a union-forming join.
+            // Infer `List<T>` for a homogeneous literal and `List<T0|T1|...>` for
+            // a mixed one — `[1, 2, "a"]` is `List<Int|String>`. Forming a union
+            // (rather than collapsing to `List<Any>`) became correct once `is` was
+            // fixed on unions (BUGS #69): `e is Int` / `e is String` on a union
+            // element now dispatches at runtime, so a union no longer statically
+            // dispatches to a wrong class the way the old comment feared.
             //
-            // Walking the elements is load-bearing for a second reason: this arm
-            // used not to infer them at all, so a variable appearing ONLY inside a
-            // list literal was never marked used and drew a false "unused variable"
-            // warning — the same un-walked-subtree defect as #126 and #121.
+            // Rules:
+            //   - Distinct element types are collected in first-seen order and
+            //     deduped by their rendered form, so `[1, 2, "a"]` yields
+            //     Int|String, not Int|Int|String.
+            //   - One distinct type -> `List<T>` (homogeneous, unchanged).
+            //   - If ANY element is `Any`, the whole list is `List<Any>`: a union
+            //     containing Any is just Any, and Any already routes to the
+            //     runtime dispatch that handles every element correctly.
+            //
+            // Every element is inferred even after the type set is known, so the
+            // walk's bookkeeping (used-variable marking, nested visibility checks)
+            // still runs over the whole literal — the un-walked-subtree defect of
+            // #126 / #121.
             ListLit(elements) => {
                 if (elements.length() == 0) {
                     AST.Type.GenericType("List", [AST.Type.AnyType])
                 } else {
-                    var ll_first: AST.Type = this.infer_type(elements[0])
-                    var ll_first_str: String = this.type_node_to_string(ll_first)
-                    var ll_same: Bool = true
-                    var lli: Float = 1
+                    var elem_types: List<AST.Type> = []
+                    var elem_keys: List<String> = []
+                    var saw_any: Bool = false
+                    var lli: Float = 0
                     while (lli < elements.length()) {
-                        // Infer every element even once a mismatch is known, so the
-                        // walk's own bookkeeping (used-variable marking, nested
-                        // visibility checks) still happens for the whole literal.
-                        var ll_other: String = this.type_node_to_string(this.infer_type(elements[lli]))
-                        if (ll_other != ll_first_str) { ll_same = false }
+                        var ll_t: AST.Type = this.infer_type(elements[lli])
+                        var ll_k: String = this.type_node_to_string(ll_t)
+                        if (ll_k == "Any") { saw_any = true }
+                        if (!elem_keys.contains(ll_k)) {
+                            elem_keys.push(ll_k)
+                            elem_types.push(ll_t)
+                        }
                         lli = lli + 1
                     }
-                    if (ll_same) {
-                        AST.Type.GenericType("List", [ll_first])
-                    } else {
+                    if (saw_any) {
                         AST.Type.GenericType("List", [AST.Type.AnyType])
+                    } else if (elem_types.length() == 1) {
+                        AST.Type.GenericType("List", [elem_types[0]])
+                    } else {
+                        AST.Type.GenericType("List", [AST.Type.UnionType(elem_types)])
                     }
                 }
             }
