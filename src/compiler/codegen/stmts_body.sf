@@ -916,15 +916,18 @@
     // Requires enum_variant_fields to be populated first, since get_max_fields
     // reads it — every caller does that immediately before.
     //
-    // A fieldless enum gets NO tag, and that is the whole shape of the
-    // half-fix: its value is the bare immediate `tag << 56`, with no allocation
-    // to carry a header, so there is nothing for __val_class_tag to read. It
-    // keeps printing its bit pattern. Guessing from the bit pattern was
-    // deliberately rejected for #115 and is rejected here for the same reason —
-    // mistaking a real double for an enum is worse than visible garbage.
+    // Both payload enums and entirely-fieldless enums get a tag (BUGS #154).
+    // A payload enum carries it in a GC header on its heap array; a fieldless
+    // enum carries it in the immediate itself under a dedicated NaN-box tag,
+    // TAG_ENUM 0x7FFB: `(0x7FFB << 48) | (type_id << 32) | variant`. Either way
+    // __val_class_tag can name the value and __val_to_string can route it to
+    // <Enum>__to_string, which is what fixes an enum printed inside a
+    // collection. The old half-fix left fieldless enums as the bare immediate
+    // `tag << 56` — a subnormal double with no identity — so they kept printing
+    // their bit pattern. The immediate encoding avoids the bit-pattern-guessing
+    // that #115 rejected: TAG_ENUM is unambiguous, not a heuristic.
     fun register_enum_tag(name: String) {
         if (this.enum_type_ids.has(name)) { return }
-        if (this.get_max_fields(name) == 0) { return }
         // The tag is 8 bits wide: __gc_pack_info stores `tag << 8` and
         // __gc_info_tag reads it back with `and 255`, so 256 would come back as
         // 0 and 266 as 10 — a silent collision with the first class. Refuse to
@@ -1129,7 +1132,14 @@
         var tag_val: String = ""
         if (max_fields == 0) {
             tag_val = this.fresh_local()
-            this.emit_indent(tag_val + " = lshr i64 %self, 56")
+            // Fieldless enum: the TAG_ENUM immediate holds the variant in its
+            // low 32 bits (BUGS #154). identity_mode keeps the old `tag << 56`
+            // layout, so its decode must match — see gen_enum_construct.
+            if (this.identity_mode or !this.enum_type_ids.has(name)) {
+                this.emit_indent(tag_val + " = lshr i64 %self, 56")
+            } else {
+                this.emit_indent(tag_val + " = and i64 %self, 4294967295")
+            }
         } else {
             var arr_ptr: String = this.val_to_typed_ptr("%self", "i64*")
             tag_val = this.fresh_local()

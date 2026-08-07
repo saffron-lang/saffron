@@ -9,6 +9,183 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 154. FIXED — an enum inside a printed collection printed a bit pattern (both halves now fixed)
+
+**Closed 2026-08-06.** The payload half was fixed 2026-08-04 (GC-header +
+shared type_id); the fieldless half is now fixed too via a new NaN-box tag
+**TAG_ENUM = 0x7FFB**. A fieldless variant of an entirely-fieldless enum was
+the bare immediate `tag << 56` — a subnormal double indistinguishable from a
+real double, so runtime formatters (`__any_to_string`) printed garbage inside a
+collection. It is now `(0x7FFB<<48)|(type_id<<32)|variant`: an immediate (no
+allocation, no GC, no equality change — bit-identical per variant so
+`emit_bit_eq` is unchanged) that `__val_class_tag` decodes (`(v>>48)==0x7FFB →
+(v>>32)&0xFFFF`), so the existing `__val_to_string` tag switch routes it to
+`Enum__to_string`. Construct (`expr_body.sf` gen_enum_construct) and both variant
+decodes (`match_body.sf`, `emit_enum_to_string`) are gated `!identity_mode`; the
+identity-mode bootstrap keeps the old `tag<<56` layout, so the fix is verified
+via gen3 user programs (`[Color.Red, Color.Green, Color.Blue]` → `[Red, Green,
+Blue]`), not the bootstrap. Runtime arm added to `base_nanbox.ll` and
+`wasm_base_32.ll` (identity `base.ll` and wasm64 `wasm_base.ll` excluded, as the
+payload half did). Suite: `oracle_enum_println` left the failure baseline; 346
+passed / 1 failed, zero regressions. The original analysis and payload-half fix
+follow, kept intact.
+
+---
+
+
+**Severity: medium as filed; now low.** Silent wrong answer, but narrower than it
+looks: only *inside* a collection. This is the residual of #105 and #115 — both
+entries describe it, but it lived in a paragraph of a *resolved* entry, which is a
+place nothing looks. Hence a number.
+
+**Status 2026-08-04: the payload half is fixed** exactly as the plan below
+prescribed, and the fieldless half is open and will stay open until the value
+representation changes. The entry keeps its number rather than splitting, because
+the two halves share one repro and one mechanism; what differs is only whether the
+value is allocated. The fix is described after the original analysis, so the
+reasoning that predicted it stays readable next to what it predicted.
+
+Verified when filed (the payload lines are now correct — see the Fix section):
+
+```saffron
+enum Color { Red, Green }
+enum Shape { Circle(r: Number), Rect(w: Number, h: Number) }
+var c: Color = Color.Red
+var s: Shape = Shape.Circle(2)
+IO.println("${c}")                      // Red        — correct
+IO.println("${s}")                      // Circle(2)  — correct
+var cs: List<Color> = [Color.Red, Color.Green]
+IO.println("${cs}")                     // [0, 7.29112e-304]        — WRONG
+var ss: List<Shape> = [Shape.Circle(1), Shape.Rect(2, 3)]
+IO.println("${ss}")                     // [5.21502e-310, ...]      — WRONG
+```
+
+`Red` renders as `0` rather than as garbage only because tag 0 `<< 56` *is* zero;
+that is the same defect wearing a plausible-looking hat, which is worth knowing
+before someone reads `0` as a working case.
+
+**Why the direct case works and the element case does not.** #105 fixed direct
+`println` by having codegen route through the enum's own `to_string()` when the
+*static* type is a known enum, and interpolation was always correct because the
+lexer inserts an explicit `.to_string()`. Elements are different in kind: they are
+formatted by `__rt_elem_to_string` → `__any_to_string` at **runtime**, where no
+static type exists. So no static-type-driven fix can ever reach them.
+
+**The two halves are not equally fixable, and #115 is the reason we now know
+what separates them.** #115 closed exactly this shape for *classes* by generating
+a `__val_to_string` tag switch from codegen's tables and calling it from
+`__any_to_string`. The prerequisite for joining that switch is that the value be
+identifiable at runtime:
+
+- **Payload enums can join.** They are allocated, so give them a GC header —
+  `__gc_alloc` instead of `__sf_malloc` in `gen_enum_construct`
+  (`expr_body.sf`) — with tags drawn from the same allocator as
+  `next_class_type_id` so they cannot collide with class tags. Then
+  `emit_val_to_string`'s switch gains arms calling `emit_enum_to_string`'s
+  symbols. Note this is a **representation change**, not a formatting change: it
+  touches every enum allocation and every place that assumes the current layout,
+  which is why it did not ride along with #115.
+- **Fieldless enums cannot.** `tag << 56` is a bare immediate — no allocation, no
+  identity, nothing to key on. A bit-pattern heuristic was deliberately not
+  written for #115 and should not be written here either: mistaking a real double
+  for an enum is worse than visible garbage. Closing this half needs the value
+  representation itself to change (a NaN-box tag for enums), which is a much
+  larger decision than a bug fix.
+
+So this entry is honest about being *partly* fixable. Doing the payload half alone
+is legitimate and leaves the fieldless half visibly broken rather than subtly
+wrong.
+
+`test/oracle_enum_println.sf` records the current output and is the regression
+test; it has shown these subnormals unchanged across both the #105 and #115 fixes,
+which is how the residual stayed measured rather than assumed.
+
+**The fix (payload half, 2026-08-04).** Three edits, in the order that matters:
+
+1. `codegen.sf` gains `enum_type_ids: Map<String, Float>` beside `class_type_ids`,
+   drawing from the **same** `next_class_type_id` counter. Sharing the counter is
+   the point, not an economy: `__val_class_tag` answers with one number space, so
+   an enum tag that duplicated a class tag would make `__val_to_string` call the
+   wrong `to_string` — a silent wrong answer strictly worse than the bit pattern
+   it replaced.
+2. `emit_enum_payload_alloc` (`stmts_body.sf`) centralises the allocation choice
+   that used to be three independent `__sf_malloc` call sites — two in
+   `gen_enum_construct`, one in `emit_enum_constructor`. It emits `__gc_alloc`
+   with the enum's tag when there is one, and falls back to the old `__sf_malloc`
+   under `identity_mode` or for an unregistered enum. One helper rather than three
+   edits, so the header decision cannot drift between construction paths.
+3. `emit_val_to_string`'s switch gains an arm per registered enum, and
+   `register_enum_tag` is called from the **prescan** (`output_body.sf`'s
+   `EnumDecl` arm) as well as from `gen_enum_decl` and `register_enum_variants`.
+   The prescan call is the one that is easy to omit and fatal to omit: without it
+   a construction site lowered before its `enum` declaration gets no tag, which is
+   the #33/#36/#37 ordering hazard.
+
+Two asymmetries had to be respected, and each would have produced a plausible
+wrong fix:
+
+- **An enum `to_string` returns a RAW `char*`; a class `to_string` returns a
+  NaN-TAGGED pointer.** The evidence is at the existing call sites — the two enum
+  ones wrap the result in `__rt_tag_ptr` (`methods_body.sf:1787`, `:3653`) and the
+  class ones do not. So the enum arms in `__val_to_string` must *not* apply
+  `__val_untag_ptr`, which every class arm does. Applying it uniformly is the #102
+  mistake mirrored.
+- **The payload pointer must stay BARE.** `ensure_enum_eq` bails to "unequal"
+  unless both operands' `lshr 48` is zero, so NaN-tagging the allocation would
+  make every payload enum unequal to itself while printing perfectly.
+  `__val_class_tag` accepts a bare pointer (`upper == 0`) precisely so a
+  GC-headered value need not be tagged to be identified.
+
+The tag is **8 bits** — `__gc_pack_info` stores `tag << 8` and `__gc_info_tag`
+reads it back with `and 255` — so `register_enum_tag` refuses past 255 rather than
+wrapping. Refusing degrades to the old bit-pattern print; wrapping would collide
+with class tag 10 and call a wrong `to_string`. GC tracing needed no work:
+`__gc_mark_drain` routes any `tag >= 10` to `trace_instance`, and slot 0 (the
+small variant tag) is rejected by `__gc_is_heap_ptr`'s alignment and 4 GB floor,
+so scanning `size/8` slots as values is already safe.
+
+**wasm64 is excluded, not overlooked.** `wasm_base.ll`'s `__gc_alloc` discards its
+`%type_tag` and its `__val_class_tag` returns 0 unconditionally. Native
+(`base_nanbox.ll`, 24-byte header) and wasm32 (`wasm_base_32.ll`, 16-byte header)
+both have real headers and both were verified end to end.
+
+Verified: native and wasm32 both go from `[5.21502e-310, ...]` / `[0, 0, 0]` to
+`[Circle(1), Rect(2, 3), Nothing]`; `==` and `match` unchanged; `./bootstrap.sh`
+green through stage 2 gen4 including the zero-`Int`-fallback assertion; the suite's
+failure *set* byte-identical to `test/FAILURE_BASELINE.txt`. `identity_mode` is
+excluded exactly as `emit_reflect_helpers` is, so **the bootstrap never exercises
+this path** — it was tested with gen3-compiled user programs, which is the only way
+it could be.
+
+`test/pass/enum_payload_any.sf` is the regression test. It asserts on the three
+paths that have no static type — a list element, a map value, an `Any` parameter —
+because those are the ones that converge on `__any_to_string`; asserting on
+`"${Shape.Circle(1)}"` would have passed before the fix and proved nothing. Five of
+its first sixteen assertions failed before the change and all sixteen pass after.
+
+It has 23 assertions now, and the extra seven are the ones that earned their keep:
+a 400-iteration GC stress loop and a recursive `Tree` formatted byte-exactly against
+an independently built expected string. Those found the two rooting bugs listed
+above, which the sixteen never reached — an enum whose to_string does not itself
+allocate past the threshold never triggers a collection mid-format. They also found
+#162, which was *not* fixed here: the recursive assertions hoist both operands into
+locals, because passing them directly left argument 0 unrooted across argument 1's
+allocation. That is an argument-temp rooting hole in codegen, reproducible with
+classes, and it is filed separately rather than papered over silently. #162 has
+since been fixed, so the hoisting in this test is no longer load-bearing — it is
+left in place because a test for #154 should not depend on #162's fix holding.
+
+**What remains open** is the fieldless half, unchanged from the analysis above, and
+`test/oracle_enum_println.sf` still fails on exactly one line for it (line 22,
+`[Color.Red, Color.Blue]` → `[0, 4.77831e-299]`). That test stays in the baseline
+for that line, so the movement here is *inside* one name — two failing lines to one
+— which an unchanged failure set does not show. Closing it needs an enum-bearing
+NaN-box tag, not another formatter arm.
+
+---
+
+---
+
 ### 182. FIXED — a match binding of a generic-type-parameter payload field was typed `Int`, so a String payload printed a raw bit pattern under interpolation
 
 ```saffron
