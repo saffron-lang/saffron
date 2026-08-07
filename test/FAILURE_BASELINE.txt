@@ -523,3 +523,15 @@
 # (BUGS #181, scheduler-linking design) remains.
 
 async
+
+# 2026-08-06 (#175 nested-fun symbol qualification): a full suite run against
+# the fix surfaced pass/http_binary_response as a stale test — it calls
+# `Http._content_length_of(...)` across a package boundary, but that helper is
+# marked `internal` in src/lib/http/server.sf:938 (annotated by Phase 6b,
+# ac2399d) and rejected by the checker's visibility pass. The failure is
+# checker-side and independent of any codegen change: the #175 diff is
+# codegen-only (src/compiler/codegen/*). Filed as a pre-existing stale test to
+# fix by either moving the assertions into the http package or dropping the
+# leading underscore + `internal` on `_content_length_of` if the API is meant
+# to be public.
+pass/http_binary_response

@@ -44,6 +44,13 @@ class Codegen {
     var current_class: String
     var current_parent: String
     var current_function_name: String
+    // BUGS #175: the function whose nested-fun definitions are currently in scope.
+    // While emitting a nested fun `step` declared in `run`, current_function_name
+    // is `step` but nested_scope stays `run`, because step's *sibling* nested funs
+    // belong to run. This is the qualifier for a nested fun's emitted symbol
+    // (run$$helper), so sibling/forward calls resolve to the right one. Empty at
+    // module top level.
+    var nested_scope: String
     var string_vars: List<String>
     var last_type: AST.Type
     var typed_vars: Map<String, AST.Type>
@@ -208,6 +215,7 @@ class Codegen {
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
+        this.nested_scope = ""
         this.string_vars = []
         this.last_type = AST.Type.IntType
         this.typed_vars = {}
@@ -1786,7 +1794,14 @@ class Codegen {
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                // BUGS #175: a nested fun is emitted under a per-scope symbol
+                // (scope$$name), so a reference to it by bare name is "known" only
+                // via that qualified symbol. Without this term the undefined-var
+                // check below fires before the nested-fun ref path is reached, so
+                // `return uncollided` (a nested fun returned as a value) wrongly
+                // errored "undefined variable 'uncollided'".
+                var __nf_ref_known: Bool = this.current_fn_locals.has("__nestedfn:" + name) and this.nested_scope.length() > 0 and this.str_in_list(this.known_functions, this.nested_fun_symbol(this.nested_scope, name))
+                if (!__nf_ref_known and !this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     // Error, not a warning (BUGS #37). Emitting a load from an
                     // undeclared %name produces invalid LLVM, so the compile
                     // fails regardless — just with "use of undefined value
@@ -1799,6 +1814,15 @@ class Codegen {
                 // the module_globals guards below would otherwise divert to a load
                 // from @__g_. Tested first for exactly that reason (BUGS #80).
                 if (this.current_fn_locals.has("__nestedfn:" + name) and !this.typed_vars.has(name) and !this.named_imports.has(name)) {
+                    // BUGS #175: prefer the per-scope symbol (scope$$name) so a
+                    // reference binds to THIS scope's nested fun, not a same-named
+                    // one elsewhere.
+                    if (this.nested_scope.length() > 0) {
+                        var __nfr: String = this.nested_fun_symbol(this.nested_scope, name)
+                        if (this.str_in_list(this.known_functions, __nfr)) {
+                            return this.gen_func_ref(__nfr)
+                        }
+                    }
                     if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                         return this.gen_func_ref(this.current_prefix + name)
                     }
@@ -3612,8 +3636,22 @@ class Codegen {
             // Undefined variable check. Kept as an error (BUGS #37): the load
             // emitted below references %name, which llc rejects anyway, so a
             // warning only delays the same failure into an opaque IR error.
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+            // BUGS #175: same qualified-symbol exemption as the Variable arm — a
+            // nested fun referenced by bare name is known via scope$$vname.
+            var __nf_vref_known: Bool = this.current_fn_locals.has("__nestedfn:" + vname) and this.nested_scope.length() > 0 and this.str_in_list(this.known_functions, this.nested_fun_symbol(this.nested_scope, vname))
+            if (!__nf_vref_known and !this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 this.codegen_error("undefined variable '" + vname + "'")
+            }
+            // BUGS #175/#80: a nested fun referenced as a VALUE (`return collide_b`)
+            // reaches this arm, which otherwise emits a plain `load %collide_b` — or,
+            // when a module global shares the name, `load @__g_collide_b`, the wrong
+            // storage (the #80 shadowing bug). A nested fun in scope SHADOWS a
+            // like-named global, so the marker takes precedence over the global
+            // diversion below — matching the first Variable arm at :103. Emit a
+            // function reference (a closure, if it captures) to @scope$$name. Guarded
+            // to fire only when the name is not a local variable (a real local wins).
+            if (__nf_vref_known and this.current_fn_locals.has("__nestedfn:" + vname) and !this.typed_vars.has(vname) and !this.named_imports.has(vname)) {
+                return this.gen_func_ref(this.nested_fun_symbol(this.nested_scope, vname))
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -4120,6 +4158,17 @@ class Codegen {
         } else if (this.current_prefix.length() > 0) {
             if (this.str_in_list(this.known_functions,this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
+            }
+        }
+        // BUGS #175: a call to a nested fun of the enclosing scope resolves to its
+        // per-scope symbol (scope$$callee). Keyed on nested_scope (the top-level
+        // ancestor, correct even inside a sibling nested fun) and on the qualified
+        // symbol actually existing in known_functions — so it only ever redirects a
+        // genuine nested call and leaves everything else alone.
+        if (this.nested_scope.length() > 0) {
+            var __nfc: String = this.nested_fun_symbol(this.nested_scope, callee_name)
+            if (this.str_in_list(this.known_functions, __nfc)) {
+                resolved_callee = __nfc
             }
         }
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")
@@ -6927,6 +6976,18 @@ class Codegen {
                 }
                 if (call_name.length() > 0) {
                     var caps_key: String = "__caps_" + this.current_prefix + call_name
+                    // BUGS #175: a sibling nested fun's captures are registered under
+                    // the per-scope symbol (scope$$name), so a call to one from another
+                    // must look them up by that same key or the transitive captures
+                    // (e.g. `source` threaded through `peek`) go missing and the callee
+                    // references an undefined value. Single source of truth:
+                    // nested_fun_symbol.
+                    if (this.nested_scope.length() > 0) {
+                        var __nf_caps_key: String = "__caps_" + this.nested_fun_symbol(this.nested_scope, call_name)
+                        if (this.func_prefix_map.has(__nf_caps_key)) {
+                            caps_key = __nf_caps_key
+                        }
+                    }
                     if (this.func_prefix_map.has(caps_key)) {
                         var caps_str: String = this.func_prefix_map.get(caps_key)
                         if (caps_str.length() > 0) {
@@ -7777,8 +7838,16 @@ class Codegen {
                     this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
-                    // Register default values for optional params
+                    // Register default values for optional params. BUGS #175: a
+                    // NESTED fun is emitted under a per-scope symbol (scope$$name),
+                    // so its param metadata must be keyed the same way or the call
+                    // site (which reads func_param_count / func_defaults under the
+                    // resolved qualified symbol) misses. in_function marks a nested
+                    // fun here; nested_scope names the enclosing scope.
                     var emit_name: String = this.current_prefix + name
+                    if (this.in_function and this.nested_scope.length() > 0) {
+                        emit_name = this.nested_fun_symbol(this.nested_scope, name)
+                    }
                     var defaults: List<AST.Expr> = []
                     var param_names: List<String> = []
                     var pi: Float = 0
@@ -11194,6 +11263,19 @@ class Codegen {
         return this.current_prefix + "|" + name
     }
 
+    // BUGS #175: the emitted symbol for a nested `fun`, qualified by the function
+    // whose body declares it, so two parents can each declare a `helper` without
+    // colliding on one `@helper` (the defined_funcs dedup dropped all but the
+    // first, and every call bound to it — a silent wrong result). Single source of
+    // truth: definition, call/reference sites, forward-ref preregister, and capture
+    // metadata all route through it. `enclosing` is nested_scope (the top-level
+    // ancestor). A top-level fun (enclosing == "") is prefix+name unchanged, so
+    // non-nested emission is untouched.
+    fun nested_fun_symbol(enclosing: String, name: String): String {
+        if (enclosing.length() == 0) { return this.current_prefix + name }
+        return this.current_prefix + enclosing + "$$" + name
+    }
+
     fun is_known_name(name: String): Bool {
         if (name == "self" or name == "this" or name == "super") { return true }
         if (name == "IO" or name == "OS" or name == "GC" or name == "Task" or name == "Reflect") { return true }
@@ -12032,10 +12114,17 @@ class Codegen {
             if (this.classify_stmt(body[i]) == "fun") {
                 var fname: String = this.get_fun_name(body[i])
                 if (fname.length() > 0) {
-                    var fem: String = this.current_prefix + fname
+                    // BUGS #175: register the per-scope symbol these nested funs are
+                    // emitted under (scope$$name), keyed on nested_scope (set by
+                    // gen_function before this runs), so a forward reference to a
+                    // sibling resolves. AND set the __nestedfn marker up front — a
+                    // forward call is emitted before its FunDecl runs, so without
+                    // this the call site would not know it is a nested fun.
+                    var fem: String = this.nested_fun_symbol(this.nested_scope, fname)
                     if (!this.str_in_list(this.known_functions, fem)) {
                         this.known_functions.push(fem)
                     }
+                    this.current_fn_locals.set("__nestedfn:" + fname, true)
                 }
             }
             i = i + 1
@@ -12047,7 +12136,18 @@ class Codegen {
         var is_lambda_body: Bool = name.contains("__lambda")
         var implicit_return: Bool = ret_name != "Nil" and ret_name != "void"
         if (this.is_unknown_type(ret_type)) { implicit_return = is_lambda_body }
+        // BUGS #175: a nested fun is qualified by nested_scope — the function whose
+        // body declares it — NOT current_function_name (which is a sibling nested
+        // fun's own name when we recurse into one). So `step` and its sibling
+        // `helper`, both nested in `run`, qualify as run$$* and resolve to each
+        // other. `in_function` marks a nested fun; a lambda keeps its unique
+        // __lambda_N name and is left alone.
+        var __nf_enclosing: String = ""
+        if (this.in_function and !is_lambda_body) { __nf_enclosing = this.nested_scope }
         var emit_name: String = this.current_prefix + name
+        if (__nf_enclosing.length() > 0) {
+            emit_name = this.nested_fun_symbol(__nf_enclosing, name)
+        }
         // Only the ENTRY module's `main` becomes __saffron_main. An imported
         // module is free to define a function called `main` (turmeric/prelude.sf
         // does — it is the <main> element builder), and renaming that one too
@@ -12094,8 +12194,15 @@ class Codegen {
             this.func_ret_types.set(name, registered_ret)
             this.func_prefix_map.set(name, emit_name)
         }
+        var __nf_saved_fn: String = this.current_function_name
         this.current_function_name = name
-        if (this.register_only) { return }
+        if (this.register_only) {
+            // A nested fun's register-only pass must not leave current_function_name
+            // pointing at the nested name — the parent's remaining statements would
+            // qualify against the wrong scope.
+            if (__nf_enclosing.length() > 0) { this.current_function_name = __nf_saved_fn }
+            return
+        }
         if (this.str_in_list(this.defined_funcs,emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
 
@@ -12310,11 +12417,18 @@ class Codegen {
             this.gc_root_count = saved_gc_root_count2
             this.current_fn_locals = saved_fn_locals2
             this.boxed_locals = saved_boxed2
+            // BUGS #175: restore the enclosing function name (nested_scope was not
+            // changed for this nested body, so it needs no restore).
+            this.current_function_name = __nf_saved_fn
             this.globals.push(nested_ir)
             return
         }
 
         this.in_function = true
+        // BUGS #175: a top-level (non-nested) function — ITS nested funs qualify by
+        // its name. Set nested_scope for the body; nested funs within inherit it.
+        var __nf_saved_scope: String = this.nested_scope
+        this.nested_scope = name
         var saved_tv: Map<String, AST.Type> = this.typed_vars
         var saved_is_coro: Bool = this.is_coroutine
         this.reset_locals()
@@ -12768,6 +12882,7 @@ class Codegen {
         this.current_fn_locals = saved_fn_locals
         this.boxed_locals = saved_boxed
         this.is_coroutine = saved_is_coro
+        this.nested_scope = __nf_saved_scope
     }
 
     // --- Top-level ---

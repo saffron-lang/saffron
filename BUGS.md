@@ -2,14 +2,25 @@
 
 ## Open
 
-**8 open entries:** #49, #65, #107, #131, #132, #175, #178, #181.
+**7 open entries:** #49, #65, #107, #131, #132, #178, #181.
 Next free number is **#183**.
+
+#175 (same-named nested funcs in different parent functions collided on an
+unqualified symbol and silently returned the wrong body) was fixed by qualifying
+a nested fun's emitted symbol by its top-level ancestor everywhere it is used —
+definition, preregistration, sibling FunDecl metadata, call resolution,
+nested-fun-as-value, undefined-var exemption, and (the transitive-capture path
+that surfaced late) `closures_body.sf` free-var lookup — from one
+`nested_fun_symbol` helper. Regression tests
+(`test/pass/nested_fun_name_collision.sf`, `nested_forward_ref.sf`) pin the
+collision + forward-ref + capture combinations. Lives in `BUGS_CLOSED.md`. Open
+set 8 → 7; next-free 182 → 183 (183 not yet claimed).
 
 #154 (an enum inside a printed collection printed a bit pattern) is now FULLY
 FIXED — the fieldless half landed via a new NaN-box tag TAG_ENUM (0x7FFB), so a
 fieldless variant is a runtime-identifiable immediate that `__val_to_string`
 routes to `Enum__to_string`. Both halves closed; moved to `BUGS_CLOSED.md`. Open
-set 9 → 8; next-free unchanged.
+set 9 → 8 upstream, then 8 → 7 here after #175 closed.
 
 #182 (a match binding of a generic-type-parameter payload field was typed `Int`,
 so a String payload printed a raw bit pattern under `"${msg}"`) was found running
@@ -707,38 +718,6 @@ but its blast radius is shrinking:
 **Remaining:** user-facing docs, then removing the surface spelling from the
 lexer/parser/checker/codegen — which is a breaking change for user programs and
 wants its own decision.
-
-### 175. OPEN — same-named nested funcs in different parent functions collide on an unqualified symbol and silently return the wrong body
-
-```saffron
-fun first(): Int {
-    fun helper(): Int { return 42 }
-    return helper()
-}
-fun second(): Int {
-    fun helper(): Int { return 10 }
-    return helper()
-}
-IO.println(first().to_string())    // 42
-IO.println(second().to_string())   // prints 42 — should be 10
-```
-
-**Severity: high** — silent wrong output, no diagnostic. A nested `fun` is
-hoisted and emitted with the unqualified symbol `@helper` (`current_prefix + name`
-in `gen_function`, with no parent qualifier). Two parents each declaring a nested
-`helper` therefore emit the same symbol; the second is dropped by the
-`defined_funcs` dedup at `output_body.sf`, and every `helper()` call binds to the
-first definition. `second()` returns 42.
-
-Found while fixing #2 (nested forward references): the collision is independent of
-forward references — it reproduces with a single non-recursive nested fun per
-parent — but #2's regression test tripped it until the test's nested names were
-made distinct. The fix is to qualify a nested fun's emitted symbol by its
-enclosing function (e.g. `parent__helper`) and resolve calls to nested funcs
-against that qualified name, which is a deeper change to nested-fun naming and call
-resolution than #2 itself and was deliberately not folded in.
-
----
 
 ### 178. OPEN — an all-scalar overload set is rejected by the checker; type-based overloading needs one non-scalar arm
 

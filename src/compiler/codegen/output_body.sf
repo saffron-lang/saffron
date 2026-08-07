@@ -35,10 +35,17 @@
             if (this.classify_stmt(body[i]) == "fun") {
                 var fname: String = this.get_fun_name(body[i])
                 if (fname.length() > 0) {
-                    var fem: String = this.current_prefix + fname
+                    // BUGS #175: register the per-scope symbol these nested funs are
+                    // emitted under (scope$$name), keyed on nested_scope (set by
+                    // gen_function before this runs), so a forward reference to a
+                    // sibling resolves. AND set the __nestedfn marker up front — a
+                    // forward call is emitted before its FunDecl runs, so without
+                    // this the call site would not know it is a nested fun.
+                    var fem: String = this.nested_fun_symbol(this.nested_scope, fname)
                     if (!this.str_in_list(this.known_functions, fem)) {
                         this.known_functions.push(fem)
                     }
+                    this.current_fn_locals.set("__nestedfn:" + fname, true)
                 }
             }
             i = i + 1
@@ -50,7 +57,18 @@
         var is_lambda_body: Bool = name.contains("__lambda")
         var implicit_return: Bool = ret_name != "Nil" and ret_name != "void"
         if (this.is_unknown_type(ret_type)) { implicit_return = is_lambda_body }
+        // BUGS #175: a nested fun is qualified by nested_scope — the function whose
+        // body declares it — NOT current_function_name (which is a sibling nested
+        // fun's own name when we recurse into one). So `step` and its sibling
+        // `helper`, both nested in `run`, qualify as run$$* and resolve to each
+        // other. `in_function` marks a nested fun; a lambda keeps its unique
+        // __lambda_N name and is left alone.
+        var __nf_enclosing: String = ""
+        if (this.in_function and !is_lambda_body) { __nf_enclosing = this.nested_scope }
         var emit_name: String = this.current_prefix + name
+        if (__nf_enclosing.length() > 0) {
+            emit_name = this.nested_fun_symbol(__nf_enclosing, name)
+        }
         // Only the ENTRY module's `main` becomes __saffron_main. An imported
         // module is free to define a function called `main` (turmeric/prelude.sf
         // does — it is the <main> element builder), and renaming that one too
@@ -97,8 +115,15 @@
             this.func_ret_types.set(name, registered_ret)
             this.func_prefix_map.set(name, emit_name)
         }
+        var __nf_saved_fn: String = this.current_function_name
         this.current_function_name = name
-        if (this.register_only) { return }
+        if (this.register_only) {
+            // A nested fun's register-only pass must not leave current_function_name
+            // pointing at the nested name — the parent's remaining statements would
+            // qualify against the wrong scope.
+            if (__nf_enclosing.length() > 0) { this.current_function_name = __nf_saved_fn }
+            return
+        }
         if (this.str_in_list(this.defined_funcs,emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
 
@@ -313,11 +338,18 @@
             this.gc_root_count = saved_gc_root_count2
             this.current_fn_locals = saved_fn_locals2
             this.boxed_locals = saved_boxed2
+            // BUGS #175: restore the enclosing function name (nested_scope was not
+            // changed for this nested body, so it needs no restore).
+            this.current_function_name = __nf_saved_fn
             this.globals.push(nested_ir)
             return
         }
 
         this.in_function = true
+        // BUGS #175: a top-level (non-nested) function — ITS nested funs qualify by
+        // its name. Set nested_scope for the body; nested funs within inherit it.
+        var __nf_saved_scope: String = this.nested_scope
+        this.nested_scope = name
         var saved_tv: Map<String, AST.Type> = this.typed_vars
         var saved_is_coro: Bool = this.is_coroutine
         this.reset_locals()
@@ -771,6 +803,7 @@
         this.current_fn_locals = saved_fn_locals
         this.boxed_locals = saved_boxed
         this.is_coroutine = saved_is_coro
+        this.nested_scope = __nf_saved_scope
     }
 
     // --- Top-level ---
