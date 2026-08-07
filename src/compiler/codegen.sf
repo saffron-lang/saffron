@@ -138,6 +138,18 @@ class Codegen {
     var coroutine_funcs: List<String>
     var inline_funcs: List<String>
     var is_coroutine: Bool
+    // True once codegen emits anything that makes the ambient scheduler's queues
+    // reachable at runtime: a Task.spawn/enqueue, or a boot wrapper that runs the
+    // scheduler because the entry (or main) is a coroutine. The scheduler is
+    // ALWAYS linked (ambient runtime, BUGS #181), but its module-init — which
+    // allocates ~13 global collections — is only CALLED when this is set. A
+    // coroutine-free program leaves the scheduler globals at their static `0`
+    // (nil), makes zero startup allocations, and -O2 drops the dead scheduler
+    // code, so it is byte-for-byte the pre-#181 program. Without this gate every
+    // program paid 28 startup allocations, which shifted the GC threshold and
+    // broke gc_test/gc_api_test (allocation counts) and enum_payload_any (a
+    // collection landing mid-format on an unrooted temporary).
+    var scheduler_used: Bool
     var use_llvm_lib: Bool
     var emit_llvm_lib: Bool
     var gc_root_count: Float
@@ -257,6 +269,7 @@ class Codegen {
         this.coroutine_funcs = []
         this.inline_funcs = []
         this.is_coroutine = false
+        this.scheduler_used = false
         this.use_llvm_lib = true
         this.emit_llvm_lib = false
         this.gc_root_count = 0

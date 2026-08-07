@@ -59,9 +59,22 @@ entry below, so it renumbered to #182. Lives in `BUGS_CLOSED.md`. Open set
 unchanged; next-free 182 → 183.
 
 #181 (a program that uses coroutines without importing `@async` fails to link —
-the scheduler symbols codegen emits are undefined) was investigated toward a fix
-and filed rather than landed, because the clean fix is a build-system change, not
-a source patch. Open set 8 → 9; next-free 181 → 182.
+the scheduler symbols codegen emits are undefined) is now FIXED via an ambient
+scheduler, matching Elixir/BEAM (and Go/Swift): the coroutine runtime links like
+`runtime.ll`/`gc.ll` rather than being a source module the user must import.
+`main.sf` always collects `@scheduler` when the entry emits a program (gated by a
+new `_entry_emits_program()` so `runtime.sf` compiling standalone doesn't
+double-define the scheduler globals), and codegen emits `__mod_init_stdlib_scheduler`
+only when `scheduler_used` is set — so a coroutine-free program is byte-identical
+to before, zero cost. The two unsound attempts that preceded it (a `yield`/`Task.spawn`
+text-scan that matched the compiler's own comments → dup symbols; collecting
+`@scheduler` as an ordinary source module → prelude interfaces dragged into
+`class_type_ids`, emitting reflect helpers the identity-mode `base.ll` can't link)
+are why the fix waited for the lazy-init + entry-gate shape. `test/async.sf`
+(top-level `yield`, no `import "@async"`) now links and runs; full suite 350
+passed / 0 failed. Regenerated gen3+gen4 artifacts; STAGE 2 fixed-point green with
+0 inference fallbacks. Never given a `### 181.` body (filed as header prose only),
+so nothing moves to `BUGS_CLOSED.md`. Open set unchanged at 6.
 
 #180 (plain assignment to a function-local `var` shadowing a module global wrote
 the global, not the local — and a shadowed loop counter hung forever) was found
