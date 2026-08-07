@@ -9,20 +9,19 @@ Last audited: 2026-08-07.
 
 ## Open — needs an edit
 
-- [ ] **Retire `Number` from the mdbook + learnxiny.** We are dropping `Number`
-      in favour of explicit `Int`/`Float` (BUGS #49). The learnxiny doc is already
-      converted (`docs/learnxinyminutes/learnsaffron.sf`), but the mdbook still
-      teaches `Number` in **8 files** (9 occurrences):
-      `tutorial/variables-and-types.md` (×2), `stdlib/{map,json,reflect,set,list,string}.md`,
-      `reference/style-guide.md`. Convert each to `Int` or `Float` per context
-      (indices/counts → `Int`; real numerics → `Float`). **Blocked**: do this only
-      once `Number` is actually removed from the surface syntax, not while the
-      checker still maps it — otherwise the docs would describe a spelling that
-      still works.
-
 - [ ] **Playground guide: theming + no-REPL iteration.** The playground now has a
       light/auto theme toggle (committed `c0f18ad`). If any doc describes the
       playground UI, note the theme control. Low priority.
+
+## Done
+
+- **`Number` retired from the mdbook (2026-08-07).** BUGS #49 removed the surface
+  spelling, so the deprecation notices became removal notices:
+  `tutorial/variables-and-types.md`, `stdlib/reflect.md`, `reference/style-guide.md`
+  now say `Number` is removed (`var x: Number` errors). The other matches
+  (`map/set/string/list.md` "Number of entries", `json.md`'s JSON Number type) are
+  the English word / JSON terminology, not the Saffron type — correctly left alone.
+  learnxiny was already converted. mdbook builds clean.
 
 ## Verified current — no action (recorded so the next audit doesn't re-check)
 

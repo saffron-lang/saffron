@@ -98,7 +98,8 @@ var config: Map<String, String> = parse_config(text)
 ```
 
 For numbers, write `Int` or `Float` — whichever the value actually is. The older
-`Number` annotation is deprecated because it hid the difference between the two.
+`Number` annotation has been removed (it hid the difference between the two); it is
+no longer a valid type.
 
 ## Enum and match style
 
