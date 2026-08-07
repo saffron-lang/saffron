@@ -1115,6 +1115,8 @@ passthrough:
 @.str.true = private unnamed_addr constant [5 x i8] c"true\00"
 @.str.false = private unnamed_addr constant [6 x i8] c"false\00"
 @.str.nil = private unnamed_addr constant [4 x i8] c"nil\00"
+; BUGS #107: a function value (closure pair, GC tag 4) reaching a formatter.
+@.str.function_w32 = private unnamed_addr constant [11 x i8] c"<function>\00"
 
 ; %b arrives ALREADY UNTAGGED — a raw 0 or 1. Every caller untags first:
 ; codegen's Bool arm calls emit_untag_bool before the call (methods_body.sf,
@@ -1795,6 +1797,19 @@ check_ptr:
   ; sentinel, and __val_class_tag/__gc_get_type_tag are both defined in this
   ; file. wasm64's identity discipline has none of that (BUGS #131), so its
   ; __any_to_string stays the pass-through stub and gains no class arm.
+  ; BUGS #107: a closure carries GC type tag 4 and has no user to_string, so it
+  ; would fall through to do_ptr and print its raw address. Detect it first and
+  ; return a static "<function>". Same treatment as base_nanbox.ll.
+  %clos_tag = call i64 @__val_class_tag(i64 %val)
+  %is_clos = icmp eq i64 %clos_tag, 4
+  br i1 %is_clos, label %do_function, label %check_class
+
+do_function:
+  %fn_str = getelementptr [11 x i8], [11 x i8]* @.str.function_w32, i64 0, i64 0
+  %fn_ptr = ptrtoint i8* %fn_str to i64
+  ret i64 %fn_ptr
+
+check_class:
   %cls_str = call i64 @__val_to_string(i64 %val)
   %has_cls = icmp ne i64 %cls_str, 0
   br i1 %has_cls, label %do_class, label %check_ptr_tag
