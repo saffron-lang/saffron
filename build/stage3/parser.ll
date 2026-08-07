@@ -1443,7 +1443,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1439 = private unnamed_addr constant [3 x i8] c"in\00"
 @.str.1440 = private unnamed_addr constant [2 x i8] c":\00"
 @.str.1441 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.1442 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1442 = private unnamed_addr constant [11 x i8] c"@for_reuse\00"
 @.str.1443 = private unnamed_addr constant [7 x i8] c"public\00"
 @.str.1444 = private unnamed_addr constant [2 x i8] c";\00"
 @.str.1445 = private unnamed_addr constant [2 x i8] c";\00"
@@ -32083,7 +32083,7 @@ endif2796:
   %t349 = load i64, i64* %name
   %t350 = load i64, i64* %vtype
   %t351 = load i64, i64* %init_expr
-  %t352 = getelementptr [1 x i8], [1 x i8]* @.str.1442, i64 0, i64 0
+  %t352 = getelementptr [11 x i8], [11 x i8]* @.str.1442, i64 0, i64 0
   %t353 = ptrtoint i8* %t352 to i64
   %t354 = getelementptr [7 x i8], [7 x i8]* @.str.1443, i64 0, i64 0
   %t355 = ptrtoint i8* %t354 to i64

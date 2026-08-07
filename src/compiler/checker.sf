@@ -516,6 +516,13 @@ class NullChecker {
     // `enum` or `type` to compare a use site against. register_module_decl fills
     // all three tables for every kind through one path.
     var decl_visibility: Map<String, String>
+    // Every declared type-alias name (`type Name = T`), so the unknown-type pass
+    // (BUGS #177) accepts `var x: Name` as naming a real type. A `type` alias
+    // reaches register_decl as a VarDecl carrying doc "@type_alias" — it does not
+    // register in class_fields or enum_variants, so without this table the alias
+    // pass would flag every use of it as an unknown type. Keyed by the bare name
+    // and by the qualified name, like the identity tables.
+    var type_alias_names: Map<String, Bool>
     // The entry file's `import "..." as Alias` map, alias → the defining module's
     // prefix, as main.sf already computes it for codegen (resolved_aliases). It is
     // what turns §6a path 2 — an alias-qualified `Mod.name` — into the same
@@ -553,6 +560,7 @@ class NullChecker {
         this.extend_member_names = {}
         this.private_types = {}
         this.decl_visibility = {}
+        this.type_alias_names = {}
         this.entry_aliases = {}
     }
 
@@ -1350,6 +1358,12 @@ class NullChecker {
         // see only the module under check, not the imported declarations that
         // registration also walked.
         this.check_duplicate_decls(stmts)
+        // Sixth pass: every type annotation must name a real type (BUGS #177).
+        // After registration so a forward reference to a type declared later in
+        // the file resolves; over `stmts` (the module under check) only, because
+        // that is where an author's typo lives and imported declarations were
+        // registered precisely so their names resolve here.
+        this.check_unknown_types(stmts)
     }
 
     fun check_conformance() {
@@ -1690,6 +1704,11 @@ class NullChecker {
                 // miss every `private type`.
                 if (d == "@type_alias") {
                     this.register_type_visibility(n, v_vis)
+                    // Record the alias name so the unknown-type pass (BUGS #177)
+                    // accepts it as a real type. Both keys, like the identity
+                    // tables, so a cross-module alias reference resolves too.
+                    this.type_alias_names.set(n, true)
+                    this.type_alias_names.set(this.current_prefix + n, true)
                 }
                 // A top-level `var`/`let` (and a desugared `type` alias) is a
                 // module-level name a cross-module reference can bind to via
@@ -2118,6 +2137,231 @@ class NullChecker {
             }
             i = i + 1
         }
+    }
+
+    /// True when `name` names a type this compilation can resolve: a primitive or
+    /// builtin, a declared class/enum/interface, a declared type alias, or a type
+    /// parameter in `tparams`. This is the predicate the unknown-type pass (BUGS
+    /// #177) rejects the negation of.
+    ///
+    /// One-sided, like every other check in this file: it errs toward ACCEPTING,
+    /// because the checker type-checks the compiler's own source and a false
+    /// rejection breaks the bootstrap. So anything it cannot positively resolve as
+    /// wrong is let through —
+    ///   - a module-qualified name (`AST.Type`): the dot means it names a member
+    ///     of an imported module, whose declarations this checker registered under
+    ///     a prefix; resolving the exact one is Phase-5 work, so accept it.
+    ///   - the empty string: an omitted annotation has no name to check.
+    /// What it rejects is a bare, capitalized, singular name that is in none of the
+    /// registries and not a declared type parameter — which is exactly a typo like
+    /// `Bogus`.
+    fun is_known_type_name(name: String, tparams: List<String>): Bool {
+        if (name.length() == 0) { return true }
+        // Module-qualified (`Mod.Type`) — accept; cross-module resolution is not
+        // this pass's job and these are legitimate.
+        if (name.contains(".")) { return true }
+        // Primitives and builtins. `Number` is retired (#49) but str_to_type still
+        // accepts it, so accept it here too rather than newly breaking it. `Void`,
+        // `Self` and `Fun` are surface spellings that carry no user type name.
+        if (name == "Int" or name == "Float" or name == "Bool" or name == "String") { return true }
+        if (name == "Nil" or name == "Any" or name == "Void" or name == "Number") { return true }
+        if (name == "Self" or name == "StringBuilder") { return true }
+        // Any function-type fragment. type_to_source spells an arrow type
+        // "Fun(A,B):R" (its component types A/B/R are split out and validated on
+        // their own), and a receiver closure type stays the raw "Fun[Recv](...)"
+        // ClassType, which the lexical splitter cannot decompose — so a token that
+        // begins "Fun" or carries a `[` is a function-type spelling, not a user
+        // type name to resolve. Accept it rather than flag the encoding.
+        if (name.starts_with("Fun")) { return true }
+        if (name.contains("[") or name.contains("]")) { return true }
+        // Builtin container / value types that never register as user classes.
+        if (name == "List" or name == "Map" or name == "Set" or name == "Sendable") { return true }
+        // `Tuple` is the base the parser renders `(A, B)` to ("Tuple<A,B>"); `Task`
+        // is the builtin async handle Task.spawn returns. Neither is a declared
+        // class, so both must be named here or a legitimate use reads as a typo.
+        if (name == "Tuple" or name == "Task") { return true }
+        if (name == "Unknown" or name == "Never") { return true }
+        // A type parameter in scope (`T` in `fun f<T>` / `class C<T>`).
+        if (this.list_has_string(tparams, name)) { return true }
+        // A declared class, interface or actor (they all register in class_fields),
+        // by bare or qualified name.
+        if (this.env.class_fields.has(name)) { return true }
+        if (this.env.class_fields.has(this.current_prefix + name)) { return true }
+        // A declared enum.
+        if (this.env.enum_variants.has(name)) { return true }
+        if (this.env.enum_variants.has(this.current_prefix + name)) { return true }
+        // A declared type alias.
+        if (this.type_alias_names.has(name)) { return true }
+        if (this.type_alias_names.has(this.current_prefix + name)) { return true }
+        // A constructor / function name registered as a value (a class name is one).
+        if (this.env.funcs.has(name)) { return true }
+        if (this.env.funcs.has(this.current_prefix + name)) { return true }
+        return false
+    }
+
+    /// Report every unknown type name a spelling mentions (BUGS #177).
+    ///
+    /// Splits the spelling with mentioned_type_names — the same lexical splitter
+    /// the leak pass uses — so a type argument (`Map<String, Bogus>`) is validated
+    /// as thoroughly as the outer type, without a second `<>` parser (I10). Only
+    /// LOWER-case-insensitive: a name whose first character is not an uppercase
+    /// letter is not a type spelling this pass understands (it never happens from
+    /// the type parser, but guards against a stray token), so it is skipped rather
+    /// than flagged.
+    fun check_unknown_types_in(subject: String, spelling: String, tparams: List<String>) {
+        if (spelling.length() == 0) { return nil }
+        var names: List<String> = this.mentioned_type_names(spelling)
+        var i: Float = 0
+        while (i < names.length()) {
+            var nm: String = names[i]
+            if (nm.length() > 0) {
+                var first: String = nm.char_at(0)
+                // Only real type-name shapes: an uppercase-initial identifier.
+                // A lowercase fragment cannot be a type the parser produced, so
+                // skipping it avoids flagging punctuation or an artifact.
+                if (first >= "A" and first <= "Z") {
+                    if (!this.is_known_type_name(nm, tparams)) {
+                        this.error(subject + " names unknown type '" + nm + "'")
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    /// The unknown-type pass: every type annotation must name a real type (BUGS
+    /// #177). A sixth pass, after registration, for the SAME reason check_leaks is
+    /// its own pass — a forward reference to a type declared later in the file is
+    /// ordinary, and only a pass that runs after every declaration is registered
+    /// can tell a forward reference from a typo. Signatures and top-level `var`
+    /// annotations only; it does not descend into bodies (a local's annotation is
+    /// caught the same way when its enclosing decl is walked, via the fun/method
+    /// arms — but statement-level locals inside a body are left to the existing
+    /// inference path, which is a separate, larger surface).
+    fun check_unknown_types(stmts: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.check_unknown_types_in_decl(stmts[i], [])
+            i = i + 1
+        }
+    }
+
+    /// Walk one top-level (or nested) declaration for unknown type names.
+    /// `outer_tparams` are the type parameters in scope from an enclosing generic
+    /// class, so a method that uses the class's `T` is not flagged.
+    fun check_unknown_types_in_decl(stmt: AST.Stmt, outer_tparams: List<String>) {
+        match (stmt) {
+            FunDecl(name, params, ret_type, body, doc, f_vis, __ns, __fs) => {
+                // A function's own generic parameters, plus any inherited from an
+                // enclosing class, are all in scope for its signature. Read them
+                // from the FunDecl's OWN docstring rather than the env table: the
+                // env is keyed by bare function name and a generic METHOD's params
+                // do not register there, so `fun get_at<T>(): T` inside a class
+                // would otherwise flag `T` as unknown. The parser encodes them as
+                // a "@generic:T,U:Constraint\n" prefix; type_params_from_doc reads
+                // exactly that.
+                var tparams: List<String> = this.union_string_lists(outer_tparams,
+                    this.type_params_from_doc(doc))
+                this.check_fun_unknown_types("fun '" + name + "'", params, ret_type, tparams)
+            }
+            ClassDecl(name, type_params, parents, fields, methods, doc, c_vis, __ns, __fs, __intro) => {
+                var ctparams: List<String> = this.union_string_lists(outer_tparams, type_params)
+                // Fields.
+                var fi: Float = 0
+                while (fi < fields.length()) {
+                    var f_name: String = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+                    var f_type: AST.Type = match (fields[fi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
+                    this.check_unknown_types_in("field '" + name + "." + f_name + "'",
+                        AST.type_to_source(f_type), ctparams)
+                    fi = fi + 1
+                }
+                // Methods — each recurses with the class's params in scope so a
+                // method's own generics are unioned in by the FunDecl arm.
+                var mi: Float = 0
+                while (mi < methods.length()) {
+                    this.check_unknown_types_in_decl(methods[mi], ctparams)
+                    mi = mi + 1
+                }
+            }
+            VarDecl(n, t, i, d, v_vis, __ns, __fs) => {
+                // A `type Name = T` alias's target is a type spelling too; validate
+                // it, but with no type parameters in scope (aliases are not generic
+                // here). An ordinary top-level `var x: T` is validated the same way.
+                // An omitted annotation (UnknownType) renders empty and is skipped.
+                if (!this.is_unknown_type(t)) {
+                    var subject: String = "var '" + n + "'"
+                    if (d == "@type_alias") { subject = "type alias '" + n + "'" }
+                    this.check_unknown_types_in(subject, AST.type_to_source(t), outer_tparams)
+                }
+            }
+            // Enum variant payloads are deliberately NOT walked: the parser
+            // discards an enum's generic parameters (parse_enum_decl_vis skips the
+            // `<...>`), so a payload referencing `T`/`E` would have no way to be
+            // recognized as a type parameter and would be flagged as unknown. That
+            // is a parser gap to close before this pass can cover enum payloads;
+            // until then, skipping them is the one-sided-safe choice.
+            EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {}
+            ExprStmt(e) => {}
+            Return(v) => {}
+            If(c, t, e) => {}
+            While(c, b) => {}
+            Block(s) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(tb, cn, cb, fb) => {}
+            Throw(v) => {}
+            LetPattern(p, v) => {}
+            TypeAlias(ta_n, ta_t, ta_vis) => {
+                this.check_unknown_types_in("type alias '" + ta_n + "'", ta_t, outer_tparams)
+            }
+        }
+    }
+
+    /// A function or method's parameter and return type spellings.
+    fun check_fun_unknown_types(subject: String, params: List<AST.Param>, ret_type: AST.Type, tparams: List<String>) {
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p_name: String = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pn }
+            var p_type: AST.Type = match (params[pi]) { Param(pn, pt, pd, p_vis, __ns) => pt }
+            this.check_unknown_types_in(subject + " parameter '" + p_name + "'",
+                AST.type_to_source(p_type), tparams)
+            pi = pi + 1
+        }
+        if (!this.is_unknown_type(ret_type)) {
+            this.check_unknown_types_in(subject + " return type", AST.type_to_source(ret_type), tparams)
+        }
+    }
+
+    /// The generic type-parameter names a FunDecl's docstring encodes, or [].
+    /// The parser prefixes a generic `fun`/method's doc with "@generic:T,U:...\n"
+    /// (parse_fun_decl_vis); this reads that prefix the same way
+    /// extract_and_register_generics does, but returns the names directly rather
+    /// than storing them, because a generic method's params are not in the env
+    /// table (that is keyed by bare function name).
+    fun type_params_from_doc(doc: String): List<String> {
+        if (!doc.starts_with("@generic:")) { return [] }
+        var newline_pos: Float = doc.index_of("\n")
+        var generic_str: String = ""
+        if (newline_pos >= 0) {
+            generic_str = doc.slice(9, newline_pos)
+        } else {
+            generic_str = doc.slice(9, doc.length())
+        }
+        return this.parse_type_param_names(generic_str)
+    }
+
+    /// Union of two string lists (dedup left-to-right). Used to combine an
+    /// enclosing class's type parameters with a method's own.
+    fun union_string_lists(a: List<String>, b: List<String>): List<String> {
+        var out: List<String> = []
+        var i: Float = 0
+        while (i < a.length()) { out.push(a[i]); i = i + 1 }
+        var j: Float = 0
+        while (j < b.length()) {
+            if (!this.list_has_string(out, b[j])) { out.push(b[j]) }
+            j = j + 1
+        }
+        return out
     }
 
     /// The leak pass: a public declaration must not expose a private type in its

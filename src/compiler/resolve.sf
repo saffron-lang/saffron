@@ -169,7 +169,20 @@ class Resolver {
                 // Resolve the initializer BEFORE declaring the name, so
                 // `var x = x` sees the outer x rather than itself.
                 var new_init: AST.Expr = this.resolve_expr(init)
-                if (this.scopes.length() > 0) {
+                // A bare-init C-style `for (i = ...)` (doc "@for_reuse") REBINDS
+                // an existing variable rather than declaring a fresh one — the
+                // `var`-less spelling is an assignment, not a declaration
+                // (BUGS #176). If `i` names a module global with no enclosing
+                // local shadowing it, declaring a block-local here would make
+                // the loop's reads resolve to a `%i` alloca the init store never
+                // targets (it stores to `@__g_i`), which is invalid IR. So leave
+                // the global in scope: the reads resolve to it, matching the
+                // store. An enclosing local is a rebind too, but re-declaring it
+                // in this scope is harmless (same alloca), and a name that
+                // resolves to nothing still declares — so the standalone
+                // `for (i = 0; ...)` with no prior `i` keeps working.
+                var reuse_global: Bool = doc == "@for_reuse" and this.lookup_local(name).length() == 0 and this.globals.has(name)
+                if (this.scopes.length() > 0 and !reuse_global) {
                     this.declare(name, "local")
                 }
                 AST.Stmt.VarDecl(name, type_ann, new_init, doc, v_vis, __ns, __fs)
