@@ -1,0 +1,35 @@
+// BUGS #107 surface: a Bool payload field bound in a match arm was typed Int by
+// get_variant_field_type (it had an explicit `if (ftype == "Bool") return "Int"`),
+// so `match (OB(false)) { OB(v) => "${v}" }` formatted v through __int_to_string
+// and printed `0`/`1` instead of `false`/`true`. Same family as #182 (the
+// Int-fallback for generic-type-param fields). The value is a NaN-boxed bool in
+// both modes; typing the binding Bool routes it through __bool_to_string.
+import "@test" as Test
+
+enum OneBool { OB(v: Bool) }
+enum Mixed { M(flag: Bool, n: Int, name: String) }
+
+fun main() {
+    // The core regression: a bound Bool renders as false/true, and the bound
+    // value can be used AS a Bool (branch on it), not just printed.
+    var s_false = match (OneBool.OB(false)) { OB(v) => "${v}" }
+    Test.assert_eq(s_false, "false", "bound Bool false interpolates as false")
+
+    var s_true = match (OneBool.OB(true)) { OB(v) => "${v}" }
+    Test.assert_eq(s_true, "true", "bound Bool true interpolates as true")
+
+    // The binding is a usable Bool, not a masked int.
+    var used = match (OneBool.OB(true)) { OB(v) => if (v) { "yes" } else { "no" } }
+    Test.assert_eq(used, "yes", "bound Bool is usable in a condition")
+
+    var used_f = match (OneBool.OB(false)) { OB(v) => if (v) { "yes" } else { "no" } }
+    Test.assert_eq(used_f, "no", "bound false Bool takes the else branch")
+
+    // A Bool field alongside Int and String fields, to confirm the fix is
+    // per-field and does not disturb its neighbours.
+    var m = match (Mixed.M(true, 42, "hi")) { M(flag, n, name) => "${flag}/${n}/${name}" }
+    Test.assert_eq(m, "true/42/hi", "Bool field renders correctly beside Int and String fields")
+
+    Test.summary()
+}
+main()

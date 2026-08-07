@@ -616,9 +616,20 @@ fixed: closures allocate through `__gc_alloc(16, 4)` (GC tag 4, the tag `gc.ll`'
 value as `Any`, and `__any_to_string` prints `<function>` for tag 4 — so lists and
 maps recurse into it (`[<function>, <function>]`, `{f: <function>}`) for free.
 Regression test `test/pass/function_value_printing.sf` asserts the exact rendered
-strings across named refs, stored vars, capturing lambdas, lists and maps. This
-entry stays open: the broader hygiene problem (positive tests asserting nothing)
-is what let this hide, and the tail of assertion-free tests remains.
+strings across named refs, stored vars, capturing lambdas, lists and maps.
+
+**2026-08-07 — a second find from the same surface.** `test/oracle_stringify.sf`
+(no assertions) printed `matched OB 0` for `match (OneBool.OB(false)) { OB(v) =>
+"matched OB ${v}" }` — a `Bool` payload bound in a match arm formatted through
+`__int_to_string` and rendered `0`/`1` instead of `false`/`true`. Root cause:
+`get_variant_field_type` had an explicit `if (ftype == "Bool") return "Int"`, the
+same Int-collapse family as #182 (generic-type-param fields). Now returns `"Bool"`
+so the binding routes through `__bool_to_string`; the value is a NaN-boxed bool in
+both modes. Regression test `test/pass/match_binding_bool.sf` (bound Bool renders
+false/true, is usable in a condition, and formats correctly beside Int/String
+fields). This entry stays open: the broader hygiene problem (positive tests
+asserting nothing) is what let both hide, and the tail of assertion-free tests
+remains.
 
 ---
 
