@@ -438,3 +438,67 @@ fun type_to_source(t: Type): String {
         NeverType => "Never"
     }
 }
+
+/// Split a type string on TOP-LEVEL commas, respecting `<>`/`()`/`[]` nesting,
+/// so `Map<String,Int>,Bool` splits into two args but the comma inside
+/// `Map<String,Int>` does not. The one home for this: parser, checker and
+/// codegen all import `ast.sf` and each used to carry its own copy (which had
+/// drifted on which bracket kinds count toward depth). This is the widest,
+/// safe form — a comma inside ANY bracket kind is protected.
+fun split_type_args(s: String): List<String> {
+    var args: List<String> = []
+    var current: String = ""
+    var depth: Float = 0
+    var i: Float = 0
+    while (i < s.length()) {
+        var ch: String = s.char_at(i)
+        if (ch == "<" or ch == "(" or ch == "[") {
+            depth = depth + 1
+            current = current + ch
+        } else if (ch == ">" or ch == ")" or ch == "]") {
+            depth = depth - 1
+            current = current + ch
+        } else if (ch == "," and depth == 0) {
+            args.push(current)
+            current = ""
+        } else {
+            current = current + ch
+        }
+        i = i + 1
+    }
+    if (current.length() > 0) {
+        args.push(current)
+    }
+    return args
+}
+
+/// Split a type string on a TOP-LEVEL `|`, respecting `<>`/`()`/`[]` nesting, so
+/// `Int|String` splits but the `|` inside `List<Int|String>` does not. Callers
+/// treat a result of length 1 as "not a union". Consolidated here for the same
+/// reason as split_type_args: three drifted copies, one shared home.
+fun split_type_union(s: String): List<String> {
+    var parts: List<String> = []
+    var current: String = ""
+    var depth: Float = 0
+    var i: Float = 0
+    while (i < s.length()) {
+        var ch: String = s.char_at(i)
+        if (ch == "<" or ch == "(" or ch == "[") {
+            depth = depth + 1
+            current = current + ch
+        } else if (ch == ">" or ch == ")" or ch == "]") {
+            depth = depth - 1
+            current = current + ch
+        } else if (ch == "|" and depth == 0) {
+            parts.push(current)
+            current = ""
+        } else {
+            current = current + ch
+        }
+        i = i + 1
+    }
+    if (current.length() > 0) {
+        parts.push(current)
+    }
+    return parts
+}

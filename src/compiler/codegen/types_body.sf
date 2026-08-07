@@ -67,7 +67,7 @@
         if (s == "Any") return AST.Type.AnyType
         // Union types: check for "|" at top level (not inside <> or ())
         if (s.contains("|")) {
-            var union_parts: List<String> = this.split_type_union(s)
+            var union_parts: List<String> = AST.split_type_union(s)
             if (union_parts.length() > 1) {
                 var types: List<AST.Type> = []
                 var ui: Float = 0
@@ -192,59 +192,9 @@
         return sb.to_string()
     }
 
-    fun split_type_union(s: String): List<String> {
-        var result: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "|" and depth == 0) {
-                result.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            result.push(current)
-        }
-        return result
-    }
-
-    fun split_type_args(s: String): List<String> {
-        var result: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "," and depth == 0) {
-                result.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            result.push(current)
-        }
-        return result
-    }
+    // split_type_union / split_type_args now live in ast.sf (AST.*), shared by
+    // parser, checker and codegen. Codegen's old copies tracked `<>`/`()` depth;
+    // the shared form adds `[]`, a safe widening.
 
     fun generic_type_string(base: String, args: List<AST.Type>): String {
         if (args.length() > 1) {
@@ -752,7 +702,7 @@
         if (!this.class_type_params.has(base_name)) { return typ }
         var params: List<String> = this.class_type_params.get(base_name)
         if (params.length() == 0) { return typ }
-        var recv_args: List<String> = this.split_type_args(this.strip_generic_brackets(recv_type))
+        var recv_args: List<String> = AST.split_type_args(this.strip_generic_brackets(recv_type))
         // Whole-type match: `fun unwrap(): T`.
         var pi: Float = 0
         while (pi < params.length()) {
@@ -769,7 +719,7 @@
         if (typ.contains("<")) {
             var lt: Float = typ.index_of("<")
             var tbase: String = typ.slice(0, lt)
-            var parts: List<String> = this.split_type_args(this.strip_generic_brackets(typ))
+            var parts: List<String> = AST.split_type_args(this.strip_generic_brackets(typ))
             var out: List<String> = []
             var i: Float = 0
             while (i < parts.length()) {
@@ -816,7 +766,7 @@
         // into "List<Int" + "Nil>" and then drop neither Nil while corrupting the
         // generic — split_type_union keeps a nested `|` intact so only a
         // top-level Nil is stripped.
-        var parts: List<String> = this.split_type_union(typ)
+        var parts: List<String> = AST.split_type_union(typ)
         var kept: List<String> = []
         var i: Float = 0
         while (i < parts.length()) {
