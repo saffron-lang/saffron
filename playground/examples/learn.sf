@@ -1,0 +1,670 @@
+//! Learn Saffron in Y minutes
+// Saffron is a small statically typed scripting language. It compiles through
+// LLVM to a native binary or a wasm32 module. Everything below is the whole
+// language — it fits in one file on purpose.
+
+// Single-line comments start with two slashes.
+
+/* Block comments
+   span multiple lines. */
+
+// Statements end at the newline. Semicolons are optional, and mostly
+// used to squeeze several statements onto one line.
+
+////////////////////////////////////////////////
+// 1. Values and variables
+////////////////////////////////////////////////
+
+// `var` declares a mutable binding, `let` an immutable one.
+var counter = 0
+let language = "Saffron"
+
+// Type annotations go after a colon. They're optional when the type is
+// obvious from the initializer.
+var pi: Float = 3.14159
+var greeting = "hello"      // inferred as String
+var ready = true            // inferred as Bool
+var nothing: Int|Nil = nil  // Nil (annotate a nil so it gets a checked type)
+
+// The primitive types are Int, Float, String, Bool, and Nil. Int and Float
+// are kept distinct — an Int annotation will not accept a float literal.
+var tick: Int = 42
+var ratio: Float = 0.5
+
+// Types are checked at compile time. This would not compile:
+// var oops: Int = "hello"   // Error: expected Int, got String
+
+////////////////////////////////////////////////
+// 2. Operators
+////////////////////////////////////////////////
+
+IO.println(1 + 1)        // 2
+IO.println(10 - 3)       // 7
+IO.println(6 * 7)        // 42
+IO.println(10 / 4)       // 2 — integer division when both sides are Ints
+IO.println(7 % 3)        // 1
+
+// Comparisons produce Bool.
+IO.println(1 < 2)        // true
+IO.println(3 != 3)       // false
+
+// The logical operators are words, not symbols.
+IO.println(true and false)   // false
+IO.println(true or false)    // true
+IO.println(!true)            // false
+
+// Bitwise operators work on Ints. Hex literals use the 0x prefix.
+IO.println(0xF0 & 0x0F)  // 0
+IO.println(0xF0 | 0x0F)  // 255
+IO.println(0xFF ^ 0x0F)  // 240
+IO.println(1 << 4)       // 16
+IO.println(16 >> 2)      // 4
+IO.println(~0)           // -1
+
+// `is` tests a value's type at runtime. Types are first-class values.
+IO.println(42 is Int)      // true
+IO.println("hi" is String) // true
+IO.println(nil is Nil)     // true
+
+// Numbers and Bools have methods. Parenthesize a literal to call one.
+IO.println((-5).abs())     // 5
+IO.println((3.7).floor())  // 3
+IO.println((3.2).ceil())   // 4
+IO.println(true.to_string())  // "true"
+
+////////////////////////////////////////////////
+// 3. Strings
+////////////////////////////////////////////////
+
+// Interpolation uses ${}, and any expression fits inside it.
+IO.println("Welcome to ${language}!")
+IO.println("2 + 2 = ${2 + 2}")
+
+var text = "hello world"
+IO.println(text.length())          // 11
+IO.println(text.to_upper())        // HELLO WORLD
+IO.println(text.slice(0, 5))       // hello
+IO.println(text.contains("wor"))   // true
+IO.println(text.starts_with("he")) // true
+IO.println(text.index_of("world")) // 6
+IO.println(text.replace("l", "L")) // heLLo worLd
+IO.println("  padded  ".trim())    // padded
+IO.println("ha".repeat(3))         // hahaha
+IO.println("42".to_number())       // 42
+
+// split() gives you a List<String>; join() puts one back together.
+var words = text.split(" ")
+IO.println(words[0])               // hello
+IO.println(words.join(" + "))      // hello + world
+
+////////////////////////////////////////////////
+// 4. Control flow
+////////////////////////////////////////////////
+
+var n = 10
+
+if (n > 5) {
+    IO.println("big")
+} else if (n > 0) {
+    IO.println("small")
+} else {
+    IO.println("nonpositive")
+}
+
+// While loop.
+var i = 0
+while (i < 3) {
+    IO.println("while ${i}")
+    i = i + 1
+}
+
+// C-style for loop.
+for (var j = 0; j < 3; j = j + 1) {
+    IO.println("for ${j}")
+}
+
+// for-in is index-based: it desugars to length() + [i], so it walks Lists
+// and Strings. There is no iterator protocol, so a custom type is a compile
+// error and a Map segfaults. `break` and `continue` behave as you'd expect.
+for (x in [1, 2, 3, 4, 5]) {
+    if (x == 3) continue
+    if (x == 5) break
+    IO.println("item ${x}")   // 1, 2, 4
+}
+
+// Strings iterate by character.
+for (ch in "abc") {
+    IO.println(ch)
+}
+
+////////////////////////////////////////////////
+// 5. Lists and maps
+////////////////////////////////////////////////
+
+var nums = [1, 2, 3]
+nums.push(4)
+IO.println(nums.length())   // 4
+IO.println(nums[0])         // 1
+IO.println(nums[-1])        // 4 — negative indices count from the end
+IO.println(nums.pop())      // 4
+nums.reverse()
+nums.sort()
+var copy = nums.copy()
+
+// Maps are written with braces. Keys and values are both typed.
+var ages: Map<String, Int> = {"ada": 36, "alan": 41}
+ages.set("grace", 45)
+IO.println(ages.get("ada"))   // 36
+IO.println(ages.has("alan"))  // true
+IO.println(ages.keys())       // ["ada", "alan", "grace"]
+IO.println(ages.values())     // [36, 41, 45]
+
+// `for (entry in ages)` segfaults — for-in is index-based and a Map has no
+// integer indexing. keys() and values() are consistently ordered, so pair them
+// up by index instead.
+var who: List<String> = ages.keys()
+var how_old: List<Int> = ages.values()
+for (i = 0; i < who.length(); i = i + 1) {
+    IO.println("${who[i]} is ${how_old[i]}")
+}
+
+////////////////////////////////////////////////
+// 6. Functions
+////////////////////////////////////////////////
+
+// Annotate the parameters and the return type.
+fun add(a: Float, b: Float): Float {
+    return a + b
+}
+IO.println(add(2, 3))   // 5
+
+// The return type may be omitted, and is inferred from the body.
+fun triple(x: Float) {
+    return x * 3
+}
+IO.println(triple(5))   // 15
+
+// Lambdas use `fun` with `=>` for a single-expression body.
+var double = fun (x: Float): Float => x * 2
+IO.println(double(21))  // 42
+
+// Or a block body, when you need statements.
+var shout = fun (s: String): String {
+    return s.to_upper() + "!"
+}
+IO.println(shout("hey"))  // HEY!
+
+// Functions are values. Function types are written (A, B) => C.
+fun apply(f: (Float) => Float, x: Float): Float {
+    return f(x)
+}
+IO.println(apply(double, 5))  // 10
+
+// Closures capture their enclosing scope by reference.
+fun make_counter(): () => Float {
+    var count = 0
+    return fun (): Float {
+        count = count + 1
+        return count
+    }
+}
+var next = make_counter()
+IO.println(next())  // 1
+IO.println(next())  // 2
+
+// Functions can be generic over types.
+fun identity<T>(value: T): T {
+    return value
+}
+IO.println(identity("generic"))  // generic
+
+// A `*` parameter is variadic: it collects the remaining arguments into a List.
+// It must be last, and fixed parameters may come before it.
+fun sum(*nums: Int): Int {
+    var total = 0
+    for (n in nums) { total = total + n }
+    return total
+}
+IO.println(sum(1, 2, 3))   // 6
+IO.println(sum())          // 0
+
+fun greet(greeting: String, *names: String): String {
+    var out = greeting
+    for (name in names) { out = out + " " + name }
+    return out
+}
+IO.println(greet("Hi", "Ada", "Alan"))  // Hi Ada Alan
+
+// Functions can be overloaded: several definitions may share a name, resolved by
+// the number and types of the arguments at the call site.
+fun area(side: Int): Int { return side * side }
+fun area(w: Int, h: Int): Int { return w * h }
+IO.println(area(4))     // 16  (one-argument overload)
+IO.println(area(3, 5))  // 15  (two-argument overload)
+
+// Same arity, different argument types also resolve when the overloads differ
+// by more than two scalar types apart (an all-scalar set is still limited):
+fun describe(n: Int): String { return "the number " + n.to_string() }
+fun describe(items: List<Any>): String { return items.length().to_string() + " items" }
+IO.println(describe(7))          // the number 7
+IO.println(describe([1, 2, 3]))  // 3 items
+
+// A closure in the last argument position can go outside the parens.
+fun each(items: List<String>, f: (String) => Nil) {
+    for (item in items) { f(item) }
+}
+each(["trailing", "closure"]) { item =>
+    IO.println(item)
+}
+
+// If the closure takes no parameters, drop the `=>` too.
+//     spawn { IO.println("hello") }
+
+////////////////////////////////////////////////
+// 7. Destructuring
+////////////////////////////////////////////////
+
+let [a, b, c] = [1, 2, 3]
+IO.println(b)   // 2
+
+// A splat captures the middle.
+let [head, *middle, tail] = [1, 2, 3, 4, 5]
+IO.println(head)     // 1
+IO.println(middle)   // [2, 3, 4]
+IO.println(tail)     // 5
+
+// Tuples are fixed-size and heterogeneous. Fields are ._0, ._1, ...
+var pair = (1, "two")
+IO.println(pair._0)   // 1
+IO.println(pair._1)   // two
+
+////////////////////////////////////////////////
+// 8. Enums and pattern matching
+////////////////////////////////////////////////
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+// Variants can carry named, typed fields, and enums can be generic.
+enum Option<T> {
+    Some(value: T),
+    None
+}
+
+var heading = Direction.North
+
+// `match` is an expression. The compiler checks exhaustiveness, so
+// leaving out a variant is a compile error, not a silent fallthrough.
+var label = match (heading) {
+    North => "north",
+    South => "south",
+    East => "east",
+    West => "west"
+}
+IO.println(label)   // north
+
+// Matching a variant binds its fields.
+var maybe: Option<Float> = Option.Some(42)
+IO.println(match (maybe) {
+    Some(v) => "got ${v}",
+    None => "got nothing"
+})
+
+// Outside of `match`, `let` destructures a variant you know you have.
+let Some(unwrapped) = Option.Some(7)
+IO.println(unwrapped)   // 7
+
+// Recursive enums plus match give you tree walkers almost for free.
+enum Expr {
+    Num(value: Float),
+    Add(left: Expr, right: Expr),
+    Mul(left: Expr, right: Expr)
+}
+
+fun eval(e: Expr): Float {
+    return match (e) {
+        Num(v) => v,
+        Add(l, r) => eval(l) + eval(r),
+        Mul(l, r) => eval(l) * eval(r)
+    }
+}
+
+// 1 + (2 * 3)
+var tree = Expr.Add(Expr.Num(1), Expr.Mul(Expr.Num(2), Expr.Num(3)))
+IO.println(eval(tree))   // 7
+
+////////////////////////////////////////////////
+// 9. Classes
+////////////////////////////////////////////////
+
+class Point {
+    var x: Float
+    var y: Float
+
+    // `init` is the constructor. Fields are assigned through `this`.
+    fun init(x: Float, y: Float) {
+        this.x = x
+        this.y = y
+    }
+
+    fun to_string(): String {
+        return "(${this.x}, ${this.y})"
+    }
+}
+
+// Instantiate by calling the class. There is no `new`.
+var origin = Point(0, 0)
+IO.println(origin.to_string())   // (0, 0)
+
+// `extends` inherits fields and methods; a subclass overrides by
+// redeclaring a method, and reaches the parent version via `super`.
+class Animal {
+    var name: String
+    fun init(name: String) { this.name = name }
+    fun speak(): String { return "..." }
+}
+
+class Dog extends Animal {
+    fun speak(): String { return "Woof!" }
+}
+
+class LoudDog extends Dog {
+    fun speak(): String { return super.speak() + "!!" }
+}
+
+var rex = LoudDog("Rex")
+IO.println("${rex.name} says ${rex.speak()}")   // Rex says Woof!!!
+
+// Classes can be generic.
+class Box<T> {
+    var value: T
+    fun init(value: T) { this.value = value }
+    fun get(): T { return this.value }
+}
+IO.println(Box("boxed").get())   // boxed
+
+// Defining add/sub/mul/div/mod/lt/gt/eq overloads the matching operator,
+// so `a + b` calls a.add(b).
+class Vec2 {
+    var x: Float
+    var y: Float
+    fun init(x: Float, y: Float) { this.x = x; this.y = y }
+    fun add(other: Vec2): Vec2 { return Vec2(this.x + other.x, this.y + other.y) }
+    fun eq(other: Vec2): Bool { return this.x == other.x and this.y == other.y }
+    fun to_string(): String { return "<${this.x}, ${this.y}>" }
+}
+IO.println((Vec2(1, 2) + Vec2(3, 4)).to_string())   // <4, 6>
+
+// Members are PUBLIC by default. `private` restricts a field or method to the
+// class itself; `protected` also allows subclasses; `internal` allows the whole
+// module but not other modules. Reaching a private member from outside is a
+// compile error, not a runtime one.
+class Account {
+    private var balance: Int          // only Account's own methods may touch it
+    fun init(b: Int) { this.balance = b }
+    fun deposit(n: Int) { this.balance = this.balance + n }
+    fun total(): Int { return this.balance }
+}
+var acc = Account(100)
+acc.deposit(50)
+IO.println(acc.total())   // 150
+// acc.balance would not compile: "private field 'Account.balance' is not
+// accessible from outside the class".
+
+// The same modifiers apply to top-level declarations, controlling what a module
+// exports: a `private fun` or `private var` is visible only within its own file.
+//     private fun helper(): Int { return 42 }
+
+////////////////////////////////////////////////
+// 10. Interfaces
+////////////////////////////////////////////////
+
+// An interface declares methods implementors must provide. Methods with
+// a body are defaults, and are inherited as-is.
+interface Drawable {
+    fun draw(): String              // abstract — must be implemented
+    fun describe(): String {        // default — inherited
+        return "a shape drawn as " + this.draw()
+    }
+}
+
+// Conformance uses the same `extends` keyword. Multiple interfaces are
+// comma-separated: class Duck extends Flyable, Swimmable { ... }
+class Circle extends Drawable {
+    fun init() {}
+    fun draw(): String { return "O" }
+}
+
+class Square extends Drawable {
+    fun init() {}
+    fun draw(): String { return "[]" }
+}
+
+IO.println(Circle().describe())   // a shape drawn as O
+
+// An `is` pattern in a match dispatches on the runtime class.
+fun name_of(shape: Drawable): String {
+    return match (shape) {
+        is Circle(c) => "circle",
+        is Square(s) => "square"
+    }
+}
+IO.println(name_of(Square()))   // square
+
+////////////////////////////////////////////////
+// 11. Custom sequences
+////////////////////////////////////////////////
+
+// There is no iterator protocol yet. `for-in` desugars to length() + [i], so
+// it walks Lists and Strings only: a custom type is a compile error, and a Map
+// segfaults. Expose a List and iterate that.
+class Countdown {
+    var from: Int
+    fun init(from: Int) { this.from = from }
+    fun to_list(): List<Int> {
+        var out: List<Int> = []
+        var i: Int = this.from
+        while (i > 0) {
+            out.push(i)
+            i = i - 1
+        }
+        return out
+    }
+}
+
+for (t in Countdown(3).to_list()) {
+    IO.println(t)   // 3, 2, 1
+}
+
+////////////////////////////////////////////////
+// 12. Error handling
+////////////////////////////////////////////////
+
+// Any value can be thrown — a String, an Int, an object.
+try {
+    throw "something broke"
+} catch (e) {
+    IO.println("caught: ${e}")
+} finally {
+    IO.println("finally always runs")
+}
+
+// Runtime errors are NOT catchable -- they are fatal. An out-of-bounds index,
+// a division by zero, or a null-pointer error prints to stderr and exits 1
+// without running any catch or finally block. So guard instead of recovering:
+var short = [1, 2, 3]
+var want: Int = 99
+if (want >= 0 and want < short.length()) {
+    IO.println(short[want])
+} else {
+    IO.println("index ${want} out of range")
+}
+
+// For failures you expect, prefer a Result enum over exceptions. This
+// puts the failure in the type, so callers can't quietly ignore it.
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+
+fun safe_divide(a: Float, b: Float): Result<Float, String> {
+    if (b == 0) {
+        return Result.Err("division by zero")
+    }
+    return Result.Ok(a / b)
+}
+
+IO.println(match (safe_divide(10, 2)) {
+    Ok(v) => "= ${v}",
+    Err(msg) => "error: ${msg}"
+})                                     // = 5
+
+IO.println(match (safe_divide(1, 0)) {
+    Ok(v) => "= ${v}",
+    Err(msg) => "error: ${msg}"
+})                                     // error: division by zero
+
+////////////////////////////////////////////////
+// 13. Modules
+////////////////////////////////////////////////
+
+// The @ prefix imports a stdlib module. Aliases are conventionally
+// PascalCase; single-letter aliases are discouraged.
+import "@math" as Math
+import "@iter" as Iter
+
+IO.println(Math.sqrt(16.0))   // 4
+IO.println(Math.pi)           // 3.14159
+
+// Import specific names instead of the whole namespace:
+import { map, filter, reduce } from "@iter"
+
+// ...or import a file relative to this one:
+//     import "./geometry.sf" as Geometry
+
+// Any .sf file is a module. Its top-level fun/class/enum/var are
+// exported. The stdlib ships @iter, @json, @toml, @csv, @time, @os,
+// @path, @fmt, @random, @uuid, @test, @regex, @http/client,
+// @http/server, @socket, @async, @sync, @supervisor, and plenty more.
+
+////////////////////////////////////////////////
+// 14. Iterator utilities
+////////////////////////////////////////////////
+
+var values = [1, 2, 3, 4, 5]
+
+IO.println(Iter.map(values, fun (x: Float): Float => x * 2))
+IO.println(Iter.filter(values, fun (x: Float): Bool => x % 2 == 0))
+IO.println(Iter.reduce(values, fun (acc: Float, x: Float): Float => acc + x, 0))
+IO.println(Iter.sum(values))
+
+// Also: any, all, each, count, find, flat_map, zip, enumerate, take, skip.
+
+// Every one of these takes any iterable, so they compose by nesting.
+IO.println(Iter.map(
+    Iter.filter(values, fun (x: Float): Bool => x > 2),
+    fun (x: Float): Float => x * x
+))                   // [9, 16, 25]
+
+// Naming the steps usually reads better than deep nesting.
+var big = Iter.filter(values, fun (x: Float): Bool => x > 2)
+var squares = Iter.map(big, fun (x: Float): Float => x * x)
+IO.println(squares)  // [9, 16, 25]
+
+////////////////////////////////////////////////
+// 15. Async and tasks
+////////////////////////////////////////////////
+
+import "@async" as Async
+
+// Tasks are lightweight and cooperatively scheduled on one thread.
+fun fetch(label: String, delay: Float): String {
+    Async.sleep(delay)   // yields control to the scheduler
+    return "${label} done"
+}
+
+var t1 = Task.spawn(fun () => fetch("users", 0.1))
+var t2 = Task.spawn(fun () => fetch("posts", 0.1))
+
+// Both sleep concurrently, so this takes about 0.1s, not 0.2s.
+IO.println(t1.await())
+IO.println(t2.await())
+
+// `yield` hands control over without sleeping — useful for keeping a long
+// computation from starving the scheduler.
+fun long_computation(): Float {
+    var sum = 0
+    for (var k = 0; k < 1000000; k = k + 1) {
+        sum = sum + k
+        if (k % 10000 == 0) yield
+    }
+    return sum
+}
+
+// Scheduling is cooperative, not preemptive. Tasks switch only at
+// `yield`, `Async.sleep()`, and `.await()` — so between yield points you
+// have exclusive access to all state, and no data races are possible.
+
+////////////////////////////////////////////////
+// 16. Actors
+////////////////////////////////////////////////
+
+// An actor is a class with serialized access: only one method body runs
+// at a time per instance, so its state cannot be raced. It's the tool for
+// mutable state that outlives a single task.
+actor BankAccount {
+    var balance: Int
+
+    fun init(amount: Int) { this.balance = amount }
+
+    fun deposit(n: Int) { this.balance = this.balance + n }
+
+    fun get_balance(): Int { return this.balance }
+
+    // Calls on `this` run synchronously and never deadlock.
+    fun deposit_twice(n: Int) {
+        this.deposit(n)
+        this.deposit(n)
+    }
+}
+
+var account = BankAccount(100)
+
+// Concurrent callers are serialized automatically. If the actor is busy,
+// the caller suspends and retries when it goes idle.
+var w1 = Task.spawn(fun () => account.deposit(50))
+var w2 = Task.spawn(fun () => account.deposit_twice(15))
+w1.await()
+w2.await()
+
+IO.println(account.get_balance())   // always 180, whatever the interleaving
+
+// `.send(method, args)` enqueues a message without waiting for a reply —
+// handy for logging, metrics, and other fire-and-forget work.
+actor Logger {
+    var entries: List<String>
+    fun init() { this.entries = [] }
+    fun log(msg: String) { this.entries.push(msg) }
+}
+
+var logger = Logger()
+logger.send("log", "request started")    // returns immediately
+logger.send("log", "request finished")   // doesn't wait for the first
+
+// Actor method parameters must be Sendable — safe to hand across a task
+// boundary. Int, Float, Bool, String, Nil, enums, and other actors are.
+// Mutable containers (List, Map) and closures are not, and the compiler
+// warns when one crosses an actor boundary. Opt a class in explicitly:
+class Money extends Sendable {
+    var cents: Int
+    fun init(cents: Int) { this.cents = cents }
+}
+
+// On WASM targets actors compile down to ordinary synchronous classes,
+// since the browser is single-threaded and contention can't happen.
+
+IO.println("Done!")
