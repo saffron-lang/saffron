@@ -3334,14 +3334,19 @@ class Codegen {
                 pi = pi + 1
             }
 
-            // Call the real function
-            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
-            wrap_ir = wrap_ir + "  ret i64 %r\n}\n"
+            // Call the real function. BUGS #186: match the callee's real return
+            // type — a coroutine target is `ptr`-returning (presplitcoroutine), so a
+            // `call i64` against it is a signature mismatch that traps on wasm32.
+            var cap_is_coro: Bool = this.str_in_list(this.coroutine_funcs, fn_name)
+            var cap_ret_ty: String = "i64"
+            if (cap_is_coro) { cap_ret_ty = "ptr" }
+            wrap_ir = wrap_ir + "  %r = call " + cap_ret_ty + " @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
+            wrap_ir = wrap_ir + "  ret " + cap_ret_ty + " %r\n}\n"
             this.globals.push(wrap_ir)
 
             // Build closure pair [trampoline_fn_ptr, env_ptr]
             var num_total_params: Float = nparams + 1
-            var fn_type_str: String = "i64 ("
+            var fn_type_str: String = cap_ret_ty + " ("
             var tti: Float = 0
             while (tti < num_total_params) {
                 if (tti > 0) { fn_type_str = fn_type_str + ", " }
@@ -3388,18 +3393,33 @@ class Codegen {
         if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
             wrap_linkage = "define"
         }
-        var wrap_ir: String = "\n" + wrap_linkage + " i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+        // BUGS #186: a coroutine is emitted `define ptr @f(...) presplitcoroutine`
+        // and returns a *frame handle*, not an i64 value. The trampoline is only a
+        // signature adapter (drop the env arg, forward the rest), so it MUST match
+        // the callee's real return type: for a coroutine target that is `ptr`, not
+        // `i64`. A `call i64 @f()` against a `ptr`-returning presplitcoroutine is a
+        // signature mismatch that traps on wasm32's typed call_indirect table (and
+        // silently reads the handle as a value on native). Emitting `ptr` here — and
+        // storing a `ptr`-returning fn_type_str below — makes `Task.spawn(worker)`
+        // lower to the same shape as the working `Task.spawn(fun () => worker())`
+        // (whose lambda is forced into a `ptr`-returning coroutine): the spawn
+        // handler calls the closure fn ptr as `call ptr fn_ptr(i64 env)` and drives
+        // the returned frame through the scheduler.
+        var ref_is_coro: Bool = this.str_in_list(this.coroutine_funcs, fn_name)
+        var wrap_ret_ty: String = "i64"
+        if (ref_is_coro) { wrap_ret_ty = "ptr" }
+        var wrap_ir: String = "\n" + wrap_linkage + " " + wrap_ret_ty + " @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
         if (nparams == 0) {
-            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "()\n"
+            wrap_ir = wrap_ir + "  %r = call " + wrap_ret_ty + " @" + fn_name + "()\n"
         } else {
-            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
+            wrap_ir = wrap_ir + "  %r = call " + wrap_ret_ty + " @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
         }
-        wrap_ir = wrap_ir + "  ret i64 %r\n}\n"
+        wrap_ir = wrap_ir + "  ret " + wrap_ret_ty + " %r\n}\n"
         this.globals.push(wrap_ir)
 
         // Build closure pair [trampoline_fn_ptr, 0] on the heap
         var num_total_params: Float = nparams + 1
-        var fn_type_str: String = "i64 ("
+        var fn_type_str: String = wrap_ret_ty + " ("
         var tti: Float = 0
         while (tti < num_total_params) {
             if (tti > 0) { fn_type_str = fn_type_str + ", " }
