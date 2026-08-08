@@ -2,8 +2,65 @@
 
 ## Open
 
-**4 open entries:** #65, #107, #131, #132.
-Next free number is **#187**.
+**7 open entries:** #65, #107, #131, #132, #187, #188, #189.
+Next free number is **#190**.
+
+### 187. Reflect.type_name returns a subnormal double instead of the class name
+
+`Reflect.type_name(instance)` returns garbage — a subnormal double like
+`2.15576e-314` — instead of the class name string. Minimal repro:
+
+```saffron
+import "@reflect" as Reflect
+class Point { var x: Int; var y: Int; fun init(x: Int, y: Int) { this.x=x; this.y=y } }
+var p: Point = Point(10, 20)
+IO.println(Reflect.type_name(p))   // prints 2.15576e-314, expected "Point"
+```
+
+Root cause: `__reflect_class_name` in `src/compiler/codegen/stmts_body.sf`
+returns the class-name string pointer through `this.ptr_to_val(gep)` — a bare
+`ptrtoint` (`codegen.sf`) — at both the matched-class arm (line ~2337) and the
+`"Unknown"` fallback (line ~2345), instead of `this.emit_tag_ptr(gep)`. The
+returned i64 is therefore an untagged pointer, which `__any_to_string` reads as
+a denormal double. This is the exact #115/#154/#105 family — a value with no
+NaN-box tag reaching a formatter. The sibling helper `__reflect_fields` in the
+same file already uses `emit_tag_ptr` for its key strings (line ~2419, with a
+comment at ~2513 explaining precisely this hazard), so the fix is to switch the
+two `ptr_to_val` calls to `emit_tag_ptr`. Compiler change → needs a rebootstrap
+and gen2 promotion. Visible-but-unfrozen in `test/test_reflect.sf`.
+
+### 188. Reflect.module_doc() always returns nil
+
+A file's leading `//!` module-doc comments are parsed but never reach codegen,
+so `Reflect.module_doc()` always returns nil. The per-declaration `///`
+docstrings (`Reflect.doc(fn)`) work fine; only the module-level path is dead.
+Repro:
+
+```saffron
+//! Line one.
+//! Line two.
+import "reflect" as Reflect
+IO.println(Reflect.module_doc())   // prints nil, expected the //! text
+```
+
+Root cause: `parser.sf` (`parse_program`, ~line 1943) calls
+`collect_module_doc()` into a local `module_doc` that is never propagated
+anywhere. `codegen.sf`'s `module_doc_text` field (declared ~line 102) is only
+ever assigned `""` (~line 249), so `__reflect_module_doc` in
+`codegen/stmts_body.sf` (~line 2578) always takes its empty→nil branch. Fix is
+to thread the collected module-doc string from the parsed program into
+`Codegen.module_doc_text`. Compiler change → rebootstrap. Visible-but-unfrozen
+in `test/docstrings.sf`.
+
+### 189. json.sf diverges native-vs-wasm32 (exit 4 on wasm32, 0 native)
+
+`tools/differential.sh --record test/json.sf` refuses to record because the
+native and wasm32 configurations disagree on exit status: `exit 0 (native-O2)
+vs 4 (wasm32)`. Native output (O0 == O2) is verified correct and is frozen as
+`test/json.expected`; the wasm32 exit-4 is a separate wasm-backend fault in the
+JSON/reflect path — likely the same pointer-tagging / pointer-width family as
+the other wasm32-only traps (#184/#186), but not yet root-caused. Needs a wasm32
+run under a debugger to localize the trapping op.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
 `var fn = worker; Task.spawn(fn)` — traps `null function or function signature
@@ -581,6 +638,21 @@ via *interpolation* (which inserts `.to_string()` and is correct), leaving every
 depths moved the reported value 18 → 24. The depth is frame-layout dependent, so
 freezing it would flag unrelated codegen as a regression. Their *invariants* are
 asserted instead — depths equal across rounds, each frame above its spawner.
+
+**2026-08-07 — fourth pass over the remaining blind tail.** Backfilled the last
+deterministic feature tests (`d0a7810`): assertions on `functions`, `async`,
+`docstrings`, `test_reflect`, and `.expected` on `enum_cross_simple`, `imports`,
+`test_package_import`, `deep_deserialize`, `visibility_internal_flat`,
+`gc_deep_test`, `json`. Every output read against source first. The pass produced
+**three more wrong-output finds**, each kept *visible* (bare `IO.println`, not
+frozen) with an inline comment rather than enshrined: `Reflect.type_name` returns
+a subnormal double instead of the class name (**#187**), `Reflect.module_doc()`
+always returns nil (**#188**), and `json.sf` diverges native-vs-wasm32 exit
+status (**#189**). Confirmed correctly-excluded and untouched: the `STALE_TESTS`
+set (`builtin_types`, `for_in`, `types` — aspirational syntax), `NETWORK_TESTS`,
+`NOT_A_TEST` (`hello_wasm`, `goals`), the import-only helpers, and the
+address-printing `gc_roots_test`. This surface has now produced **six** bugs
+(function-value printing, Bool match binding, #185, #187, #188, #189).
 
 **Three harness defects found and fixed, all of which were this entry's own
 mechanism one layer up:**
