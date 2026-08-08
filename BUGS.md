@@ -19,15 +19,36 @@ it right after the entry parse, and additive codegen wrappers
 (`Point` / the `//!` text) and by the suite (353 passed / 0 failed); live in
 `BUGS_CLOSED.md`. Open set 7 → 5.
 
-### 189. json.sf diverges native-vs-wasm32 (exit 4 on wasm32, 0 native)
+### 189. wasm32 Any-value bug cluster — one fixed, one residual (json.sf still diverges)
 
-`tools/differential.sh --record test/json.sf` refuses to record because the
-native and wasm32 configurations disagree on exit status: `exit 0 (native-O2)
-vs 4 (wasm32)`. Native output (O0 == O2) is verified correct and is frozen as
-`test/json.expected`; the wasm32 exit-4 is a separate wasm-backend fault in the
-JSON/reflect path — likely the same pointer-tagging / pointer-width family as
-the other wasm32-only traps (#184/#186), but not yet root-caused. Needs a wasm32
-run under a debugger to localize the trapping op.
+`tools/differential.sh test/json.sf` reports `native-O2 != wasm32 — exit 0 vs 4`.
+Binary-searching the divergence found **two independent bugs**:
+
+**Primary (FIXED):** `.length()` on an Any-typed receiver returned 0 on wasm32.
+An Any-typed parameter carries a list/map as a RAW (untagged) GC pointer — upper
+bits != 0x7FF8 — so `__val_is_ptr` returned false and `wasm_base_32.ll`'s
+`__any_length` short-circuited to `ret 0`. Meanwhile `is List` still answered
+true (it has the raw-pointer path) and indexing still worked, so the list looked
+present but had length 0 — every `Json.to_string` over a list/map iterated zero
+times. Native's `__any_length` and wasm32's own `__val_is_list` both carry a
+`check_raw` / magic-sentinel fallback; the wasm32 port dropped it. Restored:
+raw list → count@0, raw map → count@0, else strlen. Regression test
+`test/pass/any_length_wasm32.sf` — differential native-O2 == native-O0 ==
+wasm32.
+
+**Residual (still open under this number):** `test/json.sf` still diverges after
+the length fix. Binary-searched to a narrow interaction: the compound guard
+`if (value is Int or value is Float) { return Reflect.number_to_string(value) }`
+combined with recursive Map traversal returns an untagged pointer on wasm32
+(prints as e.g. `70000`). Splitting the guard into two ifs (`is Int` then
+`is String`) makes the divergence disappear; hoisting the recursion argument
+into a `var` also does. Minimal repro isolated (see j7 vs j10/j11 in the
+investigation), but the exact codegen path — union type narrowing under `or`,
+`Reflect.number_to_string` return, or arg-temp rooting inside a while — is not
+yet root-caused. Similar shape to the other wasm32 pointer-family traps
+(#184/#186). Kept as #189 until root-caused.
+
+`test/json.expected` remains the native-verified reference.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
 `var fn = worker; Task.spawn(fn)` — traps `null function or function signature
