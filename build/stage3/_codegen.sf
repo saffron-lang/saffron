@@ -741,7 +741,7 @@ class Codegen {
         if (s == "Any") return AST.Type.AnyType
         // Union types: check for "|" at top level (not inside <> or ())
         if (s.contains("|")) {
-            var union_parts: List<String> = this.split_type_union(s)
+            var union_parts: List<String> = AST.split_type_union(s)
             if (union_parts.length() > 1) {
                 var types: List<AST.Type> = []
                 var ui: Float = 0
@@ -866,59 +866,9 @@ class Codegen {
         return sb.to_string()
     }
 
-    fun split_type_union(s: String): List<String> {
-        var result: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "|" and depth == 0) {
-                result.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            result.push(current)
-        }
-        return result
-    }
-
-    fun split_type_args(s: String): List<String> {
-        var result: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "," and depth == 0) {
-                result.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            result.push(current)
-        }
-        return result
-    }
+    // split_type_union / split_type_args now live in ast.sf (AST.*), shared by
+    // parser, checker and codegen. Codegen's old copies tracked `<>`/`()` depth;
+    // the shared form adds `[]`, a safe widening.
 
     fun generic_type_string(base: String, args: List<AST.Type>): String {
         if (args.length() > 1) {
@@ -1426,7 +1376,7 @@ class Codegen {
         if (!this.class_type_params.has(base_name)) { return typ }
         var params: List<String> = this.class_type_params.get(base_name)
         if (params.length() == 0) { return typ }
-        var recv_args: List<String> = this.split_type_args(this.strip_generic_brackets(recv_type))
+        var recv_args: List<String> = AST.split_type_args(this.strip_generic_brackets(recv_type))
         // Whole-type match: `fun unwrap(): T`.
         var pi: Float = 0
         while (pi < params.length()) {
@@ -1443,7 +1393,7 @@ class Codegen {
         if (typ.contains("<")) {
             var lt: Float = typ.index_of("<")
             var tbase: String = typ.slice(0, lt)
-            var parts: List<String> = this.split_type_args(this.strip_generic_brackets(typ))
+            var parts: List<String> = AST.split_type_args(this.strip_generic_brackets(typ))
             var out: List<String> = []
             var i: Float = 0
             while (i < parts.length()) {
@@ -1490,7 +1440,7 @@ class Codegen {
         // into "List<Int" + "Nil>" and then drop neither Nil while corrupting the
         // generic — split_type_union keeps a nested `|` intact so only a
         // top-level Nil is stripped.
-        var parts: List<String> = this.split_type_union(typ)
+        var parts: List<String> = AST.split_type_union(typ)
         var kept: List<String> = []
         var i: Float = 0
         while (i < parts.length()) {
@@ -2004,7 +1954,7 @@ class Codegen {
                         var tf_result: String = this.fresh_local()
                         this.emit_indent(tf_result + " = call i64 @__list_get(i64 " + tf_obj + ", i64 " + tf_idx_val + ")")
                         var tf_inner: String = tf_vtype.slice(6, tf_vtype.length() - 1)
-                        var tf_args: List<String> = this.split_type_args(tf_inner)
+                        var tf_args: List<String> = AST.split_type_args(tf_inner)
                         if (tf_idx >= 0 and tf_idx < tf_args.length()) {
                             this.last_type = this.str_to_type(tf_args[tf_idx])
                         } else {
@@ -3761,7 +3711,7 @@ class Codegen {
                     var tf_result2: String = this.fresh_local()
                     this.emit_indent(tf_result2 + " = call i64 @__list_get(i64 " + tf_obj2 + ", i64 " + tf_idx_val2 + ")")
                     var tf_inner2: String = tf_vtype2.slice(6, tf_vtype2.length() - 1)
-                    var tf_args2: List<String> = this.split_type_args(tf_inner2)
+                    var tf_args2: List<String> = AST.split_type_args(tf_inner2)
                     if (tf_idx2 >= 0 and tf_idx2 < tf_args2.length()) {
                         this.last_type = this.str_to_type(tf_args2[tf_idx2])
                     } else {
@@ -14655,7 +14605,7 @@ class Codegen {
         }
         if (full_type.starts_with("Tuple<") and full_type.ends_with(">")) {
             var tuple_inner: String = full_type.slice(6, full_type.length() - 1)
-            var tuple_args: List<String> = this.split_type_args(tuple_inner)
+            var tuple_args: List<String> = AST.split_type_args(tuple_inner)
             var ct_idx: Float = -1
             var idx_ek: String = this.classify_expr(index)
             if (idx_ek == "int") {
@@ -17815,7 +17765,7 @@ class Codegen {
         var gft_rest: String = field.slice(1, field.length())
         var gft_idx: Float = gft_rest.to_number()
         var gft_inner: String = class_name.slice(6, class_name.length() - 1)
-        var gft_args: List<String> = this.split_type_args(gft_inner)
+        var gft_args: List<String> = AST.split_type_args(gft_inner)
         if (gft_idx >= 0 and gft_idx < gft_args.length()) {
             return gft_args[gft_idx]
         }

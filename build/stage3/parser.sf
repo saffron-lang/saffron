@@ -1473,7 +1473,7 @@ class Parser {
         // split_type_union respects `<>`/`()` depth, so a nested `|` is left for
         // the generic branch below; only a real top-level union (>1 part) is one.
         if (s.contains("|")) {
-            var parts: List<String> = this.split_type_union(s)
+            var parts: List<String> = AST.split_type_union(s)
             if (parts.length() > 1) {
                 var types: List<AST.Type> = []
                 var i: Float = 0
@@ -1497,7 +1497,7 @@ class Parser {
             }
             var base: String = s.slice(0, lt_pos)
             var args_str: String = s.slice(lt_pos + 1, s.length() - 1)
-            var arg_strs: List<String> = this.split_type_args(args_str)
+            var arg_strs: List<String> = AST.split_type_args(args_str)
             var args: List<AST.Type> = []
             var j: Float = 0
             while (j < arg_strs.length()) {
@@ -1562,7 +1562,7 @@ class Parser {
         // on the slice being empty rather than splitting and filtering after, so the
         // empty string never becomes a type name.
         if (params_str.length() > 0) {
-            var param_strs: List<String> = this.split_type_args(params_str)
+            var param_strs: List<String> = AST.split_type_args(params_str)
             var pi: Float = 0
             while (pi < param_strs.length()) {
                 var p: String = param_strs[pi].trim()
@@ -1618,77 +1618,9 @@ class Parser {
         }
     }
 
-    // Split a comma-separated type list on its TOP-LEVEL commas only.
-    //
-    // `<>`, `()` and `[]` all nest. Angle brackets were the only pair tracked here,
-    // which was enough while the sole caller was the generic branch of
-    // parse_type_ast — a generic argument list has no bare parentheses. It stopped
-    // being enough once parse_fun_type_ast started splitting a function type's
-    // parameter list, because a nested function type puts its own commas inside
-    // parentheses: the parameter list of `Fun(Fun(Int,Bool):Int,String)` is
-    // "Fun(Int,Bool):Int,String", whose first comma is inside the inner `Fun(...)`.
-    // Tracking `<>` alone split that into three fragments — "Fun(Int", "Bool):Int",
-    // "String" — and each fragment then parsed as a class named after the fragment.
-    //
-    // `[]` is tracked for the receiver form "Fun[Recv](A,B):R", which reaches the
-    // parameter list of an enclosing function type the same way.
-    fun split_type_args(s: String): List<String> {
-        var args: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(" or ch == "[") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")" or ch == "]") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "," and depth == 0) {
-                args.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            args.push(current)
-        }
-        return args
-    }
-
-    // Split a type string on TOP-LEVEL `|` only, respecting `<>`/`()` nesting, so
-    // `Int|String` splits but the `|` inside `List<Int|String>` does not. Mirrors
-    // the codegen helper of the same name; parse_type_ast uses it to tell a real
-    // union from a generic that merely contains a nested union.
-    fun split_type_union(s: String): List<String> {
-        var parts: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(" or ch == "[") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")" or ch == "]") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "|" and depth == 0) {
-                parts.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            parts.push(current)
-        }
-        return parts
-    }
+    // split_type_args / split_type_union now live in ast.sf (AST.*), shared by
+    // parser, checker and codegen — see the note there. They were three drifted
+    // copies; the ast.sf form tracks `<>`/`()`/`[]` depth, the widest safe set.
 
     // --- Helpers for operator precedence ---
 

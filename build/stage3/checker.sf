@@ -686,7 +686,7 @@ class NullChecker {
         // the generic arg. split_type_union respects `<>`/`()` depth, so a nested
         // `|` falls through to the generic branch; only a real union (>1 part) is one.
         if (s.contains("|")) {
-            var parts: List<String> = this.split_type_union(s)
+            var parts: List<String> = AST.split_type_union(s)
             if (parts.length() > 1) {
                 var types: List<AST.Type> = []
                 var i: Float = 0
@@ -710,7 +710,7 @@ class NullChecker {
             }
             var base: String = s.slice(0, lt_pos)
             var args_str: String = s.slice(lt_pos + 1, s.length() - 1)
-            var arg_strs: List<String> = this.split_type_args(args_str)
+            var arg_strs: List<String> = AST.split_type_args(args_str)
             var args: List<AST.Type> = []
             var j: Float = 0
             while (j < arg_strs.length()) {
@@ -723,63 +723,11 @@ class NullChecker {
         return AST.Type.ClassType(s)
     }
 
-    fun split_type_args(s: String): List<String> {
-        var args: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "," and depth == 0) {
-                args.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            args.push(current)
-        }
-        return args
-    }
-
-    // Split on a TOP-LEVEL `|` only, respecting `<>`/`()` depth, so `Int|String`
-    // splits but the `|` inside `List<Int|String>` does not. Used by
-    // parse_type_node to distinguish a real union from a generic that contains a
-    // nested union. Mirrors parser.sf and codegen's helper of the same name.
-    fun split_type_union(s: String): List<String> {
-        var parts: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<" or ch == "(" or ch == "[") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">" or ch == ")" or ch == "]") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == "|" and depth == 0) {
-                parts.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            parts.push(current)
-        }
-        return parts
-    }
+    // split_type_args / split_type_union now live in ast.sf (AST.*), shared by
+    // parser, checker and codegen. The checker's old split_type_args tracked only
+    // `<>`; the shared form also tracks `()`/`[]`, a safe widening (a comma inside
+    // any bracket is now protected, which the checker's callers never relied on
+    // breaking).
 
     fun type_node_to_string(t: AST.Type): String {
         return AST.type_to_string(t)
@@ -927,7 +875,7 @@ class NullChecker {
         // this must look at top-level parts only, where a bare "Nil" is a real
         // nullable and a nested one is not.)
         if (typ.contains("|")) {
-            var parts: List<String> = this.split_type_union(typ)
+            var parts: List<String> = AST.split_type_union(typ)
             var i: Float = 0
             while (i < parts.length()) {
                 if (parts[i] == "Nil") return true
@@ -4296,7 +4244,7 @@ class NullChecker {
             var lt: Float = typ.index_of("<")
             var base: String = typ.slice(0, lt)
             var inner: String = typ.slice(lt + 1, typ.length() - 1)
-            var parts: List<String> = this.split_type_args(inner)
+            var parts: List<String> = AST.split_type_args(inner)
             var out: List<String> = []
             var i: Float = 0
             while (i < parts.length()) {
@@ -4448,7 +4396,7 @@ class NullChecker {
                     if (resolved.length() > 0 and resolved != "Any") return resolved
                 }
                 // Handle Map<K,V> style: check each generic arg
-                var param_args: List<String> = this.split_type_args(inner)
+                var param_args: List<String> = AST.split_type_args(inner)
                 var pi: Float = 0
                 while (pi < param_args.length()) {
                     if (param_args[pi] == ret_type) {
@@ -4471,7 +4419,7 @@ class NullChecker {
         var lt_pos: Float = ret_type.index_of("<")
         var base: String = ret_type.slice(0, lt_pos)
         var ret_args_str: String = ret_type.slice(lt_pos + 1, ret_type.length() - 1)
-        var ret_args: List<String> = this.split_type_args(ret_args_str)
+        var ret_args: List<String> = AST.split_type_args(ret_args_str)
         var resolved_args: List<String> = []
         var ri: Float = 0
         while (ri < ret_args.length()) {
@@ -5150,7 +5098,7 @@ class NullChecker {
         if (fields_str.length() == 0) return []
         // Split on top-level commas only: `Map<String, Int>` is ONE field, and
         // splitting it in two shifted every later field's type by one position.
-        return this.split_type_args(fields_str)
+        return AST.split_type_args(fields_str)
     }
 
     fun get_enum_binding_type(enum_type: String, variant: String, field_idx: Float): String {
