@@ -2007,11 +2007,19 @@ fun generate_with_target_opts2(program: List<AST.Stmt>, target: String, identity
 }
 
 fun generate_with_target_opts3(program: List<AST.Stmt>, target: String, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool): String {
+    return generate_with_target_opts4(program, target, identity_mode, use_llvm_lib, emit_llvm_lib, "")
+}
+
+// BUGS #188: `module_doc` is the entry file's `//!` text (Parser.module_doc()),
+// so Reflect.module_doc() returns it instead of nil. Additive `opts4` wrapper;
+// the older arities delegate with "" (they have no module doc to pass).
+fun generate_with_target_opts4(program: List<AST.Stmt>, target: String, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, module_doc: String): String {
     var gen: Codegen = Codegen()
     gen.target = target
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib
     gen.emit_llvm_lib = emit_llvm_lib
+    gen.module_doc_text = module_doc
     var result: String = gen.generate(program)
     if (gen.has_errors) { __codegen_errors = true }
     return result
@@ -2025,7 +2033,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     // No scoped alias table: every alias resolves through the flat union, the
     // pre-#123 behaviour. Kept for callers that do not build one.
     var no_scopes: Map<String, String> = {}
-    return generate_with_modules_flat_opts4(program, all_stmts, boundaries, prefixes_joined, alias_map, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, no_scopes)
+    return generate_with_modules_flat_opts5(program, all_stmts, boundaries, prefixes_joined, alias_map, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, no_scopes, "")
 }
 
 /// `scoped_aliases` is main.sf's file-scoped alias table, keyed
@@ -2033,12 +2041,20 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
 /// consulted before `alias_map` at every alias resolution site, which is what
 /// lets two files each bind `Internal` to their own module (BUGS #123).
 fun generate_with_modules_flat_opts4(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, scoped_aliases: Map<String, String>): String {
+    return generate_with_modules_flat_opts5(program, all_stmts, boundaries, prefixes_joined, alias_map, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases, "")
+}
+
+/// BUGS #188: `module_doc` is the entry file's `//!` text (Parser.module_doc()),
+/// threaded to gen.module_doc_text so Reflect.module_doc() returns it instead of
+/// nil. Additive `opts5` wrapper; older arities delegate with "".
+fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, scoped_aliases: Map<String, String>, module_doc: String): String {
     var gen: Codegen = Codegen()
     gen.scoped_module_prefixes = scoped_aliases
     gen.target = target
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib
     gen.emit_llvm_lib = emit_llvm_lib
+    gen.module_doc_text = module_doc
     // Reflect runtime functions (generated at end of compilation)
     gen.known_functions.push("__reflect_get_fields")
     gen.known_functions.push("__reflect_class_name")

@@ -1665,6 +1665,10 @@ fun main(): Int {
     var source: String = IO.read_file(input_path)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse_with_source(tokens, source)
+    // BUGS #188: capture the entry file's `//!` module-doc now, before any later
+    // parse_with_source (imports/prelude) overwrites the parser's module_doc
+    // global. Threaded into codegen so Reflect.module_doc() returns it.
+    var entry_module_doc: String = Parser.module_doc()
 
     // Symbols are collected from the freshly-parsed program, BEFORE the resolve
     // pass rewrites Variable→Ref and the checker runs — those passes are about
@@ -2094,9 +2098,9 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat_opts4(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases)
+        ir = Codegen.generate_with_modules_flat_opts5(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases, entry_module_doc)
     } else {
-        ir = Codegen.generate_with_target_opts3(program, target, identity_mode, use_llvm_lib, emit_llvm_lib)
+        ir = Codegen.generate_with_target_opts4(program, target, identity_mode, use_llvm_lib, emit_llvm_lib, entry_module_doc)
     }
 
     // The total, printed after codegen so it counts the whole compile rather than
