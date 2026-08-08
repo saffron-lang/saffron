@@ -62,7 +62,7 @@ NETWORK_TESTS="test_httpx test_async_io test_dns test_net"
 # with no annotation, C-style `for (var i = 0; ...)`). These are STALE, not
 # broken: a human needs to decide whether to modernise or delete them.
 # Do NOT "fix" the compiler to accept these.
-STALE_TESTS="loops builtin_types for_in types runner decorators any_bug_repro"
+STALE_TESTS="loops for_in runner any_bug_repro"
 
 # Aspirational / non-native-target files that are not runnable tests.
 #
@@ -72,7 +72,7 @@ STALE_TESTS="loops builtin_types for_in types runner decorators any_bug_repro"
 # for bump allocation and minor collections, so they fail by design while the
 # nursery is off; the file is kept because it is exactly the test to re-enable
 # alongside a non-moving young generation.
-NOT_A_TEST="goals hello_wasm gc_generational_test"
+NOT_A_TEST="hello_wasm gc_generational_test"
 
 # Tests that fail ON PURPOSE because the bug they pin is still open.
 #
