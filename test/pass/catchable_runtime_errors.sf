@@ -1,0 +1,58 @@
+// BUGS #65: runtime faults (IndexError, DivisionError, NullError, and the
+// not-indexable / not-iterable errors) used to be FATAL — they printed to stderr
+// and exit(1), and try/catch could not catch them (only `throw` was catchable).
+// Now they route through __rt_raise: if a try/catch handler is active the fault
+// is caught with its message string as the exception value; with no handler it
+// still prints and exits (uncaught). The user directive: everything recoverable
+// is catchable; only truly-unrecoverable faults stay fatal.
+import "@test" as Test
+
+fun main() {
+    // IndexError is catchable, and execution continues after the catch.
+    var caught_index = false
+    try {
+        var list = [1, 2, 3]
+        IO.println(list[99])          // was: fatal exit(1)
+    } catch (e) {
+        caught_index = true
+    }
+    Test.assert(caught_index, "IndexError is catchable")
+
+    // Execution survives the catch — this line must run.
+    Test.assert(true, "control continues after a caught IndexError")
+
+    // DivisionError is catchable.
+    var caught_div = false
+    try {
+        var z = 0
+        IO.println(10 / z)
+    } catch (e) {
+        caught_div = true
+    }
+    Test.assert(caught_div, "DivisionError is catchable")
+
+    // The caught value carries a usable message string (not a raw pointer /
+    // denormal). We only assert it is a non-empty String that mentions the fault,
+    // to stay robust to exact wording.
+    var msg = ""
+    try {
+        var list = [10, 20]
+        IO.println(list[50])
+    } catch (e) {
+        msg = "${e}"
+    }
+    Test.assert(msg.length() > 0, "caught runtime error has a non-empty message")
+    Test.assert(msg.contains("IndexError"), "caught message names the fault (IndexError)")
+
+    // A `throw` inside a try still works (unchanged) — and the two paths coexist.
+    var caught_throw = false
+    try {
+        throw "manual"
+    } catch (e) {
+        caught_throw = "${e}" == "manual"
+    }
+    Test.assert(caught_throw, "explicit throw still catchable and binds its value")
+
+    Test.summary()
+}
+main()

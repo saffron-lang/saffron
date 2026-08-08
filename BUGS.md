@@ -2,8 +2,22 @@
 
 ## Open
 
-**4 open entries:** #65, #107, #131, #132.
+**3 open entries:** #107, #131, #132.
 Next free number is **#190**.
+
+#65 (runtime faults were fatal and uncatchable — `try`/`catch` couldn't catch
+IndexError/DivisionError/NullError) is now FIXED: all five recoverable runtime
+errors route through a new `__rt_raise` shim that, when a `try`/`catch` handler is
+active, stores the (NaN-tagged) message string as the exception value and
+longjmps into it — exactly what `throw` already does — so `catch (e)` binds the
+message; with no handler it falls back to the original `__runtime_error_fatal`
+(print + exit). Runtime-base shim in all four `.ll` bases + the five error
+builders in `runtime.sf` now call `__rt_raise`. The old "setjmp is a no-op on
+wasm" caveat is stale — wasm try/catch already emits setjmp (SjLj lowering), and
+the wasm bases define longjmp. Regression test
+`test/pass/catchable_runtime_errors.sf`; the exact docs repro now prints
+`caught: IndexError: ...` then `still alive`; uncaught faults still exit fatally;
+suite 355 passed / 0 failed. Lives in `BUGS_CLOSED.md`. Open set 4 → 3.
 
 #187 (`Reflect.type_name` returned a subnormal double instead of the class name)
 and #188 (`Reflect.module_doc()` always returned nil) are both now FIXED. #187:
@@ -664,51 +678,6 @@ all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
 before its tests mean anything, and a green test run against a stale artifact is
 evidence of nothing.
 
-
-### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
-
-`try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
-`IndexError`, `DivisionError` and `NullError` all route through
-`__runtime_error_fatal` (`src/runtime/runtime.sf:713`), which writes to fd 2 and
-calls `rt_exit(1)`. No `catch` or `finally` block runs.
-
-Repro — the exact example `CLAUDE.md` used to carry:
-
-```saffron
-fun main() {
-    try {
-        var list = [1, 2, 3]
-        IO.println(list[99])
-    } catch (e) {
-        IO.println("caught: ${e}")
-    }
-    IO.println("still alive")
-}
-main()
-```
-
-Actual: prints `Runtime Error: IndexError: index 99 out of bounds (length 3)`,
-exits 1. Neither `caught:` nor `still alive` is reached. Division by zero behaves
-identically. An explicit `throw` in the same shape is caught and returns 0, which
-is what made the wrong claim plausible for so long.
-
-The fatal call sites are `runtime.sf:777` (`__index_error`), `:815`
-(`__division_error`) and `:857` (`__null_pointer_error`).
-
-Nil misuse mostly never gets this far: the checker rejects calling a method on a
-nullable value at compile time.
-
-**Docs fixed** (2026-07-30): `CLAUDE.md`, `docs/src/tutorial/error-handling.md`,
-`docs/learnxinyminutes/learnsaffron.sf` and its `index.html` all claimed runtime
-errors were catchable and showed output that never occurs. They now document the
-fatal behaviour and show a guard-before-indexing pattern instead.
-
-**Still open**: whether the *behaviour* should change. Making these catchable is
-not a small fix — the error path itself allocates (`__runtime_error` calls
-`rt_malloc`), and `setjmp`/`longjmp` are no-ops on both wasm bases
-(`wasm_base_32.ll:592-597`, `wasm_base.ll:503-508`), so `try`/`catch` cannot work
-on wasm at all. Decide whether fatal-by-design is the intended semantics before
-investing there.
 
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 

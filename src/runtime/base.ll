@@ -7,6 +7,27 @@ target triple = "arm64-apple-macosx14.0.0"
 ; Exception handling state (used by codegen try/catch emission)
 @__exception_value = weak global i64 0
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
+@__jmp_buf_current = weak global i8* null
+
+; BUGS #65: catchable runtime faults. See base_nanbox.ll for the full rationale.
+; __rt_tag_ptr is identity here (returns raw), which is exactly right — identity
+; values are untagged, so the stored message and __any_to_string agree.
+declare void @__runtime_error_fatal(i64)
+declare void @longjmp(i8*, i32)
+define void @__rt_raise(i64 %msg) {
+entry:
+  %jb = load i8*, i8** @__jmp_buf_current
+  %uncaught = icmp eq i8* %jb, null
+  br i1 %uncaught, label %fatal, label %throw
+throw:
+  %tagged = call i64 @__rt_tag_ptr(i64 %msg)
+  store i64 %tagged, i64* @__exception_value
+  call void @longjmp(i8* %jb, i32 1)
+  unreachable
+fatal:
+  call void @__runtime_error_fatal(i64 %msg)
+  unreachable
+}
 
 ; Debug location tracking (set by codegen before potentially-crashing operations)
 @__debug_location = global i8* null
