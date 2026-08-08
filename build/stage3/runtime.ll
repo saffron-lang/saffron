@@ -137,6 +137,7 @@ declare i32 @setenv(i8*, i8*, i32)
 declare i64 @write(i32, i8*, i64)
 declare i64 @read(i32, i8*, i64)
 declare void @__print_debug_location()
+declare void @__rt_raise(i8*)
 declare i64 @__gc_alloc_safe(i64, i64)
 declare i64 @__val_untag_int(i64)
 declare i8* @__val_untag_ptr(i64)
@@ -3975,7 +3976,8 @@ entry:
   %t211 = inttoptr i64 %t208 to i8*
   store i8 %t210, i8* %t211
   %t212 = load i64, i64* %msg
-  %t213 = call i64 @__runtime_error_fatal(i64 %t212)
+  %t213 = inttoptr i64 %t212 to i8*
+  call void @__rt_raise(i8* %t213)
   ret i64 0
 }
 
@@ -4328,7 +4330,8 @@ entry:
   %t295 = inttoptr i64 %t292 to i8*
   store i8 %t294, i8* %t295
   %t296 = load i64, i64* %msg
-  %t297 = call i64 @__runtime_error_fatal(i64 %t296)
+  %t297 = inttoptr i64 %t296 to i8*
+  call void @__rt_raise(i8* %t297)
   ret i64 0
 }
 
@@ -5205,7 +5208,8 @@ entry:
   %t291 = call i64 @__sb_append(i64 %t289, i64 %t290)
   %t292 = load i64, i64* %sb
   %t293 = call i64 @__sb_to_string(i64 %t292)
-  %t294 = call i64 @__runtime_error_fatal(i64 %t293)
+  %t294 = inttoptr i64 %t293 to i8*
+  call void @__rt_raise(i8* %t294)
   ret i64 0
 }
 
@@ -5439,7 +5443,8 @@ entry:
   %t193 = inttoptr i64 %t190 to i8*
   store i8 %t192, i8* %t193
   %t194 = load i64, i64* %msg
-  %t195 = call i64 @__runtime_error_fatal(i64 %t194)
+  %t195 = inttoptr i64 %t194 to i8*
+  call void @__rt_raise(i8* %t195)
   ret i64 0
 }
 
@@ -5701,7 +5706,8 @@ entry:
   %t217 = inttoptr i64 %t214 to i8*
   store i8 %t216, i8* %t217
   %t218 = load i64, i64* %msg
-  %t219 = call i64 @__runtime_error_fatal(i64 %t218)
+  %t219 = inttoptr i64 %t218 to i8*
+  call void @__rt_raise(i8* %t219)
   ret i64 0
 }
 

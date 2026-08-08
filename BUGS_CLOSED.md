@@ -9,6 +9,62 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 65. FIXED — runtime faults are now catchable
+
+```saffron
+try {
+    var list = [1, 2, 3]
+    IO.println(list[99])          // IndexError
+} catch (e) {
+    IO.println("caught: ${e}")    // now: caught: IndexError: index 99 out of bounds (length 3)
+}
+IO.println("still alive")         // now reached
+```
+
+`try`/`catch` worked for `throw` but NOT for runtime faults: `IndexError`,
+`DivisionError`, `NullError`, and the not-indexable / not-iterable errors all
+called `__runtime_error_fatal` unconditionally (print to fd 2, `exit(1)`), so no
+`catch` or `finally` ran. The docs had even been "corrected" to promise fatal-by-
+design. Per the language direction (everything recoverable should be catchable;
+only truly-unrecoverable faults stay fatal), these are now catchable — the VM
+state is intact at the fault, so there is nothing unrecoverable about them.
+
+**Fix — route them through the SAME machinery `throw` already uses.** A new
+`__rt_raise(i64 msg)` shim (added to all four `.ll` runtime bases: `base_nanbox`,
+`base`, `wasm_base_32`, `wasm_base`) loads `@__jmp_buf_current`:
+- if a handler is active, it NaN-box-tags the message (`__rt_tag_ptr`) — so the
+  catch binding reads a real Saffron String, not a raw pointer that would format
+  as a denormal (the #187 family) — stores it in `@__exception_value`, and
+  `longjmp`s into the handler, exactly as codegen's `throw` lowering does;
+- with no handler (`@__jmp_buf_current == null`), it falls back to
+  `__runtime_error_fatal(msg)` — the original print-and-exit, so an UNCAUGHT
+  runtime error is unchanged (verified: still prints `Runtime Error: ...` and
+  does not continue).
+
+The five error builders in `runtime.sf` (`__index_error`, `__division_error`,
+`__null_pointer_error`, `__not_indexable_error`, `__not_iterable_error`) now call
+`__rt_raise` instead of `__runtime_error_fatal`. The message contract is
+unchanged (each still passes the same untagged char*), so the fatal path is
+byte-identical.
+
+**The old "can't work on wasm" caveat was stale.** #65's entry said `setjmp`/
+`longjmp` are no-ops on the wasm bases. That predated the wasm SjLj lowering:
+`tools/saffron` enables `-mllvm -wasm-enable-sjlj` whenever the `.ll` contains a
+`@setjmp` call, and both wasm bases now DEFINE `longjmp`. A `try`/`catch` already
+emits the setjmp that triggers the lowering, so a runtime error caught on wasm
+works for the same reason `throw` does; an uncaught one (no setjmp) still falls to
+fatal. No target-split behavior.
+
+Regression test `test/pass/catchable_runtime_errors.sf` (IndexError and
+DivisionError catchable, control continues after the catch, the caught value is a
+non-empty message string naming the fault, and explicit `throw` still works).
+Bootstrap green through the stage-2 gen4 fixed point; full suite 355 passed / 0
+failed. Docs (CLAUDE.md, error-handling tutorial, learnxinyminutes) that were
+"corrected" to claim fatal-by-design should be re-corrected — noted for a docs
+follow-up.
+
+---
+
 ### 189. FIXED — json.sf diverged native-vs-wasm32 (two wasm32 raw-pointer bugs)
 
 `test/json.sf` printed raw integers for `Json.to_string(obj)` (e.g. `70240`

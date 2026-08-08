@@ -7,6 +7,40 @@ target triple = "arm64-apple-macosx14.0.0"
 ; Exception handling state (used by codegen try/catch emission)
 @__exception_value = weak global i64 0
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
+; The active setjmp target, if any. Codegen emits this same weak global; declaring
+; it here too (weak → the defs merge) lets __rt_raise reference it even in a
+; program whose codegen path didn't happen to emit it. Null = no handler on the
+; stack, so a runtime error is uncaught and falls through to fatal.
+@__jmp_buf_current = weak global i8* null
+
+; BUGS #65: make runtime faults (IndexError/DivisionError/NullError) catchable.
+; They used to call __runtime_error_fatal unconditionally. Now they route here:
+; if a try/catch handler is active (__jmp_buf_current != null), store the message
+; as the exception value and longjmp into it — exactly what codegen's `throw`
+; lowering does — so `catch (e)` binds the message string. With no handler the
+; fault is genuinely uncaught, so fall back to the original fatal behaviour.
+; __runtime_error_fatal (runtime.ll, from runtime.sf) prints and exits.
+declare void @__runtime_error_fatal(i64)
+declare void @longjmp(i8*, i32)
+define void @__rt_raise(i64 %msg) {
+entry:
+  %jb = load i8*, i8** @__jmp_buf_current
+  %uncaught = icmp eq i8* %jb, null
+  br i1 %uncaught, label %fatal, label %throw
+throw:
+  ; The catch binding reads @__exception_value straight into `e` and formats it
+  ; with __any_to_string, so it must be a NaN-TAGGED Saffron string, not the raw
+  ; char* we were handed across the extern boundary (an untagged pointer would
+  ; read back as a denormal double — the #187 family). Tag it here.
+  %tagged = call i64 @__rt_tag_ptr(i64 %msg)
+  store i64 %tagged, i64* @__exception_value
+  call void @longjmp(i8* %jb, i32 1)
+  unreachable
+fatal:
+  ; __runtime_error_fatal takes the raw char* (it strlen/writes it directly).
+  call void @__runtime_error_fatal(i64 %msg)
+  unreachable
+}
 
 ; Async scheduler state
 @__yield_reason = global i64 0

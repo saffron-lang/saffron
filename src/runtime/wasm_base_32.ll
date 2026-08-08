@@ -23,6 +23,25 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
 @__jmp_buf_current = weak global i8* null
 
+; BUGS #65: catchable runtime faults. See base_nanbox.ll for the rationale.
+; @longjmp is defined below in this file; __rt_tag_ptr too. Only the Saffron-side
+; __runtime_error_fatal (from runtime.ll) needs declaring.
+declare void @__runtime_error_fatal(i64)
+define void @__rt_raise(i64 %msg) {
+entry:
+  %jb = load i8*, i8** @__jmp_buf_current
+  %uncaught = icmp eq i8* %jb, null
+  br i1 %uncaught, label %fatal, label %throw
+throw:
+  %tagged = call i64 @__rt_tag_ptr(i64 %msg)
+  store i64 %tagged, i64* @__exception_value
+  call void @longjmp(i8* %jb, i32 1)
+  unreachable
+fatal:
+  call void @__runtime_error_fatal(i64 %msg)
+  unreachable
+}
+
 ; Runtime global: SLOT_SIZE is always 8 (sizeof i64).
 @__g_SLOT_SIZE = global i64 8
 
