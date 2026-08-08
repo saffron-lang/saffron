@@ -9,6 +9,65 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 187. FIXED — `Reflect.type_name` returned a subnormal double instead of the class name
+
+```saffron
+import "@reflect" as Reflect
+class Point { var x: Int; var y: Int; fun init(x: Int, y: Int) { this.x=x; this.y=y } }
+var p: Point = Point(10, 20)
+IO.println(Reflect.type_name(p))   // was 2.15576e-314, now "Point"
+```
+
+`__reflect_class_name` (`codegen/stmts_body.sf`) returned the class-name string
+pointer through `this.ptr_to_val(gep)` — a bare `ptrtoint` — at BOTH the
+matched-class arm and the `"Unknown"` fallback. The returned i64 was therefore an
+untagged pointer, which `__any_to_string` reads as a denormal double. Exactly the
+#115/#154/#105 family: a value with no NaN-box tag reaching a formatter.
+
+**Fix:** switch both sites to `this.emit_tag_ptr(gep)`, matching the sibling
+`__reflect_fields`, which already tags its key strings the same way (and carries a
+comment explaining this precise hazard). Two-line change; the runtime helpers were
+already correct. Verified `Reflect.type_name(p)` → `Point`; suite 353/0.
+Visible-but-unfrozen in `test/test_reflect.sf`.
+
+---
+
+### 188. FIXED — `Reflect.module_doc()` always returned nil
+
+```saffron
+//! Line one.
+//! Line two.
+import "reflect" as Reflect
+IO.println(Reflect.module_doc())   // was nil, now "Line one.\nLine two."
+```
+
+A file's leading `//!` module-doc comments were parsed (`collect_module_doc`) into
+a LOCAL in `parse_program` that was discarded; `codegen.sf`'s `module_doc_text`
+field was only ever assigned `""`, so `__reflect_module_doc` always took its
+empty→nil branch. The per-declaration `///` path (`Reflect.doc(fn)`) was fine —
+only the module-level channel was dead.
+
+**Fix — thread the string out, mirroring the existing `_had_error` pattern, with
+no existing signature changed:**
+- Parser gains a `module_doc` field, set in `parse_program` (was a discarded
+  local). The two entry functions publish it to a `_module_doc` module global
+  beside `_had_error`, and a new `module_doc()` accessor exposes it (exactly like
+  `had_error()`).
+- `main.sf` captures `Parser.module_doc()` into a local right after the entry-file
+  parse — before any import/prelude parse overwrites the global — and passes it
+  to codegen.
+- Codegen gains additive wrappers `generate_with_target_opts4` and
+  `generate_with_modules_flat_opts5` (following the existing opts→optsN
+  evolution), each setting `gen.module_doc_text`; the older arities delegate with
+  `""`. No existing function signature changed, so the parse→main→codegen boundary
+  is stable and gen2 needs no new syntax.
+
+The checker does not need the module doc (codegen-only). Verified
+`Reflect.module_doc()` → the `//!` text; suite 353/0. Visible-but-unfrozen in
+`test/docstrings.sf`.
+
+---
+
 ### 49. FIXED — the `Number` type is retired; `Int` and `Float` only
 
 **FIXED 2026-08-07.** `Number` was one surface name for two representations,

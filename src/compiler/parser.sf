@@ -14,6 +14,10 @@ class Parser {
     var for_counter: Int
     var map_counter: Int
     var incr_counter: Int
+    // BUGS #188: the file's leading `//!` module-doc, collected in parse_program.
+    // parse_program used to drop it into a discarded local; keeping it on the
+    // instance lets the entry functions publish it (see _module_doc / module_doc()).
+    var module_doc: String
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -25,6 +29,7 @@ class Parser {
         this.for_counter = 0
         this.map_counter = 0
         this.incr_counter = 0
+        this.module_doc = ""
     }
 
     /// Suffix that makes each desugared `for-in`'s temporaries unique.
@@ -1871,8 +1876,10 @@ class Parser {
     // --- Statements ---
 
     fun parse_program(): List<AST.Stmt> {
-        // Collect leading //! module doc comments
-        var module_doc: String = this.collect_module_doc()
+        // Collect leading //! module doc comments (BUGS #188: keep it on the
+        // instance so the entry functions can publish it, rather than dropping it
+        // into a local that goes out of scope here).
+        this.module_doc = this.collect_module_doc()
         var stmts: List<AST.Stmt> = []
         while (!this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
@@ -3951,11 +3958,16 @@ class Parser {
 
 
 var _had_error: Bool = false
+// BUGS #188: the last-parsed file's `//!` module-doc, published the same way
+// _had_error is. main.sf reads module_doc() right after the entry-file parse,
+// before any import parse overwrites it.
+var _module_doc: String = ""
 
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
     var result: List<AST.Stmt> = p.parse_program()
     _had_error = p.had_error
+    _module_doc = p.module_doc
     return result
 }
 
@@ -3964,9 +3976,14 @@ fun parse_with_source(tokens: List<Lexer.Token>, source: String): List<AST.Stmt>
     p.source = source
     var result: List<AST.Stmt> = p.parse_program()
     _had_error = p.had_error
+    _module_doc = p.module_doc
     return result
 }
 
 fun had_error(): Bool {
     return _had_error
+}
+
+fun module_doc(): String {
+    return _module_doc
 }

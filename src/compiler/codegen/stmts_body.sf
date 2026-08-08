@@ -2334,7 +2334,12 @@
             var str_len: Float = cname.length() + 1
             var gep: String = this.fresh_local()
             this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + str_const + ", i64 0, i64 0")
-            var as_i64: String = this.ptr_to_val(gep)
+            // BUGS #187: NaN-box-tag the string pointer (emit_tag_ptr), not a bare
+            // ptrtoint. The result flows to __any_to_string, which reads an
+            // untagged pointer as a denormal double and printed `2.15576e-314`.
+            // The sibling __reflect_fields already tags its key strings the same
+            // way (see the emit_tag_ptr calls below).
+            var as_i64: String = this.emit_tag_ptr(gep)
             this.emit_terminator("ret i64 " + as_i64)
             ci = ci + 1
         }
@@ -2342,7 +2347,8 @@
         var unk_const: String = this.add_string_constant("Unknown")
         var unk_gep: String = this.fresh_local()
         this.emit_indent(unk_gep + " = getelementptr [8 x i8], [8 x i8]* " + unk_const + ", i64 0, i64 0")
-        var unk_i64: String = this.ptr_to_val(unk_gep)
+        // BUGS #187: tag the fallback "Unknown" string too, same reason as above.
+        var unk_i64: String = this.emit_tag_ptr(unk_gep)
         this.emit_terminator("ret i64 " + unk_i64)
         this.emit("}")
         this.block_terminated = false

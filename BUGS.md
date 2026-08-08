@@ -2,55 +2,22 @@
 
 ## Open
 
-**7 open entries:** #65, #107, #131, #132, #187, #188, #189.
+**5 open entries:** #65, #107, #131, #132, #189.
 Next free number is **#190**.
 
-### 187. Reflect.type_name returns a subnormal double instead of the class name
-
-`Reflect.type_name(instance)` returns garbage — a subnormal double like
-`2.15576e-314` — instead of the class name string. Minimal repro:
-
-```saffron
-import "@reflect" as Reflect
-class Point { var x: Int; var y: Int; fun init(x: Int, y: Int) { this.x=x; this.y=y } }
-var p: Point = Point(10, 20)
-IO.println(Reflect.type_name(p))   // prints 2.15576e-314, expected "Point"
-```
-
-Root cause: `__reflect_class_name` in `src/compiler/codegen/stmts_body.sf`
-returns the class-name string pointer through `this.ptr_to_val(gep)` — a bare
-`ptrtoint` (`codegen.sf`) — at both the matched-class arm (line ~2337) and the
-`"Unknown"` fallback (line ~2345), instead of `this.emit_tag_ptr(gep)`. The
-returned i64 is therefore an untagged pointer, which `__any_to_string` reads as
-a denormal double. This is the exact #115/#154/#105 family — a value with no
-NaN-box tag reaching a formatter. The sibling helper `__reflect_fields` in the
-same file already uses `emit_tag_ptr` for its key strings (line ~2419, with a
-comment at ~2513 explaining precisely this hazard), so the fix is to switch the
-two `ptr_to_val` calls to `emit_tag_ptr`. Compiler change → needs a rebootstrap
-and gen2 promotion. Visible-but-unfrozen in `test/test_reflect.sf`.
-
-### 188. Reflect.module_doc() always returns nil
-
-A file's leading `//!` module-doc comments are parsed but never reach codegen,
-so `Reflect.module_doc()` always returns nil. The per-declaration `///`
-docstrings (`Reflect.doc(fn)`) work fine; only the module-level path is dead.
-Repro:
-
-```saffron
-//! Line one.
-//! Line two.
-import "reflect" as Reflect
-IO.println(Reflect.module_doc())   // prints nil, expected the //! text
-```
-
-Root cause: `parser.sf` (`parse_program`, ~line 1943) calls
-`collect_module_doc()` into a local `module_doc` that is never propagated
-anywhere. `codegen.sf`'s `module_doc_text` field (declared ~line 102) is only
-ever assigned `""` (~line 249), so `__reflect_module_doc` in
-`codegen/stmts_body.sf` (~line 2578) always takes its empty→nil branch. Fix is
-to thread the collected module-doc string from the parsed program into
-`Codegen.module_doc_text`. Compiler change → rebootstrap. Visible-but-unfrozen
-in `test/docstrings.sf`.
+#187 (`Reflect.type_name` returned a subnormal double instead of the class name)
+and #188 (`Reflect.module_doc()` always returned nil) are both now FIXED. #187:
+`__reflect_class_name` returned its string pointer via a bare `ptrtoint`
+(`ptr_to_val`) at both the matched-class arm and the `"Unknown"` fallback, so
+`__any_to_string` read the untagged pointer as a denormal — switched both to
+`emit_tag_ptr` (the #115/#154 family). #188: the parser collected the `//!`
+module doc into a discarded local; it now publishes it via a `_module_doc` global
++ `module_doc()` accessor (mirroring `_had_error`/`had_error()`), main.sf captures
+it right after the entry parse, and additive codegen wrappers
+(`generate_with_target_opts4` / `generate_with_modules_flat_opts5`) thread it to
+`gen.module_doc_text` — no existing signature changed. Both verified end-to-end
+(`Point` / the `//!` text) and by the suite (353 passed / 0 failed); live in
+`BUGS_CLOSED.md`. Open set 7 → 5.
 
 ### 189. json.sf diverges native-vs-wasm32 (exit 4 on wasm32, 0 native)
 
