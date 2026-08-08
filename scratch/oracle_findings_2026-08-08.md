@@ -73,3 +73,47 @@ test_package_import` — several are known-stale (aspirational syntax, in STALE_
 
 ## Nondet (excluded, correctly)
 `functions`, `gc_roots_test` — reference disagrees with itself run-to-run (frame layout).
+
+## ROOT CAUSE — segv_name_collision (Category A #2) — DIAGNOSED
+
+Minimal repro (`/tmp/capnest.sf`, 9 lines): a named nested fun returned by name that
+captures an enclosing local returns garbage at -O0, correct at -O2:
+```
+fun make_b() {
+    var inner: String = "captured"
+    fun collide_b() { return inner }
+    return collide_b
+}
+var collide_b = make_b()
+IO.println(collide_b())   // O0: 5.21502e-310 (dangling), O2: "captured"
+```
+
+Mechanism (verified in emitted IR):
+- `gen_func_ref` (src/compiler/codegen/expr_body.sf:1540-1565) builds a nested fun's
+  closure env by storing `typed_ptr_to_val("%local","i64*")` — the ADDRESS of the
+  enclosing STACK slot (line 1560), not the value. Env is `__sf_malloc`'d (untracked).
+- The trampoline (1601-1602) loads that address and forwards it; the real
+  `make_b$$collide_b(i64 %inner.arg)` does `inttoptr %inner.arg` + `load`. So the
+  nested-fun capture convention is BY-REFERENCE (pass the slot pointer).
+- In-place calls are fine (frame alive). But a RETURNED nested fun escapes: `make_b`
+  returns and its stack frame (holding `%inner`) dies, leaving the env pointing at a
+  dead slot. -O2 keeps the value around by luck; -O0 clobbers it → denormal garbage.
+
+Contrast the LAMBDA path (closures_body.sf:116-143) which correctly COPIES the value
+for non-boxed captures and only stores a cell POINTER for `boxed_locals` (heap cells
+that survive the frame, BUGS #51). gen_func_ref never consults boxed_locals and
+always captures by-ref.
+
+Proposed fix options:
+  (a) When a named nested fun's ref ESCAPES (returned / stored, not called in-place),
+      box its captured enclosing locals in the enclosing frame — same treatment the
+      lambda path gives `boxed_caps` — so the env holds a surviving heap-cell pointer.
+      Requires the enclosing fn to mark those locals boxed (the boxed_locals decision).
+  (b) Make gen_func_ref copy by VALUE like the lambda path — but the real function
+      signature expects a pointer (inttoptr+load), so the callee lowering would also
+      need to change for the escaping case. Option (a) is more consistent with #51.
+
+This is the SAME by-reference-capture family the test_log O0 segfault likely sits in
+(default-param temp / handler dispatch also allocate + capture). Fixing gen_func_ref's
+escape case may resolve both. Compiler change → needs rebootstrap + gen2 promotion.
+Related: long-standing BUGS #2 (forward refs in nested closures) and #51 (boxed cells).
