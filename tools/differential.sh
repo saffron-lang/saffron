@@ -126,6 +126,13 @@ WASM_UNSUPPORTED_IMPORTS='"@net"|"@io"|"@os"|"os"|"@dns"|"@http/server"|"@http/c
 # comparing their stdout line-for-line would report a false mismatch.
 WASM_UNSUPPORTED_IMPORTS="$WASM_UNSUPPORTED_IMPORTS"'|"@async"|"@scheduler"|"@promise"|"@future"|"task"'
 
+# @thread is backed by @extern C functions (sf_thread_spawn/_join/_mutex_* in
+# thread_native.c) that the wasm shim does not provide, so a thread program
+# cannot run on wasm32 at all — its trap is a missing host, not a codegen bug.
+# (@toml, by contrast, is pure Saffron and its wasm32 trap IS a real bug, so it
+# is deliberately NOT gated here.)
+WASM_UNSUPPORTED_IMPORTS="$WASM_UNSUPPORTED_IMPORTS"'|"@thread"'
+
 # GC tests inspect collector statistics. Every GC entry point is a no-op stub on
 # wasm (see tools/gc_stress.sh), so their output is meaningless there.
 wasm_unsupported_by_name() {
