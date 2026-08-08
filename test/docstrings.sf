@@ -2,6 +2,7 @@
 //! It validates both /// and //! comments.
 
 import "reflect" as Reflect
+import "@test" as T
 
 /// Adds two numbers together.
 fun add(a: Int, b: Int): Int {
@@ -18,6 +19,8 @@ class Greeter {
 
 IO.println(Reflect.doc(add))
 IO.println(Reflect.doc(Greeter))
+T.assert_eq(Reflect.doc(add), "Adds two numbers together.", "function docstring")
+T.assert_eq(Reflect.doc(Greeter), "A simple greeter class.", "class docstring")
 
 // Test multi-line doc comments
 /// Computes the product
@@ -27,6 +30,7 @@ fun multiply(a: Int, b: Int): Int {
 }
 
 IO.println(Reflect.doc(multiply))
+T.assert_eq(Reflect.doc(multiply), "Computes the product\nof two numbers.", "multi-line docstring")
 
 // Test no docstring returns nil
 fun nodoc() {
@@ -34,7 +38,15 @@ fun nodoc() {
 }
 
 IO.println(Reflect.doc(nodoc))
+T.assert_eq(Reflect.doc(nodoc), nil, "no docstring returns nil")
 
-// Test module-level docstring
+// Test module-level docstring.
+// KNOWN BUG: Reflect.module_doc() returns nil even though this file has
+// leading //! comments. The parser collects them (collect_module_doc) into a
+// local in parse_program that is never propagated to codegen — module_doc_text
+// is only ever set to "" (codegen.sf:249). Left as a bare IO.println (not
+// asserted) so the wrong nil output stays visible rather than frozen.
 var mdoc = Reflect.module_doc()
 IO.println(mdoc)
+
+T.summary()

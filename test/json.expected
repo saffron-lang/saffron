@@ -1,0 +1,20 @@
+3
+4
+alice
+30
+true
+{"x":3,"y":4}
+{"name":"alice","age":30,"active":true}
+[1, 2, 3, 4, 5]
+true
+nil
+42
+10
+20
+bob
+25
+false
+{"host":"localhost","port":8080,"debug":true}
+localhost
+8080
+true
