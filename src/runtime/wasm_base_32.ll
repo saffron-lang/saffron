@@ -1215,7 +1215,15 @@ entry:
 ; beyond i64 range are not representable at all.
 define i64 @__float_to_string(i64 %v) {
 entry:
-  %f0 = bitcast i64 %v to double
+  ; A bare bitcast is wrong for an int-tagged input: a whole number in a
+  ; Float-typed slot arrives here still int-tagged (0x7FF9...), and codegen
+  ; picks this helper from the STATIC type (Float). Bitcasting the tag bits
+  ; yields a NaN, and the fcmp/formatting below then print "0"/"nan". Route
+  ; through __val_untag_float, which converts either shape (int-tag -> sitofp,
+  ; real double -> as-is), exactly as native's base_nanbox.ll does. BUGS: the
+  ; wasm32 twin of that native fix — `[10,20,30]:List<Float>[1].to_string()`
+  ; and a trailing closure returning `n*2` into a Float slot both printed 0.
+  %f0 = call double @__val_untag_float(i64 %v)
   %buf = call i8* @malloc(i64 48)
   %isneg = fcmp olt double %f0, 0.000000e+00
   br i1 %isneg, label %do_neg, label %after_sign
