@@ -1,4 +1,6 @@
 // First class functions
+import "@test" as T
+
 fun areWeHavingItYet() {
   IO.print("Yes we are!");
 }
@@ -11,18 +13,22 @@ fun sum(a: Int, b: Int, c: Int) {
 }
 
 IO.print(4 + sum(5, 6, 7));
+T.assert_eq(sum(5, 6, 7), 18, "sum(5,6,7)")
+T.assert_eq(4 + sum(5, 6, 7), 22, "4 + sum(5,6,7)")
 
 // Recursion
 fun fib(n: Int) {
   if (n < 2) return n;
   return fib(n - 2) + fib(n - 1);
 }
+T.assert_eq(fib(10), 55, "fib(10)")
 
 // Native Functions
 import "time" as Time
 var start = Time.clock();
 IO.print(fib(10));
 IO.print(Time.clock() - start);
+T.assert(Time.clock() - start >= 0, "clock delta non-negative")
 
 // Closures
 fun makeClosure() {
@@ -73,6 +79,8 @@ fun b() { c(); }
 fun c() { IO.print("chain reached c"); }
 
 a();
+
+T.summary()
 
 // This block used to read:
 //

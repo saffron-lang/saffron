@@ -26,3 +26,19 @@ fun finish() {
 
 var gen = finish()
 IO.println("Function returned", gen)
+
+// The block above is graded on nothing: IO.println(a, b) DROPS every argument
+// after the first (documented), so every "label: value" line prints only the
+// label, and IO.println(future, ...) prints a Future value bare as a subnormal
+// double (5.21502e-310) — a raw-pointer-reaching-a-formatter bug, the #115/#154
+// family. Both are left visible above rather than frozen. The assertion below
+// grades the one thing this file can check correctly: a spawned task's result.
+import "@test" as T
+fun square(n: Int): Int {
+    yield [1, 0.01]
+    return n * n
+}
+var sq_task = Task.spawn(fun () => square(9))
+var sq_result = sq_task.await()
+T.assert_eq(sq_result, 81, "spawn + await computes 9*9")
+T.summary()

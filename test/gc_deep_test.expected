@@ -1,0 +1,8 @@
+=== GC Deep Structure Test ===
+
+Test: 10000 inner lists survive mark+sweep
+  Built: 10000
+  After collect: 10000
+  PASS: Iterative worklist handles wide object graph
+
+=== GC Deep Structure Test Complete ===
