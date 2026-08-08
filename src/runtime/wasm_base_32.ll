@@ -1944,9 +1944,58 @@ entry:
   br i1 %is_nil, label %ret_zero, label %check_ptr
 
 check_ptr:
-  ; Must be pointer-tagged to have length
+  ; A value with length is either NaN-box pointer-tagged (upper 0x7FF8) or a
+  ; raw, untagged GC pointer. An Any-typed parameter carries a list/map as a
+  ; raw pointer, so — like __val_is_list's check_raw path — we must accept it
+  ; too. Native's __any_length has this fallback; the wasm32 port dropped it,
+  ; which made `.length()` on an Any-typed list return 0 (BUGS #189).
   %is_ptr = call i1 @__val_is_ptr(i64 %val)
-  br i1 %is_ptr, label %do_ptr, label %ret_zero
+  br i1 %is_ptr, label %do_ptr, label %check_raw
+
+check_raw:
+  ; Not ptr-tagged. Reject the other NaN-box tags (int/spec); anything else
+  ; might be a raw GC pointer whose magic sentinel sits at val - 8.
+  %upper = lshr i64 %val, 48
+  %is_int = icmp eq i64 %upper, 32761         ; 0x7FF9 TAG_INT
+  %is_spec = icmp eq i64 %upper, 32762        ; 0x7FFA TAG_SPEC
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %ret_zero, label %try_raw
+
+try_raw:
+  %raw_is_null = icmp eq i64 %val, 0
+  br i1 %raw_is_null, label %ret_zero, label %check_raw_magic
+
+check_raw_magic:
+  %magic_addr = sub i64 %val, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %check_type_raw, label %do_string_raw
+
+check_type_raw:
+  ; Raw pointer is already the user pointer — dispatch on its GC tag.
+  %tag_raw = call i64 @__gc_get_type_tag(i64 %val)
+  %is_list_raw = icmp eq i64 %tag_raw, 2
+  br i1 %is_list_raw, label %do_list_raw, label %check_map_raw
+
+check_map_raw:
+  %is_map_raw = icmp eq i64 %tag_raw, 3
+  br i1 %is_map_raw, label %do_map_raw, label %do_string_raw
+
+do_list_raw:
+  %list_ptr_raw = inttoptr i64 %val to i64*
+  %list_count_raw = load i64, i64* %list_ptr_raw
+  ret i64 %list_count_raw
+
+do_map_raw:
+  %map_ptr_raw = inttoptr i64 %val to i64*
+  %map_count_raw = load i64, i64* %map_ptr_raw
+  ret i64 %map_count_raw
+
+do_string_raw:
+  %str_ptr_raw = inttoptr i64 %val to i8*
+  %str_len_raw = call i64 @strlen(i8* %str_ptr_raw)
+  ret i64 %str_len_raw
 
 do_ptr:
   %raw_ptr = call i8* @__val_untag_ptr(i64 %val)
