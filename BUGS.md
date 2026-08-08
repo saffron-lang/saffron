@@ -5,21 +5,6 @@
 **4 open entries:** #65, #107, #131, #132.
 Next free number is **#190**.
 
-#189 (json.sf traps `memory access out of bounds` on wasm32 and prints raw
-integers for `Json.to_string(obj)`, while native is correct) is now FIXED. Root
-cause was not JSON-specific: wasm32's `__val_is_float` returned true for a RAW
-untagged GC pointer (a class instance passed through an `Any` binding has its
-upper 16 bits clear — neither a NaN tag nor a normalized double's exponent), so
-`Json.to_string`'s leading `value is Float` branch fired on the instance, took the
-number path, and returned a corrupt value; the roundtrip then read out of bounds.
-Ported native's fix: when `upper == 0` and `v != 0`, probe the GC magic sentinel
-at `v-8` (the same probe `__val_is_list`/`__val_is_map` already do on wasm32) — a
-GC object is not a float. `tools/differential.sh` now agrees native == wasm32 on
-json.sf (its `.expected` was already frozen). Runtime-base-only change
-(`wasm_base_32.ll`), so no bootstrap and native is unaffected. Broad fix: any
-`Any` value hitting `is Float` on wasm32 was affected, not just JSON. Lives in
-`BUGS_CLOSED.md`. Open set 5 → 4.
-
 #187 (`Reflect.type_name` returned a subnormal double instead of the class name)
 and #188 (`Reflect.module_doc()` always returned nil) are both now FIXED. #187:
 `__reflect_class_name` returned its string pointer via a bare `ptrtoint`
