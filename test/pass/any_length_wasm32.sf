@@ -1,0 +1,41 @@
+// BUGS #189 regression: `.length()` on an Any-typed receiver holding a list,
+// map, or string must dispatch through __any_length at runtime and return the
+// real length — on wasm32 as well as native.
+//
+// The wasm32 __any_length dropped the raw-untagged-GC-pointer fallback that
+// native's __any_length and wasm32's own __val_is_list both have. A list/map
+// flows through an Any-typed parameter as a RAW pointer (upper bits != 0x7FF8),
+// so __val_is_ptr returned false and __any_length short-circuited to 0 — while
+// `is List` (which has the fallback) still answered true and indexing still
+// worked. That silent 0 made every Json.to_string over a list/map iterate zero
+// times and return a bare "[]"/"{}". Found by tools/differential.sh on
+// test/json.sf (native exit 0 vs wasm32 exit 4).
+import "@test" as Test
+
+fun any_len(value: Any): Int {
+    return value.length()
+}
+
+var list: List<Int> = [10, 20, 30, 40]
+var map: Map<String, Int> = {"a": 1, "b": 2, "c": 3}
+var str: String = "hello"
+
+// The typed-receiver path (control): always worked, both targets.
+Test.assert_eq(list.length(), 4, "typed list length")
+
+// The Any-receiver path (__any_length): the bug. All three must match native.
+Test.assert_eq(any_len(list), 4, "Any list length")
+Test.assert_eq(any_len(map), 3, "Any map length")
+Test.assert_eq(any_len(str), 5, "Any string length")
+
+// The loop-over-Any-list shape that Json.to_string uses: the length gate must
+// let the body run, not skip it.
+var total: Int = 0
+var i: Int = 0
+while (i < any_len(list)) {
+    total = total + 1
+    i = i + 1
+}
+Test.assert_eq(total, 4, "loop bounded by Any length runs every iteration")
+
+Test.summary()
