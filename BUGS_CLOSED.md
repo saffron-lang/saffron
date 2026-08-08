@@ -9,6 +9,59 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 189. FIXED — json.sf diverged native-vs-wasm32 (two wasm32 raw-pointer bugs)
+
+`test/json.sf` printed raw integers for `Json.to_string(obj)` (e.g. `70240`
+instead of `{"x":3,"y":4}`) and then trapped `memory access out of bounds` on
+wasm32, while native was correct. `differential.sh` had refused to freeze it
+(native exit 0 vs wasm32 exit 4). Binary-searching found TWO independent wasm32
+raw-pointer bugs, both the same shape (a runtime predicate that dropped native's
+raw-untagged-GC-pointer fallback), fixed in turn:
+
+**Primary — `__any_length` (henry).** `.length()` on an Any-typed receiver holding
+a list/map returned 0 on wasm32: an Any value carries the collection as a RAW
+untagged GC pointer (upper bits != 0x7FF8), so `__val_is_ptr` was false and
+`__any_length` short-circuited to `ret 0`, while `is List` and indexing still
+worked — so the list looked present but `Json.to_string` iterated it zero times.
+Restored the `check_raw`/magic-sentinel fallback native's `__any_length` and
+wasm32's own `__val_is_list` already carry. Regression test
+`test/pass/any_length_wasm32.sf`. With that in, json.sf STILL diverged — leading
+to the residual below.
+
+**Residual — `__val_is_float`.** The rest of this entry. `differential.sh` had
+refused to freeze json.sf (native exit 0 vs wasm32 exit 4) even after the length
+fix.
+
+**Root cause — not JSON-specific.** wasm32's `__val_is_float` returned true for
+anything whose upper 16 bits were not one of the three NaN tags
+(`0x7FF8`/`0x7FF9`/`0x7FFA`). But a class instance from a constructor is a RAW
+untagged GC pointer — upper 16 bits clear — so `__val_is_float(instance)` returned
+true. `Json.to_string`'s first branch is `if (value is Float) ...`, so it fired on
+the instance, took the number path, and returned a corrupt value; feeding that
+corrupt "string" back through `parse_into` in the roundtrip read out of bounds.
+Bisected from the full test down to a 15-line repro: a `fun ts(value: Any)` whose
+leading guard is `value is Float` corrupts its returned String on wasm32 for a
+class argument; dropping the `is Float` guard fixes it, and `is Int` alone is
+fine — pinpointing `__val_is_float`.
+
+**Fix.** Native's `__val_is_float` already handled this: when `upper == 0` (a raw
+pointer, since a normalized double always has a non-zero exponent up top) and
+`v != 0`, it probes the GC magic sentinel at `v-8` — a GC object is not a float.
+wasm32's copy was missing that probe entirely. Ported it verbatim (same magic
+constant `6557403441622859503`, same `v-8` load that `__val_is_list`/
+`__val_is_map` already use on wasm32). Runtime-base-only change
+(`wasm_base_32.ll`, linked at build time, not compiled by gen3) — no bootstrap,
+and native is provably unaffected (never links this file).
+
+Verified: wasm32 json.sf now produces the complete correct output (all three
+`to_string`s, the full roundtrip, no trap); `tools/differential.sh test/json.sf`
+agrees `native-O0 == native-O2 == wasm32` (its `.expected` was already frozen).
+Full suite 353 passed / 0 failed. This was a **broad** wasm32 fault: any `Any`
+value reaching an `is Float` check misclassified a heap object — JSON was just the
+first test to exercise it.
+
+---
+
 ### 187. FIXED — `Reflect.type_name` returned a subnormal double instead of the class name
 
 ```saffron

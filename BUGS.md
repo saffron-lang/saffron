@@ -2,8 +2,23 @@
 
 ## Open
 
-**5 open entries:** #65, #107, #131, #132, #189.
+**4 open entries:** #65, #107, #131, #132.
 Next free number is **#190**.
+
+#189 (json.sf traps `memory access out of bounds` on wasm32 and prints raw
+integers for `Json.to_string(obj)`, while native is correct) is now FIXED. Root
+cause was not JSON-specific: wasm32's `__val_is_float` returned true for a RAW
+untagged GC pointer (a class instance passed through an `Any` binding has its
+upper 16 bits clear — neither a NaN tag nor a normalized double's exponent), so
+`Json.to_string`'s leading `value is Float` branch fired on the instance, took the
+number path, and returned a corrupt value; the roundtrip then read out of bounds.
+Ported native's fix: when `upper == 0` and `v != 0`, probe the GC magic sentinel
+at `v-8` (the same probe `__val_is_list`/`__val_is_map` already do on wasm32) — a
+GC object is not a float. `tools/differential.sh` now agrees native == wasm32 on
+json.sf (its `.expected` was already frozen). Runtime-base-only change
+(`wasm_base_32.ll`), so no bootstrap and native is unaffected. Broad fix: any
+`Any` value hitting `is Float` on wasm32 was affected, not just JSON. Lives in
+`BUGS_CLOSED.md`. Open set 5 → 4.
 
 #187 (`Reflect.type_name` returned a subnormal double instead of the class name)
 and #188 (`Reflect.module_doc()` always returned nil) are both now FIXED. #187:
@@ -19,36 +34,30 @@ it right after the entry parse, and additive codegen wrappers
 (`Point` / the `//!` text) and by the suite (353 passed / 0 failed); live in
 `BUGS_CLOSED.md`. Open set 7 → 5.
 
-### 189. wasm32 Any-value bug cluster — one fixed, one residual (json.sf still diverges)
+#189 (json.sf diverged native-vs-wasm32 — garbage output then an out-of-bounds
+trap) is now FULLY FIXED, in two independent wasm32 raw-pointer bugs found by
+binary-searching the divergence:
 
-`tools/differential.sh test/json.sf` reports `native-O2 != wasm32 — exit 0 vs 4`.
-Binary-searching the divergence found **two independent bugs**:
+**Primary — `__any_length`:** `.length()` on an Any-typed receiver returned 0 on
+wasm32. An Any-typed value carries a list/map as a RAW (untagged) GC pointer
+(upper bits != 0x7FF8), so `__val_is_ptr` returned false and `__any_length`
+short-circuited to `ret 0`, while `is List` and indexing still worked — so a list
+looked present but iterated zero times. Native's `__any_length` and wasm32's own
+`__val_is_list` carry a `check_raw`/magic-sentinel fallback; the wasm32 port had
+dropped it. Restored. Regression test `test/pass/any_length_wasm32.sf`.
 
-**Primary (FIXED):** `.length()` on an Any-typed receiver returned 0 on wasm32.
-An Any-typed parameter carries a list/map as a RAW (untagged) GC pointer — upper
-bits != 0x7FF8 — so `__val_is_ptr` returned false and `wasm_base_32.ll`'s
-`__any_length` short-circuited to `ret 0`. Meanwhile `is List` still answered
-true (it has the raw-pointer path) and indexing still worked, so the list looked
-present but had length 0 — every `Json.to_string` over a list/map iterated zero
-times. Native's `__any_length` and wasm32's own `__val_is_list` both carry a
-`check_raw` / magic-sentinel fallback; the wasm32 port dropped it. Restored:
-raw list → count@0, raw map → count@0, else strlen. Regression test
-`test/pass/any_length_wasm32.sf` — differential native-O2 == native-O0 ==
-wasm32.
+**Residual — `__val_is_float`:** with the length fix in, json.sf still diverged.
+Root-caused (this line) to `__val_is_float`, which returned true for a raw
+untagged GC pointer — so `Json.to_string`'s leading `value is Float` guard fired
+on a class instance, took the number path, and returned a corrupt value; the
+roundtrip then read out of bounds. Same missing raw-pointer probe as the primary:
+when `upper == 0` and `v != 0`, check the GC magic sentinel at `v-8` (a GC object
+is not a float), exactly as `__val_is_list` does. Ported native's guard.
 
-**Residual (still open under this number):** `test/json.sf` still diverges after
-the length fix. Binary-searched to a narrow interaction: the compound guard
-`if (value is Int or value is Float) { return Reflect.number_to_string(value) }`
-combined with recursive Map traversal returns an untagged pointer on wasm32
-(prints as e.g. `70000`). Splitting the guard into two ifs (`is Int` then
-`is String`) makes the divergence disappear; hoisting the recursion argument
-into a `var` also does. Minimal repro isolated (see j7 vs j10/j11 in the
-investigation), but the exact codegen path — union type narrowing under `or`,
-`Reflect.number_to_string` return, or arg-temp rooting inside a while — is not
-yet root-caused. Similar shape to the other wasm32 pointer-family traps
-(#184/#186). Kept as #189 until root-caused.
-
-`test/json.expected` remains the native-verified reference.
+Both are `wasm_base_32.ll` runtime-only changes (no bootstrap, native unaffected).
+`tools/differential.sh test/json.sf` now agrees `native-O0 == native-O2 == wasm32`
+(`test/json.expected` was already the native-verified reference); full suite 353
+passed / 0 failed. Both live in `BUGS_CLOSED.md`. Open set 5 → 4.
 
 #186 (`Task.spawn` of a bare named-coroutine reference — `Task.spawn(worker)` or
 `var fn = worker; Task.spawn(fn)` — traps `null function or function signature
