@@ -1,0 +1,62 @@
+// BUGS #190 regression: a NAMED nested fun captures enclosing locals correctly
+// across the full in-place-vs-escaping × read-only-vs-written matrix.
+//
+// The bug: gen_func_ref stored the enclosing local's stack-SLOT ADDRESS in the
+// closure env, so a RETURNED nested fun read a dead stack slot once its frame
+// returned (garbage at -O0, luck at -O2). The naive fix (capture by value)
+// fixed escape but REGRESSED in-place mutation — an in-place `count = count + 1`
+// inside a nested fun must be visible to the enclosing scope, and a value copy
+// loses it.
+//
+// The fix boxes any local captured by a nested fun into a heap cell (the same
+// mechanism the lambda path uses for a written capture), so the address in the
+// env survives the frame AND is shared for mutation. This test pins all four
+// quadrants; it must pass at BOTH -O0 and -O2 (the differential oracle checks
+// that, since the -O0/-O2 disagreement is exactly how #190 surfaced).
+import "@test" as T
+
+// 1. Escaping + read-only: the returned closure reads a capture after the
+//    defining frame is gone.
+fun make_reader(): Fun {
+    var inner: String = "captured"
+    fun read(): String { return inner }
+    return read
+}
+var r = make_reader()
+T.assert_eq(r(), "captured", "escaping read-only capture survives the frame")
+
+// 2. In-place + mutation: a nested fun called in place mutates a capture, and
+//    the enclosing scope sees it (the case a by-value fix breaks).
+fun counter(): Int {
+    var count: Int = 0
+    fun bump() { count = count + 1 }
+    bump()
+    bump()
+    bump()
+    return count
+}
+T.assert_eq(counter(), 3, "in-place nested-fun mutation is visible to the enclosing scope")
+
+// 3. Escaping + mutation: the returned closure keeps its own live cell across
+//    calls.
+fun make_acc(): Fun {
+    var total: Int = 0
+    fun add(): Int { total = total + 10  return total }
+    return add
+}
+var acc = make_acc()
+T.assert_eq(acc(), 10, "escaping mutating closure, call 1")
+T.assert_eq(acc(), 20, "escaping mutating closure, call 2 sees prior state")
+
+// 4. Two captures in one nested fun, one read and one written.
+fun mixed(): String {
+    var name: String = "x"
+    var n: Int = 0
+    fun tag(): String { n = n + 1  return "${name}${n}" }
+    var a: String = tag()
+    var b: String = tag()
+    return "${a},${b}"
+}
+T.assert_eq(mixed(), "x1,x2", "mixed read + written captures in one nested fun")
+
+T.summary()
