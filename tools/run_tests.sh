@@ -62,7 +62,7 @@ NETWORK_TESTS="test_httpx test_async_io test_dns test_net"
 # with no annotation, C-style `for (var i = 0; ...)`). These are STALE, not
 # broken: a human needs to decide whether to modernise or delete them.
 # Do NOT "fix" the compiler to accept these.
-STALE_TESTS="loops for_in runner any_bug_repro"
+STALE_TESTS="for_in runner any_bug_repro"
 
 # Aspirational / non-native-target files that are not runnable tests.
 #
