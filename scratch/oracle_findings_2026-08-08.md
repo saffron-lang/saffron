@@ -117,3 +117,57 @@ This is the SAME by-reference-capture family the test_log O0 segfault likely sit
 (default-param temp / handler dispatch also allocate + capture). Fixing gen_func_ref's
 escape case may resolve both. Compiler change → needs rebootstrap + gen2 promotion.
 Related: long-standing BUGS #2 (forward refs in nested closures) and #51 (boxed cells).
+
+## ROOT CAUSE — test_log O0 segfault (Category A #1) — DIAGNOSED & FIX APPLIED
+
+NOT a GC/closure/@log bug. `gen_namespace_call` (statically-typed method dispatch,
+methods_body.sf) built its arg list from only the SUPPLIED args and never filled
+omitted trailing DEFAULT parameters — unlike the free-function path (expr_body.sf:3051)
+and the untyped-receiver path (methods_body.sf:1994). So `b.go("hi")` where
+`go(msg, fields: Map = {})` emitted `call @Box__go(i64, i64)` against a 3-param
+definition; the callee read `fields` from an uninitialized ABI register (garbage),
+which faulted when dereferenced via `fields.keys()`. Heap-state-dependent (the prior
+MemoryHandler allocs decide what garbage is resident) → why O0 faults, O2 folds the
+dead load. 9-line repro `/tmp/defarg.sf` (Box.go). Affects EVERY typed method call
+omitting a trailing default param, ALL targets — a broad latent memory-safety bug.
+FIX applied: default-fill loop after arg collection in gen_namespace_call, keyed on
+full_method/canonical, mirroring expr_body.sf. Rebootstrapping.
+
+## Bug #3 from wrong-answer agent — truthy `trunc` on union (NOT yet fixed, needs decision)
+
+`if (result3)` where result3 is `String|Nil` holding a non-nil string: to_i1()
+(stmts_body.sf:1568-1583) emits `trunc i64 %v to i1` — tests BIT 0 of the NaN-box,
+i.e. heap-address parity for a pointer. Native and wasm allocators differ in parity,
+so it flips per-target (both WRONG — a non-nil string should be truthy). checker.sf:1131
+(#143) deliberately lets unions through. Fix options: (a) checker rejects a provably-
+non-Bool union condition (forces `!= nil`), or (b) to_i1 emits a real truthiness test
+(nil/false→0 else→1); needs a __val_truthy helper in all 4 bases. This is the
+nullable_narrowing divergence. Candidate new BUGS entry.
+
+## formatter_fidelity — NOT a bug (filesystem capability)
+
+The 2 "missing" assertions are guarded by `if (IO.file_exists("src/compiler/lexer.sf"))`;
+wasm has no fs (@access stub returns -1) so they skip, and native itself reports 13
+when run from a dir without that file. Differential should gate on the fs capability,
+like network. No compiler fix.
+
+## STATUS UPDATE (fixes landed / in-flight)
+
+- Fix A (__float_to_string untag, wasm_base_32.ll) — DONE, pushed cc718158. Resolved
+  trailing_closure_params AND int_to_float_widening AND import_alias_punctuation.
+- test_log O0 segfault (default-arg fill in gen_namespace_call, methods_body.sf) —
+  fix applied, bootstrapped, suite 355/0. Off-by-one (defaults/param_names include
+  self at index 0; drive fill by arg_strs.length() not the user-arg index).
+- Fix C2 (readln alias arity: add __io_readln/__io_read_line to utils_body.sf
+  known-sig table with `()`) — applied, in the final combined bootstrap.
+- Fix B (strtod fractional parse in wasm_base_32.ll) — applied (full [sign]int.frac
+  [e[sign]exp] parser), IR assembles, in the final combined bootstrap. For toml_test.
+- Fix C1 (__rt_raise / __runtime_error_fatal wasm32 signature-width mismatch) —
+  DEFERRED. It is entangled with the just-landed BUGS #65 catchable-faults work
+  (another session's active area) and involves @extern void*→i32 vs i64 ABI lowering
+  on the typed wasm table. Needs its own careful pass so as not to regress #65.
+  Affects unresolved_index + the trap in stdlib_io (stdlib_io also needs a real FS,
+  so it is partly capability-limited regardless).
+- nullable_narrowing (truthy trunc on union) — candidate new BUGS entry, needs a
+  checker-or-codegen decision (see bug #3 above). Not yet fixed.
+- formatter_fidelity — NOT a bug (fs capability); differential should gate on fs.
