@@ -770,6 +770,31 @@ Related and worth reading together: this is the same trap as #125's wrong premis
 identity i64 bitcast to double is a denormal, and `fptosi` truncates every denormal to
 0, so a nanbox helper dropped into an identity base fails silently rather than loudly.
 
+**2026-08-08 — a HARDER blocker sits above this one: wasm64 modules do not
+instantiate at all.** Investigating the fix (a planned discipline swap to nanbox),
+`scratch/w64/regress_wasm64.sh` failed all 3 cases — including the string-only ones
+that this entry says survive. Building `scratch/w64/main_only.sf` for wasm64 links
+fine but `node tools/oracle/wasm_run.mjs` rejects it at instantiation with
+`WebAssembly.instantiate(): invalid table elements limits flags`. Traced to the
+table section: LLVM 22 (Homebrew clang/LLD 22.1.6) emits a **64-bit function table
+(`table64`)** for the wasm64 target — the table's limits-flags byte is `0x05`
+(bit 2 = table64 index-type i64, bit 0 = has-max). node 22's V8 supports `memory64`
+(`--experimental-wasm-memory64`) but **not `table64`**, so it rejects the flags even
+with the flag set (verified: same error with and without
+`--experimental-wasm-memory64`). `wasm-ld --help` exposes no option to force a
+32-bit table on a 64-bit target, and a 32-bit table inside a memory64 module may
+not be valid anyway.
+
+So the string-output-only status this entry claims is now *optimistic*: on this
+toolchain (LLVM 22 + node 22) wasm64 produces **no output at all** because the
+module never loads. This is a toolchain/runtime version incompatibility (LLVM emits
+table64; V8 hasn't shipped table64 support), NOT something a `wasm_base.ll` or
+codegen change can fix — the discipline swap in the plan is moot until a module can
+instantiate. Options are all external: wait for V8 table64 support in a newer node,
+find/backport an LLVM knob to emit a 32-bit table, or post-process the emitted wasm.
+wasm32 is unaffected and remains the fully-working wasm target. Revisit when the
+toolchain moves; there is no Saffron-side fix to make here today.
+
 ---
 
 ### 132. wasm64's link line accepts every undefined symbol, and nothing in the tree tests wasm64 at all
