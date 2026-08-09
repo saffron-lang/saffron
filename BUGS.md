@@ -708,6 +708,26 @@ all 13 assertions pass. Any runtime change therefore needs the artifact rebuilt
 before its tests mean anything, and a green test run against a stale artifact is
 evidence of nothing.
 
+**2026-08-08 — the blind tail is now empty of stdout-emitting tests.** Re-derived
+the blind set with the full `@test` assertion vocab (`assert`, `assert_eq`,
+`assert_neq`, `assert_contains`, `assert_gt`, `assert_lt`) rather than the three
+spellings an earlier sweep used — that miscount reported ~148 blind, the real
+figure was 9, of which 6 are the documented skip-list exclusions (`test_httpx`,
+`test_async_io`, `test_dns` network; `for_in` stale; `hello_wasm`,
+`gc_generational_test` not-a-test). Of the remaining 3, `gc_roots_test` is the
+deliberate address-printing exclusion, and the last two — `enum_module_helper`,
+`imports_helper` — plus `test_lib_repro` are now each pinned with an **empty
+`.expected`**, the same "pin the import helpers to printing nothing" mechanism
+this entry already describes. `test_lib_repro` is the former Any-closure/`yield`
+segfault repro (fixed): a helper library with no top-level driver that prints
+nothing at top level; the pin freezes that so an accidental future driver or a
+helper that starts emitting garbage is caught rather than passing on exit-0. The
+two import helpers' pins had been claimed here but were absent from the tree —
+drift, now corrected. After the pins: **114 passed / 0 failed** on the main
+suite, and every non-skipped positive test now carries an assertion, a
+`.expected`, or a `.exit`. The stdout-emitting blind tail this entry tracked is
+closed; what remains open is the broader hygiene principle, not a concrete gap.
+
 
 ### 131. wasm64's identity discipline makes every non-String value unprintable
 
