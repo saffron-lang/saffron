@@ -49,6 +49,26 @@ written, and capturing-vs-plain nested funs. Compiler change → rebootstrap.
 Related: BUGS #2 (nested-closure forward refs), #51 (boxed cells), #175
 (nested-fun symbol qualification).
 
+**2026-08-08 — a blanket by-value switch is NOT enough (tried, reverted).** The
+obvious fix — env stores the value (`load %local`) instead of the address, callee
+allocas the capture param, direct-call site passes the value — does fix the
+escaping/dangling case AND passes `segv_name_collision_fun_vs_var` +
+`nested_fun_capture_by_value` at both -O0 and -O2. BUT it REGRESSES the
+in-place mutation case: `test/pass/closures.sf`'s `counter()` reassigns a captured
+`count` (`count = count + 1`) across three in-place `increment()` calls and expects
+`3`; by-value gives each call its own copy, so it returns `1`. The suite caught it
+(6 failures: closures output-mismatch, arity_zero_ok, json/test_json/toml_test
+crash/timeout, located_checker_diagnostics). So the fix MUST distinguish read-only
+captures (safe to copy by value) from reassigned ones (must be a shared heap cell)
+— exactly what the lambda path's `boxed_caps` does. The real work: extend
+`collect_lambda_assigned_stmt` (`closures_body.sf:820`, which currently
+DELIBERATELY skips FunDecl bodies) to also scan nested-fun bodies for assignments,
+add those to `boxed_locals`, and route `gen_func_ref` + the direct-call capture
+site + the hoisted callee through the same box-cell-vs-value logic lambdas use
+(`boxed_caps`). That changes the hoisted nested-fun capture-param convention, which
+is why the skip comment avoided it. Not a quick fix; do it with the full
+in-place-vs-escaping × read-only-vs-written regression matrix in hand.
+
 ### 191. Truthy test on a union value tests bit 0 of the NaN box (address parity)
 
 `if (x)` where `x` is a union like `String|Nil` holding a non-nil value gives an
