@@ -27,8 +27,11 @@ Last audited: 2026-08-07.
 
 - `getting-started/repl.md` — correctly states there is no REPL. ✓
 - `tutorial/error-handling.md` — correctly says runtime faults (IndexError,
-  division, null) are **fatal / not catchable**, only `throw` is catchable
-  (matches BUGS #65). ✓
+  division, null) ARE catchable with `try`/`catch`, and an UNCAUGHT fault is
+  fatal (matches BUGS #65, which made them catchable). Re-corrected 2026-08-08
+  along with CLAUDE.md, learnxinyminutes (`.sf` + `index.html`), and the
+  `memory-limits.md` cross-reference — all had said fatal/not-catchable, the
+  pre-#65 behaviour. ✓
 - wasm targets: no mdbook page currently claims wasm-specific behaviour that the
   wasm32 fixes this session (#170 for-in, #172 malloc, #173 exceptions, #174 `>=`,
   #75 boundary tagging, #179 scheduler) would contradict. If a wasm/targets page

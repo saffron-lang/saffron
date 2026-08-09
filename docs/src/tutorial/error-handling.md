@@ -24,26 +24,33 @@ throw 404
 throw {"code": 500, "message": "internal error"}
 ```
 
-## Runtime errors are not catchable
+## Catching runtime errors
 
-`try`/`catch` handles values you `throw`. It does **not** handle runtime faults:
-index-out-of-bounds, division by zero, and null-pointer errors are **fatal**.
-They print to standard error and exit with status 1, without running any
-`catch` or `finally` block.
+`try`/`catch` handles both values you `throw` and runtime faults —
+index-out-of-bounds, division by zero, and null-pointer errors. A fault raised
+inside a `try` runs the `catch` block with the error message bound to the catch
+variable, and `finally` still runs:
 
 ```saffron
 try {
     var list = [1, 2, 3]
     list[99]
 } catch (e) {
-    IO.println("caught: ${e}")  // never runs
+    IO.println("caught: ${e}")
 }
-// Output: Runtime Error: IndexError: index 99 out of bounds (length 3)
-// Exit status: 1
+IO.println("still running")
+// Output:
+//   caught: IndexError: index 99 out of bounds (length 3)
+//   still running
 ```
 
-To handle a potentially out-of-range index, check before indexing rather than
-trying to recover afterwards:
+An **uncaught** fault — one with no enclosing `try` — is still fatal: it prints
+`Runtime Error: ...` to standard error and exits with status 1. So a fault you do
+not catch behaves as before; wrapping it in `try`/`catch` is what makes it
+recoverable.
+
+You can still prefer a guard when that reads better — checking before indexing
+avoids raising the fault at all:
 
 ```saffron
 if (i >= 0 and i < list.length()) {
