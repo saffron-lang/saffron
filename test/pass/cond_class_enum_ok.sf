@@ -53,8 +53,9 @@ fun main() {
         Test.assert(true, "interface-typed condition compiles (and is falsy)")
     }
 
-    // A nullable class is let through too — proving a union means proving every
-    // member, which is the other residual #159 records.
+    // A bare truthy test on a nullable is now a compile error (BUGS #191 closed
+    // the union residual #159 named); the explicit nil comparison is the correct
+    // form and is what this asserts.
     var maybe: Box|Nil = Box(1)
     if (maybe != nil) {
         Test.assert(true, "the explicit nil comparison on a nullable class works")

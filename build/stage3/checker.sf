@@ -1128,12 +1128,46 @@ class NullChecker {
     // `ctx` names the construct ("if", "while", "ternary", "and"/"or") so the
     // message says where. Codegen is unchanged: once the condition is provably
     // Bool, trunc is the correct lowering.
+    // BUGS #191: is a single (non-union) type provably not Bool? A value of such a
+    // type can never be a Bool at runtime, so `trunc i64 %v to i1` on it is not
+    // "wrong sometimes" — for a pointer it reads the low bit of the address
+    // (allocator-parity nondeterminism), for a scalar it is a mis-test. Mirrors
+    // the registry-guarded checks in check_condition. `Nil` counts: it is the
+    // constant nil, never a Bool. Bool/Any/interface/unresolved return false
+    // (Any might hold a Bool; an interface slot's implementor might be Bool-like).
+    fun member_provably_not_bool(t: String): Bool {
+        if (t == "Bool") return false
+        if (t == "Nil") return true
+        if (this.is_scalar_name(t)) return true
+        if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") return true
+        if (this.env.class_fields.has(t) and !this.interface_names.has(t)) return true
+        if (this.env.enum_variants.has(t)) return true
+        return false
+    }
+
     fun check_condition(cond: AST.Expr, ctx: String) {
         var t: String = this.infer_expr(cond)
         if (t == "Bool") return
         var provably_not_bool: Bool = false
         if (this.is_scalar_name(t)) { provably_not_bool = true }
         if (this.generic_base(t) == "List" or this.generic_base(t) == "Map") { provably_not_bool = true }
+        // A union (`String|Nil`) is provable exactly when EVERY member is — then
+        // no runtime value of it can be a Bool, so the trunc lowering is always a
+        // mis-test (the residual named in #143's comment below, now handled).
+        // split_type_union respects `<>`/`()` depth so `List<Int|Nil>` is not
+        // mis-split. A union with any Bool/Any/interface member stays let through.
+        if (t.contains("|")) {
+            var u_parts: List<String> = AST.split_type_union(t)
+            if (u_parts.length() > 1) {
+                var all_not_bool: Bool = true
+                var ui: Float = 0
+                while (ui < u_parts.length()) {
+                    if (!this.member_provably_not_bool(u_parts[ui])) { all_not_bool = false }
+                    ui = ui + 1
+                }
+                if (all_not_bool) { provably_not_bool = true }
+            }
+        }
         // A declared class or enum is provable too, and it belongs on this side of
         // the line rather than in the let-through set above. #143 grouped
         // class/enum with Any and unions, but they are not the same kind of
@@ -1175,6 +1209,11 @@ class NullChecker {
         }
         else if (this.env.class_fields.has(t)) {
             hint = "; test a field, or compare it, e.g. `x != nil`"
+        }
+        else if (t.contains("|")) {
+            // A nullable union (`T|Nil`) is the overwhelmingly common case; `!= nil`
+            // both narrows and evaluates correctly, unlike a bare truthy test.
+            hint = "; compare it, e.g. `x != nil`"
         }
         // The condition expression itself, which is what the message is about --
         // and one span here locates all six callers (if, while, `!`, `and`,
