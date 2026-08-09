@@ -232,8 +232,8 @@ Does NOT require promotion. Trivial field addition.
 
 ```bash
 ./bootstrap.sh
-tools/saffron run test/loops.sf
-tools/saffron run test/break_continue.sf
+tools/saffron run test/pass/for_header_infer.sf
+tools/saffron run test/pass/loop_control_valid.sf
 ```
 
 ---
