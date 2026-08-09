@@ -516,10 +516,16 @@
         if (!this.identity_mode) {
             var assigned_in_lambda: List<String> = []
             this.collect_lambda_assigned_stmts(body, assigned_in_lambda, false)
+            // BUGS #190: a local captured by a NAMED nested fun must also be
+            // boxed, so gen_func_ref's env stores a surviving heap-cell pointer
+            // instead of the enclosing stack slot's (dangling-on-return) address.
+            var captured_by_nested_fun: List<String> = []
+            this.collect_nested_fun_captures(body, captured_by_nested_fun)
             var bl_i: Float = 0
             while (bl_i < var_names.length()) {
                 var bl_n: String = var_names[bl_i]
-                if (this.str_in_list(assigned_in_lambda, bl_n) and bl_n != "self") {
+                var must_box: Bool = this.str_in_list(assigned_in_lambda, bl_n) or this.str_in_list(captured_by_nested_fun, bl_n)
+                if (must_box and bl_n != "self") {
                     if (this.current_fn_locals.has(bl_n) or !this.module_globals.has(this.current_prefix + bl_n)) {
                         boxed_locals.push(bl_n)
                     }

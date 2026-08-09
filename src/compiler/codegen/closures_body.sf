@@ -818,9 +818,89 @@
             this.collect_lambda_assigned_expr(te, out, in_lambda)
         }
         // FunDecl / EnumDecl / ClassDecl / break / continue / let_pattern: a
-        // named nested function is hoisted with by-value capture params, a
-        // separate mechanism from lambda envs, so it is deliberately not scanned
-        // here. Boxing for it would change the hoisted signature.
+        // named nested function is hoisted with capture params, a separate
+        // mechanism from lambda envs. Its captures are collected by
+        // collect_nested_fun_captures below, not here.
+    }
+
+    // BUGS #190: collect every enclosing local captured by a NAMED nested fun.
+    // Such a capture reaches the enclosing frame through gen_func_ref's env,
+    // which stores the capture's SLOT ADDRESS. If the local lives in an alloca,
+    // the address dangles once the enclosing frame returns (a returned nested
+    // fun reads freed stack). Boxing the local into a heap cell — exactly what
+    // the lambda path does for a written capture — makes the address survive,
+    // and the nested fun's by-reference read stays correct. We box any local a
+    // nested fun captures (a sound over-approximation: boxing a read-only,
+    // called-in-place capture is still correct, just a heap cell instead of a
+    // stack slot). Walks into control-flow bodies AND into nested fun bodies,
+    // since a fun nested two deep still captures an outer local.
+    fun collect_nested_fun_captures(stmts: List<AST.Stmt>, out: List<String>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.collect_nested_fun_captures_stmt(stmts[i], out)
+            i = i + 1
+        }
+    }
+
+    fun collect_nested_fun_captures_stmt(stmt: AST.Stmt, out: List<String>) {
+        var sk: String = this.classify_stmt(stmt)
+        if (sk == "fun") {
+            var fbody: List<AST.Stmt> = match (stmt) { FunDecl(n, p, r, b, d, fv, __ns, __fs) => b
+                _ => []
+            }
+            var fparams: List<AST.Param> = match (stmt) { FunDecl(n, p, r, b, d, fv, __ns, __fs) => p
+                _ => []
+            }
+            // The nested fun's own params bind; its free vars are the captures.
+            var bound: List<String> = []
+            var pi: Float = 0
+            while (pi < fparams.length()) {
+                var pnm: String = match (fparams[pi]) { Param(pn, pt, pd, pv, __ps) => pn }
+                bound.push(pnm)
+                pi = pi + 1
+            }
+            var caps: List<String> = []
+            this.find_free_vars_stmts(fbody, bound, caps)
+            var ci: Float = 0
+            while (ci < caps.length()) {
+                if (!this.str_in_list(out, caps[ci])) { out.push(caps[ci]) }
+                ci = ci + 1
+            }
+            // A fun nested inside this one may capture the same outer locals.
+            this.collect_nested_fun_captures(fbody, out)
+        } else if (sk == "if") {
+            var it: List<AST.Stmt> = match (stmt) { If(c, t, e) => t
+                _ => []
+            }
+            var ie: List<AST.Stmt> = match (stmt) { If(c, t, e) => e
+                _ => []
+            }
+            this.collect_nested_fun_captures(it, out)
+            this.collect_nested_fun_captures(ie, out)
+        } else if (sk == "while") {
+            var wb: List<AST.Stmt> = match (stmt) { While(c, b) => b
+                _ => []
+            }
+            this.collect_nested_fun_captures(wb, out)
+        } else if (sk == "block") {
+            var bb: List<AST.Stmt> = match (stmt) { Block(s) => s
+                _ => []
+            }
+            this.collect_nested_fun_captures(bb, out)
+        } else if (sk == "try") {
+            var tb: List<AST.Stmt> = match (stmt) { TryCatch(t, n, c, f) => t
+                _ => []
+            }
+            var cb: List<AST.Stmt> = match (stmt) { TryCatch(t, n, c, f) => c
+                _ => []
+            }
+            var fb: List<AST.Stmt> = match (stmt) { TryCatch(t, n, c, f) => f
+                _ => []
+            }
+            this.collect_nested_fun_captures(tb, out)
+            this.collect_nested_fun_captures(cb, out)
+            this.collect_nested_fun_captures(fb, out)
+        }
     }
 
     fun collect_lambda_assigned_expr(expr: AST.Expr, out: List<String>, in_lambda: Bool) {
