@@ -15168,6 +15168,59 @@ class Codegen {
     }
     this.called_functions.push(full_method)
 
+    // Fill omitted trailing default parameters. Without this, a statically-typed
+    // receiver calling a method that defaults a trailing param (e.g.
+    // `fun go(msg: String, fields: Map = {})` called as `b.go("hi")`) emitted a
+    // short-arity call and the callee read its missing argument from an
+    // uninitialized ABI register — garbage that faulted when dereferenced (the
+    // test_log O0 segfault). The free-function path (expr_body.sf) and the
+    // untyped-receiver path already do this; this typed path was the gap.
+    //
+    // INDEXING: for a class method, both func_defaults and func_param_names are
+    // registered WITH `self` at index 0 (stmts_body.sf:843/829), so their length
+    // is the full width INCLUDING the receiver. arg_strs also already carries the
+    // receiver (has_self), so drive the fill by arg_strs.length() — NOT by `i`,
+    // which counts only user args and would be off by one (over-filling). Defaults
+    // register under the method's full/canonical name; try both.
+    var def_key: String = full_method
+    if (!this.func_defaults.has(def_key) and this.func_defaults.has(canonical)) {
+        def_key = canonical
+    }
+    var pn_key: String = full_method
+    if (!this.func_param_names.has(pn_key) and this.func_param_names.has(canonical)) {
+        pn_key = canonical
+    }
+    if (this.func_defaults.has(def_key)) {
+        var m_defaults: List<AST.Expr> = this.func_defaults.get(def_key)
+        var m_param_count: Float = m_defaults.length()
+        if (this.func_param_names.has(pn_key)) {
+            var m_pc2: Float = this.func_param_names.get(pn_key).length()
+            if (m_pc2 > m_param_count) { m_param_count = m_pc2 }
+        }
+        // j indexes the full parameter list (self at 0), aligned with arg_strs.
+        var j: Float = arg_strs.length()
+        while (j < m_param_count) {
+            if (j < m_defaults.length()) {
+                var m_def_expr: AST.Expr = m_defaults[j]
+                var m_is_nil: Bool = this.classify_expr(m_def_expr) == "nil"
+                if (!m_is_nil) {
+                    var m_def_val: String = this.gen_arg_value(m_def_expr)
+                    arg_strs.push("i64 " + m_def_val)
+                    ns_roots = ns_roots + this.gen_root_arg_temp(m_def_val)
+                } else {
+                    var m_nil_fill: String = this.fresh_local()
+                    this.emit_indent(m_nil_fill + " = call i64 @__val_nil()")
+                    arg_strs.push("i64 " + m_nil_fill)
+                }
+            } else {
+                var m_nil_fill2: String = this.fresh_local()
+                this.emit_indent(m_nil_fill2 + " = call i64 @__val_nil()")
+                arg_strs.push("i64 " + m_nil_fill2)
+            }
+            j = j + 1
+        }
+    }
+
     // Coroutine-aware method call: if this function is a coroutine and the
     // callee is also a coroutine, emit the await pattern instead of plain call.
     if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
@@ -15613,6 +15666,17 @@ class Codegen {
                 return this.gen_extern_call(__mp_func, args)
             }
             this.called_functions.push(__mp_func)
+            // Record the real arity so the auto-declare emitter (output_body.sf)
+            // does not fall back to its arity-1 default. A zero-arg runtime alias
+            // like `IO.readln()` -> @__io_readln() was declared `(i64)`, which on
+            // wasm32's typed table is a signature mismatch that traps, and on
+            // native an invalid redefinition against the real 0-arg definition.
+            // The canonical __io_readline was in the known-sig table but the
+            // __io_readln/__io_read_line aliases were not; setting arity here
+            // fixes every such alias generically rather than by enumeration.
+            if (!this.called_function_arity.has(__mp_func)) {
+                this.called_function_arity.set(__mp_func, args.length())
+            }
 
             // Check if this is a class constructor: class_fields has the method name
             // or the prefixed name, meaning it's a class not a plain function

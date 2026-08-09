@@ -571,14 +571,139 @@ end:
   ret i64 %acc
 }
 
-; --- strtod stub ---
-
+; --- strtod ---
+; Parses [sign] int [ '.' frac ] [ ('e'|'E') [sign] exp ]. The old stub read
+; only the integer part via atol, so `"3.14".to_float()` returned 3.0 — every
+; fractional literal in @toml / config parsing was truncated on wasm32 (BUGS:
+; toml_test wasm32 divergence). endptr is ignored (callers pass null).
 define double @strtod(i8* %s, i8* %endptr) {
 entry:
-  ; Minimal stub: convert integer portion only
-  %ival = call i64 @atol(i8* %s)
-  %fval = sitofp i64 %ival to double
-  ret double %fval
+  ; optional leading sign
+  %c0 = load i8, i8* %s
+  %is_minus = icmp eq i8 %c0, 45          ; '-'
+  %is_plus = icmp eq i8 %c0, 43           ; '+'
+  %has_sign = or i1 %is_minus, %is_plus
+  %sign = select i1 %is_minus, double -1.000000e+00, double 1.000000e+00
+  %start = select i1 %has_sign, i64 1, i64 0
+  br label %int_loop
+
+int_loop:
+  %ii = phi i64 [ %start, %entry ], [ %ii_next, %int_digit ]
+  %acc = phi double [ 0.000000e+00, %entry ], [ %acc_next, %int_digit ]
+  %ip = getelementptr i8, i8* %s, i64 %ii
+  %ic = load i8, i8* %ip
+  %ic_ge = icmp uge i8 %ic, 48
+  %ic_le = icmp ule i8 %ic, 57
+  %ic_ok = and i1 %ic_ge, %ic_le
+  br i1 %ic_ok, label %int_digit, label %int_done
+
+int_digit:
+  %id = sub i8 %ic, 48
+  %id_d = uitofp i8 %id to double
+  %acc_m = fmul double %acc, 1.000000e+01
+  %acc_next = fadd double %acc_m, %id_d
+  %ii_next = add i64 %ii, 1
+  br label %int_loop
+
+int_done:
+  ; optional fraction
+  %dot = icmp eq i8 %ic, 46               ; '.'
+  br i1 %dot, label %frac_init, label %exp_check
+
+frac_init:
+  %frac_start = add i64 %ii, 1
+  br label %frac_loop
+
+frac_loop:
+  %fi = phi i64 [ %frac_start, %frac_init ], [ %fi_next, %frac_digit ]
+  %facc = phi double [ %acc, %frac_init ], [ %facc_next, %frac_digit ]
+  %scale = phi double [ 1.000000e-01, %frac_init ], [ %scale_next, %frac_digit ]
+  %fp = getelementptr i8, i8* %s, i64 %fi
+  %fc = load i8, i8* %fp
+  %fc_ge = icmp uge i8 %fc, 48
+  %fc_le = icmp ule i8 %fc, 57
+  %fc_ok = and i1 %fc_ge, %fc_le
+  br i1 %fc_ok, label %frac_digit, label %frac_done
+
+frac_digit:
+  %fd = sub i8 %fc, 48
+  %fd_d = uitofp i8 %fd to double
+  %fd_scaled = fmul double %fd_d, %scale
+  %facc_next = fadd double %facc, %fd_scaled
+  %scale_next = fmul double %scale, 1.000000e-01
+  %fi_next = add i64 %fi, 1
+  br label %frac_loop
+
+frac_done:
+  br label %exp_check
+
+exp_check:
+  ; %mantissa and the index after the mantissa
+  %mantissa = phi double [ %acc, %int_done ], [ %facc, %frac_done ]
+  %after = phi i64 [ %ii, %int_done ], [ %fi, %frac_done ]
+  %ep0 = getelementptr i8, i8* %s, i64 %after
+  %ec0 = load i8, i8* %ep0
+  %is_e1 = icmp eq i8 %ec0, 101           ; 'e'
+  %is_e2 = icmp eq i8 %ec0, 69            ; 'E'
+  %is_e = or i1 %is_e1, %is_e2
+  br i1 %is_e, label %exp_init, label %finish_noexp
+
+exp_init:
+  %e_after_e = add i64 %after, 1
+  %esp = getelementptr i8, i8* %s, i64 %e_after_e
+  %esc = load i8, i8* %esp
+  %e_minus = icmp eq i8 %esc, 45
+  %e_plus = icmp eq i8 %esc, 43
+  %e_has_sign = or i1 %e_minus, %e_plus
+  %e_sign = select i1 %e_minus, double -1.000000e+00, double 1.000000e+00
+  %e_start = select i1 %e_has_sign, i64 1, i64 0
+  %e_di = add i64 %e_after_e, %e_start
+  br label %exp_loop
+
+exp_loop:
+  %ei = phi i64 [ %e_di, %exp_init ], [ %ei_next, %exp_digit ]
+  %eacc = phi i64 [ 0, %exp_init ], [ %eacc_next, %exp_digit ]
+  %eep = getelementptr i8, i8* %s, i64 %ei
+  %eec = load i8, i8* %eep
+  %ee_ge = icmp uge i8 %eec, 48
+  %ee_le = icmp ule i8 %eec, 57
+  %ee_ok = and i1 %ee_ge, %ee_le
+  br i1 %ee_ok, label %exp_digit, label %exp_apply
+
+exp_digit:
+  %ed = sub i8 %eec, 48
+  %ed_i = zext i8 %ed to i64
+  %eacc_m = mul i64 %eacc, 10
+  %eacc_next = add i64 %eacc_m, %ed_i
+  %ei_next = add i64 %ei, 1
+  br label %exp_loop
+
+exp_apply:
+  ; pow10 = 10 ^ eacc, applied via a simple loop; then * or / by e_sign
+  %exp_neg = fcmp olt double %e_sign, 0.000000e+00
+  br label %pow_loop
+
+pow_loop:
+  %pi = phi i64 [ 0, %exp_apply ], [ %pi_next, %pow_body ]
+  %pacc = phi double [ 1.000000e+00, %exp_apply ], [ %pacc_next, %pow_body ]
+  %pdone = icmp uge i64 %pi, %eacc
+  br i1 %pdone, label %pow_done, label %pow_body
+
+pow_body:
+  %pacc_next = fmul double %pacc, 1.000000e+01
+  %pi_next = add i64 %pi, 1
+  br label %pow_loop
+
+pow_done:
+  %m_signed = fmul double %mantissa, %sign
+  %m_mul = fmul double %m_signed, %pacc
+  %m_div = fdiv double %m_signed, %pacc
+  %result_exp = select i1 %exp_neg, double %m_div, double %m_mul
+  ret double %result_exp
+
+finish_noexp:
+  %result = fmul double %mantissa, %sign
+  ret double %result
 }
 
 ; --- File I/O stubs (not available in browser) ---
