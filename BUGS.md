@@ -2,72 +2,25 @@
 
 ## Open
 
-**4 open entries:** #107, #131, #132, #190.
+**3 open entries:** #107, #131, #132.
 Next free number is **#192**.
 
-### 190. An escaping named nested fun captures its enclosing locals by reference (dangling at -O0)
-
-A named nested `fun` that is RETURNED (or otherwise escapes) and reads an
-enclosing local gets that local by *reference* — the env stores the address of
-the enclosing stack slot — so once the enclosing frame dies the capture dangles.
-At -O2 the value often survives in a register by luck; at -O0 the slot is
-clobbered and the closure reads garbage. Minimal repro:
-
-```saffron
-fun make_b() {
-    var inner: String = "captured"
-    fun collide_b() { return inner }
-    return collide_b
-}
-var collide_b = make_b()
-IO.println(collide_b())   // -O0: 5.21502e-310 (dangling), -O2: "captured"
-```
-
-Found by the differential oracle: `test/pass/segv_name_collision_fun_vs_var.sf`
-disagrees native-O2 (exit 0) vs native-O0 (exit 1, the capturing-nested-fun
-assertion prints a denormal). Verified in IR: `gen_func_ref`
-(`src/compiler/codegen/expr_body.sf`, ~line 1560) builds the env with
-`typed_ptr_to_val("%local", "i64*")` — the slot ADDRESS — and the trampoline
-(~1601) forwards it; the callee `make_b$$collide_b(i64 %inner.arg)` does
-`inttoptr`+`load`. So the nested-fun capture convention is by-reference, which is
-fine for an in-place call (frame alive) but dangling on escape.
-
-Contrast the LAMBDA path (`closures_body.sf:116-143`): it COPIES the value for a
-read-only capture and only stores a cell pointer for a `boxed_locals` capture
-(heap cells that survive the frame, BUGS #51). `gen_func_ref` never consults
-`boxed_locals`. The comment at `output_body.sf:511` ("a capture that is merely
-read keeps its alloca — the env snapshot is already correct for it") is true for
-lambdas but FALSE for gen_func_ref, which snapshots the address rather than the
-value.
-
-Fix direction: make an escaping named nested fun capture read-only locals by
-VALUE (as the lambda path does), or extend `boxed_locals` to include locals
-captured by an escaping nested-fun ref so they become heap cells. Care needed:
-this is the hottest codegen path and the in-place-call case must stay working;
-needs solid regression coverage across in-place vs returned, read-only vs
-written, and capturing-vs-plain nested funs. Compiler change → rebootstrap.
-Related: BUGS #2 (nested-closure forward refs), #51 (boxed cells), #175
-(nested-fun symbol qualification).
-
-**2026-08-08 — a blanket by-value switch is NOT enough (tried, reverted).** The
-obvious fix — env stores the value (`load %local`) instead of the address, callee
-allocas the capture param, direct-call site passes the value — does fix the
-escaping/dangling case AND passes `segv_name_collision_fun_vs_var` +
-`nested_fun_capture_by_value` at both -O0 and -O2. BUT it REGRESSES the
-in-place mutation case: `test/pass/closures.sf`'s `counter()` reassigns a captured
-`count` (`count = count + 1`) across three in-place `increment()` calls and expects
-`3`; by-value gives each call its own copy, so it returns `1`. The suite caught it
-(6 failures: closures output-mismatch, arity_zero_ok, json/test_json/toml_test
-crash/timeout, located_checker_diagnostics). So the fix MUST distinguish read-only
-captures (safe to copy by value) from reassigned ones (must be a shared heap cell)
-— exactly what the lambda path's `boxed_caps` does. The real work: extend
-`collect_lambda_assigned_stmt` (`closures_body.sf:820`, which currently
-DELIBERATELY skips FunDecl bodies) to also scan nested-fun bodies for assignments,
-add those to `boxed_locals`, and route `gen_func_ref` + the direct-call capture
-site + the hoisted callee through the same box-cell-vs-value logic lambdas use
-(`boxed_caps`). That changes the hoisted nested-fun capture-param convention, which
-is why the skip comment avoided it. Not a quick fix; do it with the full
-in-place-vs-escaping × read-only-vs-written regression matrix in hand.
+#190 (a named nested fun captured enclosing locals by SLOT ADDRESS, so a RETURNED
+nested fun read a dead stack slot once its frame returned — garbage at -O0, luck at
+-O2) is now FIXED. gen_func_ref stored `ptrtoint(%local)` in the closure env and the
+hoisted callee read it by `inttoptr`+`load`; a returned closure then dereferenced a
+freed slot. The by-value attempt (b66e3933) fixed escape but regressed in-place
+mutation. The systematic fix boxes any local captured by a nested `FunDecl` into a
+heap cell — the same `boxed_locals` mechanism the lambda path already uses for a 
+written capture — so the env stores a SURVIVING cell pointer (no env-build or callee
+ABI change) and an in-place mutation stays visible because the cell is shared. One
+mechanism now serves both the lambda and named-nested-fun capture paths. New
+`collect_nested_fun_captures` (closures_body.sf) feeds `boxed_locals` (output_body.sf).
+Boxing every captured local (not only written ones) is a sound over-approximation;
+identity-mode skips boxing so the bootstrap is unaffected (stage-2 gen4 green).
+Regression `test/pass/nested_fun_capture_matrix.sf` covers escaping/in-place ×
+read-only/written; differential agrees native-O0 == native-O2 == wasm32 on it and on
+segv_name_collision. Suite 356 passed / 0 failed. Lives in `BUGS_CLOSED.md`. Open set 4 → 3.
 
 #191 (a bare truthy test on a union like `String|Nil` lowered to `trunc i64 %v to
 i1`, testing bit 0 of the heap address instead of truthiness — so

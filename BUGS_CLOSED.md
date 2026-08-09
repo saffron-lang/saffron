@@ -9,6 +9,50 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 190. FIXED — box locals captured by a named nested fun (escaping-capture dangle)
+
+A named nested `fun` captured its enclosing locals by SLOT ADDRESS: `gen_func_ref`
+(`src/compiler/codegen/expr_body.sf`) stored `ptrtoint(%local)` in the closure env,
+and the hoisted callee read it via `inttoptr`+`load`. Correct for an in-place call
+(frame alive) but a RETURNED nested fun read a dead stack slot once its defining
+frame returned — garbage at -O0 (`5.21502e-310`), lucky-survival at -O2. Found by
+the differential oracle on `test/pass/segv_name_collision_fun_vs_var.sf`
+(native-O0 disagreed with native-O2).
+
+```saffron
+fun make_b(): Fun {
+    var inner: String = "captured"
+    fun collide_b(): String { return inner }
+    return collide_b
+}
+var f = make_b()
+IO.println(f())   // was 5.21502e-310 at -O0; now "captured"
+```
+
+The naive fix — capture by VALUE (env stores `load %local`, callee allocas the
+param) — fixed escape but REGRESSED in-place mutation: a nested `count = count + 1`
+across in-place calls must be visible to the enclosing scope, and a value copy loses
+it (`test/pass/closures.sf`'s counter returned 1 instead of 3). Recorded as the
+by-value dead end before this landed.
+
+The systematic fix reuses the mechanism the LAMBDA path already had for a written
+capture (`boxed_caps`, BUGS #51): box any local captured by a nested `FunDecl` into a
+heap cell. Then `gen_func_ref`'s env stores the SURVIVING cell pointer — no change to
+the env-build or the callee's by-reference ABI — and an in-place mutation stays
+visible because the cell is shared. One mechanism now serves both capture paths.
+`collect_nested_fun_captures` (closures_body.sf) walks the enclosing body (through
+if/while/block/try and into nested fun bodies) collecting each nested fun's free
+vars; `output_body.sf`'s `boxed_locals` unions those with the lambda-assigned set.
+Boxing every captured local (not only written ones) is a sound over-approximation —
+a read-only boxed capture is still correct, just a heap cell. Identity-mode
+(bootstrap) skips boxing, so the compiler's own build is unaffected; stage-2 gen4
+fixed point stayed green.
+
+Regression `test/pass/nested_fun_capture_matrix.sf` covers all four quadrants
+(escaping/in-place × read-only/written). `tools/differential.sh` agrees
+native-O0 == native-O2 == wasm32 on it and on `segv_name_collision_fun_vs_var`.
+Full suite 356 passed / 0 failed, including the 6 tests the by-value attempt broke.
+
 ### 191. FIXED — truthy test on an all-non-Bool union rejected by the checker
 
 `if (x)` where `x` is a union like `String|Nil` holding a non-nil value used to
