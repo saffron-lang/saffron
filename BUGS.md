@@ -2,7 +2,7 @@
 
 ## Open
 
-**5 open entries:** #107, #131, #132, #190, #191.
+**4 open entries:** #107, #131, #132, #190.
 Next free number is **#192**.
 
 ### 190. An escaping named nested fun captures its enclosing locals by reference (dangling at -O0)
@@ -69,30 +69,18 @@ site + the hoisted callee through the same box-cell-vs-value logic lambdas use
 is why the skip comment avoided it. Not a quick fix; do it with the full
 in-place-vs-escaping × read-only-vs-written regression matrix in hand.
 
-### 191. Truthy test on a union value tests bit 0 of the NaN box (address parity)
-
-`if (x)` where `x` is a union like `String|Nil` holding a non-nil value gives an
-answer that depends on the heap address's low bit, not on truthiness. `to_i1()`
-(`src/compiler/codegen/stmts_body.sf:1568-1583`) emits `trunc i64 %v to i1` for a
-condition — for a `TAG_PTR | addr` value that tests bit 0 of `addr`, so the
-result flips with allocator parity. A non-nil String *should* be truthy; instead
-it is address-parity, and native vs wasm allocators differ, so the same program
-answers differently per target.
-
-Found by the differential oracle: `test/nullable_narrowing.sf` prints an extra
-line on wasm32 vs native — case 3's `if (result3)` (result3 = a non-nil String)
-fires on one target and not the other. Both are wrong; it is nondeterministic in
-principle. `checker.sf:1131` `check_condition` (BUGS #143) rejects provably-non-
-Bool conditions but deliberately lets unions through (comment at ~1159 assumes
-`if (maybe_box)` "is also always false" — but it is address-parity for the
-non-nil pointer case, not always false).
-
-Fix options: (a) checker — extend `check_condition` to reject a union condition
-whose members are all provably non-Bool, forcing an explicit `!= nil` (matches
-the #143 direction; the comment already names this as the deferred step); or
-(b) codegen — make `to_i1` on a non-Bool value emit a real truthiness test
-(nil/false → 0, else → 1) instead of a bare `trunc`, which needs a `__val_truthy`
-helper added to all four runtime bases. Compiler change → rebootstrap.
+#191 (a bare truthy test on a union like `String|Nil` lowered to `trunc i64 %v to
+i1`, testing bit 0 of the heap address instead of truthiness — so
+`if (non_nil_string)` answered on allocator parity and diverged native vs wasm32)
+is now FIXED via the checker option (a): `check_condition` proves a union
+non-Bool exactly when EVERY member is (new `member_provably_not_bool` helper,
+reusing the #143 registry checks), and rejects it with a `!= nil` hint. Closed the
+union residual #143/#159 named. Compiler source uses no such condition so the
+bootstrap stayed green (stage 2 verified). `test/fail/truthy_union_condition.sf`
+pins the rejection; `test/nullable_narrowing.sf` case 3 rewritten to `!= nil` (its
+`.expected` gained the line the guard now correctly prints), and
+`tools/differential.sh` agrees native-O0 == native-O2 == wasm32 on it. Suite 356
+passed / 0 failed. Lives in `BUGS_CLOSED.md`. Open set 5 → 4.
 
 #65 (runtime faults were fatal and uncatchable — `try`/`catch` couldn't catch
 IndexError/DivisionError/NullError) is now FIXED: all five recoverable runtime

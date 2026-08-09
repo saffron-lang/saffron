@@ -21,9 +21,13 @@ if (result2 == nil) {
     IO.println(result2.length().to_string())
 }
 
-// Case 3: Truthy check — should be fine
+// Case 3: a bare truthy check on a nullable is now a COMPILE ERROR (BUGS #191).
+// `trunc i64 %v to i1` tested bit 0 of the heap address, so `if (result3)`
+// evaluated on allocator parity — a silent wrong answer that diverged native
+// vs wasm32. The checker rejects it now and points at `!= nil`, which is the
+// correct narrowing form (Case 1). This case therefore uses the explicit guard.
 var result3: String|Nil = find("found")
-if (result3) {
+if (result3 != nil) {
     IO.println(result3.length().to_string())
 }
 

@@ -9,6 +9,36 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 191. FIXED — truthy test on an all-non-Bool union rejected by the checker
+
+`if (x)` where `x` is a union like `String|Nil` holding a non-nil value used to
+give an answer that depended on the heap address's low bit, not on truthiness.
+`to_i1()` (`src/compiler/codegen/stmts_body.sf`) emits `trunc i64 %v to i1` for a
+condition — for a `TAG_PTR | addr` value that tests bit 0 of `addr`, so the result
+flipped with allocator parity. A non-nil String *should* be truthy; instead it was
+address-parity, and native vs wasm allocators differ, so the same program answered
+differently per target (found by the differential oracle on
+`test/nullable_narrowing.sf`).
+
+`checker.sf`'s `check_condition` (BUGS #143) already rejected provably-non-Bool
+single types but deliberately let unions through — the residual #143/#159 named
+("proving a union means proving EVERY member"). FIXED by doing exactly that: a new
+`member_provably_not_bool` helper (Nil, scalars other than Bool, List/Map, concrete
+class, enum — reusing the same registry-guarded checks) is applied across
+`AST.split_type_union(t)`, and a union is rejected only when every member passes.
+Any Bool/Any/interface member keeps it let through (an `Any` might hold a Bool at
+runtime; an interface slot's implementor might be Bool-like). The diagnostic points
+at `!= nil`. Codegen unchanged — once a condition is provably non-Bool it is a
+compile error, so the bad `trunc` lowering is never reached.
+
+The compiler's own source contains no such condition, so the bootstrap stayed green
+(stage 2, gen3 compiling its own source, verified). Regression:
+`test/fail/truthy_union_condition.sf` must be rejected; `test/nullable_narrowing.sf`
+case 3 was rewritten from the (now-illegal) bare `if (result3)` to `if (result3 !=
+nil)`, and its `.expected` gained the line the correct guard now prints.
+`tools/differential.sh` agrees native-O0 == native-O2 == wasm32 on it. Suite 356
+passed / 0 failed.
+
 ### 65. FIXED — runtime faults are now catchable
 
 ```saffron
