@@ -1,0 +1,27 @@
+// BUGS #191: a bare truthy test on a union whose members are all provably
+// non-Bool must be a compile error, because codegen lowers a condition with
+// `trunc i64 %v to i1` — which for a `String|Nil` value tests bit 0 of the
+// heap address (allocator parity), NOT truthiness. A non-nil string would be
+// "truthy" or not depending on where it was allocated, and native vs wasm
+// allocators disagree, so the same program answered differently per target.
+//
+// The checker now rejects it (mirroring the single-type #143 rule) and points
+// at `!= nil`, which both narrows and evaluates correctly.
+//
+// This file MUST be rejected. If it ever compiles cleanly, the union case of
+// check_condition has regressed.
+
+fun find(name: String): String|Nil {
+    if (name == "found") { return "yes" }
+    return nil
+}
+
+fun main() {
+    var result: String|Nil = find("found")
+    // Error: `if` condition must be Bool, got String|Nil; compare it, e.g. `x != nil`
+    if (result) {
+        IO.println("truthy")
+    }
+}
+
+main()
