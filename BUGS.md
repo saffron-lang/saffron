@@ -2,8 +2,77 @@
 
 ## Open
 
-**3 open entries:** #107, #131, #132.
-Next free number is **#190**.
+**5 open entries:** #107, #131, #132, #190, #191.
+Next free number is **#192**.
+
+### 190. An escaping named nested fun captures its enclosing locals by reference (dangling at -O0)
+
+A named nested `fun` that is RETURNED (or otherwise escapes) and reads an
+enclosing local gets that local by *reference* — the env stores the address of
+the enclosing stack slot — so once the enclosing frame dies the capture dangles.
+At -O2 the value often survives in a register by luck; at -O0 the slot is
+clobbered and the closure reads garbage. Minimal repro:
+
+```saffron
+fun make_b() {
+    var inner: String = "captured"
+    fun collide_b() { return inner }
+    return collide_b
+}
+var collide_b = make_b()
+IO.println(collide_b())   // -O0: 5.21502e-310 (dangling), -O2: "captured"
+```
+
+Found by the differential oracle: `test/pass/segv_name_collision_fun_vs_var.sf`
+disagrees native-O2 (exit 0) vs native-O0 (exit 1, the capturing-nested-fun
+assertion prints a denormal). Verified in IR: `gen_func_ref`
+(`src/compiler/codegen/expr_body.sf`, ~line 1560) builds the env with
+`typed_ptr_to_val("%local", "i64*")` — the slot ADDRESS — and the trampoline
+(~1601) forwards it; the callee `make_b$$collide_b(i64 %inner.arg)` does
+`inttoptr`+`load`. So the nested-fun capture convention is by-reference, which is
+fine for an in-place call (frame alive) but dangling on escape.
+
+Contrast the LAMBDA path (`closures_body.sf:116-143`): it COPIES the value for a
+read-only capture and only stores a cell pointer for a `boxed_locals` capture
+(heap cells that survive the frame, BUGS #51). `gen_func_ref` never consults
+`boxed_locals`. The comment at `output_body.sf:511` ("a capture that is merely
+read keeps its alloca — the env snapshot is already correct for it") is true for
+lambdas but FALSE for gen_func_ref, which snapshots the address rather than the
+value.
+
+Fix direction: make an escaping named nested fun capture read-only locals by
+VALUE (as the lambda path does), or extend `boxed_locals` to include locals
+captured by an escaping nested-fun ref so they become heap cells. Care needed:
+this is the hottest codegen path and the in-place-call case must stay working;
+needs solid regression coverage across in-place vs returned, read-only vs
+written, and capturing-vs-plain nested funs. Compiler change → rebootstrap.
+Related: BUGS #2 (nested-closure forward refs), #51 (boxed cells), #175
+(nested-fun symbol qualification).
+
+### 191. Truthy test on a union value tests bit 0 of the NaN box (address parity)
+
+`if (x)` where `x` is a union like `String|Nil` holding a non-nil value gives an
+answer that depends on the heap address's low bit, not on truthiness. `to_i1()`
+(`src/compiler/codegen/stmts_body.sf:1568-1583`) emits `trunc i64 %v to i1` for a
+condition — for a `TAG_PTR | addr` value that tests bit 0 of `addr`, so the
+result flips with allocator parity. A non-nil String *should* be truthy; instead
+it is address-parity, and native vs wasm allocators differ, so the same program
+answers differently per target.
+
+Found by the differential oracle: `test/nullable_narrowing.sf` prints an extra
+line on wasm32 vs native — case 3's `if (result3)` (result3 = a non-nil String)
+fires on one target and not the other. Both are wrong; it is nondeterministic in
+principle. `checker.sf:1131` `check_condition` (BUGS #143) rejects provably-non-
+Bool conditions but deliberately lets unions through (comment at ~1159 assumes
+`if (maybe_box)` "is also always false" — but it is address-parity for the
+non-nil pointer case, not always false).
+
+Fix options: (a) checker — extend `check_condition` to reject a union condition
+whose members are all provably non-Bool, forcing an explicit `!= nil` (matches
+the #143 direction; the comment already names this as the deferred step); or
+(b) codegen — make `to_i1` on a non-Bool value emit a real truthiness test
+(nil/false → 0, else → 1) instead of a bare `trunc`, which needs a `__val_truthy`
+helper added to all four runtime bases. Compiler change → rebootstrap.
 
 #65 (runtime faults were fatal and uncatchable — `try`/`catch` couldn't catch
 IndexError/DivisionError/NullError) is now FIXED: all five recoverable runtime
