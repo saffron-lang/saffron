@@ -170,21 +170,23 @@ try {
     IO.println("cleanup")
 }
 
-// Runtime errors are NOT catchable — they are fatal.
-// IndexError, DivisionError and NullError all route to
-// __runtime_error_fatal (src/runtime/runtime.sf:713), which prints to fd 2
-// and calls rt_exit(1). The catch block below never runs:
+// Runtime errors ARE catchable (BUGS #65). IndexError, DivisionError and
+// NullError route through __rt_raise (src/runtime/*.ll): if a try/catch handler
+// is active it stores the message and longjmps into it, so `catch (e)` binds the
+// message string; with no handler it falls back to __runtime_error_fatal (print
+// to fd 2 + rt_exit(1)). The catch block below runs:
 try {
     var list = [1, 2, 3]
-    list[99]              // prints "Runtime Error: IndexError: ..." and exits 1
+    list[99]              // raises IndexError, caught below
 } catch (e) {
-    IO.println("caught: ${e}")   // unreachable
+    IO.println("caught: ${e}")   // caught: IndexError: index 99 out of bounds (length 3)
 }
 ```
 
-`try`/`catch`/`finally` works for `throw` — only runtime faults are
-uncatchable. Nil misuse is generally rejected at compile time by the checker
-rather than surfacing at runtime at all.
+`try`/`catch`/`finally` works for both `throw` and runtime faults. An UNCAUGHT
+fault (no enclosing try) is still fatal — it prints `Runtime Error: ...` and
+exits 1. Nil misuse is generally rejected at compile time by the checker rather
+than surfacing at runtime at all.
 
 ### Classes and Inheritance
 

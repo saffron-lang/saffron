@@ -492,9 +492,18 @@ try {
     IO.println("finally always runs")
 }
 
-// Runtime errors are NOT catchable -- they are fatal. An out-of-bounds index,
-// a division by zero, or a null-pointer error prints to stderr and exits 1
-// without running any catch or finally block. So guard instead of recovering:
+// Runtime errors are catchable too: an out-of-bounds index, a division by zero,
+// or a null-pointer error raised inside a try runs the catch with the message
+// bound to `e`. An UNCAUGHT fault (no enclosing try) is still fatal -- it prints
+// to stderr and exits 1.
+try {
+    var oops = [1, 2, 3]
+    IO.println(oops[99])
+} catch (e) {
+    IO.println("caught: ${e}")   // caught: IndexError: index 99 out of bounds (length 3)
+}
+
+// Or guard before indexing when that reads better -- it avoids raising at all:
 var short = [1, 2, 3]
 var want: Int = 99
 if (want >= 0 and want < short.length()) {

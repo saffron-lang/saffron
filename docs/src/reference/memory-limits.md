@@ -120,9 +120,11 @@ try {
 
 The check fires inside the allocator, part-way through constructing an object.
 Unwinding from there would leave a half-initialized value reachable from the
-shadow stack, so the runtime reports and exits instead. This matches every other
-runtime fault in Saffron — index errors, division by zero and nil misuse are all
-fatal too (see [Error Handling](../tutorial/error-handling.md)).
+shadow stack, so the runtime reports and exits instead. This is stricter than an
+ordinary runtime fault: index errors, division by zero and nil misuse ARE
+catchable with `try`/`catch` (see [Error Handling](../tutorial/error-handling.md)),
+but a cap breach is one of the few genuinely unrecoverable conditions — it always
+exits, caught or not.
 
 The error path itself allocates nothing: it writes a fixed message with a direct
 `write(2, ...)`, because the normal diagnostic machinery builds its message on the
