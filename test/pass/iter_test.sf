@@ -1,0 +1,227 @@
+// Coverage for the @iter stdlib module (src/lib/iter.sf). Every public function
+// gets a normal case plus at least one edge case (empty list, n out of range,
+// not-found, duplicates, ordering). Signatures were read from the source, not
+// guessed: reduce is (acc, elem), find/max/min return nil on miss/empty, and
+// zip/enumerate yield 2-element [a, b] lists.
+
+import "@test" as T
+import "@iter" as Iter
+
+// --- to_list ---
+var tl = Iter.to_list([1, 2, 3])
+T.assert_eq(tl.length(), 3, "to_list copies length")
+T.assert_eq(tl[0], 1, "to_list preserves first")
+T.assert_eq(tl[2], 3, "to_list preserves last")
+T.assert_eq(Iter.to_list([]).length(), 0, "to_list of empty is empty")
+
+// --- map ---
+var mapped = Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
+T.assert_eq(mapped.length(), 3, "map keeps length")
+T.assert_eq(mapped[0], 2, "map doubles first")
+T.assert_eq(mapped[2], 6, "map doubles last")
+T.assert_eq(Iter.map([], fun (x: Int): Int => x * 2).length(), 0, "map of empty is empty")
+
+// --- filter ---
+var evens = Iter.filter([1, 2, 3, 4, 5, 6], fun (x: Int): Bool => x % 2 == 0)
+T.assert_eq(evens.length(), 3, "filter keeps only evens")
+T.assert_eq(evens[0], 2, "filter first even")
+T.assert_eq(evens[2], 6, "filter last even")
+T.assert_eq(Iter.filter([1, 3, 5], fun (x: Int): Bool => x % 2 == 0).length(), 0,
+    "filter with no matches is empty")
+
+// --- reduce (accumulator first, then element) ---
+var summed = Iter.reduce([1, 2, 3, 4], fun (acc: Int, x: Int): Int => acc + x, 0)
+T.assert_eq(summed, 10, "reduce sums with initial 0")
+var withInit = Iter.reduce([1, 2, 3], fun (acc: Int, x: Int): Int => acc + x, 100)
+T.assert_eq(withInit, 106, "reduce respects initial value")
+// order matters: subtraction proves (acc, elem) not (elem, acc)
+var subbed = Iter.reduce([1, 2, 3], fun (acc: Int, x: Int): Int => acc - x, 10)
+T.assert_eq(subbed, 4, "reduce applies func as (acc, elem): 10-1-2-3")
+T.assert_eq(Iter.reduce([], fun (acc: Int, x: Int): Int => acc + x, 42), 42,
+    "reduce of empty returns initial")
+
+// --- sum ---
+T.assert_eq(Iter.sum([1, 2, 3, 4]), 10, "sum of list")
+T.assert_eq(Iter.sum([]), 0, "sum of empty is 0")
+T.assert_eq(Iter.sum([7]), 7, "sum of single element")
+
+// --- any ---
+T.assert(Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2), "any: has element > 2")
+T.assert(!Iter.any([1, 2, 3], fun (x: Int): Bool => x > 5), "any: none > 5")
+T.assert(!Iter.any([], fun (x: Int): Bool => x > 0), "any of empty is false")
+
+// --- all ---
+T.assert(Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0), "all: every element even")
+T.assert(!Iter.all([2, 3, 4], fun (x: Int): Bool => x % 2 == 0), "all: one odd fails")
+T.assert(Iter.all([], fun (x: Int): Bool => x > 0), "all of empty is vacuously true")
+
+// --- each (side effect) ---
+var eachSum = [0]
+Iter.each([1, 2, 3, 4], fun (x: Int): Nil => { eachSum[0] = eachSum[0] + x })
+T.assert_eq(eachSum[0], 10, "each visits every element")
+
+// --- count ---
+T.assert_eq(Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2), 2, "count > 2")
+T.assert_eq(Iter.count([1, 2, 3], fun (x: Int): Bool => x > 9), 0, "count with no matches")
+T.assert_eq(Iter.count([], fun (x: Int): Bool => true), 0, "count of empty is 0")
+
+// --- find (returns the element, or nil if none) ---
+T.assert_eq(Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1), 2, "find first > 1")
+var notFound = Iter.find([1, 2, 3], fun (x: Int): Bool => x > 9)
+T.assert(notFound == nil, "find returns nil when nothing matches")
+T.assert_eq(Iter.find([5, 6, 7], fun (x: Int): Bool => true), 5, "find returns first when all match")
+
+// --- flat_map ---
+var flat = Iter.flat_map([1, 2, 3], fun (x: Int): List<Int> => [x, x * 10])
+T.assert_eq(flat.length(), 6, "flat_map flattens 3 pairs into 6")
+T.assert_eq(flat[0], 1, "flat_map first")
+T.assert_eq(flat[1], 10, "flat_map second")
+T.assert_eq(flat[5], 30, "flat_map last")
+T.assert_eq(Iter.flat_map([], fun (x: Int): List<Int> => [x]).length(), 0,
+    "flat_map of empty is empty")
+
+// --- zip (pairs as [a, b], stops at shorter) ---
+var zipped = Iter.zip([1, 2, 3], ["a", "b", "c"])
+T.assert_eq(zipped.length(), 3, "zip equal-length lists")
+var z0 = zipped[0]
+T.assert_eq(z0[0], 1, "zip pair 0 left")
+T.assert_eq(z0[1], "a", "zip pair 0 right")
+var z2 = zipped[2]
+T.assert_eq(z2[0], 3, "zip pair 2 left")
+T.assert_eq(z2[1], "c", "zip pair 2 right")
+var zShort = Iter.zip([1, 2, 3, 4], ["x", "y"])
+T.assert_eq(zShort.length(), 2, "zip stops at shorter list")
+T.assert_eq(Iter.zip([], [1, 2]).length(), 0, "zip with an empty side is empty")
+
+// --- enumerate ([index, element]) ---
+var enumd = Iter.enumerate(["a", "b", "c"])
+T.assert_eq(enumd.length(), 3, "enumerate keeps length")
+var e0 = enumd[0]
+T.assert_eq(e0[0], 0, "enumerate index 0")
+T.assert_eq(e0[1], "a", "enumerate element 0")
+var e2 = enumd[2]
+T.assert_eq(e2[0], 2, "enumerate index 2")
+T.assert_eq(e2[1], "c", "enumerate element 2")
+T.assert_eq(Iter.enumerate([]).length(), 0, "enumerate of empty is empty")
+
+// --- take ---
+var took = Iter.take([1, 2, 3, 4, 5], 3)
+T.assert_eq(took.length(), 3, "take 3")
+T.assert_eq(took[0], 1, "take first")
+T.assert_eq(took[2], 3, "take third")
+T.assert_eq(Iter.take([1, 2], 5).length(), 2, "take n > length returns all")
+T.assert_eq(Iter.take([1, 2, 3], 0).length(), 0, "take 0 is empty")
+T.assert_eq(Iter.take([], 3).length(), 0, "take from empty is empty")
+
+// --- skip ---
+var skipped = Iter.skip([1, 2, 3, 4, 5], 2)
+T.assert_eq(skipped.length(), 3, "skip 2 leaves 3")
+T.assert_eq(skipped[0], 3, "skip lands on element 3")
+T.assert_eq(skipped[2], 5, "skip last element")
+T.assert_eq(Iter.skip([1, 2], 5).length(), 0, "skip n > length is empty")
+T.assert_eq(Iter.skip([1, 2, 3], 0).length(), 3, "skip 0 returns all")
+
+// --- drop (alias for skip) ---
+var dropped = Iter.drop([1, 2, 3, 4], 1)
+T.assert_eq(dropped.length(), 3, "drop 1 leaves 3")
+T.assert_eq(dropped[0], 2, "drop lands on element 2")
+T.assert_eq(Iter.drop([1, 2, 3], 10).length(), 0, "drop n > length is empty")
+
+// --- chunk ---
+var chunks = Iter.chunk([1, 2, 3, 4, 5], 2)
+T.assert_eq(chunks.length(), 3, "chunk 5 by 2 gives 3 groups")
+var c0 = chunks[0]
+T.assert_eq(c0.length(), 2, "first chunk full")
+T.assert_eq(c0[0], 1, "first chunk element 0")
+T.assert_eq(c0[1], 2, "first chunk element 1")
+var c2 = chunks[2]
+T.assert_eq(c2.length(), 1, "last chunk holds remainder")
+T.assert_eq(c2[0], 5, "remainder element")
+var evenChunks = Iter.chunk([1, 2, 3, 4], 2)
+T.assert_eq(evenChunks.length(), 2, "chunk even split has no remainder")
+T.assert_eq(Iter.chunk([], 3).length(), 0, "chunk of empty is empty")
+
+// --- zip_with ---
+var zw = Iter.zip_with([1, 2, 3], [10, 20, 30], fun (a: Int, b: Int): Int => a + b)
+T.assert_eq(zw.length(), 3, "zip_with equal lengths")
+T.assert_eq(zw[0], 11, "zip_with sums pair 0")
+T.assert_eq(zw[2], 33, "zip_with sums pair 2")
+var zwShort = Iter.zip_with([1, 2, 3, 4], [10, 20], fun (a: Int, b: Int): Int => a * b)
+T.assert_eq(zwShort.length(), 2, "zip_with stops at shorter list")
+T.assert_eq(zwShort[1], 40, "zip_with product pair 1")
+
+// --- sort_by (ascending by key, insertion sort) ---
+var sorted = Iter.sort_by([3, 1, 2], fun (x: Int): Int => x)
+T.assert_eq(sorted[0], 1, "sort_by identity: smallest first")
+T.assert_eq(sorted[1], 2, "sort_by identity: middle")
+T.assert_eq(sorted[2], 3, "sort_by identity: largest last")
+// sort by a derived key (descending magnitude via negation)
+var byNeg = Iter.sort_by([1, 3, 2], fun (x: Int): Int => 0 - x)
+T.assert_eq(byNeg[0], 3, "sort_by -x: largest first")
+T.assert_eq(byNeg[2], 1, "sort_by -x: smallest last")
+T.assert_eq(Iter.sort_by([], fun (x: Int): Int => x).length(), 0, "sort_by of empty is empty")
+T.assert_eq(Iter.sort_by([42], fun (x: Int): Int => x)[0], 42, "sort_by single element")
+
+// --- group_by (returns a Map; Map.get is nullable) ---
+var groups = Iter.group_by([1, 2, 3, 4, 5, 6], fun (x: Int): Int => x % 2)
+T.assert(groups.has(0), "group_by has even-remainder key")
+T.assert(groups.has(1), "group_by has odd-remainder key")
+var evenGroup = groups.get(0)
+T.assert(evenGroup != nil, "group_by even bucket not nil")
+if (evenGroup != nil) {
+    T.assert_eq(evenGroup.length(), 3, "group_by collects 3 evens")
+    T.assert_eq(evenGroup[0], 2, "group_by preserves order within bucket")
+}
+var oddGroup = groups.get(1)
+T.assert(oddGroup != nil, "group_by odd bucket not nil")
+if (oddGroup != nil) {
+    T.assert_eq(oddGroup.length(), 3, "group_by collects 3 odds")
+}
+T.assert_eq(Iter.group_by([], fun (x: Int): Int => x).keys().length(), 0,
+    "group_by of empty has no keys")
+
+// --- frequencies (returns a Map of element -> count) ---
+var freqs = Iter.frequencies([1, 1, 2, 3, 3, 3])
+var f1 = freqs.get(1)
+T.assert(f1 != nil, "frequencies has key 1")
+if (f1 != nil) { T.assert_eq(f1, 2, "frequencies counts 1 twice") }
+var f3 = freqs.get(3)
+T.assert(f3 != nil, "frequencies has key 3")
+if (f3 != nil) { T.assert_eq(f3, 3, "frequencies counts 3 thrice") }
+var fMissing = freqs.get(9)
+T.assert(fMissing == nil, "frequencies returns nil for absent element")
+T.assert_eq(Iter.frequencies([]).keys().length(), 0, "frequencies of empty has no keys")
+
+// --- unique (dedup, first-seen order) ---
+var uniq = Iter.unique([1, 2, 2, 3, 1, 3, 4])
+T.assert_eq(uniq.length(), 4, "unique removes duplicates")
+T.assert_eq(uniq[0], 1, "unique keeps first occurrence order 0")
+T.assert_eq(uniq[1], 2, "unique keeps first occurrence order 1")
+T.assert_eq(uniq[2], 3, "unique keeps first occurrence order 2")
+T.assert_eq(uniq[3], 4, "unique keeps first occurrence order 3")
+T.assert_eq(Iter.unique([]).length(), 0, "unique of empty is empty")
+T.assert_eq(Iter.unique([5, 5, 5]).length(), 1, "unique of all-same is single element")
+
+// --- max / min (nil on empty) ---
+T.assert_eq(Iter.max([3, 1, 4, 1, 5, 9, 2]), 9, "max finds largest")
+T.assert_eq(Iter.min([3, 1, 4, 1, 5, 9, 2]), 1, "min finds smallest")
+T.assert_eq(Iter.max([7]), 7, "max of single element")
+T.assert_eq(Iter.min([7]), 7, "min of single element")
+T.assert(Iter.max([]) == nil, "max of empty is nil")
+T.assert(Iter.min([]) == nil, "min of empty is nil")
+
+// --- reverse ---
+var rev = Iter.reverse([1, 2, 3, 4])
+T.assert_eq(rev.length(), 4, "reverse keeps length")
+T.assert_eq(rev[0], 4, "reverse first is old last")
+T.assert_eq(rev[3], 1, "reverse last is old first")
+T.assert_eq(Iter.reverse([]).length(), 0, "reverse of empty is empty")
+T.assert_eq(Iter.reverse([9])[0], 9, "reverse of single element")
+
+// --- join ---
+T.assert_eq(Iter.join([1, 2, 3], "-"), "1-2-3", "join numbers with dash")
+T.assert_eq(Iter.join(["a", "b", "c"], ", "), "a, b, c", "join strings")
+T.assert_eq(Iter.join([42], "-"), "42", "join single element has no separator")
+T.assert_eq(Iter.join([], "-"), "", "join of empty is empty string")
+
+T.summary()
