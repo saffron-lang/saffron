@@ -93,6 +93,103 @@ objects included). But a *mutable* container you also keep using on the sender
 side is shared, not copied — send immutable values, a fresh container you then
 drop, or a [`@copy`](./copy.md) deep copy.
 
+## Awaiting a thread from async code
+
+A blocking C call made directly from a coroutine would freeze the whole
+cooperative event loop: the single scheduler thread is stuck in the OS, so no
+other coroutine can run until it returns. The async bridge fixes that. It runs
+the blocking work on a real OS thread and lets the awaiting coroutine *park*
+until the worker finishes, so every other coroutine keeps making progress
+meanwhile. The two entry points live on the [Async](./async.md) module:
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `Async.spawn_blocking(fn)` | `ThreadHandle` | Run `fn` on an OS thread; returns a handle to await |
+| `Async.await_thread(handle)` | `Any` | Park the current coroutine until the worker finishes, then return its result |
+
+`await_thread` parks on the worker's completion self-pipe via the same IO-read
+yield the scheduler uses for sockets, so the event loop keeps running every other
+coroutine while this one waits; the worker writes a byte to the pipe when it is
+done, the fd poll wakes the coroutine, and it joins (already complete, so
+instant) to collect the result. If the worker finished before the coroutine
+parked, the byte is already buffered and the poll sees it at once — no lost
+wakeup.
+
+`Async.spawn_blocking` is a thin wrapper over `Thread.spawn_piped`, the low-level
+primitive that starts a thread *with* a completion self-pipe and returns a
+`ThreadHandle` whose `done_fd()` is the fd to park on (`raw_handle()` exposes the
+underlying handle). Prefer `Async.spawn_blocking` unless you are building your own
+bridge.
+
+### The v1 constraint: `fn` must be pure C or compute
+
+`fn` is for work that **blocks in C** or **computes** — a synchronous FFI call, a
+slow syscall, a tight numeric loop. It must **not**, in v1, call a Saffron
+primitive that releases the GRL while the async scheduler is running:
+`Thread.sleep`, `Thread.Mutex.lock`, another `Thread.join`, or a channel wait.
+Doing so lets the worker and the main-thread scheduler execute managed code at
+the same time, and they share scheduler globals — so the result comes back
+corrupted. Keeping `fn` to pure C/compute keeps the worker off those globals
+entirely. Lifting this limitation needs true scheduler/worker isolation, a v2
+item.
+
+### The return-value gotcha (BUGS #38)
+
+`await_thread` returns `Any` on purpose. Do **not** stash the result in an
+intermediate variable annotated with a concrete type across the suspension point:
+
+```saffron
+var r: Int = Async.await_thread(h)   // WRONG — re-tags an already-boxed Any,
+                                     // reads back wrong after the coroutine suspends
+```
+
+Annotating an already-boxed `Any` as `Int` re-tags it, and once the coroutine
+actually suspends (another task runs), the re-tagged value is read back wrong (a
+`Float` came out as a denormal). Either return it directly or keep the local
+typed `Any`:
+
+```saffron
+return Async.await_thread(h)         // right
+var r: Any = Async.await_thread(h)   // also right
+```
+
+### Example: await a compute worker while a sibling coroutine keeps running
+
+```saffron
+import "@thread" as Thread
+import "@async" as Async
+
+// A compute worker runs on its own OS thread. The worker does PURE compute —
+// no Thread.sleep / lock / join / channel wait inside it (that would race the
+// scheduler in v1).
+var worker = Task.spawn(fun (): Int {
+    var h: Thread.ThreadHandle = Async.spawn_blocking(fun (): Int {
+        var acc: Int = 0
+        var i: Int = 0
+        while (i < 5000000) { acc = acc + (i % 7); i = i + 1 }
+        return acc
+    })
+    return Async.await_thread(h)   // returned directly — see the gotcha above
+})
+
+// Meanwhile a sibling coroutine advances a counter via Async.sleep
+// (scheduler-side, safe). It keeps ticking while the worker crunches.
+var progress = Thread.Atomic(0)
+var sibling = Task.spawn(fun (): Int {
+    var i = 0
+    while (i < 5) {
+        Async.sleep(0.005)
+        progress.add(1)
+        i = i + 1
+    }
+    return 0
+})
+
+worker.await()
+sibling.await()
+// progress.load() > 0 — the event loop kept running while the worker ran
+```
+
 ## Example: spawn and join
 
 ```saffron
