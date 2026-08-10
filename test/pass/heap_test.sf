@@ -1,0 +1,114 @@
+// Coverage for the @heap stdlib module (src/lib/heap.sf). A binary heap /
+// priority queue. Signatures and contracts were read from the source, not
+// guessed:
+//   - Heap.min()  -> Heap(cmp = a < b)   : smallest pops first
+//   - Heap.max()  -> Heap(cmp = a > b)   : largest pops first
+//   - Heap.new(cmp): the comparator returns true if `a` has higher priority
+//     than `b` (i.e. `a` should pop before `b`), exactly what min()/max() pass.
+//   - push(v) returns the heap; pop()/peek() return nil on an empty heap.
+
+import "@test" as T
+import "@heap" as Heap
+
+// --- min-heap: the load-bearing ordering property ---
+var mn = Heap.min()
+mn.push(5)
+mn.push(3)
+mn.push(8)
+mn.push(1)
+mn.push(9)
+mn.push(2)
+T.assert_eq(mn.length(), 6, "min-heap length after 6 pushes")
+T.assert_eq(mn.pop(), 1, "min-heap pop 1")
+T.assert_eq(mn.pop(), 2, "min-heap pop 2")
+T.assert_eq(mn.pop(), 3, "min-heap pop 3")
+T.assert_eq(mn.pop(), 5, "min-heap pop 5")
+T.assert_eq(mn.pop(), 8, "min-heap pop 8")
+T.assert_eq(mn.pop(), 9, "min-heap pop 9")
+T.assert(mn.is_empty(), "min-heap empty after draining")
+
+// --- max-heap: same input, descending order ---
+var mx = Heap.max()
+mx.push(5)
+mx.push(3)
+mx.push(8)
+mx.push(1)
+mx.push(9)
+mx.push(2)
+T.assert_eq(mx.pop(), 9, "max-heap pop 9")
+T.assert_eq(mx.pop(), 8, "max-heap pop 8")
+T.assert_eq(mx.pop(), 5, "max-heap pop 5")
+T.assert_eq(mx.pop(), 3, "max-heap pop 3")
+T.assert_eq(mx.pop(), 2, "max-heap pop 2")
+T.assert_eq(mx.pop(), 1, "max-heap pop 1")
+T.assert(mx.is_empty(), "max-heap empty after draining")
+
+// --- peek does not remove; peek == the subsequent pop ---
+var pk = Heap.min()
+pk.push(7)
+pk.push(4)
+pk.push(6)
+T.assert_eq(pk.peek(), 4, "peek returns min without removing")
+T.assert_eq(pk.length(), 3, "peek leaves length unchanged")
+T.assert_eq(pk.peek(), pk.pop(), "peek equals subsequent pop")
+T.assert_eq(pk.length(), 2, "length shrinks after pop")
+
+// --- is_empty / length transitions ---
+var el = Heap.min()
+T.assert(el.is_empty(), "new heap is empty")
+T.assert_eq(el.length(), 0, "new heap length is 0")
+el.push(42)
+T.assert(!el.is_empty(), "not empty after one push")
+T.assert_eq(el.length(), 1, "length 1 after one push")
+
+// --- single element: peek == pop == the element, then empty ---
+var one = Heap.max()
+one.push(99)
+T.assert_eq(one.peek(), 99, "single element peek")
+T.assert_eq(one.pop(), 99, "single element pop")
+T.assert(one.is_empty(), "empty after popping the only element")
+
+// --- pop / peek on an empty heap return nil (per source) ---
+var em = Heap.min()
+T.assert_eq(em.pop(), nil, "pop on empty returns nil")
+T.assert_eq(em.peek(), nil, "peek on empty returns nil")
+// still empty and safe to reuse
+T.assert(em.is_empty(), "empty heap stays empty after nil pop/peek")
+em.push(11)
+T.assert_eq(em.pop(), 11, "empty heap usable after nil pop")
+
+// --- to_list returns all elements (heap order, not sorted) ---
+var tl = Heap.min()
+tl.push(5)
+tl.push(3)
+tl.push(8)
+var listed = tl.to_list()
+T.assert_eq(listed.length(), 3, "to_list has every element")
+T.assert_eq(tl.length(), 3, "to_list is non-destructive")
+// min-heap invariant: root of the backing list is the smallest
+T.assert_eq(listed[0], 3, "to_list[0] is the heap root (min)")
+
+// --- Heap.new(cmp): custom comparator matching min()'s contract ---
+// cmp returns true when `a` should pop before `b`. Replicate min() explicitly.
+var cn = Heap.new(fun (a: Any, b: Any): Bool => a < b)
+cn.push(30)
+cn.push(10)
+cn.push(20)
+T.assert_eq(cn.pop(), 10, "new(cmp a<b) pops smallest first")
+T.assert_eq(cn.pop(), 20, "new(cmp a<b) pops middle next")
+T.assert_eq(cn.pop(), 30, "new(cmp a<b) pops largest last")
+
+// --- iter() pops in priority order (destructive) ---
+var ih = Heap.min()
+ih.push(3)
+ih.push(1)
+ih.push(2)
+var it = ih.iter()
+T.assert(it.has_next(), "iter has_next before draining")
+T.assert_eq(it.next(), 1, "iter.next yields min first")
+T.assert_eq(it.next(), 2, "iter.next yields next-min")
+T.assert_eq(it.next(), 3, "iter.next yields max last")
+T.assert(!it.has_next(), "iter exhausted after draining")
+T.assert(ih.is_empty(), "iter drained the heap")
+
+T.summary()

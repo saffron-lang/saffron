@@ -1,0 +1,88 @@
+// Coverage for the @queue stdlib module (src/lib/queue.sf). Signatures were read
+// from the source, not guessed: Queue.new()/Queue.from(list) construct, enqueue
+// adds to back, dequeue/peek return nil when empty, to_list() is front-to-back,
+// and the internal head-pointer compaction is exercised by draining past half.
+
+import "@test" as T
+import "@queue" as Queue
+
+// --- empty queue ---
+var empty = Queue.new()
+T.assert(empty.is_empty(), "new queue is empty")
+T.assert_eq(empty.length(), 0, "new queue length 0")
+T.assert_eq(empty.dequeue(), nil, "dequeue on empty is nil")
+T.assert_eq(empty.peek(), nil, "peek on empty is nil")
+
+// --- FIFO: enqueue 1,2,3 then dequeue -> 1,2,3 ---
+var q = Queue.new()
+q.enqueue(1)
+q.enqueue(2)
+q.enqueue(3)
+T.assert_eq(q.length(), 3, "three enqueues grows to 3")
+T.assert_eq(q.is_empty(), false, "non-empty is_empty false")
+T.assert_eq(q.dequeue(), 1, "FIFO dequeue 1")
+T.assert_eq(q.dequeue(), 2, "FIFO dequeue 2")
+T.assert_eq(q.dequeue(), 3, "FIFO dequeue 3")
+T.assert_eq(q.length(), 0, "drained to 0")
+T.assert(q.is_empty(), "drained queue is empty")
+
+// --- peek does not remove; peek == next dequeue ---
+var pk = Queue.from([10, 20, 30])
+T.assert_eq(pk.length(), 3, "from-list length 3")
+T.assert_eq(pk.peek(), 10, "peek is front 10")
+T.assert_eq(pk.length(), 3, "peek leaves length unchanged")
+T.assert_eq(pk.peek(), pk.dequeue(), "peek == next dequeue")
+T.assert_eq(pk.peek(), 20, "peek after dequeue is 20")
+
+// --- from(list): first element is front, drain order matches list ---
+var f = Queue.from([1, 2, 3, 4])
+T.assert_eq(f.length(), 4, "from length matches list")
+T.assert_eq(f.dequeue(), 1, "from drain 1")
+T.assert_eq(f.dequeue(), 2, "from drain 2")
+T.assert_eq(f.dequeue(), 3, "from drain 3")
+T.assert_eq(f.dequeue(), 4, "from drain 4")
+T.assert(f.is_empty(), "from queue fully drained")
+
+// --- compaction: interleave enqueue/dequeue past the half mark ---
+var comp = Queue.new()
+comp.enqueue(1)
+comp.enqueue(2)
+comp.enqueue(3)
+comp.enqueue(4)
+T.assert_eq(comp.dequeue(), 1, "compaction pre-drain 1")
+T.assert_eq(comp.dequeue(), 2, "compaction pre-drain 2")
+T.assert_eq(comp.dequeue(), 3, "compaction triggers, still 3")
+comp.enqueue(5)
+comp.enqueue(6)
+T.assert_eq(comp.length(), 3, "after compaction length 3 (4,5,6)")
+T.assert_eq(comp.dequeue(), 4, "post-compaction 4")
+T.assert_eq(comp.dequeue(), 5, "post-compaction 5")
+T.assert_eq(comp.dequeue(), 6, "post-compaction 6")
+T.assert(comp.is_empty(), "compaction queue drained")
+
+// --- to_list round-trips current contents front-to-back ---
+var rt = Queue.from([7, 8, 9])
+rt.dequeue()          // consume 7, front is now 8
+rt.enqueue(10)        // [8, 9, 10]
+var rtl = rt.to_list()
+T.assert_eq(rtl.length(), 3, "to_list length 3")
+T.assert_eq(rtl[0], 8, "to_list front 8")
+T.assert_eq(rtl[1], 9, "to_list middle 9")
+T.assert_eq(rtl[2], 10, "to_list back 10")
+
+// --- iter walks front to back ---
+var it = rt.iter()
+T.assert(it.has_next(), "iter has_next at start")
+T.assert_eq(it.next(), 8, "iter yields 8")
+T.assert_eq(it.next(), 9, "iter yields 9")
+T.assert_eq(it.next(), 10, "iter yields 10")
+T.assert_eq(it.has_next(), false, "iter exhausted")
+
+// --- clear empties ---
+var c = Queue.from([5, 6, 7])
+T.assert_eq(c.is_empty(), false, "before clear non-empty")
+c.clear()
+T.assert(c.is_empty(), "after clear is empty")
+T.assert_eq(c.length(), 0, "after clear length 0")
+
+T.summary()
