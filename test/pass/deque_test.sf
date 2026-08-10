@@ -1,0 +1,96 @@
+// Coverage for the @deque stdlib module (src/lib/deque.sf). Signatures were read
+// from the source, not guessed: Deque.new()/Deque.from(list) are the two
+// constructors, pop_front/pop_back/peek_front/peek_back all return nil when
+// empty, to_list() snapshots front-to-back, and both push_* return `this`.
+
+import "@test" as T
+import "@deque" as Deque
+
+// --- empty deque ---
+var empty = Deque.new()
+T.assert(empty.is_empty(), "new deque is empty")
+T.assert_eq(empty.length(), 0, "new deque length 0")
+T.assert_eq(empty.pop_front(), nil, "pop_front on empty is nil")
+T.assert_eq(empty.pop_back(), nil, "pop_back on empty is nil")
+T.assert_eq(empty.peek_front(), nil, "peek_front on empty is nil")
+T.assert_eq(empty.peek_back(), nil, "peek_back on empty is nil")
+
+// --- push_back grows, pop_front drains FIFO from one end ---
+var dq = Deque.new()
+dq.push_back(1)
+dq.push_back(2)
+dq.push_back(3)
+T.assert_eq(dq.length(), 3, "three push_back grows to 3")
+T.assert_eq(dq.is_empty(), false, "non-empty is_empty false")
+// front-to-back order is 1,2,3: front is 1, back is 3
+T.assert_eq(dq.pop_front(), 1, "pop_front yields front element 1")
+T.assert_eq(dq.pop_back(), 3, "pop_back yields back element 3")
+T.assert_eq(dq.pop_front(), 2, "pop_front yields remaining 2")
+T.assert_eq(dq.length(), 0, "drained to 0")
+T.assert(dq.is_empty(), "drained deque is empty")
+
+// --- push_front / push_back mix, verify both ends ---
+var mix = Deque.new()
+mix.push_back(2)      // [2]
+mix.push_front(1)     // [1, 2]
+mix.push_back(3)      // [1, 2, 3]
+mix.push_front(0)     // [0, 1, 2, 3]
+T.assert_eq(mix.length(), 4, "mixed pushes length 4")
+T.assert_eq(mix.peek_front(), 0, "front is 0")
+T.assert_eq(mix.peek_back(), 3, "back is 3")
+// draining from front should give 0,1,2,3
+T.assert_eq(mix.pop_front(), 0, "drain front 0")
+T.assert_eq(mix.pop_front(), 1, "drain front 1")
+T.assert_eq(mix.pop_back(), 3, "drain back 3")
+T.assert_eq(mix.pop_back(), 2, "drain back 2")
+T.assert(mix.is_empty(), "mix fully drained")
+
+// --- peek does not remove ---
+var pk = Deque.from([10, 20, 30])
+T.assert_eq(pk.length(), 3, "from-list length 3")
+T.assert_eq(pk.peek_front(), 10, "peek_front is 10")
+T.assert_eq(pk.peek_back(), 30, "peek_back is 30")
+T.assert_eq(pk.length(), 3, "peek leaves length unchanged")
+// peek equals next pop from the same end
+T.assert_eq(pk.peek_front(), pk.pop_front(), "peek_front == next pop_front")
+T.assert_eq(pk.peek_back(), pk.pop_back(), "peek_back == next pop_back")
+
+// --- from(list): front-to-back order, drain matches ---
+var f = Deque.from([1, 2, 3, 4])
+T.assert_eq(f.length(), 4, "from length matches list")
+var fl = f.to_list()
+T.assert_eq(fl.length(), 4, "to_list length 4")
+T.assert_eq(fl[0], 1, "to_list[0] is list front")
+T.assert_eq(fl[3], 4, "to_list[3] is list back")
+// drain order front-to-back
+T.assert_eq(f.pop_front(), 1, "from drain 1")
+T.assert_eq(f.pop_front(), 2, "from drain 2")
+T.assert_eq(f.pop_front(), 3, "from drain 3")
+T.assert_eq(f.pop_front(), 4, "from drain 4")
+
+// --- to_list round-trips current contents in front-to-back order ---
+var rt = Deque.new()
+rt.push_front(2)   // [2]
+rt.push_front(1)   // [1, 2]
+rt.push_back(3)    // [1, 2, 3]
+var rtl = rt.to_list()
+T.assert_eq(rtl[0], 1, "round-trip front 1")
+T.assert_eq(rtl[1], 2, "round-trip middle 2")
+T.assert_eq(rtl[2], 3, "round-trip back 3")
+
+// --- iter walks front to back ---
+var it = rt.iter()
+T.assert(it.has_next(), "iter has_next at start")
+T.assert_eq(it.next(), 1, "iter yields 1")
+T.assert_eq(it.next(), 2, "iter yields 2")
+T.assert_eq(it.next(), 3, "iter yields 3")
+T.assert_eq(it.has_next(), false, "iter exhausted")
+
+// --- clear empties ---
+var c = Deque.from([5, 6, 7])
+T.assert_eq(c.is_empty(), false, "before clear non-empty")
+c.clear()
+T.assert(c.is_empty(), "after clear is empty")
+T.assert_eq(c.length(), 0, "after clear length 0")
+
+T.summary()

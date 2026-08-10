@@ -1,0 +1,76 @@
+// Coverage for the @stack stdlib module (src/lib/stack.sf). Signatures were read
+// from the source, not guessed: Stack.new()/Stack.from(list) construct, push adds
+// to top, pop/peek return nil when empty, to_list() is bottom-to-top, and iter()
+// walks top-to-bottom (the reverse of to_list).
+
+import "@test" as T
+import "@stack" as Stack
+
+// --- empty stack ---
+var empty = Stack.new()
+T.assert(empty.is_empty(), "new stack is empty")
+T.assert_eq(empty.length(), 0, "new stack length 0")
+T.assert_eq(empty.pop(), nil, "pop on empty is nil")
+T.assert_eq(empty.peek(), nil, "peek on empty is nil")
+
+// --- LIFO: push 1,2,3 then pop -> 3,2,1 ---
+var s = Stack.new()
+s.push(1)
+s.push(2)
+s.push(3)
+T.assert_eq(s.length(), 3, "three pushes grows to 3")
+T.assert_eq(s.is_empty(), false, "non-empty is_empty false")
+T.assert_eq(s.pop(), 3, "LIFO pop 3")
+T.assert_eq(s.pop(), 2, "LIFO pop 2")
+T.assert_eq(s.pop(), 1, "LIFO pop 1")
+T.assert_eq(s.length(), 0, "drained to 0")
+T.assert(s.is_empty(), "drained stack is empty")
+
+// --- peek does not remove; peek == next pop ---
+var pk = Stack.new()
+pk.push(10)
+pk.push(20)
+pk.push(30)
+T.assert_eq(pk.peek(), 30, "peek is top 30")
+T.assert_eq(pk.length(), 3, "peek leaves length unchanged")
+T.assert_eq(pk.peek(), pk.pop(), "peek == next pop")
+T.assert_eq(pk.peek(), 20, "peek after pop is 20")
+
+// --- from(list): last element is top ---
+var f = Stack.from([1, 2, 3, 4])
+T.assert_eq(f.length(), 4, "from length matches list")
+T.assert_eq(f.peek(), 4, "from top is last list element")
+// popping drains in reverse list order
+T.assert_eq(f.pop(), 4, "from pop 4")
+T.assert_eq(f.pop(), 3, "from pop 3")
+T.assert_eq(f.pop(), 2, "from pop 2")
+T.assert_eq(f.pop(), 1, "from pop 1")
+T.assert(f.is_empty(), "from stack fully drained")
+
+// --- to_list round-trips current contents bottom-to-top ---
+var rt = Stack.new()
+rt.push(1)
+rt.push(2)
+rt.push(3)
+var rtl = rt.to_list()
+T.assert_eq(rtl.length(), 3, "to_list length 3")
+T.assert_eq(rtl[0], 1, "to_list bottom 1")
+T.assert_eq(rtl[1], 2, "to_list middle 2")
+T.assert_eq(rtl[2], 3, "to_list top 3")
+
+// --- iter walks top to bottom (reverse of to_list) ---
+var it = rt.iter()
+T.assert(it.has_next(), "iter has_next at start")
+T.assert_eq(it.next(), 3, "iter yields top 3")
+T.assert_eq(it.next(), 2, "iter yields 2")
+T.assert_eq(it.next(), 1, "iter yields bottom 1")
+T.assert_eq(it.has_next(), false, "iter exhausted")
+
+// --- clear empties ---
+var c = Stack.from([5, 6, 7])
+T.assert_eq(c.is_empty(), false, "before clear non-empty")
+c.clear()
+T.assert(c.is_empty(), "after clear is empty")
+T.assert_eq(c.length(), 0, "after clear length 0")
+
+T.summary()

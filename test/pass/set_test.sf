@@ -1,0 +1,144 @@
+// Coverage for the @set stdlib module (src/lib/set.sf). Public surface, read
+// from source, not guessed:
+//   - class Set with init(), add(value): Set, has(value): Bool,
+//     remove(value): Set, size(): Int, values(): List<Any>, to_string(): String
+//   - free functions from(items), union(a, b), intersect(a, b), diff(a, b)
+// Set is Map-backed (Map<Any, Bool>); remove() sets the key to nil rather than
+// deleting it. size() counts _map.keys(), and values() returns _map.keys()
+// directly, so key/insertion order is stable but we still assert via size() and
+// has() rather than depending on values() ordering. add() returns the Set
+// itself (chainable). Every case gets a normal path plus an edge case.
+
+import "@test" as T
+import "@set" as Set
+
+// --- construction + add / size ---
+var s = Set.Set()
+T.assert_eq(s.size(), 0, "fresh set is empty")
+s.add(1)
+s.add(2)
+s.add(3)
+T.assert_eq(s.size(), 3, "size after three distinct adds")
+
+// add of a duplicate does not grow the set
+s.add(2)
+T.assert_eq(s.size(), 3, "adding a duplicate does not grow size")
+
+// add returns the Set itself (chainable)
+var chained = Set.Set().add(10).add(20).add(30)
+T.assert_eq(chained.size(), 3, "chained adds build the set")
+T.assert(chained.has(10), "chained set has first")
+T.assert(chained.has(30), "chained set has last")
+
+// --- has: true / false ---
+T.assert(s.has(1), "has returns true for a present value")
+T.assert(s.has(3), "has returns true for another present value")
+T.assert(!s.has(99), "has returns false for an absent value")
+
+// --- remove ---
+// remove() actually deletes: the value is gone from has(), size() shrinks by one,
+// and unrelated members survive. (This was a no-op before the map-rebuild fix in
+// Set.remove — set(k, nil) does not delete a Map key.)
+var size_before: Int = s.size()
+s.remove(2)
+T.assert(!s.has(2), "remove() deletes the value")
+T.assert_eq(s.size(), size_before - 1, "remove() shrinks size by one")
+T.assert(s.has(1), "unrelated member survives remove")
+T.assert(s.has(3), "unrelated member survives remove")
+// removing an absent value is a harmless no-op
+s.remove(99)
+T.assert_eq(s.size(), size_before - 1, "removing an absent value does not change size")
+
+// --- from a list, including duplicates (dedup) ---
+var fromList = Set.from([1, 2, 3, 4])
+T.assert_eq(fromList.size(), 4, "from a list of distinct items")
+T.assert(fromList.has(1), "from preserves first element")
+T.assert(fromList.has(4), "from preserves last element")
+
+var fromDup = Set.from([1, 2, 2, 1, 3, 3, 3])
+T.assert_eq(fromDup.size(), 3, "from dedupes a list with duplicates")
+T.assert(fromDup.has(1), "deduped set has 1")
+T.assert(fromDup.has(2), "deduped set has 2")
+T.assert(fromDup.has(3), "deduped set has 3")
+
+var fromEmpty = Set.from([])
+T.assert_eq(fromEmpty.size(), 0, "from an empty list is empty")
+
+// --- union ---
+var ua = Set.from([1, 2, 3])
+var ub = Set.from([3, 4, 5])
+var u = Set.union(ua, ub)
+T.assert_eq(u.size(), 5, "union of overlapping sets: 5 distinct")
+T.assert(u.has(1), "union has element only in a")
+T.assert(u.has(5), "union has element only in b")
+T.assert(u.has(3), "union has the shared element")
+// disjoint
+var uDisjoint = Set.union(Set.from([1, 2]), Set.from([3, 4]))
+T.assert_eq(uDisjoint.size(), 4, "union of disjoint sets sums sizes")
+// identical
+var uIdent = Set.union(Set.from([1, 2, 3]), Set.from([1, 2, 3]))
+T.assert_eq(uIdent.size(), 3, "union of identical sets equals either")
+// one empty
+var uEmpty = Set.union(Set.from([1, 2, 3]), Set.Set())
+T.assert_eq(uEmpty.size(), 3, "union with an empty set is the other set")
+var uEmptyLeft = Set.union(Set.Set(), Set.from([7, 8]))
+T.assert_eq(uEmptyLeft.size(), 2, "union with empty on the left is the other set")
+
+// --- intersect ---
+var ia = Set.from([1, 2, 3, 4])
+var ib = Set.from([3, 4, 5, 6])
+var inter = Set.intersect(ia, ib)
+T.assert_eq(inter.size(), 2, "intersect keeps only shared elements")
+T.assert(inter.has(3), "intersect has shared 3")
+T.assert(inter.has(4), "intersect has shared 4")
+T.assert(!inter.has(1), "intersect drops a-only element")
+T.assert(!inter.has(5), "intersect drops b-only element")
+// disjoint => empty
+var interDisjoint = Set.intersect(Set.from([1, 2]), Set.from([3, 4]))
+T.assert_eq(interDisjoint.size(), 0, "intersect of disjoint sets is empty")
+// identical => same set
+var interIdent = Set.intersect(Set.from([1, 2, 3]), Set.from([1, 2, 3]))
+T.assert_eq(interIdent.size(), 3, "intersect of identical sets equals either")
+// one empty => empty
+var interEmpty = Set.intersect(Set.from([1, 2, 3]), Set.Set())
+T.assert_eq(interEmpty.size(), 0, "intersect with an empty set is empty")
+
+// --- diff (elements in a not in b) ---
+var da = Set.from([1, 2, 3, 4])
+var db = Set.from([3, 4, 5])
+var d = Set.diff(da, db)
+T.assert_eq(d.size(), 2, "diff keeps a-only elements")
+T.assert(d.has(1), "diff has a-only 1")
+T.assert(d.has(2), "diff has a-only 2")
+T.assert(!d.has(3), "diff drops shared 3")
+T.assert(!d.has(5), "diff never includes b-only 5")
+// disjoint => all of a
+var diffDisjoint = Set.diff(Set.from([1, 2]), Set.from([3, 4]))
+T.assert_eq(diffDisjoint.size(), 2, "diff of disjoint sets is all of a")
+// identical => empty
+var diffIdent = Set.diff(Set.from([1, 2, 3]), Set.from([1, 2, 3]))
+T.assert_eq(diffIdent.size(), 0, "diff of identical sets is empty")
+// b empty => all of a
+var diffBEmpty = Set.diff(Set.from([1, 2, 3]), Set.Set())
+T.assert_eq(diffBEmpty.size(), 3, "diff with empty b is all of a")
+// a empty => empty
+var diffAEmpty = Set.diff(Set.Set(), Set.from([1, 2, 3]))
+T.assert_eq(diffAEmpty.size(), 0, "diff with empty a is empty")
+
+// --- empty set invariants ---
+var empty = Set.Set()
+T.assert_eq(empty.size(), 0, "empty set has size 0")
+T.assert(!empty.has(0), "empty set has nothing (0)")
+T.assert(!empty.has(1), "empty set has nothing (1)")
+
+// --- values() length agrees with size() ---
+var vs = Set.from([1, 2, 3])
+T.assert_eq(vs.values().length(), vs.size(), "values length matches size")
+
+// --- string values work too (Map-backed, keys are Any) ---
+var strs = Set.from(["a", "b", "a", "c"])
+T.assert_eq(strs.size(), 3, "from dedupes string elements")
+T.assert(strs.has("a"), "string set has a")
+T.assert(!strs.has("z"), "string set lacks z")
+
+T.summary()

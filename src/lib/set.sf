@@ -27,7 +27,20 @@ class Set {
     }
 
     fun remove(value: Any): Set {
-        this._map.set(value, nil)
+        // Rebuild the backing map without `value`. `_map.set(value, nil)` does
+        // NOT delete the key — setting a Map entry to nil leaves the key in
+        // keys()/has(), so the old one-liner was a no-op on membership. Map has
+        // no delete primitive (no __map_delete in the runtime), so a rebuild is
+        // the only stdlib-level fix: O(n), but correct.
+        var kept: Map<Any, Bool> = Map()
+        var keys: List<Any> = this._map.keys()
+        var i: Int = 0
+        while (i < keys.length()) {
+            var k: Any = keys[i]
+            if (k != value) { kept.set(k, true) }
+            i = i + 1
+        }
+        this._map = kept
         return this
     }
 
