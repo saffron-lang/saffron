@@ -3,6 +3,7 @@
 //! Users only need: import "@async" as Async
 
 import "@scheduler" as Scheduler
+import "@thread" as Thread
 
 @intrinsic fun __suspend(reason: Int, arg: Int)
 
@@ -98,4 +99,68 @@ fun parallel(fns: List<Fun>, max_concurrent: Int): List<Int> {
         i = i + j
     }
     return results
+}
+
+/// Run `fn` on a real OS thread and return a handle to await. This is how you
+/// call a BLOCKING function (a synchronous C call, heavy CPU work, a slow FFI)
+/// from inside a coroutine without freezing the event loop: the work runs on a
+/// worker thread while other coroutines keep making progress on the main thread.
+///
+/// The returned handle is passed to `await_thread`. Spawn it, do other async
+/// work, then await when you need the result:
+///
+/// ```saffron
+/// var t = Async.spawn_blocking(fun () => slow_c_call())
+/// // ... other coroutines run here ...
+/// var result = Async.await_thread(t)
+/// ```
+///
+/// ## What `fn` may and may not do (v1 constraint)
+///
+/// `fn` is for work that BLOCKS IN C or COMPUTES — a synchronous FFI call, a
+/// slow syscall, a tight numeric loop. It must NOT, in v1, call a Saffron
+/// primitive that releases the Global Runtime Lock while the async scheduler is
+/// running: `Thread.sleep`, `Thread.Mutex.lock`, another `Thread.join`, or a
+/// channel wait. Doing so lets the worker and the main-thread scheduler execute
+/// managed code at the same time, and they share scheduler globals
+/// (`@__task_result`, the yield registers) — the result comes back corrupted.
+/// Keeping `fn` to pure C/compute keeps the worker off those globals entirely.
+/// (Lifting this needs true scheduler/worker isolation — a v2 item; see
+/// docs/design/threading-module-plan.md.)
+///
+/// Native only (it uses @thread). On wasm there are no OS threads.
+fun spawn_blocking(fn: Fun): Thread.ThreadHandle {
+    return Thread.spawn_piped(fn)
+}
+
+/// Await a handle from `spawn_blocking`, parking THIS coroutine until the worker
+/// finishes — without blocking the runtime. Returns the worker's result.
+///
+/// The result is `Any` on purpose. Do NOT stash it in an intermediate variable
+/// annotated with a concrete type across a suspension point, e.g.
+/// `var r: Int = Async.await_thread(h)` — annotating an already-boxed Any as Int
+/// re-tags it, and once the coroutine actually suspends (another task runs), the
+/// re-tagged value is read back wrong (a Float came out as a denormal). This is
+/// BUGS #38, not specific to the bridge. Either return it directly
+/// (`return Async.await_thread(h)`) or keep the local typed `Any`.
+///
+/// It parks on the worker's completion self-pipe via yield reason 2 (IO-read),
+/// the same mechanism a socket read uses, so the scheduler keeps running every
+/// other coroutine while this one waits. When the worker finishes it writes a
+/// byte to the pipe; the scheduler's fd poll wakes this coroutine, which then
+/// joins (already complete, so instant) to collect the result. If the worker
+/// finished before we parked, the byte is already buffered and the poll sees the
+/// fd readable at once — no lost wakeup.
+fun await_thread(handle: Thread.ThreadHandle): Any {
+    var fd: Int = handle.done_fd()
+    if (fd < 0) {
+        // Not a piped handle (or already invalid): fall back to a direct join.
+        return handle.join()
+    }
+    // Park until the completion pipe is readable. `__suspend(2, fd)` is the
+    // IO-read yield the scheduler already parks sockets on.
+    __suspend(2, fd)
+    // Woken: the worker has published its result and written the wake byte.
+    // join() returns it immediately and closes the pipe.
+    return handle.join()
 }

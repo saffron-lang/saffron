@@ -1,0 +1,60 @@
+// @thread workstream D: the async bridge (Async.spawn_blocking / await_thread).
+//
+// A coroutine runs a compute-bound worker on an OS thread and awaits it without
+// freezing the event loop. The worker does PURE compute — no GRL-releasing
+// primitive inside it (see spawn_blocking's doc: that races the scheduler on
+// shared globals in v1). The load-bearing assertion is that a sibling coroutine
+// makes progress while the worker runs.
+
+import "@thread" as Thread
+import "@async" as Async
+import "@test" as T
+
+// --- await_thread returns the worker's result ---
+var w1 = Task.spawn(fun (): Int {
+    var h: Thread.ThreadHandle = Async.spawn_blocking(fun (): Int => 40 + 2)
+    return Async.await_thread(h)
+})
+T.assert_eq(w1.await(), 42, "await_thread returns the worker's result")
+
+// --- a compute worker returns the right value ---
+var w2 = Task.spawn(fun (): Int {
+    var h: Thread.ThreadHandle = Async.spawn_blocking(fun (): Int {
+        var sum: Int = 0
+        var i: Int = 0
+        while (i < 100000) { sum = sum + i; i = i + 1 }   // enough to actually run a while
+        return sum
+    })
+    return Async.await_thread(h)
+})
+T.assert_eq(w2.await(), 4999950000, "spawn_blocking of a compute worker returns the sum")
+
+// --- the event loop keeps running while a worker computes ---
+// The sibling advances a counter via Async.sleep (scheduler-side, safe) while the
+// worker crunches on its own thread. If the bridge blocked the runtime, progress
+// would stay 0.
+var progress: Thread.Atomic = Thread.Atomic(0)
+var sibling = Task.spawn(fun (): Int {
+    var i: Int = 0
+    while (i < 5) {
+        Async.sleep(0.005)
+        progress.add(1)
+        i = i + 1
+    }
+    return 0
+})
+var worker = Task.spawn(fun (): Int {
+    var h: Thread.ThreadHandle = Async.spawn_blocking(fun (): Int {
+        // Pure compute, sized to outlast a couple of sibling ticks.
+        var acc: Int = 0
+        var i: Int = 0
+        while (i < 5000000) { acc = acc + (i % 7); i = i + 1 }
+        return acc
+    })
+    return Async.await_thread(h)
+})
+worker.await()
+sibling.await()
+T.assert_gt(progress.load(), 0, "a sibling coroutine progressed while the worker ran")
+
+T.summary()
