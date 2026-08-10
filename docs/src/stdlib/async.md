@@ -15,6 +15,30 @@ Cooperative multitasking utilities. See also the [Async tutorial](../tutorial/as
 | `Async.race(tasks)` | Return the result of the first task to complete |
 | `Async.timeout(fn, seconds)` | Run a function with a timeout; returns result or `0` on timeout |
 | `Async.parallel(fns, max_concurrent)` | Run functions concurrently with bounded parallelism |
+| `Async.spawn_blocking(fn)` | Run a blocking `fn` on an OS thread; returns a `ThreadHandle` (native only) |
+| `Async.await_thread(handle)` | Park the current coroutine until the worker finishes, then return its result (native only) |
+
+## Calling blocking code without freezing the loop
+
+`Async.spawn_blocking` / `Async.await_thread` bridge a blocking C call, syscall,
+or CPU-bound loop onto an OS thread so a coroutine can await it without stalling
+the event loop. They are **native only** (they use [`@thread`](./thread.md)); on
+wasm there are no OS threads.
+
+```saffron
+import "@thread" as Thread
+import "@async" as Async
+
+var h: Thread.ThreadHandle = Async.spawn_blocking(fun () => slow_c_call())
+// ... other coroutines run here ...
+return Async.await_thread(h)   // return directly; do not annotate as a concrete type
+```
+
+The worker `fn` must be **pure C or compute** — no GRL-releasing Saffron
+primitive (`Thread.sleep`, a mutex lock, another `join`, a channel wait) inside
+it in v1 — and the result is `Any` for a reason. See the [Thread
+page](./thread.md#awaiting-a-thread-from-async-code) for the full constraint and
+the return-value gotcha.
 
 ## Task spawning and awaiting
 
