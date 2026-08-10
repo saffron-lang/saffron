@@ -38,10 +38,12 @@
 // to its raw address at the FFI boundary — exactly what the C trampoline reads as
 // [fn_ptr, env]. The Saffron-level `Fun`/`Int` annotations drive that untagging;
 // see gen_extern_call.
-@extern("i64 sf_thread_spawn(i64)")  fun _spawn(closure: Fun): Int
-@extern("i64 sf_thread_join(i64)")   fun _join(handle: Int): Any
-@extern("i64 sf_thread_detach(i64)") fun _detach(handle: Int): Int
-@extern("void sf_thread_sleep(double)") fun _sleep(seconds: Float)
+@extern("i64 sf_thread_spawn(i64)")       fun _spawn(closure: Fun): Int
+@extern("i64 sf_thread_spawn_piped(i64)") fun _spawn_piped(closure: Fun): Int
+@extern("i64 sf_thread_done_fd(i64)")     fun _done_fd(handle: Int): Int
+@extern("i64 sf_thread_join(i64)")        fun _join(handle: Int): Any
+@extern("i64 sf_thread_detach(i64)")      fun _detach(handle: Int): Int
+@extern("void sf_thread_sleep(double)")   fun _sleep(seconds: Float)
 
 @extern("i64 sf_mutex_new()")          fun _mutex_new(): Int
 @extern("void sf_mutex_lock(i64)")     fun _mutex_lock(handle: Int)
@@ -98,6 +100,27 @@ class ThreadHandle {
         this._consumed = 1
         _detach(this._handle)
     }
+
+    /// The read end of this thread's completion self-pipe, or -1 if the thread was
+    /// not spawned for async awaiting. `Async.await_thread` parks a coroutine on
+    /// this fd; not normally called directly.
+    fun done_fd(): Int {
+        if (this._handle <= 0) { return -1 }
+        return _done_fd(this._handle)
+    }
+
+    /// The raw handle, for the async bridge to join once the coroutine has woken.
+    fun raw_handle(): Int {
+        return this._handle
+    }
+}
+
+/// Start `fn` on a new OS thread WITH a completion self-pipe, so an async
+/// coroutine can await it without blocking the runtime. Returns a ThreadHandle
+/// whose `done_fd()` is the fd to park on. This is the primitive behind
+/// `Async.spawn_blocking`; prefer that unless you are building your own bridge.
+fun spawn_piped(fn: Fun): ThreadHandle {
+    return ThreadHandle(_spawn_piped(fn))
 }
 
 /// Start `fn` on a new OS thread and return a handle to it. `fn` takes no

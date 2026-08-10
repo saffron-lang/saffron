@@ -30,6 +30,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <time.h>
 #include <pthread.h>
 
@@ -87,6 +88,12 @@ typedef struct {
     int done;          /* 1 once the worker has finished; read under the GRL */
     int detached;      /* 1 if detached — join is illegal and the slot self-frees */
     int joined;        /* 1 once joined, so a double join is a no-op not a crash */
+    /* Async bridge (Workstream D): a self-pipe so an awaiting coroutine can park
+     * on the read end (yield reason 2) instead of blocking the whole runtime in
+     * pthread_join. -1 when the thread was spawned without a pipe (plain
+     * spawn/join). The trampoline writes one byte to done_pipe_w on finish. */
+    int done_pipe_r;
+    int done_pipe_w;
 } sf_thread_entry_t;
 
 static sf_thread_entry_t thread_table[SF_MAX_THREADS];
@@ -117,6 +124,9 @@ static int64_t thread_table_alloc(void) {
         if (!thread_table[i].in_use) {
             memset(&thread_table[i], 0, sizeof(sf_thread_entry_t));
             thread_table[i].in_use = 1;
+            /* memset zeroed the fds; -1 means "no pipe" (0 is a real fd). */
+            thread_table[i].done_pipe_r = -1;
+            thread_table[i].done_pipe_w = -1;
             h = i + 1;
             break;
         }
@@ -161,17 +171,32 @@ static void *sf_thread_trampoline(void *arg) {
     sf_grl_unlock();                                   /* leave managed code */
 
     /* Publish result/done under the table lock. A detached thread frees its own
-     * slot here since no one will join it. */
+     * slot here since no one will join it. Capture the pipe write-end while
+     * holding the lock, but write to it AFTER releasing (write() can block if the
+     * pipe were full, which must not happen under the table lock). */
+    int wake_fd = -1;
     pthread_mutex_lock(&thread_table_lock);
     e = thread_entry(handle);
     if (e) {
         e->result = r;
         e->done = 1;
+        wake_fd = e->done_pipe_w;
         if (e->detached) {
             e->in_use = 0;   /* self-free: detached threads are never joined */
         }
     }
     pthread_mutex_unlock(&thread_table_lock);
+
+    /* Wake an awaiting coroutine: one byte on the self-pipe makes the read fd
+     * readable, which is what await_thread parked on (yield reason 2). done=1 is
+     * already published above, so when the coroutine wakes and calls join, the
+     * result is ready. Retried across EINTR; a full pipe (EAGAIN) is impossible
+     * here since exactly one byte is ever written per thread. */
+    if (wake_fd >= 0) {
+        unsigned char b = 1;
+        ssize_t w;
+        do { w = write(wake_fd, &b, 1); } while (w < 0 && errno == EINTR);
+    }
     return NULL;
 }
 
@@ -216,6 +241,69 @@ int64_t sf_thread_spawn(int64_t closure) {
 }
 
 /*
+ * sf_thread_spawn_piped — Like sf_thread_spawn, but also creates a self-pipe so
+ * an async coroutine can park on the read fd (via Async.await_thread) instead of
+ * blocking the runtime in join. The worker writes one byte to the write end when
+ * it finishes. Returns a 1-based handle, or -1 on failure (pipe or thread create).
+ *
+ * Structured as a distinct entry point rather than a flag on sf_thread_spawn so
+ * the plain spawn/join path (workstreams A-C) keeps its exact signature and
+ * behavior. The pipe's read end is non-blocking, matching signal_native.c: a
+ * spurious poll wake then returns EAGAIN rather than blocking the single-threaded
+ * scheduler.
+ */
+int64_t sf_thread_spawn_piped(int64_t closure) {
+    pthread_once(&sf_main_grl_once, sf_main_grl_acquire);
+
+    int fds[2];
+    if (pipe(fds) != 0) return -1;
+    int flags = fcntl(fds[0], F_GETFL, 0);
+    if (flags != -1) fcntl(fds[0], F_SETFL, flags | O_NONBLOCK);
+
+    int64_t handle = thread_table_alloc();
+    if (handle < 0) { close(fds[0]); close(fds[1]); return -1; }
+
+    pthread_mutex_lock(&thread_table_lock);
+    sf_thread_entry_t *e = thread_entry(handle);
+    if (e) {
+        e->closure = closure;
+        e->done_pipe_r = fds[0];
+        e->done_pipe_w = fds[1];
+    }
+    pthread_mutex_unlock(&thread_table_lock);
+
+    pthread_t tid;
+    if (pthread_create(&tid, NULL, sf_thread_trampoline,
+                       (void *)(intptr_t)handle) != 0) {
+        pthread_mutex_lock(&thread_table_lock);
+        e = thread_entry(handle);
+        if (e) e->in_use = 0;
+        pthread_mutex_unlock(&thread_table_lock);
+        close(fds[0]); close(fds[1]);
+        return -1;
+    }
+
+    pthread_mutex_lock(&thread_table_lock);
+    e = thread_entry(handle);
+    if (e) e->tid = tid;
+    pthread_mutex_unlock(&thread_table_lock);
+    return handle;
+}
+
+/*
+ * sf_thread_done_fd — The read end of a piped thread's self-pipe, for a coroutine
+ * to park on. Returns -1 for a plain (non-piped) or invalid handle.
+ */
+int64_t sf_thread_done_fd(int64_t handle) {
+    int64_t fd = -1;
+    pthread_mutex_lock(&thread_table_lock);
+    sf_thread_entry_t *e = thread_entry(handle);
+    if (e) fd = e->done_pipe_r;
+    pthread_mutex_unlock(&thread_table_lock);
+    return fd;
+}
+
+/*
  * sf_thread_join — Wait for a worker to finish and return its result.
  *
  * CRITICAL GRL discipline: the caller holds the GRL; we DROP it around
@@ -242,13 +330,20 @@ int64_t sf_thread_join(int64_t handle) {
     sf_grl_lock();                   /* back into managed code */
 
     int64_t result = 0;
+    int pr = -1, pw = -1;
     pthread_mutex_lock(&thread_table_lock);
     e = thread_entry(handle);
     if (e) {
         result = e->result;
+        pr = e->done_pipe_r;
+        pw = e->done_pipe_w;
         e->in_use = 0;               /* joined: slot is free to reuse */
     }
     pthread_mutex_unlock(&thread_table_lock);
+    /* Close the self-pipe if this was a piped (async-bridge) thread. Freeing the
+     * slot above does not close fds; leaving them open would leak two per await. */
+    if (pr >= 0) close(pr);
+    if (pw >= 0) close(pw);
     return result;
 }
 
