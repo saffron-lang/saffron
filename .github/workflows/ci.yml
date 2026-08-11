@@ -1,0 +1,194 @@
+# CI — per-push / per-PR gate for the Saffron compiler.
+#
+# RUNNER OS: macos-14 (Apple silicon, arm64), and this is not a preference.
+# The build scripts are hard-bound to macOS + Homebrew LLVM in ways a stock
+# Linux runner cannot satisfy without editing scripts this workflow is not
+# allowed to touch:
+#   * bootstrap.sh uses `sed -i ''` (BSD sed; GNU sed rejects the empty arg).
+#   * every link line passes `-Wl,-stack_size,0x10000000`, a Mach-O ld64 flag
+#     that GNU ld / lld do not accept.
+#   * tools/saffron and tools/differential.sh hardcode the wasm32 toolchain at
+#     /opt/homebrew/opt/llvm/bin/clang and /opt/homebrew/bin/wasm-ld, and
+#     CLAUDE.md is explicit that Apple's system clang cannot target wasm32 at
+#     all — only Homebrew LLVM can. macOS is therefore the only host where the
+#     wasm32 differential leg can run.
+#
+# Each GitHub-hosted macOS job is its own fresh VM, so the machine-wide OOM /
+# single-flight concerns that apply to a shared dev box do not apply here: the
+# jobs are isolated, not sharing one machine's RAM. `concurrency` still cancels
+# superseded runs on the same ref to avoid piling work up.
+#
+# JOB GRAPH (fast-fail): bootstrap must go green before either downstream job
+# runs. bootstrap already contains the strongest gates in the repo — the gen4
+# fixed-point check and the assert-zero unresolved-inference-fallback count
+# (bootstrap.sh STAGE 2) — so if it is red there is no point compiling tests or
+# running the oracle. bootstrap uploads its build/ tree as an artifact; the
+# tests and differential jobs download it instead of re-bootstrapping (which is
+# the single heaviest step in the repo, ~2–4 min).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel an in-flight run when a newer commit lands on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # bootstrap — the fast-fail prerequisite for everything else.
+  # Runs ./bootstrap.sh, which:
+  #   * STAGE 1: gen2 (checked in) compiles gen3.
+  #   * STAGE 2: gen3 compiles its own source (gen4 fixed point), links it, AND
+  #     asserts codegen's `Int` inference fallback count is exactly 0
+  #     (--report-unresolved). Any of these failing fails the job.
+  # We do NOT set SKIP_GEN4 — the fixed-point + zero-fallback gate is the whole
+  # point of gating CI on the bootstrap.
+  # ---------------------------------------------------------------------------
+  bootstrap:
+    name: bootstrap (gen4 fixed-point + 0 unresolved)
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      # bootstrap.sh serializes across worktrees via a machine-wide lock; on an
+      # isolated CI VM there is no other worktree, so skip the lock to avoid a
+      # pointless 30-min wait if a stale lock dir were ever restored from cache.
+      SAFFRON_NO_BOOTSTRAP_LOCK: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: clang --version
+
+      - name: Bootstrap (gen2 -> gen3 -> gen4)
+        run: ./bootstrap.sh
+
+      # Carry the built compiler + generated runtime IR to the downstream jobs
+      # so they don't re-run the heaviest step. build/saffronc is a native
+      # Mach-O binary; it runs unchanged on an identical macos-14 image.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: saffron-build
+          path: |
+            build/saffronc
+            build/stage2/saffronc
+            build/stage3/runtime.ll
+          if-no-files-found: error
+          retention-days: 3
+
+  # ---------------------------------------------------------------------------
+  # tests — tools/run_tests.sh across all suites (main + pass + fail).
+  # Network tests are skipped by default (no --network), so CI never touches the
+  # network. The script exits nonzero on any real failure (TOTAL_FAIL != 0),
+  # including an xpass (a KNOWN_FAIL test that started passing) — so this gate
+  # fails on both regressions and silently-fixed bugs.
+  # ---------------------------------------------------------------------------
+  tests:
+    name: run_tests.sh (main + pass + fail)
+    runs-on: macos-14
+    needs: bootstrap
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: saffron-build
+          path: build
+
+      # upload/download can drop the executable bit; restore it.
+      - name: Restore executable bits
+        run: chmod +x build/saffronc build/stage2/saffronc tools/saffron tools/run_tests.sh
+
+      # Every native link line passes -lssl -lcrypto (tools/saffron), so OpenSSL
+      # must be linkable for EVERY test build even though most tests don't use
+      # it. tools/saffron discovers it via `brew --prefix openssl`.
+      - name: Ensure OpenSSL is present
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+
+      - name: Run test suites
+        run: tools/run_tests.sh -v
+
+  # ---------------------------------------------------------------------------
+  # differential (per-push) — the curated `oracle` subset only.
+  #
+  # tools/differential.sh compiles each program under native-O2 (reference),
+  # native-O0, and wasm32, and fails (exit nonzero) ONLY when two configs
+  # disagree on stdout/exit-status — the silent-wrong-answer + tag/NaN-box bug
+  # class the identity-mode bootstrap is structurally blind to.
+  #
+  # WHY --suite oracle PER PUSH, not the full corpus:
+  #   * The `oracle` suite (test/oracle_*.sf, 6 files) is purpose-built for this
+  #     script — each pins a specific silent-wrong-answer class (#102, #77-shaped,
+  #     enum-payload stringify, class-vs-bits println, any-compare). It is the
+  #     highest-signal-per-second slice.
+  #   * None of the 6 use IO.print or a wasm-unsupported import, so the wasm32
+  #     leg — the axis that catches #77-shaped tag bugs — actually RUNS for all
+  #     of them here, not just native-O0. That is the coverage point 3 wants.
+  #   * The full main+pass corpus (~290 files x 3 configs) is deferred to the
+  #     nightly job (nightly.yml) to keep the per-push wall time bounded and to
+  #     honor the repo's one-heavy-job-at-a-time discipline. This is a documented
+  #     deferral, not a silent drop: nightly runs the exact same script with no
+  #     --suite so it covers `main pass`.
+  #
+  # INVOCATION (derived from reading the script, not guessed):
+  #   `tools/differential.sh --suite oracle`
+  # differential.sh takes .sf files positionally OR `--suite {main|pass|oracle}`
+  # OR `--config <cfg>`; with no args it defaults to SUITES="main pass". We pass
+  # the named suite. The script self-gates the wasm32 leg: if node or Homebrew
+  # LLVM were absent it would print "wasm32 unavailable" and compare native-O0
+  # only, still failing closed on a native-O0 vs native-O2 mismatch. We install
+  # both below so the wasm32 leg is exercised.
+  # ---------------------------------------------------------------------------
+  differential:
+    name: differential oracle (native-O0 + wasm32 vs native-O2)
+    runs-on: macos-14
+    needs: bootstrap
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: saffron-build
+          path: build
+
+      - name: Restore executable bits
+        run: chmod +x build/saffronc build/stage2/saffronc tools/saffron tools/differential.sh
+
+      - name: Ensure OpenSSL is present
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+
+      # Cache the Homebrew download (bottle) so re-installing LLVM is fast. This
+      # caches the fetched bottle, not the install tree — the low-risk cache that
+      # materially speeds the runner without the fragility of caching /opt/homebrew
+      # symlinks. Key rotates weekly so a stale bottle can't pin an old LLVM.
+      - name: Cache Homebrew downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-llvm-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            brew-llvm-${{ runner.os }}-
+
+      # wasm32 needs Homebrew LLVM specifically: /opt/homebrew/opt/llvm/bin/clang
+      # and /opt/homebrew/bin/wasm-ld (both provided by the `llvm` formula).
+      # Apple's system clang cannot target wasm32 (CLAUDE.md).
+      - name: Install Homebrew LLVM (wasm32 toolchain)
+        run: brew list llvm >/dev/null 2>&1 || brew install llvm
+
+      - name: Verify wasm32 toolchain
+        run: |
+          test -x /opt/homebrew/opt/llvm/bin/clang || { echo "missing homebrew clang"; exit 1; }
+          test -x /opt/homebrew/bin/wasm-ld       || { echo "missing wasm-ld"; exit 1; }
+          node --version
+
+      - name: Differential oracle (curated subset)
+        run: tools/differential.sh --suite oracle

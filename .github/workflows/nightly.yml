@@ -1,0 +1,70 @@
+# Nightly — the full differential corpus that the per-push CI deliberately omits.
+#
+# The per-push `differential` job (ci.yml) runs only the curated `oracle`
+# subset (6 files) to keep PR latency bounded. This job closes that gap: it runs
+# tools/differential.sh over the FULL default corpus — `main pass`, ~290 .sf
+# files x up to 3 configurations (native-O2 reference, native-O0, wasm32) — so
+# no coverage is permanently dropped, only deferred to a schedule.
+#
+# Same runner constraint as ci.yml: macos-14 is mandatory (BSD sed, Mach-O
+# -Wl,-stack_size link flag, and the /opt/homebrew wasm32 toolchain — see the
+# header comment in ci.yml). This job bootstraps its own compiler rather than
+# depending on ci.yml's artifact, because it runs on a schedule where no CI run
+# artifact is guaranteed to exist.
+
+name: Nightly differential
+
+on:
+  schedule:
+    # 07:00 UTC daily. Adjust to the team's low-traffic window if desired.
+    - cron: "0 7 * * *"
+  # Allow a maintainer to trigger the full sweep on demand.
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-differential
+  cancel-in-progress: true
+
+jobs:
+  full-differential:
+    name: differential oracle (full main+pass corpus)
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      SAFFRON_NO_BOOTSTRAP_LOCK: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure OpenSSL is present
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+
+      - name: Cache Homebrew downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-llvm-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            brew-llvm-${{ runner.os }}-
+
+      - name: Install Homebrew LLVM (wasm32 toolchain)
+        run: brew list llvm >/dev/null 2>&1 || brew install llvm
+
+      - name: Verify wasm32 toolchain
+        run: |
+          test -x /opt/homebrew/opt/llvm/bin/clang || { echo "missing homebrew clang"; exit 1; }
+          test -x /opt/homebrew/bin/wasm-ld       || { echo "missing wasm-ld"; exit 1; }
+          node --version
+
+      # A fresh compiler for the sweep. The gen4 fixed-point + 0-unresolved gate
+      # runs here too, so a nightly also re-verifies the bootstrap invariants.
+      - name: Bootstrap
+        run: ./bootstrap.sh
+
+      # No --suite => SUITES defaults to "main pass": the whole corpus, all
+      # three configurations. Exit is nonzero only on a genuine config
+      # disagreement (a silent wrong answer); build failures in a non-reference
+      # config and nondeterministic tests are reported loudly but do NOT fail the
+      # run (see the exit-code note at the end of differential.sh). That is the
+      # script's designed behavior and is preserved here intentionally.
+      - name: Full differential sweep
+        run: tools/differential.sh
