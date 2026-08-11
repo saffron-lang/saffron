@@ -9,6 +9,79 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 194. FIXED — modules were keyed by literal import-path string, not canonical path — same file imported two ways became two instances
+
+**Severity: medium — duplicate module state, or invalid IR, in any multi-file project.**
+
+Surfaced building `sumac/examples/claude_tui` (a file importing `../../src/layout.sf`
+got a DIFFERENT `layout` instance than one importing `../../../src/layout.sf`, so
+`_collect` saw an empty `_ctx_stack` and rendered nothing). The compiler's
+module-dedup map is keyed on the path *string*, so two spellings that resolve to the
+same file are treated as two modules. Minimal repro:
+
+```saffron
+// sub/mod.sf
+var counter: Int = 0
+fun bump(): Int { counter = counter + 1 return counter }
+
+// main.sf
+import "./sub/mod.sf" as A
+import "./sub/../sub/mod.sf" as B   // same file, different spelling
+fun main() {
+    IO.println("${A.bump()}")   // 1
+    IO.println("${B.bump()}")   // 1  ← should be 2; B is a SECOND instance
+    IO.println("${A.bump()}")   // 2
+}
+```
+
+Two independent `counter` globals. In the worse case (both spellings pulled into one
+link) the duplicated module globals collide as `redefinition of global '@__g_...'`
+and the build fails in `opt` — exactly the shape of the Turmeric-side path-identity
+bug **#57** (relative vs absolute prelude path emitted twice). Same root cause.
+
+**Root cause.** Two sites in `src/compiler/main.sf` disagreed on a module's
+identity, and BOTH derived it from the raw import specifier:
+
+1. `resolve_import_path` returned an un-normalised path — `./sub/mod.sf` →
+   `<dir>/sub/mod.sf`, but `./sub/../sub/mod.sf` → `<dir>/sub/../sub/mod.sf`. That
+   string is the key for the `visited`, `path_to_prefix` and `module_file_paths`
+   maps, so each spelling registered a separate module.
+2. `path_based_prefix` built the mangled symbol prefix from the specifier text:
+   `sub_mod_` vs `sub____sub_mod_`. Two prefixes → two `@__g_..._counter` globals.
+   (`--dump-packages` on the repro showed `MOD 2 sub_mod_` beside
+   `MOD 3 sub____sub_mod_`, two rows for one file.)
+
+**Fix.** Canonicalise the resolved path ONCE, at the single choke point, so the
+dedup key and the prefix basis agree on one identity per file. A new `_canon_path`
+(the existing `_canon_dir` now delegates to it) absolutises against `OS.cwd()` and
+lexically collapses `.`/`..`/duplicate slashes; `resolve_import_path` wraps the raw
+resolver (`_resolve_import_path_raw`) and routes every specifier through it. Because
+`path_to_prefix` is keyed on that canonical path and every prefix site checks
+`path_to_prefix.has(key)` before deriving, the first spelling of a file seeds one
+prefix and all later spellings reuse it — one instance, one set of globals. The
+three paths pushed into `visited`/`path_to_prefix` directly rather than through
+`resolve_import_path` — the stdlib `prelude.sf`, the auto-collected `scheduler.sf`
+(`sched_auto`), and the entry `prelude_path` — are canonicalised the same way so an
+explicit `@scheduler`/`@prelude` import cannot re-register them under a second key
+(the #194 mechanism meeting #181's single-definition scheduler requirement).
+
+Verified: the repro prints 1, 2, 3; `./x`, `./x/../x`, `./x/./x` and an absolute
+spelling of one file all resolve to a single module; the both-in-one-link variant
+links cleanly through `opt` (no `redefinition of global`); the Sumac claude_tui
+example still builds. Suite 369 passed / 0 failed / 9 skipped (367 baseline + the
+two new files); `package_map_test.sh` 18/0; bootstrap green including the gen4
+fixed-point stage (0 unresolved inference fallbacks). Regression test
+`test/pass/import_path_canonicalization.sf` + fixture
+`test/pass/import_path_canon_mod.sf`.
+
+**Limitation (accepted v1).** The normalisation is purely LEXICAL — `OS` has no
+realpath binding — so it does not resolve symlinks. Two DIFFERENT symlinks to one
+file still read as two modules, and a literal path that crosses a symlink (e.g.
+`/tmp/...` where `/tmp` → `/private/tmp`) will not dedup against a relative import
+that `OS.cwd()` reports through the resolved target. Every spelling difference this
+bug is actually about — redundant `.`/`..`, relative-vs-absolute-under-one-root —
+reduces here. This mirrors #57's identical lexical-only limitation for `--lib-path`.
+
 ### 195. FIXED — a capturing closure popped the enclosing frame's GC roots on return, so a still-live captured value was swept
 
 **Was: high — deterministic segfault / heap corruption in the steady-state
