@@ -1,0 +1,78 @@
+// string_split_trailing_empty.sf — BUGS #193 regression.
+//
+// __str_split used to loop `while (rt_strlen(pos) > 0)` — content-driven — so it
+// stopped as soon as the remaining string was empty and never emitted the segment
+// AFTER a trailing delimiter, and returned [] for the empty string. Every
+// mainstream language (Python/JS/Go/Rust) returns delimiter_count + 1 segments: a
+// trailing delimiter yields a trailing "", and splitting "" yields [""]. The fix
+// makes the loop delimiter-driven and always pushes the final trailing segment.
+//
+// Interior empties already worked; this pins the trailing/empty-input cases plus a
+// join round-trip (List.join already preserved empties, so split/join now
+// reconstruct the original string), a multi-char delimiter, and a large split.
+import "@test" as Test
+
+// --- trailing delimiter yields a trailing empty segment ---
+var a = "ab\n".split("\n")
+Test.assert_eq(a.length(), 2, "trailing delim: length")
+Test.assert_eq(a[0], "ab", "trailing delim: [0]")
+Test.assert_eq(a[1], "", "trailing delim: [1] is empty")
+
+// --- empty input yields one empty segment ---
+var b = "".split("\n")
+Test.assert_eq(b.length(), 1, "empty input: length")
+Test.assert_eq(b[0], "", "empty input: [0] is empty")
+
+// --- multiple segments with a trailing delimiter ---
+var c = "a,b,".split(",")
+Test.assert_eq(c.length(), 3, "a,b,: length")
+Test.assert_eq(c[0], "a", "a,b,: [0]")
+Test.assert_eq(c[1], "b", "a,b,: [1]")
+Test.assert_eq(c[2], "", "a,b,: [2] is empty")
+
+// --- interior empties still work (unchanged) ---
+var d = "a\n\nb".split("\n")
+Test.assert_eq(d.length(), 3, "interior empty: length")
+Test.assert_eq(d[0], "a", "interior empty: [0]")
+Test.assert_eq(d[1], "", "interior empty: [1]")
+Test.assert_eq(d[2], "b", "interior empty: [2]")
+
+// --- multi-char delimiter ---
+var e = "a--b--".split("--")
+Test.assert_eq(e.length(), 3, "multi-char delim: length")
+Test.assert_eq(e[0], "a", "multi-char delim: [0]")
+Test.assert_eq(e[1], "b", "multi-char delim: [1]")
+Test.assert_eq(e[2], "", "multi-char delim: [2] is empty")
+
+// --- delimiter not present ---
+var f = "abc".split(",")
+Test.assert_eq(f.length(), 1, "no delim: length")
+Test.assert_eq(f[0], "abc", "no delim: [0]")
+
+// --- string that is only a delimiter ---
+var g = "\n".split("\n")
+Test.assert_eq(g.length(), 2, "only delim: length")
+Test.assert_eq(g[0], "", "only delim: [0] is empty")
+Test.assert_eq(g[1], "", "only delim: [1] is empty")
+
+// --- join round-trip reconstructs the original, including trailing-delim ---
+Test.assert_eq("ab\n".split("\n").join("\n"), "ab\n", "roundtrip: ab\\n")
+Test.assert_eq("a,b,".split(",").join(","), "a,b,", "roundtrip: a,b,")
+Test.assert_eq("".split("\n").join("\n"), "", "roundtrip: empty")
+Test.assert_eq("a--b--".split("--").join("--"), "a--b--", "roundtrip: a--b--")
+Test.assert_eq("hello world foo".split(" ").join(" "), "hello world foo", "roundtrip: words")
+Test.assert_eq("\n".split("\n").join("\n"), "\n", "roundtrip: only delim")
+
+// --- large split to shake out GC (1000 segments) ---
+var big = ""
+var i = 0
+while (i < 999) {
+    big = big + "x,"
+    i = i + 1
+}
+big = big + "x"
+var parts = big.split(",")
+Test.assert_eq(parts.length(), 1000, "large split: 1000 segments")
+Test.assert_eq(parts.join(","), big, "large split: join round-trip")
+
+Test.summary()

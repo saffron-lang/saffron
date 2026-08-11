@@ -9,6 +9,143 @@ definition open. See `BUGS.md`'s preamble for the numbering and merge discipline
 
 ## Resolved
 
+### 195. FIXED — a capturing closure popped the enclosing frame's GC roots on return, so a still-live captured value was swept
+
+**Was: high — deterministic segfault / heap corruption in the steady-state
+render loop under normal GC; a sibling of #192 but on the closure path, not the
+constructor path.**
+
+Surfaced when the `GC.disable()` scaffolding was removed from the Sumac widget
+tests after #192 landed: `test_list`, `test_table` and `test_textarea` failed
+under normal GC (IndexError length 0, or segfault rc 139). The original
+suspicion pointed at the layout `_ctx_stack` or an LNode freed mid-construction;
+the bisection was accurate that it needed a captured-closure + a cross-module
+method + allocation, but the true cause was simpler and broader.
+
+**Minimized repro (no Sumac at all):** any capturing closure that is *called*,
+followed by a collection, frees the caller's rooted locals.
+
+```saffron
+class W { var items: List<String>  fun init(it: List<String>) { this.items = it }
+  fun view() { var n: Int = this.items.length()  /* ... */ } }
+fun main() {
+    var w = W(["a","b","c","d","e","f","g","h"])   // rooted local in main
+    var f: () => Nil = fun () => w.view()          // f captures w
+    f()                                            // <-- pops main's frame roots
+    GC.collect()
+    IO.println("${w.items.length()}")              // prints 0 — w.items was swept
+}
+```
+
+**Root cause — codegen, NOT the tracer.** Frame-local GC roots are managed by a
+per-function counter, `this.gc_root_count`: the function prologue emits one
+`__gc_push_root` per rooted local and bumps the counter; every `Return` emits
+`__gc_pop_roots(gc_root_count)` to balance them. The FunDecl body emitter
+(`output_body.sf`) correctly saves this counter, zeroes it while emitting the
+nested body, and restores it afterward. But `gen_closure_function`
+(`src/compiler/codegen/closures_body.sf`) — the emitter for a capturing arrow
+lambda — is *also* a separate function body and it never reset the counter. So
+the lambda body inherited the ENCLOSING function's `gc_root_count`, and its
+`Return` emitted `__gc_pop_roots(N)` for N roots it had never pushed. Calling the
+closure therefore popped the CALLER's live frame roots off the shadow stack. The
+IR made it plain: `__lambda_283`, which pushed nothing, ended with
+`call void @__gc_pop_roots(i64 2)` — the 2 being `main`'s `%w` and `%f`. After
+`f()` returned, `w` was no longer a shadow-stack root, so the next collection
+swept it and its `items` list. This is exactly why `GC.disable()` hid it and why
+it needed the *combination* the bisection found: you need a captured value that
+becomes garbage-if-unrooted, a closure call to do the popping, and a subsequent
+allocation/collection to actually sweep it.
+
+**Fix:** `gen_closure_function` now saves `this.gc_root_count`, sets it to 0 for
+the duration of the closure body, and restores it on exit — mirroring the
+FunDecl path exactly. The lambda's `Return` then pops only the roots the lambda
+itself pushed (0 for a simple `=> expr`), and the caller's frame roots stay on
+the shadow stack across the call. Codegen change → required a bootstrap; no
+`gc.ll`/runtime change and no gen2 promotion (no new syntax). Verified: the
+`/tmp/gc195` repro prints `ok 200 renders`, a 2500-iteration stress passes, the
+three widget tests pass under normal GC, the full Sumac suite is 14/14, the main
+suite is green, and the gen4 fixed-point bootstrap passes with 0 unresolved
+fallbacks. Regression test: `test/pass/gc_widget_view_render_loop.sf`. This
+unblocked the Sumac render loop under normal GC.
+
+### 193. FIXED — String.split dropped trailing empty segments and returned [] for ""
+
+**Was: medium — silently wrong results; diverged from every mainstream language.**
+
+Discovered building `sumac/src/widgets/textarea.sf`, whose line model is
+`value.split("\n")`. `__str_split` (`src/runtime/runtime.sf`) looped
+`while (rt_strlen(pos) > 0)` — content-driven, not delimiter-driven — so it stopped
+as soon as the remaining string was empty and never emitted the segment *after* a
+trailing delimiter, and returned `[]` for the empty string. Verified before the fix:
+
+```
+"ab\n".split("\n")   -> ["ab"]          (should be ["ab", ""],  len 2)
+"".split("\n")       -> []              (should be [""],        len 1)
+"a,b,".split(",")    -> ["a", "b"]      (should be ["a","b",""], len 3)
+"a\n\nb".split("\n") -> ["a","","b"]    (correct — interior empties were fine)
+```
+
+Python/JS/Go/Rust all return `delimiter_count + 1` segments. Interior empties
+already worked; only the trailing/empty-input cases were wrong. A textarea whose
+buffer was `"ab\n"` lost its second (empty) line entirely — the textarea widget
+worked around it with a hand-written `_split_keep` char scanner (can be retired now).
+
+**Root cause:** the loop condition tested "content remains", so it exited before
+emitting a final empty segment; an empty input never entered the loop at all.
+
+**Fix:** made the loop delimiter-driven — `while (true)` iterating on `rt_strstr`
+matches, pushing the segment before each match, advancing past the delimiter, and
+after the last match pushing the FINAL trailing segment (which may be `""`). An
+empty input takes the no-match path immediately and pushes exactly one `""`
+segment, so the result is always `delimiter_count + 1` segments. The empty-delimiter
+edge case is split off into a guarded branch that keeps the OLD content-driven loop
+verbatim (strstr on `""` returns `pos`, which would spin the delimiter-driven loop
+forever), so empty-delimiter behaviour is unchanged. GC-safety discipline is
+preserved exactly: every segment is still allocated with `__gc_alloc_safe` +
+`__rt_tag_ptr` and pushed with `__split_push`, and `rt_free(buf)` runs on every
+return path. `List.join` already preserved empties, so `xs.join(d)` where
+`xs = s.split(d)` now reconstructs `s`.
+
+Regression test `test/pass/string_split_trailing_empty.sf` asserts all four
+original cases plus a multi-char delimiter, an absent delimiter, a delimiter-only
+string, a 1000-segment split, and join round-trips (including trailing-delimiter
+strings). Full `tools/run_tests.sh` (365 passed, 0 failed) and `./bootstrap.sh`
+(gen4 fixed-point green) both pass — the compiler's own lexer/parser/import
+scanners rely on `split` and are unaffected. Runtime.sf change, no gen2 promotion.
+
+### 192. FIXED — GC swept a live cross-module instance because its constructor call left it unrooted across `__init`
+
+**Was: high — deterministic heap corruption under normal allocation.** Discovered
+building `sumac/src/buffer.sf` (a `Buffer` class whose field is a `List<Cell>`,
+both defined in an imported module). A loop allocating transient `Buffer`s crashed
+with `NullError` after ~45 allocations (one GC cycle); `GC.disable()` avoided it.
+
+**Root cause — codegen, NOT the GC tracer.** The tracer was correct. The fault:
+the primary same-file constructor path (`gen_call`, `expr_body.sf`, the BUGS #162
+arm) emits `alloc + push_temp(instance) + push_temp(args) + call __init +
+pop_temps`, keeping the fresh instance a GC temp-root for the width of the `__init`
+window. But a module-qualified call like `M.Buffer(...)` is lowered by the
+namespace-dispatch arms in `methods_body.sf`, whose three constructor branches
+(`__pe_is_ctor`, `__mp_is_ctor`, `__pe2_is_ctor`) emitted `alloc + call __init`
+with NO `gen_root_arg_temp`. So the instance lived only in an SSA temp across
+`__init`, which allocates the `List<Cell>` + nested `Cell`s; those allocations
+tripped a major collection, the mark phase never saw the not-yet-stored instance,
+and it was swept while live. This exactly explains the bisection: same-file is
+rooted (survives); cross-module `List<Int>` allocates little (usually survives);
+cross-module `List<class>` allocates enough nested objects to fire a collection
+mid-`__init` (crashes); `GC.disable()` removes the collection (survives).
+
+**Fix:** all three module-qualified constructor branches in
+`src/compiler/codegen/methods_body.sf` now root the instance and each argument
+temp across the `__init` call (`gen_root_arg_temp` per value, `gen_pop_arg_roots`
+after), mirroring the primary path. Codegen change → required a bootstrap; no
+`gc.ll`/runtime change and no gen2 promotion (no new syntax). Verified: the repro
+prints `done 1000`, a 100k-transient stress passes, a 500-`Buffer` loop runs under
+normal GC, the full suite is green, and the gen4 fixed-point bootstrap passes.
+Regression test: `test/pass/gc_cross_module_list_of_class.sf` (+ fixture
+`test/fixtures/gc_cross_module_holder.sf`). This unblocked the Sumac render loop,
+which rebuilds a Buffer + LNode tree every frame.
+
 ### 190. FIXED — box locals captured by a named nested fun (escaping-capture dangle)
 
 A named nested `fun` captured its enclosing locals by SLOT ADDRESS: `gen_func_ref`

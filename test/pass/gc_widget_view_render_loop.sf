@@ -1,0 +1,78 @@
+// BUGS #195: GC swept a live captured local because a capturing closure's body
+// popped the ENCLOSING frame's GC roots off the shadow stack when it returned.
+//
+// gen_closure_function (codegen/closures_body.sf) is a separate function-body
+// emitter, but it never reset `this.gc_root_count` the way the FunDecl path in
+// output_body.sf does. So a lambda inherited the enclosing function's frame-root
+// count, and its `Return` emitted `__gc_pop_roots(N)` for N roots it never
+// pushed — popping the CALLER's live frame roots. After the closure returned,
+// the caller's rooted locals (e.g. a widget instance captured by the closure)
+// were no longer on the shadow stack, so the next collection swept them while
+// they were still live. Reproduced by the Sumac render loop:
+// `_collect(fun () => widget.view())` where view() builds a nested LNode tree
+// through closures, repeated across GC cycles.
+//
+// Must run under NORMAL GC (no GC.disable()) to have any value.
+import "@test" as Test
+import "@gc" as GC
+
+// A builder that takes a closure and runs it while allocating (mirrors the
+// layout context-stack builders that view() drives).
+fun run_block(block: () => Nil): List<String> {
+    var out: List<String> = []
+    block()
+    var i: Int = 0
+    while (i < 16) { out.push("node") i = i + 1 }
+    return out
+}
+
+class Widget {
+    var items: List<String>
+    fun init(it: List<String>) { this.items = it }
+    // view() reads its own list into a local, then builds a tree through a
+    // closure that captures those locals — allocating as it goes.
+    fun view(): Int {
+        var items: List<String> = this.items
+        var n: Int = items.length()
+        var total: Int = 0
+        var nodes: List<String> = run_block(fun () {
+            var i: Int = 0
+            while (i < n) {
+                var junk: List<String> = []
+                var q: Int = 0
+                while (q < 8) { junk.push(items[i]) q = q + 1 }
+                total = total + junk.length()
+                i = i + 1
+            }
+        })
+        return total + nodes.length()
+    }
+}
+
+fun main() {
+    var w: Widget = Widget(["a", "b", "c", "d", "e", "f", "g", "h"])
+
+    // Drive view() through an OUTER closure that captures the widget — this is
+    // the shape that popped the caller's roots. Repeat across many GC cycles.
+    var i: Int = 0
+    var last: Int = 0
+    while (i < 3000) {
+        var render: () => Int = fun (): Int => w.view()
+        last = render()
+        i = i + 1
+    }
+
+    // 8 items * 8 pushes = 64, + 16 nodes = 80. If the widget's list were swept
+    // mid-loop, n would read 0 and this would be 16 (or crash indexing).
+    Test.assert_eq(last, 80, "captured widget survives GC across a render loop")
+    Test.assert_eq(w.items.length(), 8, "widget's list intact after the loop")
+
+    // Force a collection after the loop and re-read through the captured path.
+    GC.collect()
+    var after: () => Int = fun (): Int => w.view()
+    Test.assert_eq(after(), 80, "widget still live after an explicit collection")
+    Test.assert_eq(w.items.length(), 8, "widget's list still intact after collect")
+
+    Test.summary()
+}
+main()

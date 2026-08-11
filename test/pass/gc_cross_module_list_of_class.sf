@@ -1,0 +1,48 @@
+// BUGS #192: GC corrupts the heap when a cross-module class holds a List of
+// another cross-module class instance.
+//
+// A loop that repeatedly allocates a `Holder` (whose field is a `List<Inner>`,
+// both classes defined in the imported fixture) crashed with a NullError after
+// ~one GC cycle. Cause was NOT in the tracer: the three module-qualified
+// constructor paths in codegen/methods_body.sf emitted the `alloc + __init` pair
+// without rooting the fresh instance as a GC temp across `__init`. `__init`
+// itself allocates (the List<Inner> field and its 24 nested Inner objects), so a
+// collection triggered there swept the Holder while it was live only in an SSA
+// temp. The primary same-file constructor path (expr_body.sf) already rooted it;
+// the module-prefixed paths did not. Fix mirrors that rooting.
+//
+// This test must run under normal GC (no GC.disable()) to have any value.
+import "../fixtures/gc_cross_module_holder.sf" as M
+import "@test" as Test
+
+fun main() {
+    // Enough iterations to force several major collections with the default
+    // threshold: each Holder allocates ~26 objects and is immediately garbage.
+    var j: Int = 0
+    var last: Int = 0
+    while (j < 3000) {
+        var h: M.Holder = M.Holder(24)
+        last = h.total()   // touch the instance after __init to catch a freed field
+        j = j + 1
+    }
+    // total() over Inner(0..23) is 0+1+...+23 = 276.
+    Test.assert_eq(last, 276, "cross-module Holder survives GC and holds its list")
+
+    // Also keep a batch alive across collections and re-read them.
+    var kept: List<M.Holder> = []
+    var k: Int = 0
+    while (k < 500) {
+        kept.push(M.Holder(24))
+        k = k + 1
+    }
+    var sum: Int = 0
+    var m: Int = 0
+    while (m < kept.length()) {
+        sum = sum + kept[m].total()
+        m = m + 1
+    }
+    Test.assert_eq(sum, 276 * 500, "retained cross-module Holders keep their lists intact")
+
+    Test.summary()
+}
+main()
