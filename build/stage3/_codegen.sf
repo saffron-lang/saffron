@@ -11789,6 +11789,26 @@ class Codegen {
         return lib_ir.slice(2, lib_ir.length())
     }
 
+    /// Emit the common `<result> = call <ret_type> @<fn_name>(<args_str>)` shape,
+    /// switching on use_llvm_lib exactly the way the ~40 hand-written fork sites
+    /// used to. This is a byte-for-byte extraction of that idiom:
+    ///
+    ///   if (this.use_llvm_lib) {
+    ///       this.emit_indent(this.lib_call(result, ret_type, fn_name, args_str))
+    ///   } else {
+    ///       this.emit_indent(result + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")")
+    ///   }
+    ///
+    /// Only collapse a fork here when BOTH branches are exactly this — no extra
+    /// bookkeeping (llvm_values tracking, verify_call) inside either arm.
+    fun emit_runtime_call(result: String, ret_type: String, fn_name: String, args_str: String) {
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(result, ret_type, fn_name, args_str))
+        } else {
+            this.emit_indent(result + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")")
+        }
+    }
+
     fun lib_ptrtoint(result_name: String, val_name: String): String {
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
@@ -14415,11 +14435,7 @@ class Codegen {
 
     fun gen_list_lit(elements: List<AST.Expr>): String {
     var list_val: String = this.fresh_local()
-    if (this.use_llvm_lib) {
-        this.emit_indent(this.lib_call(list_val, "i64", "__list_new", ""))
-    } else {
-        this.emit_indent(list_val + " = call i64 @__list_new()")
-    }
+    this.emit_runtime_call(list_val, "i64", "__list_new", "")
     // The element type used to be recognised from a two-entry whitelist — String,
     // or Int/Float collapsed to Int — and everything else stayed Any. A list of
     // class instances therefore produced `List<Any>`, so `un[0].to_string()` had an
@@ -14464,11 +14480,7 @@ class Codegen {
         var elem: String = this.gen_arg_value(elements[i])
         ll_roots = ll_roots + this.gen_root_arg_temp(elem)
         var discard_lp: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(discard_lp, "i64", "__list_push", "i64 " + list_val + ", i64 " + elem))
-        } else {
-            this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
-        }
+        this.emit_runtime_call(discard_lp, "i64", "__list_push", "i64 " + list_val + ", i64 " + elem)
         this.gen_pop_arg_roots(ll_roots)
         i = i + 1
     }
@@ -14603,11 +14615,7 @@ class Codegen {
         var sg_idx_tagged: String = this.gen_arg_value(index)
         var sg_idx: String = this.emit_untag_index(sg_idx_tagged, this.last_type)
         var sg_local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(sg_local, "i64", "__str_get", "i64 " + obj + ", i64 " + sg_idx))
-        } else {
-            this.emit_indent(sg_local + " = call i64 @__str_get(i64 " + obj + ", i64 " + sg_idx + ")")
-        }
+        this.emit_runtime_call(sg_local, "i64", "__str_get", "i64 " + obj + ", i64 " + sg_idx)
         this.called_functions.push("__str_get")
         this.last_type = AST.Type.StringType
         return sg_local
@@ -14649,11 +14657,7 @@ class Codegen {
         // the BUGS #85 shape. Record the real arity instead of relying on the default.
         this.called_function_arity.set("__any_index_get", 2)
         var ai_res: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(ai_res, "i64", "__any_index_get", "i64 " + obj + ", i64 " + ai_idx))
-        } else {
-            this.emit_indent(ai_res + " = call i64 @__any_index_get(i64 " + obj + ", i64 " + ai_idx + ")")
-        }
+        this.emit_runtime_call(ai_res, "i64", "__any_index_get", "i64 " + obj + ", i64 " + ai_idx)
         // Any, not the receiver's type: this is an *element*, and claiming the
         // container's type would misroute the next dispatch — the same reasoning
         // the getItem arm above records for its fallback.
@@ -14668,11 +14672,7 @@ class Codegen {
     var is_neg: String = this.fresh_local()
     this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
     var len: String = this.fresh_local()
-    if (this.use_llvm_lib) {
-        this.emit_indent(this.lib_call(len, "i64", "__list_length", "i64 " + obj))
-    } else {
-        this.emit_indent(len + " = call i64 @__list_length(i64 " + obj + ")")
-    }
+    this.emit_runtime_call(len, "i64", "__list_length", "i64 " + obj)
     var adjusted: String = this.fresh_local()
     this.emit_indent(adjusted + " = add i64 " + len + ", " + idx)
     var final_idx: String = this.fresh_local()
@@ -14735,11 +14735,7 @@ class Codegen {
     var idx: String = this.emit_untag_index(idx_tagged, this.last_type)
     var val: String = this.gen_arg_value(value)
     var discard_ls: String = this.fresh_local()
-    if (this.use_llvm_lib) {
-        this.emit_indent(this.lib_call(discard_ls, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val))
-    } else {
-        this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
-    }
+    this.emit_runtime_call(discard_ls, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val)
     return val
     }
 
@@ -15351,11 +15347,7 @@ class Codegen {
     /// (prefixed name, bare method, named-import target).
     fun gen_coro_call(target: String, arg_strs: List<String>): String {
         var hdl: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(hdl, "ptr", target, arg_strs.join(", ")))
-        } else {
-            this.emit_indent(hdl + " = call ptr @" + target + "(" + arg_strs.join(", ") + ")")
-        }
+        this.emit_runtime_call(hdl, "ptr", target, arg_strs.join(", "))
         var hdl_i64: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_ptrtoint(hdl_i64, hdl))
@@ -15477,11 +15469,7 @@ class Codegen {
         var __ig_idx: String = this.emit_untag_index(__ig_idx_tagged, this.last_type)
         this.called_functions.push("__any_iter_get")
         var __ig_res: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(__ig_res, "i64", "__any_iter_get", "i64 " + __ig_obj + ", i64 " + __ig_idx))
-        } else {
-            this.emit_indent(__ig_res + " = call i64 @__any_iter_get(i64 " + __ig_obj + ", i64 " + __ig_idx + ")")
-        }
+        this.emit_runtime_call(__ig_res, "i64", "__any_iter_get", "i64 " + __ig_obj + ", i64 " + __ig_idx)
         // The element's type is whatever the collection holds: T for a List<T>,
         // String for a String, List<Any> for a Map, and Any when the receiver is
         // the desugaring's untyped temporary.
@@ -15517,11 +15505,7 @@ class Codegen {
         var parent_method: String = this.current_parent + "__" + method
         this.called_functions.push(parent_method)
         var super_result: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(super_result, "i64", parent_method, super_args.join(", ")))
-        } else {
-            this.emit_indent(super_result + " = call i64 @" + parent_method + "(" + super_args.join(", ") + ")")
-        }
+        this.emit_runtime_call(super_result, "i64", parent_method, super_args.join(", "))
         if (this.func_ret_types.has(parent_method)) {
             this.last_type = this.func_ret_types.get(parent_method)
         } else {
@@ -16070,11 +16054,7 @@ class Codegen {
         // emit the await loop pattern (call as ptr, suspend/resume until done)
         if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var b_hdl: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
-            } else {
-                this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-            }
+            this.emit_runtime_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", "))
             var b_i64: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_ptrtoint(b_i64, b_hdl))
@@ -16120,11 +16100,7 @@ class Codegen {
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
         if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var s_hdl: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
-            } else {
-                this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-            }
+            this.emit_runtime_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", "))
             var s_i64: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_ptrtoint(s_i64, s_hdl))
@@ -16157,11 +16133,7 @@ class Codegen {
             return s_result
         }
         var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", prefixed_name, arg_strs.join(", ")))
-        } else {
-            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-        }
+        this.emit_runtime_call(local, "i64", prefixed_name, arg_strs.join(", "))
         if (this.func_ret_types.has(prefixed_name)) {
             this.last_type = this.func_ret_types.get(prefixed_name)
         } else if (this.func_ret_types.has(method)) {
@@ -16313,11 +16285,7 @@ class Codegen {
         // save its result immediately before another spawn could overwrite @__task_result.
         // Don't enqueue already-done tasks (the scheduler would read stale @__task_result).
         var spawn_done: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(spawn_done, "i64", "__sched_coro_done", "i64 " + task_i64))
-        } else {
-            this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
-        }
+        this.emit_runtime_call(spawn_done, "i64", "__sched_coro_done", "i64 " + task_i64)
         var spawn_done_cmp: String = this.fresh_local()
         this.emit_indent(spawn_done_cmp + " = icmp eq i64 " + spawn_done + ", 1")
         var spawn_save_label: String = this.fresh_label("spawn.save")
@@ -16495,21 +16463,13 @@ class Codegen {
             if (method == "push") {
                 var __lp_val: String = this.gen_arg_value(args[0])
                 var __lp_discard: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lp_discard, "i64", "__list_push", "i64 " + obj + ", i64 " + __lp_val))
-                } else {
-                    this.emit_indent(__lp_discard + " = call i64 @__list_push(i64 " + obj + ", i64 " + __lp_val + ")")
-                }
+                this.emit_runtime_call(__lp_discard, "i64", "__list_push", "i64 " + obj + ", i64 " + __lp_val)
                 this.last_type = AST.Type.NilType
                 return "0"
             }
             if (method == "pop") {
                 var __lpop_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lpop_local, "i64", "__list_pop", "i64 " + obj))
-                } else {
-                    this.emit_indent(__lpop_local + " = call i64 @__list_pop(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__lpop_local, "i64", "__list_pop", "i64 " + obj)
                 var __pop_elem: AST.Type = this.get_list_element_type(__list_saved_type)
                 if (this.type_to_string(__pop_elem) != "Any") {
                     this.last_type = __pop_elem
@@ -16523,11 +16483,7 @@ class Codegen {
                 var __lrm_tagged: String = this.gen_arg_value(args[0])
                 var __lrm_val: String = this.emit_untag_int(__lrm_tagged)
                 var __lrm_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lrm_local, "i64", "__list_remove", "i64 " + obj + ", i64 " + __lrm_val))
-                } else {
-                    this.emit_indent(__lrm_local + " = call i64 @__list_remove(i64 " + obj + ", i64 " + __lrm_val + ")")
-                }
+                this.emit_runtime_call(__lrm_local, "i64", "__list_remove", "i64 " + obj + ", i64 " + __lrm_val)
                 var __rm_elem: AST.Type = this.get_list_element_type(__list_saved_type)
                 if (this.type_to_string(__rm_elem) != "Any") {
                     this.last_type = __rm_elem
@@ -16539,44 +16495,28 @@ class Codegen {
             if (method == "reverse") {
                 this.called_functions.push("rt_list_reverse")
                 var __lrev_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lrev_local, "i64", "rt_list_reverse", "i64 " + obj))
-                } else {
-                    this.emit_indent(__lrev_local + " = call i64 @rt_list_reverse(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__lrev_local, "i64", "rt_list_reverse", "i64 " + obj)
                 this.last_type = __list_saved_type
                 return __lrev_local
             }
             if (method == "copy") {
                 this.called_functions.push("rt_list_copy")
                 var __lcopy_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lcopy_local, "i64", "rt_list_copy", "i64 " + obj))
-                } else {
-                    this.emit_indent(__lcopy_local + " = call i64 @rt_list_copy(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__lcopy_local, "i64", "rt_list_copy", "i64 " + obj)
                 this.last_type = __list_saved_type
                 return __lcopy_local
             }
             if (method == "sort") {
                 this.called_functions.push("rt_list_sort")
                 var __lsort_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__lsort_local, "i64", "rt_list_sort", "i64 " + obj))
-                } else {
-                    this.emit_indent(__lsort_local + " = call i64 @rt_list_sort(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__lsort_local, "i64", "rt_list_sort", "i64 " + obj)
                 this.last_type = __list_saved_type
                 return __lsort_local
             }
             if (method == "join") {
                 var __ljoin_val: String = this.gen_arg_value(args[0])
                 var __ljoin_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__ljoin_local, "i64", "__list_join", "i64 " + obj + ", i64 " + __ljoin_val))
-                } else {
-                    this.emit_indent(__ljoin_local + " = call i64 @__list_join(i64 " + obj + ", i64 " + __ljoin_val + ")")
-                }
+                this.emit_runtime_call(__ljoin_local, "i64", "__list_join", "i64 " + obj + ", i64 " + __ljoin_val)
                 this.last_type = AST.Type.StringType
                 return __ljoin_local
             }
@@ -16589,11 +16529,7 @@ class Codegen {
         var __map_type_match: Bool = __map_obj_type.starts_with("Map") or __map_obj_type == "Any"
         if (__map_type_match and method == "keys") {
             var __mk_local: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(__mk_local, "i64", "__map_keys", "i64 " + obj))
-            } else {
-                this.emit_indent(__mk_local + " = call i64 @__map_keys(i64 " + obj + ")")
-            }
+            this.emit_runtime_call(__mk_local, "i64", "__map_keys", "i64 " + obj)
             // The element type is K, not String. Hardcoding List<String> here
             // made `for (k in m.keys())` on a Map<Int,String> hand each raw Int
             // to string-typed consumers and SEGFAULT. Unannotated maps stay Any.
@@ -16603,11 +16539,7 @@ class Codegen {
         if (__map_type_match and method == "values") {
             this.called_functions.push("__map_values")
             var __mv_local: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(__mv_local, "i64", "__map_values", "i64 " + obj))
-            } else {
-                this.emit_indent(__mv_local + " = call i64 @__map_values(i64 " + obj + ")")
-            }
+            this.emit_runtime_call(__mv_local, "i64", "__map_values", "i64 " + obj)
             // Element type is V — see the keys() note above.
             this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_value_type(__map_obj_type))])
             return __mv_local
@@ -16631,11 +16563,7 @@ class Codegen {
             if (method == "trim") {
                 this.called_functions.push("rt_str_trim")
                 var __st_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__st_local, "i64", "rt_str_trim", "i64 " + obj))
-                } else {
-                    this.emit_indent(__st_local + " = call i64 @rt_str_trim(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__st_local, "i64", "rt_str_trim", "i64 " + obj)
                 var __st_ptr: String = this.fresh_local()
                 this.emit_indent(__st_ptr + " = inttoptr i64 " + __st_local + " to i8*")
                 var __st_tagged: String = this.emit_tag_ptr(__st_ptr)
@@ -16645,11 +16573,7 @@ class Codegen {
             if (method == "to_upper") {
                 this.called_functions.push("rt_str_to_upper")
                 var __su_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__su_local, "i64", "rt_str_to_upper", "i64 " + obj))
-                } else {
-                    this.emit_indent(__su_local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__su_local, "i64", "rt_str_to_upper", "i64 " + obj)
                 var __su_ptr: String = this.fresh_local()
                 this.emit_indent(__su_ptr + " = inttoptr i64 " + __su_local + " to i8*")
                 var __su_tagged: String = this.emit_tag_ptr(__su_ptr)
@@ -16659,11 +16583,7 @@ class Codegen {
             if (method == "to_lower") {
                 this.called_functions.push("rt_str_to_lower")
                 var __sl_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__sl_local, "i64", "rt_str_to_lower", "i64 " + obj))
-                } else {
-                    this.emit_indent(__sl_local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
-                }
+                this.emit_runtime_call(__sl_local, "i64", "rt_str_to_lower", "i64 " + obj)
                 var __sl_ptr: String = this.fresh_local()
                 this.emit_indent(__sl_ptr + " = inttoptr i64 " + __sl_local + " to i8*")
                 var __sl_tagged: String = this.emit_tag_ptr(__sl_ptr)
@@ -16675,11 +16595,7 @@ class Codegen {
                 this.called_function_arity.set("rt_str_index_of", 2)
                 var __si_arg: String = this.gen_arg_value(args[0])
                 var __si_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__si_local, "i64", "rt_str_index_of", "i64 " + obj + ", i64 " + __si_arg))
-                } else {
-                    this.emit_indent(__si_local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + __si_arg + ")")
-                }
+                this.emit_runtime_call(__si_local, "i64", "rt_str_index_of", "i64 " + obj + ", i64 " + __si_arg)
                 var __si_tagged: String = this.emit_tag_int(__si_local)
                 this.last_type = AST.Type.IntType
                 return __si_tagged
@@ -16689,11 +16605,7 @@ class Codegen {
                 this.called_function_arity.set("rt_str_repeat", 2)
                 var __sr_arg: String = this.gen_arg_value(args[0])
                 var __sr_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__sr_local, "i64", "rt_str_repeat", "i64 " + obj + ", i64 " + __sr_arg))
-                } else {
-                    this.emit_indent(__sr_local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + __sr_arg + ")")
-                }
+                this.emit_runtime_call(__sr_local, "i64", "rt_str_repeat", "i64 " + obj + ", i64 " + __sr_arg)
                 var __sr_ptr: String = this.fresh_local()
                 this.emit_indent(__sr_ptr + " = inttoptr i64 " + __sr_local + " to i8*")
                 var __sr_tagged: String = this.emit_tag_ptr(__sr_ptr)
@@ -16703,22 +16615,14 @@ class Codegen {
             if (method == "split") {
                 var __ss_arg: String = this.gen_arg_value(args[0])
                 var __ss_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__ss_local, "i64", "__str_split", "i64 " + obj + ", i64 " + __ss_arg))
-                } else {
-                    this.emit_indent(__ss_local + " = call i64 @__str_split(i64 " + obj + ", i64 " + __ss_arg + ")")
-                }
+                this.emit_runtime_call(__ss_local, "i64", "__str_split", "i64 " + obj + ", i64 " + __ss_arg)
                 this.last_type = this.make_list_str_type()
                 return __ss_local
             }
             if (method == "ends_with") {
                 var __se_arg: String = this.gen_arg_value(args[0])
                 var __se_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__se_local, "i64", "__str_ends_with", "i64 " + obj + ", i64 " + __se_arg))
-                } else {
-                    this.emit_indent(__se_local + " = call i64 @__str_ends_with(i64 " + obj + ", i64 " + __se_arg + ")")
-                }
+                this.emit_runtime_call(__se_local, "i64", "__str_ends_with", "i64 " + obj + ", i64 " + __se_arg)
                 var __se_tagged: String = this.emit_tag_bool(__se_local)
                 this.last_type = AST.Type.BoolType
                 return __se_tagged
@@ -16727,11 +16631,7 @@ class Codegen {
                 var __sre_arg1: String = this.gen_arg_value(args[0])
                 var __sre_arg2: String = this.gen_arg_value(args[1])
                 var __sre_local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(__sre_local, "i64", "__str_replace", "i64 " + obj + ", i64 " + __sre_arg1 + ", i64 " + __sre_arg2))
-                } else {
-                    this.emit_indent(__sre_local + " = call i64 @__str_replace(i64 " + obj + ", i64 " + __sre_arg1 + ", i64 " + __sre_arg2 + ")")
-                }
+                this.emit_runtime_call(__sre_local, "i64", "__str_replace", "i64 " + obj + ", i64 " + __sre_arg1 + ", i64 " + __sre_arg2)
                 var __sre_ptr: String = this.fresh_local()
                 this.emit_indent(__sre_ptr + " = inttoptr i64 " + __sre_local + " to i8*")
                 var __sre_tagged: String = this.emit_tag_ptr(__sre_ptr)
@@ -16762,11 +16662,7 @@ class Codegen {
             var idx: String = this.emit_untag_int(idx_tagged)
             var val: String = this.gen_arg_value(args[1])
             var discard: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(discard, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val))
-            } else {
-                this.emit_indent(discard + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
-            }
+            this.emit_runtime_call(discard, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val)
             this.last_type = AST.Type.NilType
             return "0"
         }
@@ -16782,11 +16678,7 @@ class Codegen {
         var val: String = this.gen_arg_value(args[1])
         var val_entry_type: String = this.type_to_string(this.last_type)
         var discard: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val))
-        } else {
-            this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val + ")")
-        }
+        this.emit_runtime_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val)
         // Recover the K and V of a map *literal* from the entries themselves.
         //
         // The parser desugars {"a": 1} into a VarDecl of a temporary annotated
@@ -16814,11 +16706,7 @@ class Codegen {
         // keys from numeric ones; untagging here destroyed that discriminator.
         var key_raw: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw))
-        } else {
-            this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_raw + ")")
-        }
+        this.emit_runtime_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw)
         var local: String = this.emit_tag_bool(raw)
         this.last_type = AST.Type.BoolType
         return local
@@ -16833,11 +16721,7 @@ class Codegen {
         // keys from numeric ones; untagging here destroyed that discriminator.
         var key_raw_g: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g))
-        } else {
-            this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_raw_g + ")")
-        }
+        this.emit_runtime_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g)
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
         if (obj_name.length() > 0) {
@@ -17001,11 +16885,7 @@ class Codegen {
             // Use runtime dispatch (__any_length) for unknown types
             this.called_functions.push("__any_length")
             var raw: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(raw, "i64", "__any_length", "i64 " + obj))
-            } else {
-                this.emit_indent(raw + " = call i64 @__any_length(i64 " + obj + ")")
-            }
+            this.emit_runtime_call(raw, "i64", "__any_length", "i64 " + obj)
             var local: String = this.emit_tag_int(raw)
             this.last_type = AST.Type.IntType
             return local
@@ -17339,11 +17219,7 @@ class Codegen {
         }
         if (this.is_coroutine and is_coro_callee) {
             var b_hdl: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
-            } else {
-                this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-            }
+            this.emit_runtime_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", "))
             var b_i64: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_ptrtoint(b_i64, b_hdl))
@@ -17358,11 +17234,7 @@ class Codegen {
             this.emit_terminator("br label %" + ac)
             this.start_block(ac)
             var bd: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(bd, "i64", "__sched_coro_done", "i64 " + b_i64))
-            } else {
-                this.emit_indent(bd + " = call i64 @__sched_coro_done(i64 " + b_i64 + ")")
-            }
+            this.emit_runtime_call(bd, "i64", "__sched_coro_done", "i64 " + b_i64)
             var bdc: String = this.fresh_local()
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
@@ -17395,11 +17267,7 @@ class Codegen {
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
         if (!this.is_coroutine and is_coro_callee) {
             var s_hdl: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
-            } else {
-                this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-            }
+            this.emit_runtime_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", "))
             var s_i64: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_ptrtoint(s_i64, s_hdl))
@@ -17432,11 +17300,7 @@ class Codegen {
             return s_result
         }
         var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", prefixed_name, arg_strs.join(", ")))
-        } else {
-            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-        }
+        this.emit_runtime_call(local, "i64", prefixed_name, arg_strs.join(", "))
         if (this.func_ret_types.has(prefixed_name)) {
             this.last_type = this.func_ret_types.get(prefixed_name)
         } else if (this.func_ret_types.has(method)) {
