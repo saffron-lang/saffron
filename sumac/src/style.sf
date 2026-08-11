@@ -1,0 +1,408 @@
+//! Sumac style layer — colors and text attributes, à la Lip Gloss.
+//!
+//! This is the leaf of the module graph: buffer/layout/widgets/runtime all
+//! store and emit `Style` values, but this file depends on nothing but the
+//! language itself. A `Style` is an immutable value — fg color, bg color, and a
+//! bitfield of text attributes — that knows how to serialize itself to the SGR
+//! (Select Graphic Rendition) escape parameters a terminal understands.
+//!
+//! Everything here is integer-first. Color components, palette indices, and the
+//! attribute bitfield are all annotated `Int`: a `Float` slips silently through
+//! arithmetic but reads element 0 when used as a list index (BUGS #72), and the
+//! palette conversions below index tables, so a stray `Float` would corrupt a
+//! downsample without a diagnostic.
+
+// =============================================================================
+// Color
+// =============================================================================
+
+/// A color. `kind` selects which of the remaining fields carry meaning:
+///   0 = default   — the terminal's own fg/bg; emits no SGR parameters
+///   1 = ANSI 16   — `idx` in 0..15 (the 8 normal + 8 bright colors)
+///   2 = ANSI 256  — `idx` in 0..255 (16 system + 6x6x6 cube + 24 grays)
+///   3 = truecolor — `r`, `g`, `b` each in 0..255
+class Color {
+    var kind: Int
+    var idx: Int
+    var r: Int
+    var g: Int
+    var b: Int
+    fun init(kind: Int, idx: Int, r: Int, g: Int, b: Int) {
+        this.kind = kind
+        this.idx = idx
+        this.r = r
+        this.g = g
+        this.b = b
+    }
+
+    /// Emit the SGR parameter list for this color, used as a foreground
+    /// (`fg == true`) or a background. The result is the bare parameter run
+    /// with no leading `;`, CSI, or trailing `m` — `Style.sgr()` stitches those
+    /// together. A default color contributes nothing, so it returns "".
+    ///
+    ///   truecolor fg -> "38;2;R;G;B"      truecolor bg -> "48;2;R;G;B"
+    ///   ansi256   fg -> "38;5;N"          ansi256   bg -> "48;5;N"
+    ///   ansi16    fg -> "3N" (0..7) / "9N" (8..15, i.e. 90-97)
+    ///   ansi16    bg -> "4N" (0..7) / "10N" (8..15, i.e. 100-107)
+    fun sgr(fg: Bool): String {
+        // Bind fields to typed Int locals before .to_string(): calling a method
+        // straight on `this.<field>` trips a codegen inference warning (the
+        // receiver reads as untyped), and an untyped receiver can silently drop
+        // the call. Local Int copies make the receiver type explicit.
+        if (this.kind == 3) {
+            var head: String = "38;2;"
+            if (!fg) { head = "48;2;" }
+            var r: Int = this.r
+            var g: Int = this.g
+            var b: Int = this.b
+            return head + r.to_string() + ";" + g.to_string() + ";" + b.to_string()
+        }
+        if (this.kind == 2) {
+            var head256: String = "38;5;"
+            if (!fg) { head256 = "48;5;" }
+            var idx256: Int = this.idx
+            return head256 + idx256.to_string()
+        }
+        if (this.kind == 1) {
+            // ANSI 16: 0..7 are the normal codes, 8..15 the "bright" range,
+            // which lives at 90-97 (fg) / 100-107 (bg), NOT 38/48.
+            var idx: Int = this.idx
+            var bright: Int = idx - 8
+            if (fg) {
+                if (idx < 8) { return "3" + idx.to_string() }
+                return "9" + bright.to_string()
+            }
+            if (idx < 8) { return "4" + idx.to_string() }
+            return "10" + bright.to_string()
+        }
+        // kind 0 (default) or anything unrecognized: emit nothing.
+        return ""
+    }
+}
+
+// --- Color constructors (free functions) ---
+
+/// The terminal's own default fg/bg. Emits no color SGR.
+fun color_default(): Color {
+    return Color(0, 0, 0, 0, 0)
+}
+
+/// A color from the 16-color ANSI palette (`idx` 0..15).
+fun ansi(idx: Int): Color {
+    return Color(1, idx, 0, 0, 0)
+}
+
+/// A color from the 256-color ANSI palette (`idx` 0..255).
+fun ansi256(idx: Int): Color {
+    return Color(2, idx, 0, 0, 0)
+}
+
+/// A 24-bit truecolor from explicit r/g/b components (each 0..255).
+fun rgb(r: Int, g: Int, b: Int): Color {
+    return Color(3, 0, r, g, b)
+}
+
+// Hex digit value for a single character, case-insensitive. Returns 0 for a
+// non-hex character rather than failing — hex() is best-effort, and a malformed
+// string degrades to black instead of aborting a render.
+fun _hex_digit(ch: String): Int {
+    var i: Int = "0123456789abcdef".index_of(ch)
+    if (i == -1) {
+        i = "0123456789ABCDEF".index_of(ch)
+    }
+    if (i == -1) { return 0 }
+    return i
+}
+
+// Parse two hex characters into a byte value 0..255.
+fun _hex_byte(hi: String, lo: String): Int {
+    return _hex_digit(hi) * 16 + _hex_digit(lo)
+}
+
+/// A truecolor from a CSS-style hex string: "#rrggbb" or the shorthand "#rgb"
+/// (where each nibble is doubled, so "#f00" == "#ff0000"). A leading '#' is
+/// optional. Malformed input degrades to black rather than throwing.
+fun hex(s: String): Color {
+    var body: String = s
+    if (body.length() > 0 and body.char_at(0) == "#") {
+        body = body.slice(1, body.length())
+    }
+    if (body.length() == 3) {
+        // "#rgb" — each digit is repeated to form the byte.
+        var d0: String = body.char_at(0)
+        var d1: String = body.char_at(1)
+        var d2: String = body.char_at(2)
+        return rgb(_hex_byte(d0, d0), _hex_byte(d1, d1), _hex_byte(d2, d2))
+    }
+    if (body.length() == 6) {
+        var r: Int = _hex_byte(body.char_at(0), body.char_at(1))
+        var g: Int = _hex_byte(body.char_at(2), body.char_at(3))
+        var b: Int = _hex_byte(body.char_at(4), body.char_at(5))
+        return rgb(r, g, b)
+    }
+    // Unrecognized length: fall back to black.
+    return rgb(0, 0, 0)
+}
+
+// =============================================================================
+// Text attributes
+// =============================================================================
+//
+// A `Style`'s attributes are a bitfield: OR the flags together to combine them,
+// and test membership with `(attrs & ATTR_X) != 0`. The SGR code for each flag
+// (bold=1, faint=2, italic=3, ...) is looked up in Style.sgr(), not stored here
+// — these constants are the bit positions, not the escape codes.
+
+let ATTR_NONE: Int = 0
+let ATTR_BOLD: Int = 1
+let ATTR_FAINT: Int = 2
+let ATTR_ITALIC: Int = 4
+let ATTR_UNDERLINE: Int = 8
+let ATTR_BLINK: Int = 16
+let ATTR_REVERSE: Int = 32
+let ATTR_STRIKE: Int = 64
+
+// =============================================================================
+// Style
+// =============================================================================
+
+/// A fully resolved text style: a foreground color, a background color, and a
+/// bitfield of attributes. This is the value a Cell stores and paint reads.
+///
+/// Styles are immutable: the fluent builders (`with_fg`, `bold`, ...) each
+/// return a NEW Style rather than mutating in place, so a base style can be
+/// shared and specialized without spooky action at a distance.
+class Style {
+    var fg: Color
+    var bg: Color
+    var attrs: Int
+    fun init(fg: Color, bg: Color, attrs: Int) {
+        this.fg = fg
+        this.bg = bg
+        this.attrs = attrs
+    }
+
+    /// The full SGR string that SETS this style from a clean baseline, e.g.
+    /// "\x1b[0;1;38;2;255;0;0m" for bold truecolor-red text. It always leads
+    /// with the reset parameter (0) so the output is self-contained and
+    /// order-independent — the diff optimizer in buffer.sf may later suppress
+    /// emits it can prove redundant, but each string on its own is complete.
+    fun sgr(): String {
+        // params always starts from the reset code so the run is absolute.
+        var params: String = "0"
+        // Attributes, in ascending bit order. The SGR code differs from the
+        // flag bit (reverse is bit 32 but code 7, strike bit 64 but code 9).
+        if ((this.attrs & ATTR_BOLD) != 0) { params = params + ";1" }
+        if ((this.attrs & ATTR_FAINT) != 0) { params = params + ";2" }
+        if ((this.attrs & ATTR_ITALIC) != 0) { params = params + ";3" }
+        if ((this.attrs & ATTR_UNDERLINE) != 0) { params = params + ";4" }
+        if ((this.attrs & ATTR_BLINK) != 0) { params = params + ";5" }
+        if ((this.attrs & ATTR_REVERSE) != 0) { params = params + ";7" }
+        if ((this.attrs & ATTR_STRIKE) != 0) { params = params + ";9" }
+        // Colors. A default color yields "" and adds no parameter.
+        var fgp: String = this.fg.sgr(true)
+        if (fgp != "") { params = params + ";" + fgp }
+        var bgp: String = this.bg.sgr(false)
+        if (bgp != "") { params = params + ";" + bgp }
+        return "\x1b[" + params + "m"
+    }
+
+    /// Structural equality — same colors and attributes. Used by the buffer
+    /// diff to decide whether a cell's style actually changed.
+    fun eq(other: Style): Bool {
+        if (this.attrs != other.attrs) { return false }
+        if (this.fg.kind != other.fg.kind) { return false }
+        if (this.bg.kind != other.bg.kind) { return false }
+        if (this.fg.idx != other.fg.idx or this.bg.idx != other.bg.idx) { return false }
+        if (this.fg.r != other.fg.r or this.fg.g != other.fg.g or this.fg.b != other.fg.b) { return false }
+        if (this.bg.r != other.bg.r or this.bg.g != other.bg.g or this.bg.b != other.bg.b) { return false }
+        return true
+    }
+
+    // --- Fluent builders (each returns a NEW Style) ---
+
+    fun with_fg(c: Color): Style {
+        return Style(c, this.bg, this.attrs)
+    }
+    fun with_bg(c: Color): Style {
+        return Style(this.fg, c, this.attrs)
+    }
+    fun bold(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_BOLD)
+    }
+    fun faint(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_FAINT)
+    }
+    fun italic(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_ITALIC)
+    }
+    fun underline(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_UNDERLINE)
+    }
+    fun blink(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_BLINK)
+    }
+    fun reverse(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_REVERSE)
+    }
+    fun strike(): Style {
+        return Style(this.fg, this.bg, this.attrs | ATTR_STRIKE)
+    }
+}
+
+/// A default style: terminal-default fg/bg and no attributes.
+fun style(): Style {
+    return Style(color_default(), color_default(), ATTR_NONE)
+}
+
+// =============================================================================
+// Adaptive colors
+// =============================================================================
+
+/// Pick between a light-background and dark-background variant of a color.
+/// Lip Gloss resolves this against the detected terminal background; here the
+/// caller passes the decision in (`is_dark`) so this file stays a pure leaf.
+fun adaptive(light: Color, dark: Color, is_dark: Bool): Color {
+    if (is_dark) { return dark }
+    return light
+}
+
+// =============================================================================
+// Capability downsampling
+// =============================================================================
+//
+// A terminal may support fewer color kinds than a Style asks for. `downsample`
+// maps a Color down to the richest kind the terminal supports (`max_kind`,
+// using the same 0..3 scale as Color.kind), approximating with the nearest
+// available color. The mappings are:
+//   truecolor -> 256   quantize each channel to the xterm cube / gray ramp
+//   truecolor -> 16    nearest of the 16 standard ANSI colors by RGB distance
+//   256       -> 16    expand the palette index to RGB, then nearest-16
+//   * -> 0             collapse to the terminal default (monochrome)
+// Any color already within `max_kind` is returned unchanged. "Nearest" is a
+// plain squared-Euclidean RGB distance — good enough for a v1, and cheap.
+
+// The six intensity levels of the xterm 6x6x6 color cube.
+fun _cube_level_val(i: Int): Int {
+    if (i <= 0) { return 0 }
+    if (i == 1) { return 95 }
+    if (i == 2) { return 135 }
+    if (i == 3) { return 175 }
+    if (i == 4) { return 215 }
+    return 255
+}
+
+// Map a 0..255 channel to its nearest cube level index (0..5). Thresholds are
+// the midpoints between adjacent cube values (0,95,135,175,215,255).
+fun _cube_level(v: Int): Int {
+    if (v < 48) { return 0 }
+    if (v < 115) { return 1 }
+    if (v < 155) { return 2 }
+    if (v < 195) { return 3 }
+    if (v < 235) { return 4 }
+    return 5
+}
+
+// Squared-Euclidean RGB distance. Used only for comparisons, so no sqrt.
+fun _rgb_dist(r0: Int, g0: Int, b0: Int, r1: Int, g1: Int, b1: Int): Int {
+    var dr: Int = r0 - r1
+    var dg: Int = g0 - g1
+    var db: Int = b0 - b1
+    return dr * dr + dg * dg + db * db
+}
+
+// The RGB of an ANSI-16 palette index, using xterm's default palette. Indexed
+// by `idx` (0..15); a `Float` index here would read black (element 0), hence
+// the explicit Int annotations everywhere this table is touched.
+fun _ansi16_rgb(idx: Int): List<Int> {
+    var table: List<List<Int>> = [
+        [0, 0, 0], [205, 0, 0], [0, 205, 0], [205, 205, 0],
+        [0, 0, 238], [205, 0, 205], [0, 205, 205], [229, 229, 229],
+        [127, 127, 127], [255, 0, 0], [0, 255, 0], [255, 255, 0],
+        [92, 92, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
+    ]
+    if (idx < 0 or idx > 15) { return [0, 0, 0] }
+    return table[idx]
+}
+
+// Nearest ANSI-16 index for an RGB triple.
+fun _rgb_to_ansi16(r: Int, g: Int, b: Int): Int {
+    var best: Int = 0
+    var best_dist: Int = -1
+    var i: Int = 0
+    while (i < 16) {
+        var c: List<Int> = _ansi16_rgb(i)
+        var d: Int = _rgb_dist(r, g, b, c[0], c[1], c[2])
+        if (best_dist == -1 or d < best_dist) {
+            best_dist = d
+            best = i
+        }
+        i = i + 1
+    }
+    return best
+}
+
+// Nearest ANSI-256 index for an RGB triple. Considers both the 6x6x6 color cube
+// and the 24-step grayscale ramp, and picks whichever is closer.
+fun _rgb_to_ansi256(r: Int, g: Int, b: Int): Int {
+    // Color-cube candidate.
+    var r6: Int = _cube_level(r)
+    var g6: Int = _cube_level(g)
+    var b6: Int = _cube_level(b)
+    var cube_idx: Int = 16 + 36 * r6 + 6 * g6 + b6
+    var cube_dist: Int = _rgb_dist(r, g, b,
+        _cube_level_val(r6), _cube_level_val(g6), _cube_level_val(b6))
+
+    // Grayscale-ramp candidate: values 8, 18, ..., 238 at indices 232..255.
+    var avg: Int = (r + g + b) / 3
+    var step: Int = (avg - 8) / 10
+    if (step < 0) { step = 0 }
+    if (step > 23) { step = 23 }
+    var gray_val: Int = 8 + 10 * step
+    var gray_dist: Int = _rgb_dist(r, g, b, gray_val, gray_val, gray_val)
+
+    if (gray_dist < cube_dist) { return 232 + step }
+    return cube_idx
+}
+
+// The RGB of an ANSI-256 palette index, for re-quantizing 256 down to 16.
+fun _ansi256_rgb(idx: Int): List<Int> {
+    if (idx < 16) { return _ansi16_rgb(idx) }
+    if (idx >= 232) {
+        var gray: Int = 8 + 10 * (idx - 232)
+        return [gray, gray, gray]
+    }
+    var n: Int = idx - 16
+    var r6: Int = n / 36
+    var g6: Int = (n / 6) % 6
+    var b6: Int = n % 6
+    return [_cube_level_val(r6), _cube_level_val(g6), _cube_level_val(b6)]
+}
+
+/// Downsample a color to the richest kind a terminal supports. `max_kind` uses
+/// Color's own 0..3 scale (0 default, 1 ansi16, 2 ansi256, 3 truecolor). A
+/// color already within reach is returned as-is; otherwise it is approximated
+/// with the nearest color the terminal can show.
+fun downsample(c: Color, max_kind: Int): Color {
+    // Default is available at every level, and a color already within the
+    // supported kind needs no change.
+    if (c.kind == 0 or c.kind <= max_kind) { return c }
+
+    // Monochrome terminal: nothing but the default color.
+    if (max_kind <= 0) { return color_default() }
+
+    if (c.kind == 3) {
+        // Truecolor down to 256 or 16.
+        if (max_kind == 2) { return ansi256(_rgb_to_ansi256(c.r, c.g, c.b)) }
+        return ansi(_rgb_to_ansi16(c.r, c.g, c.b))
+    }
+
+    if (c.kind == 2) {
+        // 256 down to 16: expand to RGB, then find the nearest of the 16.
+        var comp: List<Int> = _ansi256_rgb(c.idx)
+        return ansi(_rgb_to_ansi16(comp[0], comp[1], comp[2]))
+    }
+
+    // kind 1 with max_kind >= 1 already returned above; nothing else remains.
+    return c
+}

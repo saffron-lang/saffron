@@ -1,0 +1,369 @@
+//! Sumac table widget — a columnar data table with a header and selectable rows
+//! (à la Bubbletea's table).
+//!
+//! A `Table` renders a fixed-height *window* onto a signal of rows, where each
+//! row is a list of cell strings (one per `Column`). The `selected` signal is
+//! the 0-based cursor into the row list; the internal `offset` signal is the
+//! index of the top visible data row. As the selection moves, the offset scrolls
+//! just enough to keep the cursor inside the `height`-row viewport — the exact
+//! viewport logic the list widget uses.
+//!
+//! Column alignment is enforced by geometry, not by padding strings: each cell is
+//! rendered as a fixed-width `box(width=col.width)` holding the (clipped) cell
+//! text, laid out in an `hstack`. This is deliberate — layout word-wrap collapses
+//! leading/trailing spaces in a text node, so a hand-padded "Age   " would lose
+//! its trailing columns, but a fixed-width box reserves the columns regardless of
+//! what the text does. Every column therefore starts at a predictable x offset:
+//! column c begins at the sum of the widths of columns 0..c-1.
+//!
+//! Everything index-shaped — the selection, the scroll offset, the height, the
+//! row/column counts, every loop counter — is annotated `Int`: a `Float` used as
+//! a list index silently reads element 0 (BUGS #72), which for a table would pin
+//! the cursor to the first row forever. Signals and `this.<field>` values are
+//! bound to typed locals before any method call, because a method call straight
+//! on an untyped receiver can be silently dropped. Cell clipping is rune-aware
+//! (via `Buf.rune_width`) so a wide glyph counts as two columns rather than one.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+import "../buffer.sf" as Buf
+
+// =============================================================================
+// Column
+// =============================================================================
+
+/// A single table column: its header `title` and its fixed display `width` in
+/// terminal columns. Cells wider than `width` are clipped; narrower ones are
+/// left-padded by the fixed-width box they render into.
+class Column {
+    var title: String
+    var width: Int
+    fun init(title: String, width: Int) {
+        this.title = title
+        this.width = width
+    }
+}
+
+/// Construct a column with a header title and a fixed width.
+fun column(title: String, width: Int): Column {
+    return Column(title, width)
+}
+
+// =============================================================================
+// Clipping
+// =============================================================================
+
+// Clip `s` to at most `width` display columns, breaking on rune boundaries so a
+// multi-byte / wide glyph is never split. Rune-aware: a wide (CJK/emoji) rune
+// counts as two columns. Returns "" for a non-positive width.
+fun _clip(s: String, width: Int): String {
+    if (width <= 0) { return "" }
+    if (Buf.str_width(s) <= width) { return s }
+    var runes: List<String> = Buf._runes(s)
+    var out: String = ""
+    var w: Int = 0
+    var i: Int = 0
+    var n: Int = runes.length()
+    while (i < n) {
+        var r: String = runes[i]
+        var rw: Int = Buf.rune_width(r)
+        if (w + rw > width) { break }
+        out = out + r
+        w = w + rw
+        i = i + 1
+    }
+    return out
+}
+
+// =============================================================================
+// Table
+// =============================================================================
+
+/// A data table with a header and a scrollable, selectable body. `columns`
+/// describes the fixed-width columns; `rows` is a signal of rows (each row a
+/// list of cell strings, one per column — short rows pad with ""); `selected` is
+/// the 0-based cursor into the rows; `offset` is the top visible data row;
+/// `height` is the number of visible data rows (excluding the header). The
+/// header is drawn with `header_style` (bold by default), body rows with
+/// `row_style`, and the selected row with `selected_style` (reverse by default).
+/// `show_header` toggles the header row, and `show_separator` a `─` rule beneath
+/// it.
+class Table {
+    var columns: List<Column>
+    var rows: Sig.Signal<List<List<String>>>
+    var selected: Sig.Signal<Int>
+    var offset: Sig.Signal<Int>
+    var height: Int
+    var header_style: St.Style
+    var row_style: St.Style
+    var selected_style: St.Style
+    var show_header: Bool
+    var show_separator: Bool
+
+    fun init(columns: List<Column>, rows: Sig.Signal<List<List<String>>>,
+             selected: Sig.Signal<Int>, offset: Sig.Signal<Int>, height: Int,
+             header_style: St.Style, row_style: St.Style,
+             selected_style: St.Style, show_header: Bool,
+             show_separator: Bool) {
+        this.columns = columns
+        this.rows = rows
+        this.selected = selected
+        this.offset = offset
+        this.height = height
+        this.header_style = header_style
+        this.row_style = row_style
+        this.selected_style = selected_style
+        this.show_header = show_header
+        this.show_separator = show_separator
+    }
+
+    // --- Signal readers (bind to a typed local first, then read) ---
+
+    /// The full backing row list.
+    fun rows_data(): List<List<String>> {
+        var sig: Sig.Signal<List<List<String>>> = this.rows
+        return sig.get()
+    }
+
+    /// The number of rows.
+    fun count(): Int {
+        var data: List<List<String>> = this.rows_data()
+        return data.length()
+    }
+
+    /// The current selection index (0-based cursor into the rows).
+    fun selected_index(): Int {
+        var sig: Sig.Signal<Int> = this.selected
+        return sig.get()
+    }
+
+    /// The current scroll offset (index of the top visible data row).
+    fun offset_index(): Int {
+        var sig: Sig.Signal<Int> = this.offset
+        return sig.get()
+    }
+
+    fun _set_selected(v: Int) {
+        var sig: Sig.Signal<Int> = this.selected
+        sig.set(v)
+    }
+
+    fun _set_offset(v: Int) {
+        var sig: Sig.Signal<Int> = this.offset
+        sig.set(v)
+    }
+
+    // --- Scrolling / movement ---
+
+    /// Scroll the offset so `sel` sits inside the [offset, offset+height) window.
+    /// Clamps the offset to be non-negative — a negative offset would index
+    /// element 0 (BUGS #72) and pin the window to the top.
+    fun _ensure_visible(sel: Int) {
+        var off: Int = this.offset_index()
+        var h: Int = this.height
+        if (sel < off) { off = sel }
+        if (sel >= off + h) { off = (sel - h) + 1 }
+        if (off < 0) { off = 0 }
+        this._set_offset(off)
+    }
+
+    /// Move the cursor to `idx`, clamped to [0, count-1], and scroll to keep it
+    /// visible. A no-op when the table is empty.
+    fun select(idx: Int) {
+        var n: Int = this.count()
+        if (n <= 0) { return }
+        var sel: Int = idx
+        if (sel < 0) { sel = 0 }
+        if (sel > n - 1) { sel = n - 1 }
+        this._set_selected(sel)
+        this._ensure_visible(sel)
+    }
+
+    /// Move the cursor down one row, stopping at the last row.
+    fun move_down() {
+        var sel: Int = this.selected_index()
+        this.select(sel + 1)
+    }
+
+    /// Move the cursor up one row, stopping at the first row.
+    fun move_up() {
+        var sel: Int = this.selected_index()
+        this.select(sel - 1)
+    }
+
+    /// Jump the cursor down by one viewport height.
+    fun page_down() {
+        var sel: Int = this.selected_index()
+        var h: Int = this.height
+        this.select(sel + h)
+    }
+
+    /// Jump the cursor up by one viewport height.
+    fun page_up() {
+        var sel: Int = this.selected_index()
+        var h: Int = this.height
+        this.select(sel - h)
+    }
+
+    /// Select the first row.
+    fun select_first() {
+        this.select(0)
+    }
+
+    /// Select the last row.
+    fun select_last() {
+        var n: Int = this.count()
+        this.select(n - 1)
+    }
+
+    // --- Rendering ---
+
+    // Emit one row as an hstack of fixed-width column boxes. `cells` supplies the
+    // cell text per column (short rows read "" for the missing tail); each cell
+    // is clipped to its column width and drawn in `st`.
+    fun _emit_row(cells: List<String>, st: St.Style) {
+        var cols: List<Column> = this.columns
+        var ncols: Int = cols.length()
+        L.hstack(fun () {
+            var c: Int = 0
+            while (c < ncols) {
+                var col: Column = cols[c]
+                var cw: Int = col.width
+                var cell: String = ""
+                if (c < cells.length()) { cell = cells[c] }
+                var clipped: String = _clip(cell, cw)
+                var cell_st: St.Style = st
+                L.box(0, 0, 0, 0, 0, 0, 0, 0, cw, 1, 0, fun () {
+                    L.text_styled(clipped, cell_st)
+                })
+                c = c + 1
+            }
+        })
+    }
+
+    /// Emit the header (optional), a `─` separator (optional), and the visible
+    /// window of data rows from `offset` to `offset + height`, as a vstack. Each
+    /// row is an hstack of fixed-width column boxes so columns stay aligned. The
+    /// selected row uses `selected_style`, the rest `row_style`. Reads the
+    /// rows/selected/offset signals so the runtime re-renders on any change.
+    fun view() {
+        var cols: List<Column> = this.columns
+        var ncols: Int = cols.length()
+        var data: List<List<String>> = this.rows_data()
+        var nrows: Int = data.length()
+        var sel: Int = this.selected_index()
+        var off: Int = this.offset_index()
+        var h: Int = this.height
+        var hs: St.Style = this.header_style
+        var rs: St.Style = this.row_style
+        var ss: St.Style = this.selected_style
+        var show: Bool = this.show_header
+        var sep: Bool = this.show_separator
+        L.vstack(fun () {
+            // Header row.
+            if (show) {
+                var titles: List<String> = []
+                var hc: Int = 0
+                while (hc < ncols) {
+                    var col: Column = cols[hc]
+                    titles.push(col.title)
+                    hc = hc + 1
+                }
+                this._emit_row(titles, hs)
+                // Separator rule of ─ under the header.
+                if (sep) {
+                    var dashes: List<String> = []
+                    var sc: Int = 0
+                    while (sc < ncols) {
+                        var col2: Column = cols[sc]
+                        var cw2: Int = col2.width
+                        dashes.push("─".repeat(cw2))
+                        sc = sc + 1
+                    }
+                    this._emit_row(dashes, hs)
+                }
+            }
+            // Visible data rows.
+            var r: Int = off
+            var last: Int = off + h
+            while (r < last and r < nrows) {
+                var row: List<String> = data[r]
+                var is_selected: Bool = (r == sel)
+                var style: St.Style = rs
+                if (is_selected) { style = ss }
+                this._emit_row(row, style)
+                r = r + 1
+            }
+        })
+    }
+
+    // --- Input ---
+
+    /// Handle a key or mouse event. down/j and up/k move by one; pgdown/pgup move
+    /// by a page; home/end jump to the ends; the mouse wheel (kind 3 up, 4 down)
+    /// scrolls the selection. Returns true if the event was consumed so the
+    /// runtime can stop propagation.
+    fun handle(e: Ev.Event): Bool {
+        var k: Ev.KeyEvent = e.key
+        if (k != nil) {
+            var name: String = k.name()
+            if (name == "down" or name == "j") { this.move_down(); return true }
+            if (name == "up" or name == "k") { this.move_up(); return true }
+            if (name == "pgdown") { this.page_down(); return true }
+            if (name == "pgup") { this.page_up(); return true }
+            if (name == "home") { this.select_first(); return true }
+            if (name == "end") { this.select_last(); return true }
+            return false
+        }
+        var m: Ev.MouseEvent = e.mouse
+        if (m != nil) {
+            var kind: Int = m.kind
+            // MOUSE_WHEEL_UP = 3, MOUSE_WHEEL_DOWN = 4 (see input.sf).
+            if (kind == 3) { this.move_up(); return true }
+            if (kind == 4) { this.move_down(); return true }
+            return false
+        }
+        return false
+    }
+
+    /// Tables are focusable — they consume navigation keys.
+    fun focusable(): Bool {
+        return true
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A table over `columns` and `rows` with the given `selected`-index signal and
+/// viewport `height`. Owns a fresh scroll-offset signal (starting at 0), a bold
+/// header style, a plain body style, and a reverse-video selected-row highlight;
+/// the header and its separator rule are both shown.
+fun table(columns: List<Column>, rows: Sig.Signal<List<List<String>>>,
+          selected: Sig.Signal<Int>, height: Int): Table {
+    // Seed the offset from an Int local — a bare `0` literal is a Float and
+    // would poison the index math (BUGS #72).
+    var zero: Int = 0
+    var offset: Sig.Signal<Int> = Sig.signal(zero)
+    var header_style: St.Style = St.style().bold()
+    var row_style: St.Style = St.style()
+    var selected_style: St.Style = St.style().reverse()
+    return Table(columns, rows, selected, offset, height, header_style,
+                 row_style, selected_style, true, true)
+}
+
+/// A table with explicit header/row/selected styles and header/separator
+/// toggles. Owns a fresh scroll-offset signal (0).
+fun table_styled(columns: List<Column>, rows: Sig.Signal<List<List<String>>>,
+                 selected: Sig.Signal<Int>, height: Int,
+                 header_style: St.Style, row_style: St.Style,
+                 selected_style: St.Style, show_header: Bool,
+                 show_separator: Bool): Table {
+    var zero: Int = 0
+    var offset: Sig.Signal<Int> = Sig.signal(zero)
+    return Table(columns, rows, selected, offset, height, header_style,
+                 row_style, selected_style, show_header, show_separator)
+}

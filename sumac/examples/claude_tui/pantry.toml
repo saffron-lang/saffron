@@ -1,0 +1,15 @@
+[package]
+name = "claude_tui"
+version = "0.1.0"
+description = "Saffron Dusk — a prettier reactive TUI front-end for the claude CLI, built on Sumac"
+type = "binary"
+entry = "src/main.sf"
+authors = ["henry232323"]
+target = "native"
+
+[dependencies]
+
+[scripts]
+build = "saffron build src/main.sf -o build/claude-tui"
+run = "saffron run src/main.sf"
+render = "saffron run test_render.sf"

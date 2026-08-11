@@ -1,0 +1,178 @@
+// Tests for the Sumac input escape-sequence parser.
+// Run: tools/saffron run sumac/test/test_input.sf
+import "../src/input.sf" as In
+import "io" as IO
+import "@test" as T
+
+// Build an IO.Bytes from a list of byte values.
+fun bytes_of(vals: List<Int>): IO.Bytes {
+    var n: Int = vals.length()
+    var b: IO.Bytes = IO.bytes_alloc(n)
+    var i: Int = 0
+    while (i < n) {
+        b.set(i, vals[i] & 255)
+        i = i + 1
+    }
+    return b
+}
+
+fun main() {
+    // --- plain "a" ---
+    var evs: List<In.Event> = In.parse(bytes_of([97]))
+    T.assert_eq(evs.length(), 1, "plain 'a' -> 1 event")
+    var e: In.Event = evs[0]
+    T.assert(e.key != nil, "'a' is a key event")
+    T.assert_eq(e.key.kind, In.KEY_RUNE, "'a' kind is rune")
+    T.assert_eq(e.key.rune, "a", "'a' rune")
+    T.assert_eq(e.key.mods, In.MOD_NONE, "'a' no mods")
+    T.assert_eq(e.key.name(), "a", "'a' name")
+
+    // --- ctrl+c (byte 3) ---
+    evs = In.parse(bytes_of([3]))
+    T.assert_eq(evs.length(), 1, "ctrl+c -> 1 event")
+    e = evs[0]
+    T.assert_eq(e.key.kind, In.KEY_RUNE, "ctrl+c kind is rune")
+    T.assert_eq(e.key.rune, "c", "ctrl+c rune is c")
+    T.assert_eq(e.key.mods, In.MOD_CTRL, "ctrl+c has ctrl mod")
+    T.assert_eq(e.key.name(), "ctrl+c", "ctrl+c name")
+
+    // ctrl+a .. ctrl+z boundaries
+    T.assert_eq(In.parse(bytes_of([1]))[0].key.name(), "ctrl+a", "byte 1 -> ctrl+a")
+    T.assert_eq(In.parse(bytes_of([26]))[0].key.name(), "ctrl+z", "byte 26 -> ctrl+z")
+
+    // --- control chars ---
+    T.assert_eq(In.parse(bytes_of([13]))[0].key.kind, In.KEY_ENTER, "CR -> enter")
+    T.assert_eq(In.parse(bytes_of([9]))[0].key.kind, In.KEY_TAB, "TAB")
+    T.assert_eq(In.parse(bytes_of([127]))[0].key.kind, In.KEY_BACKSPACE, "DEL -> backspace")
+    T.assert_eq(In.parse(bytes_of([8]))[0].key.kind, In.KEY_BACKSPACE, "BS -> backspace")
+    T.assert_eq(In.parse(bytes_of([32]))[0].key.kind, In.KEY_SPACE, "SPACE")
+    T.assert_eq(In.parse(bytes_of([32]))[0].key.name(), "space", "space name")
+
+    // lone ESC (nothing follows)
+    evs = In.parse(bytes_of([27]))
+    T.assert_eq(evs.length(), 1, "lone ESC -> 1 event")
+    T.assert_eq(evs[0].key.kind, In.KEY_ESC, "lone ESC -> esc key")
+
+    // --- arrow up: ESC [ A = 27,91,65 ---
+    evs = In.parse(bytes_of([27, 91, 65]))
+    T.assert_eq(evs.length(), 1, "arrow up -> 1 event")
+    e = evs[0]
+    T.assert_eq(e.key.kind, In.KEY_UP, "arrow up kind")
+    T.assert_eq(e.key.mods, In.MOD_NONE, "arrow up no mods")
+    T.assert_eq(e.key.name(), "up", "arrow up name")
+
+    // arrows B/C/D
+    T.assert_eq(In.parse(bytes_of([27, 91, 66]))[0].key.kind, In.KEY_DOWN, "down")
+    T.assert_eq(In.parse(bytes_of([27, 91, 67]))[0].key.kind, In.KEY_RIGHT, "right")
+    T.assert_eq(In.parse(bytes_of([27, 91, 68]))[0].key.kind, In.KEY_LEFT, "left")
+
+    // Home/End (H/F)
+    T.assert_eq(In.parse(bytes_of([27, 91, 72]))[0].key.kind, In.KEY_HOME, "home H")
+    T.assert_eq(In.parse(bytes_of([27, 91, 70]))[0].key.kind, In.KEY_END, "end F")
+
+    // --- ctrl+up: ESC [ 1 ; 5 A = 27,91,49,59,53,65 ---
+    evs = In.parse(bytes_of([27, 91, 49, 59, 53, 65]))
+    T.assert_eq(evs.length(), 1, "ctrl+up -> 1 event")
+    e = evs[0]
+    T.assert_eq(e.key.kind, In.KEY_UP, "ctrl+up kind is up")
+    T.assert_eq(e.key.mods, In.MOD_CTRL, "ctrl+up has ctrl mod")
+    T.assert_eq(e.key.name(), "ctrl+up", "ctrl+up name")
+
+    // shift+up: ESC [ 1 ; 2 A
+    T.assert_eq(In.parse(bytes_of([27, 91, 49, 59, 50, 65]))[0].key.mods, In.MOD_SHIFT, "shift+up mods")
+    // alt+up: ESC [ 1 ; 3 A
+    T.assert_eq(In.parse(bytes_of([27, 91, 49, 59, 51, 65]))[0].key.mods, In.MOD_ALT, "alt+up mods")
+    // ctrl+shift+up: ESC [ 1 ; 6 A -> mods 6-1=5 -> shift(1)+ctrl(4)
+    var csu: Int = In.parse(bytes_of([27, 91, 49, 59, 54, 65]))[0].key.mods
+    T.assert_eq(csu, In.MOD_CTRL | In.MOD_SHIFT, "ctrl+shift+up mods")
+
+    // --- F1 via SS3: ESC O P = 27,79,80 ---
+    evs = In.parse(bytes_of([27, 79, 80]))
+    T.assert_eq(evs.length(), 1, "F1 SS3 -> 1 event")
+    e = evs[0]
+    T.assert_eq(e.key.kind, In.KEY_F1, "F1 kind")
+    T.assert_eq(e.key.name(), "f1", "F1 name")
+
+    // F2..F4 SS3
+    T.assert_eq(In.parse(bytes_of([27, 79, 81]))[0].key.kind, In.KEY_F2, "F2 SS3")
+    T.assert_eq(In.parse(bytes_of([27, 79, 83]))[0].key.kind, In.KEY_F4, "F4 SS3")
+
+    // F5 via tilde: ESC [ 1 5 ~ = 27,91,49,53,126
+    T.assert_eq(In.parse(bytes_of([27, 91, 49, 53, 126]))[0].key.kind, In.KEY_F5, "F5 tilde")
+    // F12 via tilde: ESC [ 2 4 ~
+    T.assert_eq(In.parse(bytes_of([27, 91, 50, 52, 126]))[0].key.kind, In.KEY_F12, "F12 tilde")
+
+    // PgUp/PgDn/Insert/Delete tilde codes
+    T.assert_eq(In.parse(bytes_of([27, 91, 53, 126]))[0].key.kind, In.KEY_PGUP, "PgUp")
+    T.assert_eq(In.parse(bytes_of([27, 91, 54, 126]))[0].key.kind, In.KEY_PGDN, "PgDn")
+    T.assert_eq(In.parse(bytes_of([27, 91, 50, 126]))[0].key.kind, In.KEY_INSERT, "Insert")
+    T.assert_eq(In.parse(bytes_of([27, 91, 51, 126]))[0].key.kind, In.KEY_DELETE, "Delete")
+
+    // --- Alt+key: ESC then 'x' = 27,120 ---
+    evs = In.parse(bytes_of([27, 120]))
+    T.assert_eq(evs.length(), 1, "alt+x -> 1 event")
+    e = evs[0]
+    T.assert_eq(e.key.rune, "x", "alt+x rune")
+    T.assert_eq(e.key.mods, In.MOD_ALT, "alt+x mod")
+    T.assert_eq(e.key.name(), "alt+x", "alt+x name")
+
+    // --- SGR mouse click: ESC [ < 0 ; 10 ; 5 M  (left press at col10,row5) ---
+    // bytes: 27,91,60,48,59,49,48,59,53,77
+    evs = In.parse(bytes_of([27, 91, 60, 48, 59, 49, 48, 59, 53, 77]))
+    T.assert_eq(evs.length(), 1, "mouse press -> 1 event")
+    e = evs[0]
+    T.assert(e.mouse != nil, "mouse event present")
+    T.assert_eq(e.mouse.kind, In.MOUSE_PRESS, "mouse press kind")
+    T.assert_eq(e.mouse.button, 0, "mouse left button")
+    T.assert_eq(e.mouse.x, 9, "mouse x 0-based (10-1)")
+    T.assert_eq(e.mouse.y, 4, "mouse y 0-based (5-1)")
+
+    // release: ESC [ < 0 ; 10 ; 5 m
+    e = In.parse(bytes_of([27, 91, 60, 48, 59, 49, 48, 59, 53, 109]))[0]
+    T.assert_eq(e.mouse.kind, In.MOUSE_RELEASE, "mouse release kind")
+
+    // wheel up: b=64 -> ESC [ < 6 4 ; 1 ; 1 M
+    e = In.parse(bytes_of([27, 91, 60, 54, 52, 59, 49, 59, 49, 77]))[0]
+    T.assert_eq(e.mouse.kind, In.MOUSE_WHEEL_UP, "wheel up")
+    // wheel down: b=65
+    e = In.parse(bytes_of([27, 91, 60, 54, 53, 59, 49, 59, 49, 77]))[0]
+    T.assert_eq(e.mouse.kind, In.MOUSE_WHEEL_DOWN, "wheel down")
+
+    // ctrl+left-click: b = 0 + 16 = 16 -> "16"
+    e = In.parse(bytes_of([27, 91, 60, 49, 54, 59, 49, 59, 49, 77]))[0]
+    T.assert_eq(e.mouse.mods, In.MOD_CTRL, "mouse ctrl mod")
+
+    // --- Bracketed paste: ESC [ 200 ~ "hi" ESC [ 201 ~ ---
+    // start: 27,91,50,48,48,126 ; body 'h','i' = 104,105 ; end: 27,91,50,48,49,126
+    evs = In.parse(bytes_of([27, 91, 50, 48, 48, 126, 104, 105, 27, 91, 50, 48, 49, 126]))
+    T.assert_eq(evs.length(), 1, "paste -> 1 event")
+    e = evs[0]
+    T.assert(e.paste != nil, "paste text present")
+    T.assert_eq(e.paste, "hi", "paste text is 'hi'")
+
+    // --- Focus in/out: ESC [ I / ESC [ O ---
+    e = In.parse(bytes_of([27, 91, 73]))[0]
+    T.assert_eq(e.focus, 1, "focus in")
+    e = In.parse(bytes_of([27, 91, 79]))[0]
+    T.assert_eq(e.focus, 0, "focus out (blur)")
+
+    // --- Multiple sequences in one read: "a" + arrow-up + ctrl+c ---
+    evs = In.parse(bytes_of([97, 27, 91, 65, 3]))
+    T.assert_eq(evs.length(), 3, "3 sequences in one read")
+    T.assert_eq(evs[0].key.rune, "a", "seq0 = a")
+    T.assert_eq(evs[1].key.kind, In.KEY_UP, "seq1 = up")
+    T.assert_eq(evs[2].key.name(), "ctrl+c", "seq2 = ctrl+c")
+
+    // --- Unrecognized escape dropped silently: ESC [ 9 9 9 z (unknown final) ---
+    evs = In.parse(bytes_of([27, 91, 57, 57, 57, 122]))
+    T.assert_eq(evs.length(), 0, "unknown CSI dropped")
+
+    // --- Multi-byte UTF-8 rune: é = 0xC3 0xA9 = 195,169 ---
+    evs = In.parse(bytes_of([195, 169]))
+    T.assert_eq(evs.length(), 1, "utf8 é -> 1 event")
+    T.assert_eq(evs[0].key.rune, "é", "utf8 é rune")
+
+    T.summary()
+}
+
+main()

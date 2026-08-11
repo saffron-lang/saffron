@@ -1,0 +1,198 @@
+//! Sumac progress-bar widget — a 0.0..1.0 fill meter with optional percent label.
+//!
+//! Follows the uniform widget convention (CONTRACT.md > widgets): the class holds
+//! the signal it binds to (`value`), `view()` emits LNodes via the layout
+//! builders, and `handle()` reports whether it consumed an event. A progress bar
+//! is not interactive, so `handle` always returns false.
+//!
+//! Two fill modes:
+//!   * plain — `round(value * width)` cells of the full block glyph `█`, the rest
+//!     blank. Whole-cell precision.
+//!   * ramp  — sub-cell precision at the fill boundary using the eight partial
+//!     block glyphs `▏▎▍▌▋▊▉█`. The integer part of `value * width` is full `█`
+//!     cells; the fractional part selects one partial glyph (`round(frac * 8)`
+//!     eighths) for the boundary cell.
+//!
+//! Integer discipline (BUGS #72): `value` is legitimately a Float (0..1), but
+//! every cell count, glyph index, and percent integer is computed into an `Int`
+//! local via `.floor()`/`.round()` before it is ever used to index the partial
+//! glyph list. A Float used as a list index silently reads element 0.
+
+import "../buffer.sf" as Buf
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+import "../layout.sf" as L
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+// Clamp a Float into [0, 1] with plain comparisons (no min/max builtin needed).
+fun _clamp01(v: Float): Float {
+    if (v < 0.0) { return 0.0 }
+    if (v > 1.0) { return 1.0 }
+    return v
+}
+
+// The eight partial-block glyphs, 1/8 .. 8/8 of a cell. Index 0..7; index 7 is
+// the full block `█`. Only ever indexed by an Int (BUGS #72).
+fun _ramp_glyphs(): List<String> {
+    return ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+}
+
+// Build [fill_str, empty_str] for a bar of `width` cells at fraction `v` (already
+// clamped to 0..1). In ramp mode a single boundary cell may carry a partial glyph.
+// The two strings together are exactly `width` display columns wide.
+fun _bar_parts(v: Float, width: Int, ramp: Bool): List<String> {
+    if (width <= 0) {
+        return ["", ""]
+    }
+    var fill_str: String = ""
+    var full: Int = 0            // number of solid `█` cells
+    var partial: String = ""     // boundary glyph, or "" if none
+
+    if (ramp) {
+        // Sub-cell fill: integer part is full cells, fractional part -> eighths.
+        var exact: Float = v * width
+        full = exact.floor()
+        var frac: Float = exact - full
+        var eighths: Int = (frac * 8.0).round()
+        if (eighths >= 8) {
+            // Rounded up to a whole cell.
+            full = full + 1
+        } else if (eighths >= 1) {
+            var glyphs: List<String> = _ramp_glyphs()
+            var gi: Int = eighths - 1
+            partial = glyphs[gi]
+        }
+    } else {
+        // Plain whole-cell fill.
+        full = (v * width).round()
+    }
+
+    // Never overrun the bar (rounding at v==1.0, or a partial past the last cell).
+    if (full > width) { full = width }
+
+    var solids: Int = full
+    if (solids > 0) {
+        fill_str = "█".repeat(solids)
+    }
+
+    // The partial glyph only fits if there is a spare cell after the solids.
+    var used: Int = full
+    if (partial != "" and used < width) {
+        fill_str = fill_str + partial
+        used = used + 1
+    }
+
+    var empties: Int = width - used
+    var empty_str: String = ""
+    if (empties > 0) {
+        empty_str = " ".repeat(empties)
+    }
+    return [fill_str, empty_str]
+}
+
+// =============================================================================
+// Progress
+// =============================================================================
+
+/// A progress bar bound to a `Float` signal in [0, 1] (clamped on read).
+class Progress {
+    var value: Sig.Signal<Float>
+    var width: Int
+    var show_percent: Bool
+    var fill_style: St.Style
+    var empty_style: St.Style
+    var ramp: Bool
+
+    fun init(value: Sig.Signal<Float>, width: Int, show_percent: Bool,
+             fill_style: St.Style, empty_style: St.Style, ramp: Bool) {
+        this.value = value
+        this.width = width
+        this.show_percent = show_percent
+        this.fill_style = fill_style
+        this.empty_style = empty_style
+        this.ramp = ramp
+    }
+
+    /// Set the bar's fraction, clamped to [0, 1].
+    fun set(v: Float) {
+        var sig: Sig.Signal<Float> = this.value
+        sig.set(_clamp01(v))
+    }
+
+    /// Read the current clamped fraction.
+    fun fraction(): Float {
+        var sig: Sig.Signal<Float> = this.value
+        return _clamp01(sig.get())
+    }
+
+    /// The integer percent (0..100) for the label.
+    fun percent(): Int {
+        return (this.fraction() * 100.0).round()
+    }
+
+    /// Emit the bar: a filled run (fill_style) + an empty run (empty_style) in an
+    /// hstack, with an optional " NN%" label appended.
+    fun view() {
+        // Bind fields to typed locals before use: a method/builder call on an
+        // untyped receiver can silently drop (see style.sf note / MEMORY).
+        var w: Int = this.width
+        var use_ramp: Bool = this.ramp
+        var v: Float = this.fraction()
+        var fs: St.Style = this.fill_style
+        var es: St.Style = this.empty_style
+        var want_pct: Bool = this.show_percent
+        var pct: Int = this.percent()
+
+        var parts: List<String> = _bar_parts(v, w, use_ramp)
+        var fill_str: String = parts[0]
+        var empty_str: String = parts[1]
+        var label: String = ""
+        if (want_pct) {
+            label = " " + pct.to_string() + "%"
+        }
+
+        L.hstack(fun () {
+            L.text_styled(fill_str, fs)
+            L.text_styled(empty_str, es)
+            if (label != "") {
+                L.text(label)
+            }
+        })
+    }
+
+    /// Not interactive — never consumes input.
+    fun handle(e: Ev.Event): Bool {
+        return false
+    }
+
+    fun focusable(): Bool {
+        return false
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A progress bar with sensible defaults: given width, percent label on, plain
+/// (non-ramp) block fill, a cyan fill and a faint empty track. The caller owns
+/// the signal.
+fun progress(width: Int): Progress {
+    var v: Sig.Signal<Float> = Sig.signal(0.0)
+    var fill: St.Style = St.style().with_fg(St.rgb(80, 200, 160))
+    var empty: St.Style = St.style().faint()
+    return Progress(v, width, true, fill, empty, false)
+}
+
+/// A progress bar with explicit styles and flags. `ramp` enables sub-cell
+/// partial-block fill. Creates its own value signal (starting at 0.0); the app
+/// drives it via `.set()` or the public `value` field.
+fun progress_styled(width: Int, fill_style: St.Style, empty_style: St.Style,
+                    show_percent: Bool, ramp: Bool): Progress {
+    var v: Sig.Signal<Float> = Sig.signal(0.0)
+    return Progress(v, width, show_percent, fill_style, empty_style, ramp)
+}

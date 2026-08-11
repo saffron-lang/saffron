@@ -1,0 +1,676 @@
+//! Sumac input layer — terminal escape-sequence parser.
+//!
+//! Turns a raw stdin byte range (as produced by `tty.read_input`) into a list
+//! of high-level `Event`s: key presses, mouse actions, bracketed-paste blocks,
+//! and focus in/out markers.
+//!
+//! This is the highest-bug-surface part of the framework: terminals speak a
+//! sprawling, ambiguous dialect of xterm escape sequences, and a single read()
+//! can carry several sequences back-to-back (plus a whole paste payload). The
+//! parser walks the range with a small cursor, recognizing one sequence per
+//! step, and silently drops anything it does not understand rather than erroring
+//! or emitting garbage.
+//!
+//! Everything that indexes bytes MUST be `Int` — a `Float` list/Bytes index
+//! silently reads element 0 (BUGS #72). All positions, byte values, and mod
+//! flags are annotated `Int` throughout.
+
+import "io" as IO
+
+// =============================================================================
+// Key kinds
+// =============================================================================
+
+let KEY_RUNE: Int = 0
+let KEY_ENTER: Int = 1
+let KEY_TAB: Int = 2
+let KEY_BACKSPACE: Int = 3
+let KEY_ESC: Int = 4
+let KEY_UP: Int = 5
+let KEY_DOWN: Int = 6
+let KEY_LEFT: Int = 7
+let KEY_RIGHT: Int = 8
+let KEY_HOME: Int = 9
+let KEY_END: Int = 10
+let KEY_PGUP: Int = 11
+let KEY_PGDN: Int = 12
+let KEY_DELETE: Int = 13
+let KEY_INSERT: Int = 14
+let KEY_SPACE: Int = 15
+// F1..F12 = 16..27
+let KEY_F1: Int = 16
+let KEY_F2: Int = 17
+let KEY_F3: Int = 18
+let KEY_F4: Int = 19
+let KEY_F5: Int = 20
+let KEY_F6: Int = 21
+let KEY_F7: Int = 22
+let KEY_F8: Int = 23
+let KEY_F9: Int = 24
+let KEY_F10: Int = 25
+let KEY_F11: Int = 26
+let KEY_F12: Int = 27
+
+// Modifier bitflags in `mods`.
+let MOD_NONE: Int = 0
+let MOD_CTRL: Int = 1
+let MOD_ALT: Int = 2
+let MOD_SHIFT: Int = 4
+
+// Mouse event kinds.
+let MOUSE_PRESS: Int = 0
+let MOUSE_RELEASE: Int = 1
+let MOUSE_MOTION: Int = 2
+let MOUSE_WHEEL_UP: Int = 3
+let MOUSE_WHEEL_DOWN: Int = 4
+
+// =============================================================================
+// Event types
+// =============================================================================
+
+/// A keyboard event. Printable runes carry kind KEY_RUNE with the decoded
+/// grapheme in `rune`; every other key is one of the KEY_* kinds with `rune`
+/// left "".
+class KeyEvent {
+    var kind: Int
+    var rune: String
+    var mods: Int
+
+    fun init(kind: Int, rune: String, mods: Int) {
+        this.kind = kind
+        this.rune = rune
+        this.mods = mods
+    }
+
+    /// Canonical name for keymap matching: "ctrl+c", "up", "enter", "a", "F1".
+    /// Modifier prefixes are applied in ctrl+alt+shift order, matching the
+    /// convention Bubbletea keymaps use.
+    fun name(): String {
+        var base: String = this._base_name()
+        var out: String = ""
+        if ((this.mods & MOD_CTRL) != 0) { out = out + "ctrl+" }
+        if ((this.mods & MOD_ALT) != 0) { out = out + "alt+" }
+        if ((this.mods & MOD_SHIFT) != 0) { out = out + "shift+" }
+        return out + base
+    }
+
+    fun _base_name(): String {
+        if (this.kind == KEY_RUNE) {
+            if (this.rune == " ") { return "space" }
+            return this.rune
+        }
+        if (this.kind == KEY_ENTER) { return "enter" }
+        if (this.kind == KEY_TAB) { return "tab" }
+        if (this.kind == KEY_BACKSPACE) { return "backspace" }
+        if (this.kind == KEY_ESC) { return "esc" }
+        if (this.kind == KEY_UP) { return "up" }
+        if (this.kind == KEY_DOWN) { return "down" }
+        if (this.kind == KEY_LEFT) { return "left" }
+        if (this.kind == KEY_RIGHT) { return "right" }
+        if (this.kind == KEY_HOME) { return "home" }
+        if (this.kind == KEY_END) { return "end" }
+        if (this.kind == KEY_PGUP) { return "pgup" }
+        if (this.kind == KEY_PGDN) { return "pgdown" }
+        if (this.kind == KEY_DELETE) { return "delete" }
+        if (this.kind == KEY_INSERT) { return "insert" }
+        if (this.kind == KEY_SPACE) { return "space" }
+        if (this.kind >= KEY_F1 and this.kind <= KEY_F12) {
+            var n: Int = (this.kind - KEY_F1) + 1
+            return "f" + n.to_string()
+        }
+        return ""
+    }
+}
+
+/// A mouse event. Coordinates are 0-based (the SGR sequence is 1-based; we
+/// subtract one on decode).
+class MouseEvent {
+    var kind: Int
+    var button: Int
+    var x: Int
+    var y: Int
+    var mods: Int
+
+    fun init(kind: Int, button: Int, x: Int, y: Int, mods: Int) {
+        this.kind = kind
+        this.button = button
+        this.x = x
+        this.y = y
+        this.mods = mods
+    }
+}
+
+/// A single decoded event. Exactly one facet is populated; the rest are the
+/// nil/default sentinel:
+///   - a key event   → `key` non-nil
+///   - a mouse event  → `mouse` non-nil
+///   - a paste event  → `paste` non-nil (may be "")
+///   - a resize marker → `resize` true (injected by the runtime, never parsed)
+///   - a focus event  → `focus` 0 (blur) or 1 (focus); -1 means "not a focus event"
+class Event {
+    var key: KeyEvent
+    var mouse: MouseEvent
+    var paste: String
+    var resize: Bool
+    var focus: Int
+
+    fun init(key: KeyEvent, mouse: MouseEvent, paste: String, resize: Bool, focus: Int) {
+        this.key = key
+        this.mouse = mouse
+        this.paste = paste
+        this.resize = resize
+        this.focus = focus
+    }
+}
+
+// --- Constructor helpers (fully-formed events with the unused facets nil) ---
+
+fun key_event(kind: Int, rune: String, mods: Int): Event {
+    return Event(KeyEvent(kind, rune, mods), nil, nil, false, -1)
+}
+
+fun mouse_event(kind: Int, button: Int, x: Int, y: Int, mods: Int): Event {
+    return Event(nil, MouseEvent(kind, button, x, y, mods), nil, false, -1)
+}
+
+fun paste_event(text: String): Event {
+    return Event(nil, nil, text, false, -1)
+}
+
+fun focus_event(focused: Int): Event {
+    return Event(nil, nil, nil, false, focused)
+}
+
+fun resize_event(): Event {
+    return Event(nil, nil, nil, true, -1)
+}
+
+// =============================================================================
+// Byte / rune helpers
+// =============================================================================
+
+/// Build a one-character String from a single ASCII/Latin-1 byte value.
+fun _rune_from_byte(b: Int): String {
+    var buf: IO.Bytes = IO.bytes_alloc(1)
+    buf.set(0, b & 255)
+    return buf.to_string()
+}
+
+/// How many bytes the UTF-8 rune starting with lead byte `b` occupies.
+/// 1 for ASCII / invalid, 2/3/4 for multi-byte leads.
+fun _utf8_len(b: Int): Int {
+    if (b < 128) { return 1 }
+    if (b >= 240 and b < 248) { return 4 }   // 11110xxx
+    if (b >= 224 and b < 240) { return 3 }   // 1110xxxx
+    if (b >= 192 and b < 224) { return 2 }   // 110xxxxx
+    return 1                                  // continuation / invalid → 1
+}
+
+// =============================================================================
+// Parser cursor
+// =============================================================================
+//
+// A tiny mutable cursor over the byte range, so the recognizer functions can
+// share position without threading it through every return value.
+
+class Cursor {
+    var bytes: IO.Bytes
+    var pos: Int
+    var len: Int
+
+    fun init(bytes: IO.Bytes) {
+        this.bytes = bytes
+        this.pos = 0
+        this.len = bytes.length()
+    }
+
+    fun has(n: Int): Bool {
+        return (this.pos + n) <= this.len
+    }
+
+    fun eof(): Bool {
+        return this.pos >= this.len
+    }
+
+    /// Byte at an absolute offset, or -1 if out of range.
+    fun at(i: Int): Int {
+        if (i < 0 or i >= this.len) { return -1 }
+        return this.bytes.get(i)
+    }
+
+    /// Byte `k` ahead of the cursor without advancing, or -1.
+    fun peek(k: Int): Int {
+        return this.at(this.pos + k)
+    }
+
+    fun advance(n: Int) {
+        this.pos = this.pos + n
+    }
+}
+
+// =============================================================================
+// Public entry point
+// =============================================================================
+
+/// Parse a raw input byte range into zero or more events. Stateless per call.
+fun parse(bytes: IO.Bytes): List<Event> {
+    var out: List<Event> = []
+    var cur: Cursor = Cursor(bytes)
+    while (!cur.eof()) {
+        var before: Int = cur.pos
+        _parse_one(cur, out)
+        // Safety: a recognizer must always consume at least one byte, else we
+        // would spin forever on an unrecognized lead byte.
+        if (cur.pos <= before) {
+            cur.advance(1)
+        }
+    }
+    return out
+}
+
+// Decode a single sequence at the cursor, pushing 0..1 events. Advances the
+// cursor past everything it consumed.
+fun _parse_one(cur: Cursor, out: List<Event>) {
+    var b: Int = cur.peek(0)
+
+    if (b == 27) {                      // ESC — start of an escape sequence
+        _parse_escape(cur, out)
+        return
+    }
+
+    // Not an escape: a plain key byte.
+    var ev: Event = _parse_key_byte(cur)
+    if (ev != nil) {
+        out.push(ev)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Plain (non-ESC) key bytes: control chars, ctrl+letter, printable UTF-8 runes.
+// -----------------------------------------------------------------------------
+
+fun _parse_key_byte(cur: Cursor): Event {
+    var b: Int = cur.peek(0)
+
+    if (b == 13 or b == 10) {           // CR / LF → ENTER
+        cur.advance(1)
+        return key_event(KEY_ENTER, "", MOD_NONE)
+    }
+    if (b == 9) {                       // TAB
+        cur.advance(1)
+        return key_event(KEY_TAB, "", MOD_NONE)
+    }
+    if (b == 127 or b == 8) {           // DEL / BS → BACKSPACE
+        cur.advance(1)
+        return key_event(KEY_BACKSPACE, "", MOD_NONE)
+    }
+    if (b == 32) {                      // SPACE
+        cur.advance(1)
+        return key_event(KEY_SPACE, " ", MOD_NONE)
+    }
+
+    // Ctrl+letter: bytes 1..26 map to ctrl+a .. ctrl+z. (9/13 handled above as
+    // Tab/Enter, which is the conventional interpretation.)
+    if (b >= 1 and b <= 26) {
+        cur.advance(1)
+        var letter: Int = (b - 1) + 97   // 'a' == 97
+        return key_event(KEY_RUNE, _rune_from_byte(letter), MOD_CTRL)
+    }
+
+    // Other C0 control bytes we don't name → drop (consume one byte).
+    if (b < 32) {
+        cur.advance(1)
+        return nil
+    }
+
+    // Printable byte: decode a (possibly multi-byte) UTF-8 rune.
+    var n: Int = _utf8_len(b)
+    if (!cur.has(n)) {
+        // Truncated multi-byte rune at end of buffer: emit the lead byte alone.
+        n = 1
+    }
+    var buf: IO.Bytes = IO.bytes_alloc(n)
+    var i: Int = 0
+    while (i < n) {
+        buf.set(i, cur.peek(i) & 255)
+        i = i + 1
+    }
+    cur.advance(n)
+    return key_event(KEY_RUNE, buf.to_string(), MOD_NONE)
+}
+
+// -----------------------------------------------------------------------------
+// ESC-led sequences.
+// -----------------------------------------------------------------------------
+
+fun _parse_escape(cur: Cursor, out: List<Event>) {
+    var next: Int = cur.peek(1)
+
+    // Lone ESC (nothing follows in this read) → the Escape key.
+    if (next < 0) {
+        cur.advance(1)
+        out.push(key_event(KEY_ESC, "", MOD_NONE))
+        return
+    }
+
+    if (next == 91) {                   // '[' — CSI
+        _parse_csi(cur, out)
+        return
+    }
+    if (next == 79) {                   // 'O' — SS3 (function keys / app cursor)
+        _parse_ss3(cur, out)
+        return
+    }
+
+    // ESC followed by another key → Alt+<key>. Consume the ESC, parse the rest
+    // as an ordinary key, and OR in MOD_ALT.
+    cur.advance(1)
+    // A second ESC that itself begins a sequence: treat this ESC as a bare Esc.
+    if (next == 27) {
+        out.push(key_event(KEY_ESC, "", MOD_NONE))
+        return
+    }
+    var ev: Event = _parse_key_byte(cur)
+    if (ev != nil) {
+        if (ev.key != nil) {
+            ev.key.mods = ev.key.mods | MOD_ALT
+        }
+        out.push(ev)
+    } else {
+        // Nothing usable followed → treat the ESC as the Escape key.
+        out.push(key_event(KEY_ESC, "", MOD_NONE))
+    }
+}
+
+// Convert an xterm modifier parameter (1-based: 1=none,2=shift,3=alt,5=ctrl,...)
+// into our MOD_* bitflags. xterm encodes mods as (1 + bitflags) where the flags
+// are 1=shift, 2=alt, 4=ctrl.
+fun _decode_mod_param(param: Int): Int {
+    if (param <= 1) { return MOD_NONE }
+    var flags: Int = param - 1
+    var mods: Int = MOD_NONE
+    if ((flags & 1) != 0) { mods = mods | MOD_SHIFT }
+    if ((flags & 2) != 0) { mods = mods | MOD_ALT }
+    if ((flags & 4) != 0) { mods = mods | MOD_CTRL }
+    return mods
+}
+
+// Parse a CSI sequence: ESC '[' ... final. On entry the cursor is at the ESC.
+fun _parse_csi(cur: Cursor, out: List<Event>) {
+    // SGR mouse:  ESC [ < ...
+    if (cur.peek(2) == 60) {            // '<'
+        _parse_sgr_mouse(cur, out)
+        return
+    }
+
+    // Scan the parameter/intermediate bytes up to the final byte (0x40..0x7E).
+    // Params are digits and ';'. We record the numeric params in a list.
+    var i: Int = cur.pos + 2            // first byte after "ESC ["
+    var params: List<Int> = []
+    var cur_num: Int = 0
+    var have_num: Bool = false
+    var final_b: Int = -1
+    var final_at: Int = -1
+
+    while (i < cur.len) {
+        var c: Int = cur.at(i)
+        if (c >= 48 and c <= 57) {      // digit
+            cur_num = (cur_num * 10) + (c - 48)
+            have_num = true
+            i = i + 1
+        } else if (c == 59) {           // ';'
+            if (have_num) { params.push(cur_num) } else { params.push(0) }
+            cur_num = 0
+            have_num = false
+            i = i + 1
+        } else if (c >= 64 and c <= 126) {   // final byte 0x40..0x7E
+            final_b = c
+            final_at = i
+            i = i + 1
+            break
+        } else {
+            // Unexpected byte inside a CSI: bail, dropping what we've seen.
+            i = i + 1
+            final_at = -1
+            break
+        }
+    }
+
+    if (have_num) { params.push(cur_num) }
+
+    if (final_b < 0 or final_at < 0) {
+        // Incomplete / malformed CSI. Consume up to where we stopped so we make
+        // progress, but emit nothing.
+        cur.pos = i
+        return
+    }
+
+    // Advance the cursor past the whole recognized sequence.
+    cur.pos = final_at + 1
+
+    // Bracketed paste start: ESC [ 200 ~ ... ESC [ 201 ~. Capture the text
+    // between the markers as a single paste event.
+    if (final_b == 126 and params.length() >= 1 and params[0] == 200) {
+        _capture_paste(cur, out)
+        return
+    }
+
+    // The modifier param, if present, is the SECOND numeric parameter in the
+    // "ESC [ 1 ; 5 A" style. Default to none.
+    var mods: Int = MOD_NONE
+    if (params.length() >= 2) {
+        mods = _decode_mod_param(params[1])
+    }
+
+    var ev: Event = _csi_to_event(final_b, params, mods)
+    if (ev != nil) {
+        out.push(ev)
+    }
+}
+
+// Capture a bracketed-paste body. On entry the cursor sits just past the
+// "ESC [ 200 ~" start marker. We copy bytes verbatim until the "ESC [ 201 ~"
+// end marker (or end of buffer), then emit one paste event.
+fun _capture_paste(cur: Cursor, out: List<Event>) {
+    var start: Int = cur.pos
+    var end: Int = -1
+    var after: Int = cur.len       // where the cursor lands when done
+    var i: Int = cur.pos
+    while (i < cur.len) {
+        // Look for the 6-byte end marker: 27 91 50 48 49 126  (ESC [ 2 0 1 ~).
+        if (cur.at(i) == 27 and cur.at(i + 1) == 91 and
+            cur.at(i + 2) == 50 and cur.at(i + 3) == 48 and
+            cur.at(i + 4) == 49 and cur.at(i + 5) == 126) {
+            end = i
+            after = i + 6
+            break
+        }
+        i = i + 1
+    }
+    if (end < 0) {
+        // No end marker in this read: take the rest of the buffer as the paste.
+        end = cur.len
+        after = cur.len
+    }
+
+    var count: Int = end - start
+    if (count < 0) { count = 0 }
+    var buf: IO.Bytes = IO.bytes_alloc(count)
+    var j: Int = 0
+    while (j < count) {
+        buf.set(j, cur.at(start + j) & 255)
+        j = j + 1
+    }
+    cur.pos = after
+    out.push(paste_event(buf.to_string()))
+}
+
+// Map a completed CSI (final byte + params + decoded mods) to an event, or nil.
+fun _csi_to_event(final_b: Int, params: List<Int>, mods: Int): Event {
+    // Letter finals: arrows, Home/End, focus.
+    if (final_b == 65) { return key_event(KEY_UP, "", mods) }      // A
+    if (final_b == 66) { return key_event(KEY_DOWN, "", mods) }    // B
+    if (final_b == 67) { return key_event(KEY_RIGHT, "", mods) }   // C
+    if (final_b == 68) { return key_event(KEY_LEFT, "", mods) }    // D
+    if (final_b == 72) { return key_event(KEY_HOME, "", mods) }    // H
+    if (final_b == 70) { return key_event(KEY_END, "", mods) }     // F
+
+    // SS3-style function keys that some terminals send as CSI: ESC [ P..S
+    if (final_b == 80) { return key_event(KEY_F1, "", mods) }      // P
+    if (final_b == 81) { return key_event(KEY_F2, "", mods) }      // Q
+    if (final_b == 82) { return key_event(KEY_F3, "", mods) }      // R
+    if (final_b == 83) { return key_event(KEY_F4, "", mods) }      // S
+
+    // Focus in/out: ESC [ I  /  ESC [ O
+    if (final_b == 73) { return focus_event(1) }                   // I → focus
+    if (final_b == 79) { return focus_event(0) }                   // O → blur
+
+    // Tilde finals: ESC [ N ~  — numbered special keys.
+    if (final_b == 126) {                                          // '~'
+        var code: Int = 0
+        if (params.length() >= 1) { code = params[0] }
+        return _tilde_to_event(code, mods)
+    }
+
+    return nil
+}
+
+// Map the numeric code of an "ESC [ N ~" sequence to an event.
+fun _tilde_to_event(code: Int, mods: Int): Event {
+    if (code == 1) { return key_event(KEY_HOME, "", mods) }
+    if (code == 2) { return key_event(KEY_INSERT, "", mods) }
+    if (code == 3) { return key_event(KEY_DELETE, "", mods) }
+    if (code == 4) { return key_event(KEY_END, "", mods) }
+    if (code == 5) { return key_event(KEY_PGUP, "", mods) }
+    if (code == 6) { return key_event(KEY_PGDN, "", mods) }
+    if (code == 7) { return key_event(KEY_HOME, "", mods) }
+    if (code == 8) { return key_event(KEY_END, "", mods) }
+    // Function keys via tilde codes (xterm): 11..15 → F1..F5, 17..21 → F6..F10,
+    // 23..24 → F11..F12. (16, 22 are unused gaps in the xterm table.)
+    if (code == 11) { return key_event(KEY_F1, "", mods) }
+    if (code == 12) { return key_event(KEY_F2, "", mods) }
+    if (code == 13) { return key_event(KEY_F3, "", mods) }
+    if (code == 14) { return key_event(KEY_F4, "", mods) }
+    if (code == 15) { return key_event(KEY_F5, "", mods) }
+    if (code == 17) { return key_event(KEY_F6, "", mods) }
+    if (code == 18) { return key_event(KEY_F7, "", mods) }
+    if (code == 19) { return key_event(KEY_F8, "", mods) }
+    if (code == 20) { return key_event(KEY_F9, "", mods) }
+    if (code == 21) { return key_event(KEY_F10, "", mods) }
+    if (code == 23) { return key_event(KEY_F11, "", mods) }
+    if (code == 24) { return key_event(KEY_F12, "", mods) }
+
+    // Bracketed paste is handled before we get here (ESC [ 200 ~); codes 200/201
+    // reaching this point are stray and dropped.
+    return nil
+}
+
+// SS3 sequences: ESC O <final>. Application-cursor arrows and F1..F4.
+fun _parse_ss3(cur: Cursor, out: List<Event>) {
+    var f: Int = cur.peek(2)
+    if (f < 0) {
+        // Truncated "ESC O" — treat as bare Esc + 'O' isn't worth it; drop ESC.
+        cur.advance(1)
+        out.push(key_event(KEY_ESC, "", MOD_NONE))
+        return
+    }
+    cur.advance(3)                      // consume ESC O <final>
+    if (f == 80) { out.push(key_event(KEY_F1, "", MOD_NONE)); return }   // P
+    if (f == 81) { out.push(key_event(KEY_F2, "", MOD_NONE)); return }   // Q
+    if (f == 82) { out.push(key_event(KEY_F3, "", MOD_NONE)); return }   // R
+    if (f == 83) { out.push(key_event(KEY_F4, "", MOD_NONE)); return }   // S
+    if (f == 65) { out.push(key_event(KEY_UP, "", MOD_NONE)); return }   // A
+    if (f == 66) { out.push(key_event(KEY_DOWN, "", MOD_NONE)); return } // B
+    if (f == 67) { out.push(key_event(KEY_RIGHT, "", MOD_NONE)); return }// C
+    if (f == 68) { out.push(key_event(KEY_LEFT, "", MOD_NONE)); return } // D
+    if (f == 72) { out.push(key_event(KEY_HOME, "", MOD_NONE)); return } // H
+    if (f == 70) { out.push(key_event(KEY_END, "", MOD_NONE)); return }  // F
+    // Unknown SS3 final: already consumed, emit nothing.
+}
+
+// -----------------------------------------------------------------------------
+// SGR mouse:  ESC [ < b ; x ; y (M|m)
+//   M = press/motion/wheel, m = release.
+//   b low 2 bits = button (0 left, 1 middle, 2 right, 3 released-marker)
+//   bit 5 (32)   = motion
+//   >= 64        = wheel (64 up, 65 down)
+//   bit 4 (16)   = ctrl, bit 3 (8) = alt, bit 2 (4) = shift
+// -----------------------------------------------------------------------------
+
+fun _parse_sgr_mouse(cur: Cursor, out: List<Event>) {
+    var i: Int = cur.pos + 3            // skip "ESC [ <"
+    var nums: List<Int> = []
+    var n: Int = 0
+    var have: Bool = false
+    var final_b: Int = -1
+    var final_at: Int = -1
+
+    while (i < cur.len) {
+        var c: Int = cur.at(i)
+        if (c >= 48 and c <= 57) {
+            n = (n * 10) + (c - 48)
+            have = true
+            i = i + 1
+        } else if (c == 59) {           // ';'
+            if (have) { nums.push(n) } else { nums.push(0) }
+            n = 0
+            have = false
+            i = i + 1
+        } else if (c == 77 or c == 109) {  // 'M' or 'm'
+            final_b = c
+            final_at = i
+            i = i + 1
+            break
+        } else {
+            final_at = -1
+            i = i + 1
+            break
+        }
+    }
+    if (have) { nums.push(n) }
+
+    if (final_b < 0 or final_at < 0 or nums.length() < 3) {
+        // Malformed / truncated. Make progress; emit nothing.
+        cur.pos = i
+        return
+    }
+    cur.pos = final_at + 1
+
+    var b: Int = nums[0]
+    var mx: Int = nums[1]
+    var my: Int = nums[2]
+
+    // Modifiers.
+    var mods: Int = MOD_NONE
+    if ((b & 4) != 0) { mods = mods | MOD_SHIFT }
+    if ((b & 8) != 0) { mods = mods | MOD_ALT }
+    if ((b & 16) != 0) { mods = mods | MOD_CTRL }
+
+    // Coordinates: sequence is 1-based, buffer is 0-based.
+    var x: Int = mx - 1
+    var y: Int = my - 1
+    if (x < 0) { x = 0 }
+    if (y < 0) { y = 0 }
+
+    // Wheel: button codes 64/65 (and 66/67 for horizontal, mapped to up/down).
+    if ((b & 64) != 0) {
+        var wheel_kind: Int = MOUSE_WHEEL_UP
+        if ((b & 1) != 0) { wheel_kind = MOUSE_WHEEL_DOWN }
+        out.push(mouse_event(wheel_kind, 0, x, y, mods))
+        return
+    }
+
+    var button: Int = b & 3
+    var kind: Int = MOUSE_PRESS
+    if ((b & 32) != 0) {
+        kind = MOUSE_MOTION
+    } else if (final_b == 109) {        // 'm' = release
+        kind = MOUSE_RELEASE
+    }
+
+    // On release the low bits are often 3 (no button); report button 0 so the
+    // event still carries a sane value.
+    if (button == 3) { button = 0 }
+
+    out.push(mouse_event(kind, button, x, y, mods))
+}

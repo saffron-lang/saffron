@@ -1,0 +1,119 @@
+// Verify the help and paginator widgets: view() emits LNodes that render to the
+// expected runes, and the paginator's next()/prev()/handle() move the page.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/help.sf" as Help
+import "../src/widgets/paginator.sf" as Pag
+import "@test" as T
+import "io" as IO
+
+// Render a widget's LNode into a fresh w x h buffer and flatten it to a string
+// (blanks and zero-width halves dropped) so we can assert content appears.
+fun render_str(node: L.LNode, w: Int, h: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var y: Int = 0
+    while (y < h) {
+        var x: Int = 0
+        while (x < w) {
+            var c: Buf.Cell = buf.get(x, y)
+            if (c.width == 0) {
+                // trailing half of a wide cell — skip
+            } else {
+                var r: String = c.rune
+                if (r == "") { r = " " }
+                out = out + r
+            }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // ---------------------------------------------------------------------
+    // Help: renders keys + descriptions on one line
+    // ---------------------------------------------------------------------
+    var hints: List<Help.KeyHint> = [
+        Help.key_hint("ctrl+c", "quit"),
+        Help.key_hint("up", "prev"),
+        Help.key_hint("down", "next")
+    ]
+    var h: Help.Help = Help.help(hints)
+    var hnode: L.LNode = h.view()
+    var htxt: String = render_str(hnode, 60, 1)
+    IO.println("help: [" + htxt + "]")
+    T.assert_contains(htxt, "ctrl+c", "help shows the ctrl+c key")
+    T.assert_contains(htxt, "quit", "help shows the quit description")
+    T.assert_contains(htxt, "up", "help shows the up key")
+    T.assert_contains(htxt, "•", "help shows the separator glyph")
+
+    // Help is not interactive.
+    var consumed_h: Bool = h.handle(Ev.key_event(Ev.KEY_RIGHT, "", Ev.MOD_NONE))
+    T.assert_eq(consumed_h, false, "help never consumes input")
+
+    // ---------------------------------------------------------------------
+    // Paginator (dots): 4 pages, active dot at page 0
+    // ---------------------------------------------------------------------
+    var p: Pag.Paginator = Pag.paginator(4)
+    var dots0: String = render_str(p.view(), 4, 1)
+    IO.println("dots@0: [" + dots0 + "]")
+    T.assert_eq(dots0, "●○○○", "dots: active dot at page 0")
+
+    // next() advances the page and moves the active dot
+    p.next()
+    T.assert_eq(p.page.get(), 1, "next() moves page to 1")
+    var dots1: String = render_str(p.view(), 4, 1)
+    IO.println("dots@1: [" + dots1 + "]")
+    T.assert_eq(dots1, "○●○○", "dots: active dot moved to page 1")
+
+    // prev() goes back, clamps at 0
+    p.prev()
+    T.assert_eq(p.page.get(), 0, "prev() moves page back to 0")
+    p.prev()
+    T.assert_eq(p.page.get(), 0, "prev() clamps at page 0")
+
+    // next() clamps at the last page
+    var q: Pag.Paginator = Pag.paginator(3)
+    q.next(); q.next(); q.next(); q.next()
+    T.assert_eq(q.page.get(), 2, "next() clamps at last page (total-1)")
+
+    // ---------------------------------------------------------------------
+    // Paginator handle(): a synthetic "right" key advances + is consumed
+    // ---------------------------------------------------------------------
+    var p2: Pag.Paginator = Pag.paginator(4)
+    var right_ev: Ev.Event = Ev.key_event(Ev.KEY_RIGHT, "", Ev.MOD_NONE)
+    var consumed: Bool = p2.handle(right_ev)
+    T.assert_eq(consumed, true, "handle('right') consumes the event")
+    T.assert_eq(p2.page.get(), 1, "handle('right') advances to page 1")
+
+    // "left" moves back and is consumed
+    var left_ev: Ev.Event = Ev.key_event(Ev.KEY_LEFT, "", Ev.MOD_NONE)
+    var consumed_l: Bool = p2.handle(left_ev)
+    T.assert_eq(consumed_l, true, "handle('left') consumes the event")
+    T.assert_eq(p2.page.get(), 0, "handle('left') moves back to page 0")
+
+    // a non-nav key is ignored
+    var a_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "a", Ev.MOD_NONE)
+    var consumed_a: Bool = p2.handle(a_ev)
+    T.assert_eq(consumed_a, false, "handle ignores a non-nav key")
+
+    // ---------------------------------------------------------------------
+    // Paginator (arabic): shows "N/M" 1-based
+    // ---------------------------------------------------------------------
+    var pa: Pag.Paginator = Pag.paginator_arabic(4)
+    pa.next()   // page 1 (0-based) -> displays "2/4"
+    var arabic: String = render_str(pa.view(), 8, 1)
+    IO.println("arabic@1: [" + arabic + "]")
+    T.assert_contains(arabic, "2/4", "arabic mode shows 2/4 at page index 1")
+
+    T.summary()
+}
+
+main()

@@ -1,0 +1,535 @@
+//! Sumac textarea widget — a multi-line editable text field (à la Bubbletea's
+//! textarea).
+//!
+//! A `TextArea` owns a `value` signal holding the *whole* text as one
+//! "\n"-separated string, plus a caret split across `cursor_row` / `cursor_col`
+//! signals and a `scroll` signal naming the top visible row. The content lines
+//! are derived on demand via `value.get().split("\n")`; every editing op mutates
+//! that line list and writes the rejoined string back through `value.set(...)`,
+//! so the app keeps a single source of truth and the reactive runtime repaints
+//! on change.
+//!
+//! Everything index-shaped — the caret row/col, the scroll offset, the line
+//! count, every loop counter — is annotated `Int`: a `Float` used as a string or
+//! list index silently reads element 0 (BUGS #72), which for a text editor would
+//! pin the caret to the first character forever, so the index math stays strictly
+//! integer. Signals are read into typed locals before use, because a method call
+//! straight on `this.<field>` reads as an untyped receiver and can be silently
+//! dropped.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+import "../buffer.sf" as Buf
+
+// =============================================================================
+// TextArea
+// =============================================================================
+
+/// A multi-line editable text field. `value` is the whole "\n"-separated text
+/// (a signal, so the runtime repaints on change); `cursor_row`/`cursor_col` are
+/// the 0-based caret position; `scroll` is the index of the top visible row.
+/// `width`/`height` bound the visible window (columns / rows). `placeholder` is
+/// shown when the value is empty and the field is unfocused. `text_style`,
+/// `placeholder_style`, and `cursor_style` style the content, the placeholder,
+/// and the caret cell respectively.
+class TextArea {
+    var value: Sig.Signal<String>
+    var cursor_row: Sig.Signal<Int>
+    var cursor_col: Sig.Signal<Int>
+    var width: Int
+    var height: Int
+    var scroll: Sig.Signal<Int>
+    var placeholder: String
+    var text_style: St.Style
+    var placeholder_style: St.Style
+    var cursor_style: St.Style
+    var focused: Bool
+
+    fun init(value: Sig.Signal<String>, cursor_row: Sig.Signal<Int>,
+             cursor_col: Sig.Signal<Int>, width: Int, height: Int,
+             scroll: Sig.Signal<Int>, placeholder: String,
+             text_style: St.Style, placeholder_style: St.Style,
+             cursor_style: St.Style, focused: Bool) {
+        this.value = value
+        this.cursor_row = cursor_row
+        this.cursor_col = cursor_col
+        this.width = width
+        this.height = height
+        this.scroll = scroll
+        this.placeholder = placeholder
+        this.text_style = text_style
+        this.placeholder_style = placeholder_style
+        this.cursor_style = cursor_style
+        this.focused = focused
+    }
+
+    // --- Signal readers (bind to a typed local first, then read) ---
+
+    /// The whole text as one "\n"-separated string.
+    fun value_str(): String {
+        var sig: Sig.Signal<String> = this.value
+        return sig.get()
+    }
+
+    /// The content split into physical lines, one element per physical line —
+    /// so "" yields a single empty line and a trailing newline yields a trailing
+    /// empty line, keeping `lines[row]` always in range. `String.split("\n")` now
+    /// preserves trailing empty segments (BUGS #193, fixed), so the builtin is
+    /// correct here; the former hand-rolled `_split_keep` scanner is retired.
+    fun lines(): List<String> {
+        var v: String = this.value_str()
+        return v.split("\n")
+    }
+
+    /// The caret row (0-based).
+    fun row(): Int {
+        var sig: Sig.Signal<Int> = this.cursor_row
+        return sig.get()
+    }
+
+    /// The caret column (0-based).
+    fun col(): Int {
+        var sig: Sig.Signal<Int> = this.cursor_col
+        return sig.get()
+    }
+
+    /// The index of the top visible row.
+    fun scroll_top(): Int {
+        var sig: Sig.Signal<Int> = this.scroll
+        return sig.get()
+    }
+
+    fun _set_row(v: Int) {
+        var sig: Sig.Signal<Int> = this.cursor_row
+        sig.set(v)
+    }
+
+    fun _set_col(v: Int) {
+        var sig: Sig.Signal<Int> = this.cursor_col
+        sig.set(v)
+    }
+
+    fun _set_scroll(v: Int) {
+        var sig: Sig.Signal<Int> = this.scroll
+        sig.set(v)
+    }
+
+    /// Rejoin the line list with "\n" and write it back to the value signal.
+    fun _set_lines(lines: List<String>) {
+        var joined: String = lines.join("\n")
+        var sig: Sig.Signal<String> = this.value
+        sig.set(joined)
+    }
+
+    // --- Editing ---
+
+    /// Insert `s` at the caret. A newline-free `s` splices into the current line
+    /// and advances the column; an `s` containing "\n" (e.g. a multi-line paste)
+    /// splits the current line, inserting the intermediate lines between the
+    /// caret's before/after halves, and leaves the caret at the end of the last
+    /// inserted segment.
+    fun insert(s: String) {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c > llen) { c = llen }
+        var before: String = line.slice(0, c)
+        var after: String = line.slice(c, llen)
+        var parts: List<String> = s.split("\n")
+        var np: Int = parts.length()
+        if (np <= 1) {
+            // No newline: splice into the current line.
+            var merged: String = before + s + after
+            lines.set(r, merged)
+            this._set_col(c + s.length())
+            this._set_lines(lines)
+            this._ensure_visible()
+            return
+        }
+        // Multi-line: rebuild the line list around the split.
+        var first: String = parts[0]
+        var last: String = parts[np - 1]
+        var out: List<String> = []
+        var i: Int = 0
+        while (i < r) {
+            out.push(lines[i])
+            i = i + 1
+        }
+        out.push(before + first)
+        var j: Int = 1
+        while (j < np - 1) {
+            out.push(parts[j])
+            j = j + 1
+        }
+        out.push(last + after)
+        var k: Int = r + 1
+        var n: Int = lines.length()
+        while (k < n) {
+            out.push(lines[k])
+            k = k + 1
+        }
+        this._set_row(r + (np - 1))
+        this._set_col(last.length())
+        this._set_lines(out)
+        this._ensure_visible()
+    }
+
+    /// Split the current line at the caret and move to the start of the new line.
+    fun newline() {
+        this.insert("\n")
+    }
+
+    /// Delete the character before the caret. At column 0 with a row above, join
+    /// this line onto the end of the previous line and place the caret at the
+    /// join point.
+    fun backspace() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c > llen) { c = llen }
+        if (c > 0) {
+            var merged: String = line.slice(0, c - 1) + line.slice(c, llen)
+            lines.set(r, merged)
+            this._set_col(c - 1)
+            this._set_lines(lines)
+            this._ensure_visible()
+            return
+        }
+        if (r > 0) {
+            var prev: String = lines[r - 1]
+            var newcol: Int = prev.length()
+            var merged: String = prev + line
+            var out: List<String> = []
+            var i: Int = 0
+            var n: Int = lines.length()
+            while (i < n) {
+                if (i == r - 1) {
+                    out.push(merged)
+                } else if (i == r) {
+                    // drop the joined-away line
+                } else {
+                    out.push(lines[i])
+                }
+                i = i + 1
+            }
+            this._set_row(r - 1)
+            this._set_col(newcol)
+            this._set_lines(out)
+            this._ensure_visible()
+        }
+    }
+
+    /// Delete the character at the caret. At the end of a line with a row below,
+    /// join the next line onto this one.
+    fun delete_forward() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c < llen) {
+            var merged: String = line.slice(0, c) + line.slice(c + 1, llen)
+            lines.set(r, merged)
+            this._set_lines(lines)
+            return
+        }
+        var n: Int = lines.length()
+        if (r < n - 1) {
+            var nextl: String = lines[r + 1]
+            var merged: String = line + nextl
+            var out: List<String> = []
+            var i: Int = 0
+            while (i < n) {
+                if (i == r) {
+                    out.push(merged)
+                } else if (i == r + 1) {
+                    // drop the joined-away line
+                } else {
+                    out.push(lines[i])
+                }
+                i = i + 1
+            }
+            this._set_lines(out)
+        }
+    }
+
+    // --- Movement ---
+
+    /// Clamp the caret column to the current line's length (used after a vertical
+    /// move onto a possibly shorter line).
+    fun _clamp_col() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c > llen) { this._set_col(llen) }
+    }
+
+    /// Move left one character, wrapping to the end of the previous line at
+    /// column 0.
+    fun left() {
+        var r: Int = this.row()
+        var c: Int = this.col()
+        if (c > 0) {
+            this._set_col(c - 1)
+        } else if (r > 0) {
+            var lines: List<String> = this.lines()
+            var prev: String = lines[r - 1]
+            this._set_row(r - 1)
+            this._set_col(prev.length())
+        }
+        this._ensure_visible()
+    }
+
+    /// Move right one character, wrapping to the start of the next line at the
+    /// end of a line.
+    fun right() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c < llen) {
+            this._set_col(c + 1)
+        } else if (r < lines.length() - 1) {
+            this._set_row(r + 1)
+            this._set_col(0)
+        }
+        this._ensure_visible()
+    }
+
+    /// Move up one row, keeping the column clamped to the target line's length.
+    fun up() {
+        var r: Int = this.row()
+        if (r > 0) {
+            this._set_row(r - 1)
+            this._clamp_col()
+        }
+        this._ensure_visible()
+    }
+
+    /// Move down one row, keeping the column clamped to the target line's length.
+    fun down() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        if (r < lines.length() - 1) {
+            this._set_row(r + 1)
+            this._clamp_col()
+        }
+        this._ensure_visible()
+    }
+
+    /// Move the caret to the start of the current line.
+    fun home() {
+        this._set_col(0)
+    }
+
+    /// Move the caret to the end of the current line.
+    fun end() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var line: String = lines[r]
+        this._set_col(line.length())
+    }
+
+    /// Scroll so the caret row sits inside the [scroll, scroll+height) window.
+    /// The offset is clamped non-negative — a negative offset would index element
+    /// 0 (BUGS #72) and pin the window to the top.
+    fun _ensure_visible() {
+        var r: Int = this.row()
+        var top: Int = this.scroll_top()
+        var h: Int = this.height
+        if (r < top) { top = r }
+        if (r >= top + h) { top = (r - h) + 1 }
+        if (top < 0) { top = 0 }
+        this._set_scroll(top)
+    }
+
+    // --- Rendering ---
+
+    /// Clip a line to `width` display columns (by character count; adequate for
+    /// the ASCII-dominant editor case). A non-positive width disables clipping.
+    fun _clip(line: String, w: Int): String {
+        if (w <= 0) { return line }
+        var len: Int = line.length()
+        if (len <= w) { return line }
+        return line.slice(0, w)
+    }
+
+    /// Emit the visible window of lines wrapped in a bordered box. When focused,
+    /// the caret row is drawn as an hstack of before/caret/after so the caret
+    /// cell (the character under the caret, or a blank at end-of-line) carries
+    /// `cursor_style`. When the value is empty and unfocused, the placeholder is
+    /// shown instead. Reads the value/row/col/scroll signals so the runtime
+    /// re-renders on any change.
+    fun view() {
+        var lines: List<String> = this.lines()
+        var n: Int = lines.length()
+        var top: Int = this.scroll_top()
+        var h: Int = this.height
+        var w: Int = this.width
+        var ts: St.Style = this.text_style
+        var ps: St.Style = this.placeholder_style
+        var cs: St.Style = this.cursor_style
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var foc: Bool = this.focused
+        var v: String = this.value_str()
+
+        // Placeholder: empty value, unfocused, and a placeholder is set.
+        if (v == "" and !foc and this.placeholder != "") {
+            var ph: String = this.placeholder
+            L.box(0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, fun () {
+                L.text_styled(ph, ps)
+            })
+            return
+        }
+
+        // Precompute the clipped visible lines so the render block references
+        // only locals (a nested builder lambda should not call back into `this`).
+        var clipped: List<String> = []
+        var idx: Int = top
+        var last: Int = top + h
+        while (idx < last and idx < n) {
+            var line: String = lines[idx]
+            clipped.push(this._clip(line, w))
+            idx = idx + 1
+        }
+        var m: Int = clipped.length()
+
+        L.box(0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, fun () {
+            L.vstack(fun () {
+                var i: Int = 0
+                while (i < m) {
+                    var absrow: Int = top + i
+                    var cl: String = clipped[i]
+                    if (foc and absrow == r) {
+                        var clen: Int = cl.length()
+                        var cc: Int = c
+                        if (cc > clen) { cc = clen }
+                        var before: String = cl.slice(0, cc)
+                        var caretch: String = " "
+                        if (cc < clen) { caretch = cl.slice(cc, cc + 1) }
+                        var after: String = ""
+                        if (cc + 1 <= clen) { after = cl.slice(cc + 1, clen) }
+                        L.hstack(fun () {
+                            if (before != "") { L.text_styled(before, ts) }
+                            L.text_styled(caretch, cs)
+                            if (after != "") { L.text_styled(after, ts) }
+                        })
+                    } else {
+                        L.text_styled(cl, ts)
+                    }
+                    i = i + 1
+                }
+            })
+        })
+    }
+
+    // --- Input ---
+
+    /// Handle a key or paste event. A paste is inserted verbatim (newlines split
+    /// lines); runes/space insert, enter splits, backspace/delete remove, and the
+    /// arrow / home / end keys move the caret. Ctrl/Alt-modified runes are ignored
+    /// so key chords are not typed as text. Returns true when the event was
+    /// consumed so the runtime can stop propagation.
+    fun handle(e: Ev.Event): Bool {
+        var p: String = e.paste
+        if (p != nil) {
+            this.insert(p)
+            return true
+        }
+        var k: Ev.KeyEvent = e.key
+        if (k != nil) {
+            var kind: Int = k.kind
+            if (kind == Ev.KEY_RUNE) {
+                var mods: Int = k.mods
+                if ((mods & Ev.MOD_CTRL) != 0 or (mods & Ev.MOD_ALT) != 0) {
+                    return false
+                }
+                this.insert(k.rune)
+                return true
+            }
+            if (kind == Ev.KEY_SPACE) { this.insert(" "); return true }
+            if (kind == Ev.KEY_ENTER) { this.newline(); return true }
+            if (kind == Ev.KEY_BACKSPACE) { this.backspace(); return true }
+            if (kind == Ev.KEY_DELETE) { this.delete_forward(); return true }
+            if (kind == Ev.KEY_LEFT) { this.left(); return true }
+            if (kind == Ev.KEY_RIGHT) { this.right(); return true }
+            if (kind == Ev.KEY_UP) { this.up(); return true }
+            if (kind == Ev.KEY_DOWN) { this.down(); return true }
+            if (kind == Ev.KEY_HOME) { this.home(); return true }
+            if (kind == Ev.KEY_END) { this.end(); return true }
+            return false
+        }
+        return false
+    }
+
+    /// Focus the field (shows the caret; suppresses the placeholder).
+    fun focus() {
+        this.focused = true
+    }
+
+    /// Blur the field.
+    fun blur() {
+        this.focused = false
+    }
+
+    /// Textareas are focusable — they consume typing and navigation keys.
+    fun focusable(): Bool {
+        return true
+    }
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A textarea with the given placeholder and visible `width`/`height`, owning
+/// fresh value/cursor/scroll signals (all seeded from Int locals — a bare `0`
+/// literal is a Float and would poison the index math, BUGS #72). The content is
+/// plain, the placeholder faint, and the caret a reverse-video cell.
+fun textarea(placeholder: String, width: Int, height: Int): TextArea {
+    var empty: String = ""
+    var value: Sig.Signal<String> = Sig.signal(empty)
+    var zr: Int = 0
+    var cursor_row: Sig.Signal<Int> = Sig.signal(zr)
+    var zc: Int = 0
+    var cursor_col: Sig.Signal<Int> = Sig.signal(zc)
+    var zs: Int = 0
+    var scroll: Sig.Signal<Int> = Sig.signal(zs)
+    var text_style: St.Style = St.style()
+    var placeholder_style: St.Style = St.style().faint()
+    var cursor_style: St.Style = St.style().reverse()
+    return TextArea(value, cursor_row, cursor_col, width, height, scroll,
+                    placeholder, text_style, placeholder_style, cursor_style,
+                    false)
+}
+
+/// A textarea with explicit styles, owning fresh value/cursor/scroll signals.
+fun textarea_styled(placeholder: String, width: Int, height: Int,
+                    text_style: St.Style, placeholder_style: St.Style,
+                    cursor_style: St.Style): TextArea {
+    var empty: String = ""
+    var value: Sig.Signal<String> = Sig.signal(empty)
+    var zr: Int = 0
+    var cursor_row: Sig.Signal<Int> = Sig.signal(zr)
+    var zc: Int = 0
+    var cursor_col: Sig.Signal<Int> = Sig.signal(zc)
+    var zs: Int = 0
+    var scroll: Sig.Signal<Int> = Sig.signal(zs)
+    return TextArea(value, cursor_row, cursor_col, width, height, scroll,
+                    placeholder, text_style, placeholder_style, cursor_style,
+                    false)
+}

@@ -1,0 +1,63 @@
+//! Shared helpers for Sumac golden-buffer tests.
+//!
+//! A "golden" test renders a widget/layout tree into a cell Buffer and asserts
+//! the resulting text grid, deterministically, with no real TTY and no event
+//! loop. These helpers turn a Buffer into a human-readable multi-line string
+//! (the golden form) and provide a one-shot "render a view() block into a grid"
+//! function.
+//!
+//! Integer discipline (BUGS #72): every coordinate, width, and loop counter is
+//! annotated `Int`. A `Float` used as a list index silently reads element 0, and
+//! Buffer is entirely index-addressed, so a stray Float would corrupt lookups.
+
+import "../src/buffer.sf" as Buf
+import "../src/layout.sf" as L
+
+// A single cell's rune, with the empty string (a blank cell, or the width-0
+// trailing half of a wide glyph) rendered as a space so rows stay aligned.
+fun _cell_rune(buf: Buf.Buffer, x: Int, y: Int): String {
+    var c: Buf.Cell = buf.get(x, y)
+    var r: String = c.rune
+    if (r == "") { return " " }
+    return r
+}
+
+/// Render the whole buffer's runes to a multi-line string: one line per row,
+/// joined with "\n". Each cell contributes its `.rune` ("" rendered as " ").
+/// This is the human-readable golden form a test compares against.
+fun dump_buffer(buf: Buf.Buffer): String {
+    return dump_region(buf, 0, 0, buf.w, buf.h)
+}
+
+/// Render a sub-rectangle [x, x+w) x [y, y+h) of the buffer to a multi-line
+/// string, one line per row. Off-grid cells read as blanks (Buffer.get is
+/// bounds-safe), so an over-large region simply pads with spaces.
+fun dump_region(buf: Buf.Buffer, x: Int, y: Int, w: Int, h: Int): String {
+    var out: String = ""
+    var row: Int = 0
+    while (row < h) {
+        if (row > 0) { out = out + "\n" }
+        var col: Int = 0
+        while (col < w) {
+            out = out + _cell_rune(buf, x + col, y + row)
+            col = col + 1
+        }
+        row = row + 1
+    }
+    return out
+}
+
+/// Render a view() block into a fresh Buffer(w, h): collect the LNodes the block
+/// appends, render each into the region (0, 0, w, h), and return the buffer.
+/// This is the one-shot "render a view to a grid" helper the golden tests use.
+fun render_tree(block: () => Nil, w: Int, h: Int): Buf.Buffer {
+    var nodes: List<L.LNode> = L._collect(block)
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    var i: Int = 0
+    var n: Int = nodes.length()
+    while (i < n) {
+        L.render_node(nodes[i], buf, 0, 0, w, h)
+        i = i + 1
+    }
+    return buf
+}

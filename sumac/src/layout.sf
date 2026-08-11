@@ -1,0 +1,748 @@
+//! Sumac layout engine — the Lip Gloss role: flexbox-style stacking, borders,
+//! padding, alignment, and overlays for the retained LNode tree.
+//!
+//! The tree is built by context-stack builders (copied from Turmeric's
+//! _el/_push_ctx/_pop_ctx): a builder pushes a fresh child-list context, runs
+//! its block (which appends child LNodes), pops, forms the node, and appends it
+//! to the parent context — or returns it as the root when the stack is empty.
+//!
+//! Layout is a two-phase, integer-first affair. `measure` computes a node's
+//! natural (grow-ignoring) size; `render_node` then lays children along the box
+//! main axis, distributing leftover space to `grow` children, positions them by
+//! `justify`/`align`, and recurses. Everything — coordinates, sizes, indices,
+//! border codes, flags — is annotated `Int`, because a `Float` used as a list
+//! index silently reads element 0 (BUGS #72) and this module is index-heavy.
+
+import "./buffer.sf" as Buf
+import "./style.sf" as St
+
+// =============================================================================
+// LNode + BoxProps
+// =============================================================================
+
+/// The retained layout node. Either a leaf run of styled text or a box that
+/// stacks children along an axis with borders/padding/alignment.
+enum LNode {
+    TextNode(content: String, style: St.Style),
+    BoxNode(props: BoxProps, children: List<LNode>)
+}
+
+/// Box configuration: direction, border style, padding, cross/main alignment,
+/// fixed-or-auto sizing, flex grow factor, fill/border style, and border title.
+///
+///   dir     : 0 = vertical (vstack), 1 = horizontal (hstack)
+///   border  : 0 none, 1 normal, 2 rounded, 3 thick, 4 double
+///   align   : cross-axis, 0 start 1 center 2 end
+///   justify : main-axis,  0 start 1 center 2 end 3 between
+///   width   : -1 auto/flex, >=0 fixed (content-box, borders/padding add on)
+///   height  : same convention as width
+///   grow    : flex factor, 0 = don't grow
+///   style   : bg fill + border color
+///   title   : optional border title, drawn in the top edge when it fits
+class BoxProps {
+    var dir: Int
+    var border: Int
+    var pad_t: Int
+    var pad_r: Int
+    var pad_b: Int
+    var pad_l: Int
+    var align: Int
+    var justify: Int
+    var width: Int
+    var height: Int
+    var grow: Int
+    var style: St.Style
+    var title: String
+
+    fun init(dir: Int, border: Int, pad_t: Int, pad_r: Int, pad_b: Int,
+             pad_l: Int, align: Int, justify: Int, width: Int, height: Int,
+             grow: Int, style: St.Style, title: String) {
+        this.dir = dir
+        this.border = border
+        this.pad_t = pad_t
+        this.pad_r = pad_r
+        this.pad_b = pad_b
+        this.pad_l = pad_l
+        this.align = align
+        this.justify = justify
+        this.width = width
+        this.height = height
+        this.grow = grow
+        this.style = style
+        this.title = title
+    }
+}
+
+/// A fresh BoxProps with sensible defaults: vertical, no border, no padding,
+/// start-aligned, auto-sized, non-growing, default style, no title.
+fun _default_props(): BoxProps {
+    return BoxProps(0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, St.style(), "")
+}
+
+// =============================================================================
+// Context-stack builders (mirrors Turmeric element.sf)
+// =============================================================================
+
+class LayoutCtx {
+    var children: List<LNode>
+    fun init() {
+        this.children = []
+    }
+    fun add(node: LNode) {
+        this.children.push(node)
+    }
+}
+
+var _ctx_stack: List<LayoutCtx> = []
+
+fun _push_ctx(): LayoutCtx {
+    var ctx: LayoutCtx = LayoutCtx()
+    _ctx_stack.push(ctx)
+    return ctx
+}
+
+fun _pop_ctx(): LayoutCtx {
+    return _ctx_stack.pop()
+}
+
+fun _current_ctx(): LayoutCtx {
+    return _ctx_stack[_ctx_stack.length() - 1]
+}
+
+// Append a formed node to the current parent context, if any. Returns the node
+// so builders can also hand it back as a root.
+fun _emit(node: LNode): LNode {
+    if (_ctx_stack.length() > 0) {
+        var ctx: LayoutCtx = _current_ctx()
+        ctx.add(node)
+    }
+    return node
+}
+
+/// A plain text run in the default style.
+fun text(content: String): LNode {
+    return _emit(LNode.TextNode(content, St.style()))
+}
+
+/// A text run with an explicit style.
+fun text_styled(content: String, st: St.Style): LNode {
+    return _emit(LNode.TextNode(content, st))
+}
+
+// Run a builder block inside a fresh child context and return the collected
+// children, forming them into a BoxNode with the given props.
+fun _box_with(props: BoxProps, block: () => Nil): LNode {
+    _push_ctx()
+    block()
+    var ctx: LayoutCtx = _pop_ctx()
+    var node: LNode = LNode.BoxNode(props, ctx.children)
+    return _emit(node)
+}
+
+/// A vertical stack (children top to bottom).
+fun vstack(block: () => Nil): LNode {
+    var props: BoxProps = _default_props()
+    props.dir = 0
+    return _box_with(props, block)
+}
+
+/// A horizontal stack (children left to right).
+fun hstack(block: () => Nil): LNode {
+    var props: BoxProps = _default_props()
+    props.dir = 1
+    return _box_with(props, block)
+}
+
+/// A flexible empty box that eats leftover main-axis space (grow = 1). Used to
+/// push siblings apart or to fill.
+fun spacer(): LNode {
+    var props: BoxProps = _default_props()
+    props.grow = 1
+    return _emit(LNode.BoxNode(props, []))
+}
+
+/// The general box builder. All BoxProps fields are optional with defaults, so
+/// `box(block=fun(){...})` and `box(border=2, title="Hi", block=fun(){...})`
+/// both work. `border`: 0 none/1 normal/2 rounded/3 thick/4 double.
+fun box(dir: Int = 0, border: Int = 0, pad_t: Int = 0, pad_r: Int = 0,
+        pad_b: Int = 0, pad_l: Int = 0, align: Int = 0, justify: Int = 0,
+        width: Int = -1, height: Int = -1, grow: Int = 0,
+        block: () => Nil = fun () => nil): LNode {
+    var props: BoxProps = BoxProps(dir, border, pad_t, pad_r, pad_b, pad_l,
+        align, justify, width, height, grow, St.style(), "")
+    return _box_with(props, block)
+}
+
+/// A box with an explicit style (bg fill + border color) and a title.
+fun box_styled(dir: Int, border: Int, pad_t: Int, pad_r: Int, pad_b: Int,
+               pad_l: Int, align: Int, justify: Int, width: Int, height: Int,
+               grow: Int, st: St.Style, title: String,
+               block: () => Nil): LNode {
+    var props: BoxProps = BoxProps(dir, border, pad_t, pad_r, pad_b, pad_l,
+        align, justify, width, height, grow, st, title)
+    return _box_with(props, block)
+}
+
+/// Convenience for a padded, uniform-padding box.
+fun padding(all: Int, block: () => Nil): LNode {
+    var props: BoxProps = _default_props()
+    props.pad_t = all
+    props.pad_r = all
+    props.pad_b = all
+    props.pad_l = all
+    return _box_with(props, block)
+}
+
+/// Push a fresh root context. The runtime uses this + _collect to build a tree
+/// without a surrounding builder.
+fun _push_root(): LayoutCtx {
+    return _push_ctx()
+}
+
+/// Run `block` in a fresh context and return the LNodes it appended. The runtime
+/// wraps a user view() this way to obtain the root child list.
+fun _collect(block: () => Nil): List<LNode> {
+    _push_ctx()
+    block()
+    var ctx: LayoutCtx = _pop_ctx()
+    return ctx.children
+}
+
+// =============================================================================
+// Border glyph sets
+// =============================================================================
+//
+// Index order per set: [top-left, top-right, bottom-left, bottom-right,
+// horizontal, vertical]. border code 0 means "no border" and is handled by the
+// caller (never asks for a glyph set).
+
+fun _border_glyphs(border: Int): List<String> {
+    if (border == 2) {
+        return ["╭", "╮", "╰", "╯", "─", "│"]   // rounded
+    }
+    if (border == 3) {
+        return ["┏", "┓", "┗", "┛", "━", "┃"]   // thick
+    }
+    if (border == 4) {
+        return ["╔", "╗", "╚", "╝", "═", "║"]   // double
+    }
+    // 1 (normal) or any fallback
+    return ["┌", "┐", "└", "┘", "─", "│"]
+}
+
+// =============================================================================
+// Measure pass
+// =============================================================================
+//
+// measure(node) returns [w, h]: the node's natural size in cells, ignoring grow.
+// Text uses its own content (longest line x line count). measure_w takes an
+// available-width hint so text can wrap when measured inside a constrained box.
+// Simplifications (documented): text measurement without a width hint does NOT
+// wrap — it reports the longest raw line. Wrapping only happens when a concrete
+// avail_w is supplied (measure_w / render).
+
+// Split a string on "\n" into physical lines.
+fun _split_lines(s: String): List<String> {
+    return s.split("\n")
+}
+
+// Word-wrap one logical line into pieces no wider than `avail` display columns.
+// Breaks on spaces; a single word longer than `avail` is hard-split by runes.
+// `avail <= 0` disables wrapping (returns the line as-is).
+fun _wrap_line(line: String, avail: Int): List<String> {
+    var out: List<String> = []
+    if (avail <= 0) {
+        out.push(line)
+        return out
+    }
+    var words: List<String> = line.split(" ")
+    var cur: String = ""
+    var cur_w: Int = 0
+    var wi: Int = 0
+    var nwords: Int = words.length()
+    while (wi < nwords) {
+        var word: String = words[wi]
+        var ww: Int = Buf.str_width(word)
+        // A word longer than the line: hard-split it by runes.
+        if (ww > avail) {
+            if (cur_w > 0) {
+                out.push(cur)
+                cur = ""
+                cur_w = 0
+            }
+            var pieces: List<String> = _hard_split(word, avail)
+            var pi: Int = 0
+            var np: Int = pieces.length()
+            while (pi < np - 1) {
+                out.push(pieces[pi])
+                pi = pi + 1
+            }
+            // Last piece stays as the running line to allow following words.
+            if (np > 0) {
+                cur = pieces[np - 1]
+                cur_w = Buf.str_width(cur)
+            }
+            wi = wi + 1
+            continue
+        }
+        var add_w: Int = ww
+        if (cur_w > 0) { add_w = ww + 1 }   // + separating space
+        if (cur_w + add_w > avail) {
+            out.push(cur)
+            cur = word
+            cur_w = ww
+        } else {
+            if (cur_w > 0) {
+                cur = cur + " " + word
+                cur_w = cur_w + 1 + ww
+            } else {
+                cur = word
+                cur_w = ww
+            }
+        }
+        wi = wi + 1
+    }
+    out.push(cur)
+    return out
+}
+
+// Hard-split a string into pieces each at most `avail` columns wide, breaking
+// between runes. Used for words that individually exceed the line width.
+fun _hard_split(s: String, avail: Int): List<String> {
+    var out: List<String> = []
+    var runes: List<String> = Buf._runes(s)
+    var cur: String = ""
+    var cur_w: Int = 0
+    var i: Int = 0
+    var n: Int = runes.length()
+    while (i < n) {
+        var r: String = runes[i]
+        var rw: Int = Buf.rune_width(r)
+        if (cur_w + rw > avail and cur_w > 0) {
+            out.push(cur)
+            cur = ""
+            cur_w = 0
+        }
+        cur = cur + r
+        cur_w = cur_w + rw
+        i = i + 1
+    }
+    out.push(cur)
+    return out
+}
+
+// Wrap whole content (multi physical line) at `avail`, returning display lines.
+fun _wrap_content(content: String, avail: Int): List<String> {
+    var out: List<String> = []
+    var phys: List<String> = _split_lines(content)
+    var i: Int = 0
+    var n: Int = phys.length()
+    while (i < n) {
+        var wrapped: List<String> = _wrap_line(phys[i], avail)
+        var j: Int = 0
+        var m: Int = wrapped.length()
+        while (j < m) {
+            out.push(wrapped[j])
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// The extra columns/rows a box adds around its content: borders (1 per bordered
+// side) + padding. Returns [horiz_extra, vert_extra].
+fun _box_chrome(props: BoxProps): List<Int> {
+    var bt: Int = 0
+    if (props.border != 0) { bt = 1 }
+    var h_extra: Int = props.pad_l + props.pad_r + bt + bt
+    var v_extra: Int = props.pad_t + props.pad_b + bt + bt
+    return [h_extra, v_extra]
+}
+
+/// Natural size [w, h] of a node ignoring grow and without a width constraint.
+fun measure(node: LNode): List<Int> {
+    return measure_w(node, -1)
+}
+
+/// Natural size [w, h] of a node, given an available content width hint
+/// `avail_w` (-1 = unconstrained). Text wraps to `avail_w` when positive.
+fun measure_w(node: LNode, avail_w: Int): List<Int> {
+    return match (node) {
+        TextNode(content, style) => {
+            var lines: List<String> = _wrap_content(content, avail_w)
+            var maxw: Int = 0
+            var i: Int = 0
+            var n: Int = lines.length()
+            while (i < n) {
+                var lw: Int = Buf.str_width(lines[i])
+                if (lw > maxw) { maxw = lw }
+                i = i + 1
+            }
+            [maxw, n]
+        }
+        BoxNode(props, children) => {
+            var p: BoxProps = props
+            var chrome: List<Int> = _box_chrome(p)
+            var h_extra: Int = chrome[0]
+            var v_extra: Int = chrome[1]
+
+            // Inner available width for measuring children (if we have a hint).
+            var inner_avail: Int = -1
+            if (avail_w >= 0) {
+                inner_avail = avail_w - h_extra
+                if (inner_avail < 0) { inner_avail = 0 }
+            }
+            if (p.width >= 0) {
+                inner_avail = p.width
+            }
+
+            var main_sum: Int = 0    // along dir
+            var cross_max: Int = 0   // perpendicular
+            var ci: Int = 0
+            var nc: Int = children.length()
+            while (ci < nc) {
+                var childw: Int = inner_avail
+                if (p.dir == 1) { childw = -1 }   // horizontal: each child free-width
+                var cm: List<Int> = measure_w(children[ci], childw)
+                var cw: Int = cm[0]
+                var ch: Int = cm[1]
+                if (p.dir == 0) {
+                    // vertical: main = height (sum), cross = width (max)
+                    main_sum = main_sum + ch
+                    if (cw > cross_max) { cross_max = cw }
+                } else {
+                    // horizontal: main = width (sum), cross = height (max)
+                    main_sum = main_sum + cw
+                    if (ch > cross_max) { cross_max = ch }
+                }
+                ci = ci + 1
+            }
+
+            var inner_w: Int = 0
+            var inner_h: Int = 0
+            if (p.dir == 0) {
+                inner_w = cross_max
+                inner_h = main_sum
+            } else {
+                inner_w = main_sum
+                inner_h = cross_max
+            }
+
+            var total_w: Int = inner_w + h_extra
+            var total_h: Int = inner_h + v_extra
+            if (p.width >= 0) { total_w = p.width + h_extra }
+            if (p.height >= 0) { total_h = p.height + v_extra }
+            [total_w, total_h]
+        }
+    }
+}
+
+// Convenience accessors so calling code reads clearly.
+fun _mw(size: List<Int>): Int { return size[0] }
+fun _mh(size: List<Int>): Int { return size[1] }
+
+// =============================================================================
+// Paint helpers
+// =============================================================================
+
+// Fill a rectangle of the buffer with blanks in the given style (bg fill).
+fun _fill_bg(buf: Buf.Buffer, x: Int, y: Int, w: Int, h: Int, st: St.Style) {
+    if (w <= 0 or h <= 0) { return }
+    var cell: Buf.Cell = Buf.Cell(" ", st, 1)
+    buf.fill(x, y, w, h, cell)
+}
+
+// Draw a border rectangle [x,y] .. [x+w-1, y+h-1] using the box's glyph set and
+// border-color style, and render the title in the top edge if it fits.
+fun _draw_border(buf: Buf.Buffer, x: Int, y: Int, w: Int, h: Int,
+                 border: Int, st: St.Style, title: String) {
+    if (w < 2 or h < 2) { return }
+    var g: List<String> = _border_glyphs(border)
+    var tl: String = g[0]
+    var tr: String = g[1]
+    var bl: String = g[2]
+    var br: String = g[3]
+    var horiz: String = g[4]
+    var vert: String = g[5]
+
+    var right: Int = x + w - 1
+    var bottom: Int = y + h - 1
+
+    // Corners.
+    buf.set(x, y, Buf.Cell(tl, st, 1))
+    buf.set(right, y, Buf.Cell(tr, st, 1))
+    buf.set(x, bottom, Buf.Cell(bl, st, 1))
+    buf.set(right, bottom, Buf.Cell(br, st, 1))
+
+    // Top + bottom edges.
+    var cx: Int = x + 1
+    while (cx < right) {
+        buf.set(cx, y, Buf.Cell(horiz, st, 1))
+        buf.set(cx, bottom, Buf.Cell(horiz, st, 1))
+        cx = cx + 1
+    }
+    // Left + right edges.
+    var cy: Int = y + 1
+    while (cy < bottom) {
+        buf.set(x, cy, Buf.Cell(vert, st, 1))
+        buf.set(right, cy, Buf.Cell(vert, st, 1))
+        cy = cy + 1
+    }
+
+    // Title, centered-ish in the top edge, framed by a space each side if room.
+    if (title != "") {
+        var inner: Int = w - 2
+        var tw: Int = Buf.str_width(title)
+        if (tw > 0 and tw <= inner) {
+            var start: Int = x + 1 + (inner - tw) / 2
+            buf.put_str(start, y, title, st)
+        }
+    }
+}
+
+// =============================================================================
+// Render (layout + paint)
+// =============================================================================
+
+// Paint a text node clipped/wrapped into the region.
+fun _render_text(content: String, st: St.Style, buf: Buf.Buffer,
+                 x: Int, y: Int, w: Int, h: Int) {
+    if (w <= 0 or h <= 0) { return }
+    var lines: List<String> = _wrap_content(content, w)
+    var i: Int = 0
+    var n: Int = lines.length()
+    while (i < n and i < h) {
+        buf.put_str(x, y + i, lines[i], st)
+        i = i + 1
+    }
+}
+
+/// Layout and paint `node` into the region (x, y, w, h) of `buf`.
+fun render_node(node: LNode, buf: Buf.Buffer, x: Int, y: Int, w: Int, h: Int) {
+    if (w <= 0 or h <= 0) { return }
+    match (node) {
+        TextNode(content, style) => {
+            _render_text(content, style, buf, x, y, w, h)
+        }
+        BoxNode(props, children) => {
+            _render_box(props, children, buf, x, y, w, h)
+        }
+    }
+}
+
+// The core box layout: bg fill, border, padding, then main-axis stacking with
+// grow distribution and justify/align positioning.
+fun _render_box(props: BoxProps, children: List<LNode>, buf: Buf.Buffer,
+                x: Int, y: Int, w: Int, h: Int) {
+    var p: BoxProps = props
+
+    // 1) Background fill for the whole box region (only if a non-default bg or
+    // any styling is present — but a plain fill of default style is harmless).
+    _fill_bg(buf, x, y, w, h, p.style)
+
+    // 2) Border shrinks the inner region by 1 on each side.
+    var bt: Int = 0
+    if (p.border != 0) { bt = 1 }
+    if (p.border != 0) {
+        _draw_border(buf, x, y, w, h, p.border, p.style, p.title)
+    }
+
+    // 3) Padding + border give the content region.
+    var ix: Int = x + bt + p.pad_l
+    var iy: Int = y + bt + p.pad_t
+    var iw: Int = w - bt - bt - p.pad_l - p.pad_r
+    var ih: Int = h - bt - bt - p.pad_t - p.pad_b
+    if (iw < 0) { iw = 0 }
+    if (ih < 0) { ih = 0 }
+    if (iw == 0 or ih == 0) { return }
+
+    var nc: Int = children.length()
+    if (nc == 0) { return }
+
+    // Main-axis extent and cross-axis extent of the content region.
+    var main_avail: Int = ih
+    var cross_avail: Int = iw
+    if (p.dir == 1) {
+        main_avail = iw
+        cross_avail = ih
+    }
+
+    // 4) Measure each child's natural main-axis size, and note grow factors.
+    var main_sizes: List<Int> = []
+    var grows: List<Int> = []
+    var total_natural: Int = 0
+    var total_grow: Int = 0
+    var i: Int = 0
+    while (i < nc) {
+        // For a vertical box, constrain child width to cross_avail so wrapping
+        // measures against the real column budget. For horizontal, leave free.
+        var hint: Int = cross_avail
+        if (p.dir == 1) { hint = -1 }
+        var sz: List<Int> = measure_w(children[i], hint)
+        var cm: Int = sz[1]           // vertical main = height
+        if (p.dir == 1) { cm = sz[0] } // horizontal main = width
+        main_sizes.push(cm)
+        total_natural = total_natural + cm
+        var gf: Int = _child_grow(children[i])
+        grows.push(gf)
+        total_grow = total_grow + gf
+        i = i + 1
+    }
+
+    // 5) Distribute leftover main-axis space to grow children in proportion.
+    var leftover: Int = main_avail - total_natural
+    if (leftover < 0) { leftover = 0 }
+    var final_main: List<Int> = []
+    if (total_grow > 0 and leftover > 0) {
+        var given: Int = 0
+        var gi: Int = 0
+        while (gi < nc) {
+            var base: Int = main_sizes[gi]
+            var gf2: Int = grows[gi]
+            var extra: Int = 0
+            if (gf2 > 0) {
+                if (gi == nc - 1) {
+                    // Last grow-ish child soaks up the rounding remainder — but
+                    // only if it actually grows; otherwise no extra.
+                    extra = leftover - given
+                } else {
+                    extra = (leftover * gf2) / total_grow
+                }
+                given = given + extra
+            }
+            final_main.push(base + extra)
+            gi = gi + 1
+        }
+    } else {
+        var k: Int = 0
+        while (k < nc) {
+            final_main.push(main_sizes[k])
+            k = k + 1
+        }
+    }
+
+    // 6) Compute the starting main offset from justify when there's slack and
+    // nothing grew (grow already consumed the slack).
+    var used_main: Int = 0
+    var u: Int = 0
+    while (u < nc) {
+        used_main = used_main + final_main[u]
+        u = u + 1
+    }
+    var slack: Int = main_avail - used_main
+    if (slack < 0) { slack = 0 }
+
+    var start_off: Int = 0
+    var between_gap: Int = 0
+    if (total_grow == 0) {
+        if (p.justify == 1) {          // center
+            start_off = slack / 2
+        } else if (p.justify == 2) {   // end
+            start_off = slack
+        } else if (p.justify == 3) {   // between
+            if (nc > 1) {
+                between_gap = slack / (nc - 1)
+            }
+        }
+    }
+
+    // 7) Place each child.
+    var cursor: Int = start_off
+    var ci: Int = 0
+    while (ci < nc) {
+        var child_main: Int = final_main[ci]
+
+        // Cross-axis size + offset: measure the child's natural cross size,
+        // then align within cross_avail. A child fills cross if it has no
+        // natural cap (we cap at cross_avail).
+        var hint2: Int = cross_avail
+        if (p.dir == 1) { hint2 = -1 }
+        var csz: List<Int> = measure_w(children[ci], hint2)
+        var natural_cross: Int = csz[0]      // vertical cross = width
+        if (p.dir == 1) { natural_cross = csz[1] } // horizontal cross = height
+
+        var child_cross: Int = natural_cross
+        if (child_cross > cross_avail) { child_cross = cross_avail }
+        // Grow children and boxes generally want to fill the cross axis.
+        if (_child_fills_cross(children[ci])) {
+            child_cross = cross_avail
+        }
+
+        var cross_off: Int = 0
+        if (p.align == 1) {            // center
+            cross_off = (cross_avail - child_cross) / 2
+        } else if (p.align == 2) {     // end
+            cross_off = cross_avail - child_cross
+        }
+        if (cross_off < 0) { cross_off = 0 }
+
+        // Translate (main, cross) back to (x, y, w, h).
+        var cxp: Int = 0
+        var cyp: Int = 0
+        var cwp: Int = 0
+        var chp: Int = 0
+        if (p.dir == 0) {
+            // vertical: main is y/height, cross is x/width
+            cxp = ix + cross_off
+            cyp = iy + cursor
+            cwp = child_cross
+            chp = child_main
+        } else {
+            // horizontal: main is x/width, cross is y/height
+            cxp = ix + cursor
+            cyp = iy + cross_off
+            cwp = child_main
+            chp = child_cross
+        }
+        render_node(children[ci], buf, cxp, cyp, cwp, chp)
+
+        cursor = cursor + child_main + between_gap
+        ci = ci + 1
+    }
+}
+
+// Grow factor of a child node (0 for text).
+fun _child_grow(node: LNode): Int {
+    return match (node) {
+        TextNode(content, style) => 0
+        BoxNode(props, children) => {
+            var p: BoxProps = props
+            p.grow
+        }
+    }
+}
+
+// Whether a child should fill the cross axis. Boxes fill (so borders/bg stretch
+// nicely); text stays at its natural width so alignment can position it.
+fun _child_fills_cross(node: LNode): Bool {
+    return match (node) {
+        TextNode(content, style) => false
+        BoxNode(props, children) => {
+            var p: BoxProps = props
+            // A box with a fixed width should not be stretched.
+            var fills: Bool = true
+            if (p.width >= 0) { fills = false }
+            fills
+        }
+    }
+}
+
+// =============================================================================
+// Overlay / placement
+// =============================================================================
+
+/// Paint `node` over `buf` at the absolute region (x, y, w, h) without clearing
+/// the rest of the buffer — for modals, popovers, tooltips.
+fun place(node: LNode, buf: Buf.Buffer, x: Int, y: Int, w: Int, h: Int) {
+    render_node(node, buf, x, y, w, h)
+}
+
+/// Center a w x h region in `buf` and render `node` into it as an overlay.
+fun place_centered(node: LNode, buf: Buf.Buffer, w: Int, h: Int) {
+    var x: Int = (buf.w - w) / 2
+    var y: Int = (buf.h - h) / 2
+    if (x < 0) { x = 0 }
+    if (y < 0) { y = 0 }
+    render_node(node, buf, x, y, w, h)
+}

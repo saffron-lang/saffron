@@ -1,0 +1,189 @@
+// Verify sumac's list widget: initial selection/offset, move_down/up scrolling
+// to keep the cursor visible, page moves, home/end, key + mouse-wheel handling,
+// the optional filter, and that view() renders the visible window with the
+// marker on the selected row.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/list.sf" as List
+import "@test" as T
+import "io" as IO
+
+// Render an LNode tree into a fresh buffer and return the row at `y` as a string
+// (blanks preserved as spaces) so we can search for item text / the marker.
+fun render_row(node: L.LNode, w: Int, h: Int, y: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var x: Int = 0
+    while (x < w) {
+        var c: Buf.Cell = buf.get(x, y)
+        var r: String = c.rune
+        if (r == "") { r = " " }
+        out = out + r
+        x = x + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // 8 items, viewport height 3.
+    var data: List<String> = ["a0", "b1", "c2", "d3", "e4", "f5", "g6", "h7"]
+    var zero: Int = 0
+    var items: Sig.Signal<List<String>> = Sig.signal(data)
+    var selected: Sig.Signal<Int> = Sig.signal(zero)
+    var three: Int = 3
+    var lst: List.List_ = List.list_widget(items, selected, three)
+
+    // ---------------------------------------------------------------------
+    // initial state
+    // ---------------------------------------------------------------------
+    T.assert_eq(lst.count(), 8, "eight items")
+    T.assert_eq(lst.selected_index(), 0, "selection starts at 0")
+    T.assert_eq(lst.offset_index(), 0, "offset starts at 0")
+
+    // ---------------------------------------------------------------------
+    // move_down 3x: selected 0 -> 3; window is [0,3), so selecting 3 scrolls
+    // the offset to 1 (3 - 3 + 1) to keep 3 visible.
+    // ---------------------------------------------------------------------
+    lst.move_down()
+    T.assert_eq(lst.selected_index(), 1, "move_down: 0 -> 1")
+    T.assert_eq(lst.offset_index(), 0, "offset still 0 (1 visible in [0,3))")
+    lst.move_down()
+    T.assert_eq(lst.selected_index(), 2, "move_down: 1 -> 2")
+    T.assert_eq(lst.offset_index(), 0, "offset still 0 (2 visible in [0,3))")
+    lst.move_down()
+    T.assert_eq(lst.selected_index(), 3, "move_down: 2 -> 3")
+    T.assert_eq(lst.offset_index(), 1, "offset scrolled to 1 to keep 3 visible")
+
+    // ---------------------------------------------------------------------
+    // move_up back: selected 3 -> 2; 2 is still >= offset(1), so no scroll.
+    // ---------------------------------------------------------------------
+    lst.move_up()
+    T.assert_eq(lst.selected_index(), 2, "move_up: 3 -> 2")
+    T.assert_eq(lst.offset_index(), 1, "offset stays 1 (2 still visible)")
+    // move_up to 1 == offset boundary, still visible, no scroll.
+    lst.move_up()
+    T.assert_eq(lst.selected_index(), 1, "move_up: 2 -> 1")
+    T.assert_eq(lst.offset_index(), 1, "offset stays 1 (1 == offset)")
+    // move_up to 0 scrolls offset back to 0.
+    lst.move_up()
+    T.assert_eq(lst.selected_index(), 0, "move_up: 1 -> 0")
+    T.assert_eq(lst.offset_index(), 0, "offset scrolled back to 0")
+
+    // move_up at the top is clamped (stays 0).
+    lst.move_up()
+    T.assert_eq(lst.selected_index(), 0, "move_up at top clamps to 0")
+    T.assert_eq(lst.offset_index(), 0, "offset stays 0")
+
+    // ---------------------------------------------------------------------
+    // end: selected -> last (7), offset shows the last window (7 - 3 + 1 = 5).
+    // ---------------------------------------------------------------------
+    lst.select_last()
+    T.assert_eq(lst.selected_index(), 7, "end: selects last item 7")
+    T.assert_eq(lst.offset_index(), 5, "end: offset shows last window (5)")
+
+    // move_down at the bottom is clamped.
+    lst.move_down()
+    T.assert_eq(lst.selected_index(), 7, "move_down at bottom clamps to 7")
+    T.assert_eq(lst.offset_index(), 5, "offset stays 5")
+
+    // ---------------------------------------------------------------------
+    // home: back to 0, offset 0.
+    // ---------------------------------------------------------------------
+    lst.select_first()
+    T.assert_eq(lst.selected_index(), 0, "home: selects 0")
+    T.assert_eq(lst.offset_index(), 0, "home: offset 0")
+
+    // ---------------------------------------------------------------------
+    // page_down / page_up by height (3).
+    // ---------------------------------------------------------------------
+    lst.page_down()
+    T.assert_eq(lst.selected_index(), 3, "page_down: 0 -> 3")
+    lst.page_down()
+    T.assert_eq(lst.selected_index(), 6, "page_down: 3 -> 6")
+    lst.page_up()
+    T.assert_eq(lst.selected_index(), 3, "page_up: 6 -> 3")
+
+    // ---------------------------------------------------------------------
+    // handle: a synthetic "down" key moves and is consumed.
+    // ---------------------------------------------------------------------
+    lst.select_first()
+    var down_ev: Ev.Event = Ev.key_event(Ev.KEY_DOWN, "", Ev.MOD_NONE)
+    var consumed: Bool = lst.handle(down_ev)
+    T.assert(consumed, "down key consumed")
+    T.assert_eq(lst.selected_index(), 1, "down key moved 0 -> 1")
+
+    // handle: "j" also moves down.
+    var j_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "j", Ev.MOD_NONE)
+    T.assert(lst.handle(j_ev), "j key consumed")
+    T.assert_eq(lst.selected_index(), 2, "j key moved 1 -> 2")
+
+    // handle: "k" moves up.
+    var k_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "k", Ev.MOD_NONE)
+    T.assert(lst.handle(k_ev), "k key consumed")
+    T.assert_eq(lst.selected_index(), 1, "k key moved 2 -> 1")
+
+    // handle: an unrelated key is not consumed.
+    var x_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "x", Ev.MOD_NONE)
+    T.assert(!lst.handle(x_ev), "unrelated key 'x' not consumed")
+
+    // handle: mouse wheel down (kind 4) moves down; wheel up (kind 3) moves up.
+    lst.select_first()
+    var wheel_down: Ev.Event = Ev.mouse_event(4, 0, 0, 0, Ev.MOD_NONE)
+    T.assert(lst.handle(wheel_down), "wheel down consumed")
+    T.assert_eq(lst.selected_index(), 1, "wheel down moved 0 -> 1")
+    var wheel_up: Ev.Event = Ev.mouse_event(3, 0, 0, 0, Ev.MOD_NONE)
+    T.assert(lst.handle(wheel_up), "wheel up consumed")
+    T.assert_eq(lst.selected_index(), 0, "wheel up moved 1 -> 0")
+
+    // ---------------------------------------------------------------------
+    // view(): the visible window renders with the marker on the selected row.
+    // Selection 0, offset 0, height 3 -> rows a0/b1/c2, marker on a0.
+    // ---------------------------------------------------------------------
+    lst.select_first()
+    var tree: List<L.LNode> = L._collect(fun () {
+        lst.view()
+    })
+    T.assert_eq(tree.length(), 1, "view emits one root vstack")
+    var row0: String = render_row(tree[0], 30, 3, 0)
+    var row1: String = render_row(tree[0], 30, 3, 1)
+    var row2: String = render_row(tree[0], 30, 3, 2)
+    T.assert(row0.contains("a0"), "row 0 shows item a0")
+    T.assert(row1.contains("b1"), "row 1 shows item b1")
+    T.assert(row2.contains("c2"), "row 2 shows item c2")
+    // The selected row (0) carries the "▸" marker; the others do not.
+    T.assert(row0.contains("▸"), "selected row shows the ▸ marker")
+    T.assert(!row1.contains("▸"), "non-selected row has no marker")
+    IO.println("list row0: [" + row0 + "]")
+
+    // Move selection to 1 and re-render: marker follows to row 1.
+    lst.move_down()
+    var tree2: List<L.LNode> = L._collect(fun () {
+        lst.view()
+    })
+    var r0b: String = render_row(tree2[0], 30, 3, 0)
+    var r1b: String = render_row(tree2[0], 30, 3, 1)
+    T.assert(!r0b.contains("▸"), "after move: row 0 no marker")
+    T.assert(r1b.contains("▸"), "after move: marker on row 1 (b1)")
+
+    // ---------------------------------------------------------------------
+    // filter: restrict to items containing "1"/"2"... use a substring present
+    // in a subset. Filtering by "5" leaves only "f5".
+    // ---------------------------------------------------------------------
+    var sel2: Sig.Signal<Int> = Sig.signal(zero)
+    var fl: List.List_ = List.list_widget(items, sel2, three)
+    T.assert_eq(fl.count(), 8, "unfiltered count is 8")
+    var f5: String = "5"
+    fl.filter.set(f5)
+    T.assert_eq(fl.count(), 1, "filter '5' leaves 1 item")
+    var vis: List<String> = fl.visible_items()
+    T.assert_eq(vis[0], "f5", "filtered item is f5")
+
+    T.summary()
+}
+
+main()

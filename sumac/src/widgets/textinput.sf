@@ -1,0 +1,327 @@
+//! Sumac textinput widget — a single-line editable text field (à la Bubbles'
+//! `textinput`).
+//!
+//! A `TextInput` owns a `value` string signal and a `cursor` signal (a 0-based
+//! CHARACTER index in [0, len]); the reactive runtime repaints when either
+//! changes. Editing operations (`insert`, `backspace`, `delete_fwd`) rewrite the
+//! value with string slices and move the cursor; the arrow/home/end movers clamp
+//! the cursor into range. `view()` renders a horizontally-scrolled window of the
+//! value so the cursor stays visible even when the text is wider than the field,
+//! drawing the caret cell in `cursor_style` when focused.
+//!
+//! Everything index-shaped — the cursor, the string length, the scroll offset,
+//! every loop counter — is annotated `Int`. A `Float` used as a string/list
+//! index silently reads element 0 (BUGS #72), which for a text field would pin
+//! the cursor to the start forever, so the index math stays strictly integer.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+
+// =============================================================================
+// TextInput
+// =============================================================================
+
+/// A single-line editable text field. `value` is the current text (a signal),
+/// `cursor` is the 0-based character index of the insertion point (a signal),
+/// `placeholder` is shown when the field is empty and unfocused, `width` is the
+/// visible column budget (the value scrolls horizontally when longer), and the
+/// three styles color the text, the placeholder, and the caret cell. `focused`
+/// toggles the caret and placeholder behavior.
+class TextInput {
+    var value: Sig.Signal<String>
+    var cursor: Sig.Signal<Int>
+    var placeholder: String
+    var width: Int
+    var text_style: St.Style
+    var placeholder_style: St.Style
+    var cursor_style: St.Style
+    var focused: Bool
+
+    fun init(value: Sig.Signal<String>, cursor: Sig.Signal<Int>,
+             placeholder: String, width: Int, text_style: St.Style,
+             placeholder_style: St.Style, cursor_style: St.Style) {
+        this.value = value
+        this.cursor = cursor
+        this.placeholder = placeholder
+        this.width = width
+        this.text_style = text_style
+        this.placeholder_style = placeholder_style
+        this.cursor_style = cursor_style
+        this.focused = false
+    }
+
+    // --- signal accessors (bind to a typed local first — a method call straight
+    // on `this.value` reads as an untyped receiver and can be silently dropped) --
+
+    /// The current text.
+    fun text(): String {
+        var sig: Sig.Signal<String> = this.value
+        return sig.get()
+    }
+
+    /// The current cursor index.
+    fun cursor_pos(): Int {
+        var sig: Sig.Signal<Int> = this.cursor
+        return sig.get()
+    }
+
+    /// Length of the current text in characters.
+    fun length(): Int {
+        var v: String = this.text()
+        return v.length()
+    }
+
+    // --- editing ops ---------------------------------------------------------
+
+    /// Insert `s` at the cursor and advance the cursor past it. Used for both
+    /// single typed runes and pasted blocks.
+    fun insert(s: String) {
+        var vsig: Sig.Signal<String> = this.value
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = vsig.get()
+        var len: Int = v.length()
+        var c: Int = csig.get()
+        if (c < 0) { c = 0 }
+        if (c > len) { c = len }
+        var head: String = v.slice(0, c)
+        var tail: String = v.slice(c, len)
+        vsig.set(head + s + tail)
+        csig.set(c + s.length())
+    }
+
+    /// Delete the character before the cursor and move the cursor left. No-op at
+    /// the start of the field.
+    fun backspace() {
+        var vsig: Sig.Signal<String> = this.value
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = vsig.get()
+        var len: Int = v.length()
+        var c: Int = csig.get()
+        if (c > len) { c = len }
+        if (c <= 0) { return }
+        var head: String = v.slice(0, c - 1)
+        var tail: String = v.slice(c, len)
+        vsig.set(head + tail)
+        csig.set(c - 1)
+    }
+
+    /// Delete the character at the cursor (the one to its right). No-op at the
+    /// end of the field. The cursor does not move.
+    fun delete_fwd() {
+        var vsig: Sig.Signal<String> = this.value
+        var v: String = vsig.get()
+        var len: Int = v.length()
+        var csig: Sig.Signal<Int> = this.cursor
+        var c: Int = csig.get()
+        if (c < 0) { c = 0 }
+        if (c >= len) { return }
+        var head: String = v.slice(0, c)
+        var tail: String = v.slice(c + 1, len)
+        vsig.set(head + tail)
+    }
+
+    // --- cursor movement (clamped to [0, len]) -------------------------------
+
+    /// Move the cursor one character left.
+    fun left() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var c: Int = csig.get()
+        if (c > 0) { csig.set(c - 1) }
+    }
+
+    /// Move the cursor one character right, clamped to the end of the text.
+    fun right() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var c: Int = csig.get()
+        var len: Int = this.length()
+        if (c < len) { csig.set(c + 1) }
+    }
+
+    /// Move the cursor to the start of the field.
+    fun home() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var zero: Int = 0
+        csig.set(zero)
+    }
+
+    /// Move the cursor to the end of the field.
+    fun end() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var len: Int = this.length()
+        csig.set(len)
+    }
+
+    // --- focus ---------------------------------------------------------------
+
+    fun focus() {
+        this.focused = true
+    }
+
+    fun blur() {
+        this.focused = false
+    }
+
+    fun focusable(): Bool {
+        return true
+    }
+
+    // --- input handling ------------------------------------------------------
+
+    /// Feed one event. Paste blocks and printable runes/space insert; backspace
+    /// and delete remove; the arrow/home/end keys move the cursor. Returns true
+    /// if the event was consumed so the runtime can stop propagation.
+    fun handle(e: Ev.Event): Bool {
+        // Paste: insert the whole block verbatim.
+        if (e.paste != nil) {
+            this.insert(e.paste)
+            return true
+        }
+        var k: Ev.KeyEvent = e.key
+        if (k == nil) { return false }
+        var kind: Int = k.kind
+        if (kind == Ev.KEY_RUNE) {
+            this.insert(k.rune)
+            return true
+        }
+        if (kind == Ev.KEY_SPACE) {
+            this.insert(" ")
+            return true
+        }
+        if (kind == Ev.KEY_BACKSPACE) {
+            this.backspace()
+            return true
+        }
+        if (kind == Ev.KEY_DELETE) {
+            this.delete_fwd()
+            return true
+        }
+        if (kind == Ev.KEY_LEFT) {
+            this.left()
+            return true
+        }
+        if (kind == Ev.KEY_RIGHT) {
+            this.right()
+            return true
+        }
+        if (kind == Ev.KEY_HOME) {
+            this.home()
+            return true
+        }
+        if (kind == Ev.KEY_END) {
+            this.end()
+            return true
+        }
+        return false
+    }
+
+    // --- rendering -----------------------------------------------------------
+
+    /// The scroll offset (first visible character index) that keeps the cursor
+    /// inside the `width`-column window. 0 while the cursor fits from the start;
+    /// otherwise the window slides right so the cursor sits on the last column.
+    fun _scroll_off(c: Int): Int {
+        var w: Int = this.width
+        if (w <= 0) { return 0 }
+        // The caret occupies one column; the cursor can sit at index == len (one
+        // past the last char), so keep column [c] visible in a width-w window.
+        if (c >= w) { return (c - w) + 1 }
+        return 0
+    }
+
+    /// Emit the field. Empty + unfocused shows the placeholder in
+    /// `placeholder_style`. Otherwise render the horizontally-scrolled window of
+    /// the value; when focused, split it before-caret / caret / after-caret and
+    /// draw the caret cell in `cursor_style`. A caret over a space (or past the
+    /// end) uses a block glyph so it survives layout's space collapsing.
+    fun view() {
+        var v: String = this.text()
+        var len: Int = v.length()
+        var ts: St.Style = this.text_style
+        var ps: St.Style = this.placeholder_style
+        var cs: St.Style = this.cursor_style
+        var w: Int = this.width
+        var foc: Bool = this.focused
+
+        // Placeholder state.
+        if (len == 0 and !foc) {
+            var ph: String = this.placeholder
+            L.text_styled(ph, ps)
+            return
+        }
+
+        var c: Int = this.cursor_pos()
+        if (c < 0) { c = 0 }
+        if (c > len) { c = len }
+
+        var off: Int = this._scroll_off(c)
+        var vis_end: Int = off + w
+        if (vis_end > len) { vis_end = len }
+        if (w <= 0) { vis_end = len }
+
+        // Not focused: just the visible window as one text run (spaces intact).
+        if (!foc) {
+            var visible: String = v.slice(off, vis_end)
+            L.text_styled(visible, ts)
+            return
+        }
+
+        // Focused: split the visible window around the caret column.
+        var cpos: Int = c - off               // caret column within the window
+        var before: String = v.slice(off, off + cpos)
+        var caret: String = ""
+        if (c < len) {
+            caret = v.slice(c, c + 1)
+        }
+        var after: String = ""
+        if (c < len) {
+            after = v.slice(c + 1, vis_end)
+        }
+        // A caret over a space or past the end has no visible glyph — layout
+        // collapses a lone space in a text node — so use a solid block instead.
+        if (caret == "" or caret == " ") {
+            caret = "█"
+        }
+
+        L.hstack(fun () {
+            if (before != "") { L.text_styled(before, ts) }
+            L.text_styled(caret, cs)
+            if (after != "") { L.text_styled(after, ts) }
+        })
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A text field with the given placeholder and visible width, owning fresh
+/// empty value + cursor(0) signals and sensible default styles: plain text, a
+/// faint placeholder, and a reverse-video caret.
+fun textinput(placeholder: String, width: Int): TextInput {
+    var empty: String = ""
+    var value: Sig.Signal<String> = Sig.signal(empty)
+    // The cursor index must be Int — seed the signal from an Int local so a bare
+    // `0` (a Float literal) can't poison the index math (BUGS #72).
+    var zero: Int = 0
+    var cursor: Sig.Signal<Int> = Sig.signal(zero)
+    var text_style: St.Style = St.style()
+    var placeholder_style: St.Style = St.style().faint()
+    var cursor_style: St.Style = St.style().reverse()
+    return TextInput(value, cursor, placeholder, width, text_style,
+                     placeholder_style, cursor_style)
+}
+
+/// A text field with explicit styles, owning fresh empty value + cursor(0)
+/// signals.
+fun textinput_styled(placeholder: String, width: Int, text_style: St.Style,
+                     placeholder_style: St.Style,
+                     cursor_style: St.Style): TextInput {
+    var empty: String = ""
+    var value: Sig.Signal<String> = Sig.signal(empty)
+    var zero: Int = 0
+    var cursor: Sig.Signal<Int> = Sig.signal(zero)
+    return TextInput(value, cursor, placeholder, width, text_style,
+                     placeholder_style, cursor_style)
+}

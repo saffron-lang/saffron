@@ -1,0 +1,184 @@
+// Verify sumac's table widget: initial selection/offset, move_down/up scrolling
+// to keep the cursor visible, page moves, home/end, key + mouse-wheel handling,
+// and that view() renders the header titles and the visible row cells at the
+// right column offsets (column 2 begins after column 1's width).
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/table.sf" as Table
+import "@test" as T
+import "io" as IO
+
+// Render an LNode tree into a fresh buffer and return the row at `y` as a string
+// (blanks preserved as spaces) so we can search for header/cell text by column.
+fun render_row(node: L.LNode, w: Int, h: Int, y: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var x: Int = 0
+    while (x < w) {
+        var c: Buf.Cell = buf.get(x, y)
+        var r: String = c.rune
+        if (r == "") { r = " " }
+        out = out + r
+        x = x + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // Two columns: Name (width 10), Age (width 5). Six rows.
+    var name_col: Table.Column = Table.column("Name", 10)
+    var age_col: Table.Column = Table.column("Age", 5)
+    var cols: List<Table.Column> = [name_col, age_col]
+
+    var data: List<List<String>> = [
+        ["Alice", "30"],
+        ["Bob", "25"],
+        ["Carol", "41"],
+        ["Dave", "19"],
+        ["Eve", "37"],
+        ["Frank", "52"]
+    ]
+    var zero: Int = 0
+    var rows: Sig.Signal<List<List<String>>> = Sig.signal(data)
+    var selected: Sig.Signal<Int> = Sig.signal(zero)
+    var three: Int = 3
+    var tbl: Table.Table = Table.table(cols, rows, selected, three)
+
+    // ---------------------------------------------------------------------
+    // initial state
+    // ---------------------------------------------------------------------
+    T.assert_eq(tbl.count(), 6, "six rows")
+    T.assert_eq(tbl.selected_index(), 0, "selection starts at 0")
+    T.assert_eq(tbl.offset_index(), 0, "offset starts at 0")
+
+    // ---------------------------------------------------------------------
+    // move_down 2x: selected 0 -> 2, window [0,3) keeps 2 visible (offset 0).
+    // ---------------------------------------------------------------------
+    tbl.move_down()
+    tbl.move_down()
+    T.assert_eq(tbl.selected_index(), 2, "move_down 2x -> selected 2")
+    T.assert_eq(tbl.offset_index(), 0, "offset still 0 (2 visible in [0,3))")
+
+    // move_down again: selected 3, offset scrolls to 1 (3 - 3 + 1).
+    tbl.move_down()
+    T.assert_eq(tbl.selected_index(), 3, "move_down -> selected 3")
+    T.assert_eq(tbl.offset_index(), 1, "offset scrolled to 1 to keep 3 visible")
+
+    // move_up: selected 3 -> 2, still >= offset(1), no scroll.
+    tbl.move_up()
+    T.assert_eq(tbl.selected_index(), 2, "move_up -> selected 2")
+    T.assert_eq(tbl.offset_index(), 1, "offset stays 1")
+
+    // ---------------------------------------------------------------------
+    // select_last: selected 5, offset shows last window (5 - 3 + 1 = 3).
+    // ---------------------------------------------------------------------
+    tbl.select_last()
+    T.assert_eq(tbl.selected_index(), 5, "select_last -> selected 5")
+    T.assert_eq(tbl.offset_index(), 3, "select_last -> offset 3 (last window)")
+
+    // move_down at the bottom clamps.
+    tbl.move_down()
+    T.assert_eq(tbl.selected_index(), 5, "move_down at bottom clamps to 5")
+    T.assert_eq(tbl.offset_index(), 3, "offset stays 3")
+
+    // ---------------------------------------------------------------------
+    // select_first: back to 0, offset 0.
+    // ---------------------------------------------------------------------
+    tbl.select_first()
+    T.assert_eq(tbl.selected_index(), 0, "select_first -> selected 0")
+    T.assert_eq(tbl.offset_index(), 0, "select_first -> offset 0")
+
+    // ---------------------------------------------------------------------
+    // page_down / page_up by height (3).
+    // ---------------------------------------------------------------------
+    tbl.page_down()
+    T.assert_eq(tbl.selected_index(), 3, "page_down: 0 -> 3")
+    tbl.page_up()
+    T.assert_eq(tbl.selected_index(), 0, "page_up: 3 -> 0")
+
+    // ---------------------------------------------------------------------
+    // handle: a synthetic "down" key moves and is consumed.
+    // ---------------------------------------------------------------------
+    tbl.select_first()
+    var down_ev: Ev.Event = Ev.key_event(Ev.KEY_DOWN, "", Ev.MOD_NONE)
+    var consumed: Bool = tbl.handle(down_ev)
+    T.assert(consumed, "down key consumed")
+    T.assert_eq(tbl.selected_index(), 1, "down key moved 0 -> 1")
+
+    // handle: mouse wheel down (kind 4) moves down.
+    tbl.select_first()
+    var wheel_down: Ev.Event = Ev.mouse_event(4, 0, 0, 0, Ev.MOD_NONE)
+    T.assert(tbl.handle(wheel_down), "wheel down consumed")
+    T.assert_eq(tbl.selected_index(), 1, "wheel down moved 0 -> 1")
+
+    // handle: an unrelated key is not consumed.
+    var x_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "x", Ev.MOD_NONE)
+    T.assert(!tbl.handle(x_ev), "unrelated key 'x' not consumed")
+
+    // ---------------------------------------------------------------------
+    // view(): header titles + visible rows at the right column offsets.
+    // Layout: row 0 = header (Name/Age), row 1 = separator, rows 2..4 = data.
+    // Column "Name" occupies x=0..9, "Age" begins at x=10.
+    // ---------------------------------------------------------------------
+    tbl.select_first()
+    var tree: List<L.LNode> = L._collect(fun () {
+        tbl.view()
+    })
+    T.assert_eq(tree.length(), 1, "view emits one root vstack")
+
+    var w: Int = 20
+    var header: String = render_row(tree[0], w, 6, 0)
+    var separator: String = render_row(tree[0], w, 6, 1)
+    var data0: String = render_row(tree[0], w, 6, 2)
+    var data1: String = render_row(tree[0], w, 6, 3)
+
+    IO.println("header:    [" + header + "]")
+    IO.println("separator: [" + separator + "]")
+    IO.println("data0:     [" + data0 + "]")
+    IO.println("data1:     [" + data1 + "]")
+
+    T.assert(header.contains("Name"), "header shows Name")
+    T.assert(header.contains("Age"), "header shows Age")
+    // "Age" is column 2 — it must begin at x=10 (past Name's width of 10).
+    T.assert_eq(header.index_of("Age"), 10, "Age header at column offset 10")
+
+    // Separator rule under the header.
+    T.assert(separator.contains("─"), "separator shows a ─ rule")
+
+    // First visible data row is Alice / 30, with 30 in the second column (x>=10).
+    T.assert(data0.contains("Alice"), "data row 0 shows Alice")
+    T.assert(data0.contains("30"), "data row 0 shows 30")
+    T.assert_eq(data0.index_of("30"), 10, "Alice's age 30 at column offset 10")
+    // Second visible data row is Bob / 25.
+    T.assert(data1.contains("Bob"), "data row 1 shows Bob")
+    T.assert_eq(data1.index_of("25"), 10, "Bob's age 25 at column offset 10")
+
+    // ---------------------------------------------------------------------
+    // Clipping: a cell longer than its column width is truncated.
+    // ---------------------------------------------------------------------
+    var long_data: List<List<String>> = [["Bartholomew", "100"]]
+    var rows2: Sig.Signal<List<List<String>>> = Sig.signal(long_data)
+    var sel2: Sig.Signal<Int> = Sig.signal(zero)
+    var tbl2: Table.Table = Table.table_styled(cols, rows2, sel2, three,
+        St.style().bold(), St.style(), St.style().reverse(), false, false)
+    var tree2: List<L.LNode> = L._collect(fun () {
+        tbl2.view()
+    })
+    // No header/separator: row 0 is the data row directly.
+    var clip_row: String = render_row(tree2[0], w, 3, 0)
+    IO.println("clip_row:  [" + clip_row + "]")
+    // "Bartholomew" is 11 chars, clipped to the 10-wide Name column: "Bartholome".
+    T.assert(clip_row.contains("Bartholome"), "long name clipped to width 10")
+    T.assert(!clip_row.contains("Bartholomew"), "full 11-char name does not fit")
+    // The age still lands in column 2 at x=10.
+    T.assert_eq(clip_row.index_of("100"), 10, "clipped row keeps age at offset 10")
+
+    T.summary()
+}
+
+main()

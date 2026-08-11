@@ -1,0 +1,108 @@
+// Verify sumac's spinner widget: frame wrapping via tick(), style vocabularies,
+// and that view() renders the current glyph at the expected buffer cell.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/widgets/spinner.sf" as Sp
+import "@test" as T
+import "io" as IO
+
+fun main() {
+    // collector bug; disabling GC sidesteps it so we test the spinner logic.)
+
+    // ---------------------------------------------------------------------
+    // construction + initial frame
+    // ---------------------------------------------------------------------
+    var sp: Sp.Spinner = Sp.spinner("loading")
+    var f0: Sig.Signal<Int> = sp.frame
+    T.assert_eq(f0.get(), 0, "spinner starts at frame 0")
+    T.assert_eq(sp.style_kind, Sp.SPINNER_DOTS, "default style is dots")
+    T.assert_eq(sp.label, "loading", "label stored")
+    T.assert(!sp.focusable(), "spinner is not focusable")
+
+    // ---------------------------------------------------------------------
+    // tick() advances the frame and wraps modulo the frame count
+    // ---------------------------------------------------------------------
+    // Dots vocabulary has 10 frames.
+    sp.tick()
+    T.assert_eq(f0.get(), 1, "tick -> frame 1")
+    sp.tick()
+    T.assert_eq(f0.get(), 2, "tick -> frame 2")
+    // Advance to the last frame (index 9) then one more to wrap to 0.
+    var i: Int = 2
+    while (i < 9) {
+        sp.tick()
+        i = i + 1
+    }
+    T.assert_eq(f0.get(), 9, "advanced to last dots frame (9)")
+    sp.tick()
+    T.assert_eq(f0.get(), 0, "tick wraps 9 -> 0 (10 frames)")
+
+    // ---------------------------------------------------------------------
+    // line vocabulary wraps at 4
+    // ---------------------------------------------------------------------
+    var line: Sp.Spinner = Sp.spinner_styled("", Sp.SPINNER_LINE, St.style())
+    var lf: Sig.Signal<Int> = line.frame
+    line.tick()   // 1
+    line.tick()   // 2
+    line.tick()   // 3
+    T.assert_eq(lf.get(), 3, "line at frame 3")
+    line.tick()   // wraps to 0
+    T.assert_eq(lf.get(), 0, "line wraps 3 -> 0 (4 frames)")
+
+    // ---------------------------------------------------------------------
+    // view() renders the current glyph + label into a buffer
+    // ---------------------------------------------------------------------
+    // Reset the dots spinner to a known frame and render.
+    var f0b: Sig.Signal<Int> = sp.frame
+    f0b.set(0)
+    var tree: List<L.LNode> = L._collect(fun () {
+        sp.view()
+    })
+    T.assert_eq(tree.length(), 1, "view emits one root node")
+    var buf: Buf.Buffer = Buf.Buffer(20, 1)
+    L.render_node(tree[0], buf, 0, 0, 20, 1)
+    // Frame 0 of dots is "⠋"; it should sit at cell (0,0).
+    var g0: Buf.Cell = buf.get(0, 0)
+    T.assert_eq(g0.rune, "⠋", "glyph for frame 0 at cell (0,0)")
+    // A space separates glyph and label, so the label starts at column 2.
+    var lc: Buf.Cell = buf.get(2, 0)
+    T.assert_eq(lc.rune, "l", "label 'loading' starts at col 2")
+
+    // ---------------------------------------------------------------------
+    // view() reflects a later frame's glyph
+    // ---------------------------------------------------------------------
+    f0b.set(2)
+    var tree2: List<L.LNode> = L._collect(fun () {
+        sp.view()
+    })
+    var buf2: Buf.Buffer = Buf.Buffer(20, 1)
+    L.render_node(tree2[0], buf2, 0, 0, 20, 1)
+    var g2: Buf.Cell = buf2.get(0, 0)
+    T.assert_eq(g2.rune, "⠹", "glyph for frame 2 at cell (0,0)")
+
+    // ---------------------------------------------------------------------
+    // empty label -> just the glyph, no trailing space text
+    // ---------------------------------------------------------------------
+    var bare: Sp.Spinner = Sp.spinner_styled("", Sp.SPINNER_LINE, St.style())
+    var btree: List<L.LNode> = L._collect(fun () {
+        bare.view()
+    })
+    var bbuf: Buf.Buffer = Buf.Buffer(10, 1)
+    L.render_node(btree[0], bbuf, 0, 0, 10, 1)
+    var bg0: Buf.Cell = bbuf.get(0, 0)
+    T.assert_eq(bg0.rune, "|", "bare line spinner glyph at (0,0)")
+    // Column 1 should be blank (no label text after it).
+    var bg1: Buf.Cell = bbuf.get(1, 0)
+    T.assert(bg1.rune == " " or bg1.rune == "", "no label text after bare glyph")
+
+    // ---------------------------------------------------------------------
+    // handle() never consumes (spinner is passive)
+    // ---------------------------------------------------------------------
+    T.assert(!sp.handle(nil), "spinner does not consume events")
+
+    T.summary()
+}
+
+main()

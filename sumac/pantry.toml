@@ -1,0 +1,16 @@
+[package]
+name = "sumac"
+version = "0.1.0"
+description = "Reactive TUI framework for Saffron — Bubbletea-class terminal rendering with signals"
+type = "library"
+entry = "src/index.sf"
+authors = ["henry232323"]
+target = "native"
+
+[dependencies]
+
+[scripts]
+build = "saffronc src/index.sf build/sumac.ll"
+
+[scripts.bin]
+sumac-run = "saffron run tools/run.sf"

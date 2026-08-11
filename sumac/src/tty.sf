@@ -1,0 +1,159 @@
+//! Sumac TTY layer — raw mode, alt-screen, cursor control, size, and the
+//! low-level input read.
+//!
+//! This is the thin Saffron skin over `src/runtime/tty_native.c`. Everything
+//! above it (buffer, layout, widgets, runtime) is pure Saffron and talks to the
+//! terminal only through the handful of functions here.
+//!
+//! Lifecycle: `enter()` puts the terminal into the state a full-screen UI needs
+//! (raw mode, alternate screen, hidden cursor, mouse+paste reporting on) and
+//! `leave()` restores every one of those in reverse. They are idempotent and
+//! MUST be paired — `leave()` on exit (including an error path) is what stops a
+//! crash from leaving the user staring at a dead, echo-less terminal.
+//!
+//! Native only. On wasm there is no controlling terminal; the externs return
+//! failure and `size()` falls back to 80x24.
+
+import "io" as IO
+
+// --- Native TTY primitives (src/runtime/tty_native.c) ---
+@extern("i64 sf_tty_raw_mode(i64)") fun _tty_raw_mode(on: Int): Int
+@extern("i64 sf_tty_size()") fun _tty_size(): Int
+@extern("i64 sf_tty_read_input(i8*, i64, i64)") fun _tty_read_input(buf: Int, max_len: Int, timeout_ms: Int): Int
+@extern("i64 sf_tty_write(i8*, i64)") fun _tty_write(buf: Int, len: Int): Int
+@extern("i64 strlen(void*)") fun _tty_strlen(s: Int): Int
+
+// =============================================================================
+// ANSI escape sequences
+// =============================================================================
+//
+// One place for every control string the renderer emits, named rather than
+// spelled inline, so a terminal-quirk workaround lives in exactly one spot.
+
+let ESC: String = "\x1b"
+let CSI: String = "\x1b["
+
+// Screen / cursor
+let ALT_SCREEN_ON: String = "\x1b[?1049h"    // enter alternate screen buffer
+let ALT_SCREEN_OFF: String = "\x1b[?1049l"    // restore the normal screen
+let CURSOR_HIDE: String = "\x1b[?25l"
+let CURSOR_SHOW: String = "\x1b[?25h"
+let CLEAR_SCREEN: String = "\x1b[2J"
+let CLEAR_LINE: String = "\x1b[2K"
+let CURSOR_HOME: String = "\x1b[H"
+let RESET_STYLE: String = "\x1b[0m"
+
+// Input reporting modes
+let MOUSE_ON: String = "\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h"  // click+drag+motion, SGR
+let MOUSE_OFF: String = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l"
+let PASTE_ON: String = "\x1b[?2004h"          // bracketed paste
+let PASTE_OFF: String = "\x1b[?2004l"
+let FOCUS_ON: String = "\x1b[?1004h"          // focus in/out reporting
+let FOCUS_OFF: String = "\x1b[?1004l"
+
+// =============================================================================
+// Terminal size
+// =============================================================================
+
+/// Terminal dimensions in character cells.
+class TermSize {
+    var rows: Int
+    var cols: Int
+    fun init(rows: Int, cols: Int) {
+        this.rows = rows
+        this.cols = cols
+    }
+}
+
+/// Query the current terminal size. Falls back to 80x24 when there is no tty
+/// (piped output, wasm) so callers always get a usable grid.
+fun size(): TermSize {
+    var packed: Int = _tty_size()
+    if (packed == 0) {
+        return TermSize(24, 80)
+    }
+    // C packs (rows << 32) | cols.
+    var rows: Int = (packed >> 32) & 65535
+    var cols: Int = packed & 65535
+    if (rows <= 0) { rows = 24 }
+    if (cols <= 0) { cols = 80 }
+    return TermSize(rows, cols)
+}
+
+// =============================================================================
+// Raw output
+// =============================================================================
+
+/// Write a control/render string straight to stdout, unbuffered. ANSI strings
+/// never contain an interior NUL, so strlen gives the exact length.
+fun write(s: String) {
+    var len: Int = _tty_strlen(s)
+    if (len > 0) {
+        _tty_write(s, len)
+    }
+}
+
+// =============================================================================
+// Cursor positioning (1-based row/col, matching ANSI)
+// =============================================================================
+
+/// The escape string that moves the cursor to (row, col), 1-based.
+fun move_to(row: Int, col: Int): String {
+    return CSI + row.to_string() + ";" + col.to_string() + "H"
+}
+
+/// Move the cursor immediately (convenience over write(move_to(...))).
+fun goto(row: Int, col: Int) {
+    write(move_to(row, col))
+}
+
+// =============================================================================
+// Raw input read
+// =============================================================================
+
+/// Read up to `max_len` bytes of terminal input, waiting at most `timeout_ms`
+/// for the first byte (negative = block forever, 0 = poll). Returns the bytes
+/// read as a `Bytes` range of the true length (empty on timeout).
+fun read_input(max_len: Int, timeout_ms: Int): IO.Bytes {
+    var buf: IO.Bytes = IO.bytes_alloc(max_len)
+    var n: Int = _tty_read_input(buf.ptr(), max_len, timeout_ms)
+    if (n <= 0) {
+        return IO.Bytes(buf.ptr(), 0)
+    }
+    return IO.Bytes(buf.ptr(), n)
+}
+
+// =============================================================================
+// Lifecycle
+// =============================================================================
+
+var _entered: Bool = false
+
+/// Enter full-screen UI mode: raw input, alternate screen, hidden cursor,
+/// mouse + paste + focus reporting. Idempotent.
+fun enter() {
+    if (_entered) { return }
+    _entered = true
+    _tty_raw_mode(1)
+    write(ALT_SCREEN_ON)
+    write(CURSOR_HIDE)
+    write(MOUSE_ON)
+    write(PASTE_ON)
+    write(FOCUS_ON)
+    write(CLEAR_SCREEN)
+    write(CURSOR_HOME)
+}
+
+/// Restore the terminal to the state it had before `enter()`. Reverses every
+/// step. Safe to call unconditionally on shutdown. Idempotent.
+fun leave() {
+    if (!_entered) { return }
+    write(FOCUS_OFF)
+    write(PASTE_OFF)
+    write(MOUSE_OFF)
+    write(RESET_STYLE)
+    write(CURSOR_SHOW)
+    write(ALT_SCREEN_OFF)
+    _tty_raw_mode(0)
+    _entered = false
+}

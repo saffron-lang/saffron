@@ -1,0 +1,8 @@
+# Build artifacts
+build/
+*.ll
+*.wasm
+a.out
+# Example binaries
+examples/*/claude-tui
+examples/**/*.bin

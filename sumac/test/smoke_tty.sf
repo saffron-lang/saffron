@@ -1,0 +1,31 @@
+// Smoke test: enter raw+alt-screen, print size, echo keypresses, quit on 'q'.
+// Run interactively: tools/saffron build sumac/test/smoke_tty.sf -o /tmp/smoke && /tmp/smoke
+import "../src/tty.sf" as Tty
+import "io" as IO
+
+fun main() {
+    var sz: Tty.TermSize = Tty.size()
+    Tty.enter()
+    Tty.goto(1, 1)
+    Tty.write("sumac tty smoke — size ${sz.rows}x${sz.cols} — press keys, 'q' to quit")
+
+    var row: Int = 3
+    var running: Bool = true
+    while (running) {
+        var input: IO.Bytes = Tty.read_input(64, -1)
+        if (input.length() > 0) {
+            var first: Int = input.get(0)
+            Tty.goto(row, 1)
+            Tty.write(Tty.CLEAR_LINE)
+            Tty.write("bytes=${input.length()} first=${first}")
+            row = row + 1
+            if (row > sz.rows - 1) { row = 3 }
+            if (first == 113) { running = false }  // 'q'
+        }
+    }
+
+    Tty.leave()
+    IO.println("clean exit")
+}
+
+main()

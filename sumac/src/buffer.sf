@@ -1,0 +1,393 @@
+//! Sumac cell buffer + minimal-diff renderer — the flicker-free heart of the
+//! paint pipeline (the tcell / Bubbletea renderer role).
+//!
+//! A `Buffer` is a flat, row-major grid of `Cell`s (index = y*w + x). The paint
+//! pass rasterizes styled runes into a *back* buffer; `diff()` then walks the
+//! back buffer against the *front* buffer (the terminal's current contents) and
+//! returns the minimal ANSI byte stream that transforms front → back. The caller
+//! writes that stream, then copies back → front. `diff` never mutates either
+//! buffer.
+//!
+//! Everything is integer-first. Coordinates, widths, byte values, and codepoints
+//! are all annotated `Int`: a `Float` slips through arithmetic silently but reads
+//! element 0 when used as a list index (BUGS #72), and this whole module is
+//! list-indexed, so a stray `Float` would corrupt every lookup with no
+//! diagnostic. Coordinates here are 0-based; the 1-based ANSI cursor move is
+//! produced inside `diff` (row+1, col+1).
+
+import "./style.sf" as St
+import "io" as IO
+
+// =============================================================================
+// Rune width — display columns for a single grapheme
+// =============================================================================
+//
+// Width method: we decode the rune's UTF-8 bytes to a Unicode codepoint and
+// classify it against a coarse but practical table (the same shape tcell and
+// go-runewidth use):
+//   * control / C1 (cp < 0x20, or 0x7F..0x9F) .......... 0 columns
+//   * combining marks (U+0300..U+036F) and zero-width
+//     format chars (U+200B..U+200F, incl. ZWJ U+200D) ... 0 columns
+//   * East-Asian Wide / Fullwidth ranges (CJK, Hangul,
+//     Kana, compatibility forms, fullwidth forms) ....... 2 columns
+//   * common emoji ranges (U+2600..U+27BF, and the
+//     U+1F300..U+1FAFF pictographic block) .............. 2 columns
+//   * everything else (incl. Latin-1, accented Latin) ... 1 column
+// This is deliberately not the full Unicode UAX #11 table — it covers the cases
+// a TUI actually renders and stays cheap. Emoji ZWJ sequences and variation
+// selectors are approximated, not perfectly measured.
+
+// Decode a short rune String (its leading UTF-8 sequence) to a codepoint.
+// Returns 0 for the empty string. Continuation bytes are masked to 6 bits and
+// folded in; a malformed lead byte degrades to its raw value rather than
+// throwing (width classification then just treats it as narrow).
+fun _rune_codepoint(rune: String): Int {
+    var bytes: IO.Bytes = IO.bytes_from_string(rune)
+    var n: Int = bytes.length()
+    if (n == 0) { return 0 }
+    var b0: Int = bytes.get(0)
+    if (b0 < 128) { return b0 }
+    var cp: Int = 0
+    var extra: Int = 0
+    if (b0 >= 240) {
+        // 4-byte sequence: 11110xxx
+        cp = b0 & 7
+        extra = 3
+    } else if (b0 >= 224) {
+        // 3-byte sequence: 1110xxxx
+        cp = b0 & 15
+        extra = 2
+    } else if (b0 >= 192) {
+        // 2-byte sequence: 110xxxxx
+        cp = b0 & 31
+        extra = 1
+    } else {
+        // Stray continuation byte — not a valid lead. Use it verbatim.
+        return b0
+    }
+    var j: Int = 1
+    while (j <= extra and j < n) {
+        var cont: Int = bytes.get(j)
+        cp = (cp << 6) | (cont & 63)
+        j = j + 1
+    }
+    return cp
+}
+
+// True for codepoints that occupy zero columns: combining marks and the
+// zero-width / bidi format characters (which includes ZWJ, U+200D).
+fun _cp_is_zero_width(cp: Int): Bool {
+    if (cp >= 768 and cp <= 879) { return true }      // U+0300..U+036F combining
+    if (cp >= 8203 and cp <= 8207) { return true }    // U+200B..U+200F (ZWSP..RLM)
+    return false
+}
+
+// True for East-Asian Wide / Fullwidth codepoints and common emoji — 2 columns.
+fun _cp_is_wide(cp: Int): Bool {
+    if (cp >= 4352 and cp <= 4447) { return true }        // U+1100..U+115F Hangul Jamo
+    if (cp >= 11904 and cp <= 12350) { return true }      // U+2E80..U+303E
+    if (cp >= 12353 and cp <= 13311) { return true }      // U+3041..U+33FF
+    if (cp >= 13312 and cp <= 19903) { return true }      // U+3400..U+4DBF CJK Ext A
+    if (cp >= 19968 and cp <= 40959) { return true }      // U+4E00..U+9FFF CJK Unified
+    if (cp >= 40960 and cp <= 42191) { return true }      // U+A000..U+A4CF Yi
+    if (cp >= 44032 and cp <= 55203) { return true }      // U+AC00..U+D7A3 Hangul Syllables
+    if (cp >= 63744 and cp <= 64255) { return true }      // U+F900..U+FAFF CJK Compat
+    if (cp >= 65072 and cp <= 65103) { return true }      // U+FE30..U+FE4F vertical forms
+    if (cp >= 65280 and cp <= 65376) { return true }      // U+FF00..U+FF60 Fullwidth
+    if (cp >= 65504 and cp <= 65510) { return true }      // U+FFE0..U+FFE6 Fullwidth signs
+    if (cp >= 9728 and cp <= 10175) { return true }       // U+2600..U+27BF Misc symbols/Dingbats
+    if (cp >= 127744 and cp <= 129791) { return true }    // U+1F300..U+1FAFF emoji/pictographs
+    if (cp >= 131072) { return true }                     // U+20000+ CJK Ext B and beyond
+    return false
+}
+
+/// Display width, in terminal columns, of a single rune. See the width-method
+/// note above. The empty string measures 0; a normal narrow rune measures 1.
+fun rune_width(rune: String): Int {
+    var cp: Int = _rune_codepoint(rune)
+    if (cp == 0) { return 0 }
+    if (cp < 32) { return 0 }                     // C0 control
+    if (cp >= 127 and cp <= 159) { return 0 }     // DEL + C1 control
+    if (_cp_is_zero_width(cp)) { return 0 }
+    if (_cp_is_wide(cp)) { return 2 }
+    return 1
+}
+
+// Split a String into its runes (each a 1-grapheme-ish String holding one
+// UTF-8-encoded codepoint). Byte-index based: builtin String.slice cuts on byte
+// offsets, so slicing between codepoint boundaries yields well-formed runes.
+fun _runes(s: String): List<String> {
+    var out: List<String> = []
+    var bytes: IO.Bytes = IO.bytes_from_string(s)
+    var n: Int = bytes.length()
+    var i: Int = 0
+    while (i < n) {
+        var b0: Int = bytes.get(i)
+        var len: Int = 1
+        if (b0 >= 240) { len = 4 }
+        else if (b0 >= 224) { len = 3 }
+        else if (b0 >= 192) { len = 2 }
+        if (i + len > n) { len = n - i }
+        out.push(s.slice(i, i + len))
+        i = i + len
+    }
+    return out
+}
+
+/// Display width, in terminal columns, of a whole string (wide-char aware).
+fun str_width(s: String): Int {
+    var runes: List<String> = _runes(s)
+    var total: Int = 0
+    for (r in runes) {
+        total = total + rune_width(r)
+    }
+    return total
+}
+
+// =============================================================================
+// Cell
+// =============================================================================
+
+/// One terminal cell. `rune` is a 1-grapheme String ("" or " " = blank).
+/// `width` is display columns: 1 normally, 2 for a wide (CJK/emoji) cell, and 0
+/// for the trailing half of a wide cell — a placeholder painted as a no-op so
+/// the grid stays column-aligned.
+class Cell {
+    var rune: String
+    var style: St.Style
+    var width: Int
+    fun init(rune: String, style: St.Style, width: Int) {
+        this.rune = rune
+        this.style = style
+        this.width = width
+    }
+}
+
+// A fresh blank cell: a single space in the default style. Blanks are made new
+// each time rather than shared, so a later mutation of one cell can never alias
+// another (cells are replaced wholesale, but this keeps the invariant honest).
+fun _blank_cell(): Cell {
+    return Cell(" ", St.style(), 1)
+}
+
+// =============================================================================
+// Buffer
+// =============================================================================
+
+/// A row-major grid of cells. Storage is a flat `List<Cell>` of length w*h;
+/// the cell at (x, y) lives at index y*w + x.
+class Buffer {
+    var w: Int
+    var h: Int
+    var cells: List<Cell>
+
+    fun init(w: Int, h: Int) {
+        this.w = w
+        this.h = h
+        this.cells = []
+        var total: Int = w * h
+        var i: Int = 0
+        while (i < total) {
+            this.cells.push(_blank_cell())
+            i = i + 1
+        }
+    }
+
+    /// Read the cell at (x, y). Off-grid reads are safe and return a fresh blank
+    /// cell, so callers never have to bounds-check before a get.
+    fun get(x: Int, y: Int): Cell {
+        if (x < 0 or x >= this.w or y < 0 or y >= this.h) {
+            return _blank_cell()
+        }
+        var idx: Int = y * this.w + x
+        return this.cells[idx]
+    }
+
+    /// Write the cell at (x, y). Off-grid writes are a safe no-op.
+    fun set(x: Int, y: Int, c: Cell) {
+        if (x < 0 or x >= this.w or y < 0 or y >= this.h) {
+            return
+        }
+        var idx: Int = y * this.w + x
+        this.cells[idx] = c
+    }
+
+    /// Write `s` starting at (x, y) in style `st`, advancing by each rune's
+    /// display width and clipping at the right edge. A wide rune writes the wide
+    /// cell plus a width-0 placeholder in the next column; a wide rune that would
+    /// straddle the edge is replaced by a blank space and writing stops. Returns
+    /// the x column just past the last cell written.
+    fun put_str(x: Int, y: Int, s: String, st: St.Style): Int {
+        var cx: Int = x
+        var runes: List<String> = _runes(s)
+        for (r in runes) {
+            if (cx >= this.w) { break }
+            var rw: Int = rune_width(r)
+            if (rw == 0) {
+                // Zero-width (combining / format): does not occupy a column. Drop
+                // it for v1 rather than trying to merge onto the previous cell.
+                continue
+            }
+            if (rw == 2 and cx + 1 >= this.w) {
+                // A wide rune cannot fit in the single remaining column: fill it
+                // with a blank and stop, matching how terminals refuse to split a
+                // wide glyph across the edge.
+                this.set(cx, y, Cell(" ", st, 1))
+                cx = cx + 1
+                break
+            }
+            this.set(cx, y, Cell(r, st, rw))
+            if (rw == 2) {
+                this.set(cx + 1, y, Cell("", st, 0))
+                cx = cx + 2
+            } else {
+                cx = cx + 1
+            }
+        }
+        return cx
+    }
+
+    /// Fill the rectangle [x, x+w) x [y, y+h) with copies of `c`. Off-grid parts
+    /// are clipped by `set`'s bounds check.
+    fun fill(x: Int, y: Int, w: Int, h: Int, c: Cell) {
+        var row: Int = 0
+        while (row < h) {
+            var col: Int = 0
+            while (col < w) {
+                // Fresh Cell per position so no two grid slots alias one object.
+                this.set(x + col, y + row, Cell(c.rune, c.style, c.width))
+                col = col + 1
+            }
+            row = row + 1
+        }
+    }
+
+    /// Reset every cell to a blank in the default style.
+    fun clear() {
+        var total: Int = this.w * this.h
+        var i: Int = 0
+        while (i < total) {
+            this.cells[i] = _blank_cell()
+            i = i + 1
+        }
+    }
+
+    /// Resize the grid to (w, h), preserving the contents of the overlapping
+    /// top-left region and blank-filling anything new.
+    fun resize(w: Int, h: Int) {
+        var old_w: Int = this.w
+        var old_h: Int = this.h
+        var old_cells: List<Cell> = this.cells
+        var new_cells: List<Cell> = []
+        var total: Int = w * h
+        var i: Int = 0
+        while (i < total) {
+            new_cells.push(_blank_cell())
+            i = i + 1
+        }
+        var y: Int = 0
+        var copy_h: Int = old_h
+        if (h < copy_h) { copy_h = h }
+        var copy_w: Int = old_w
+        if (w < copy_w) { copy_w = w }
+        while (y < copy_h) {
+            var x: Int = 0
+            while (x < copy_w) {
+                var old_idx: Int = y * old_w + x
+                var new_idx: Int = y * w + x
+                new_cells[new_idx] = old_cells[old_idx]
+                x = x + 1
+            }
+            y = y + 1
+        }
+        this.w = w
+        this.h = h
+        this.cells = new_cells
+    }
+}
+
+// =============================================================================
+// Diff
+// =============================================================================
+
+// True when the back cell at (x, y) differs from the front cell — by rune,
+// style, or width. Both gets are bounds-safe.
+fun _cell_changed(front: Buffer, back: Buffer, x: Int, y: Int): Bool {
+    var fc: Cell = front.get(x, y)
+    var bc: Cell = back.get(x, y)
+    if (fc.width != bc.width) { return true }
+    if (fc.rune != bc.rune) { return true }
+    var fs: St.Style = fc.style
+    var bs: St.Style = bc.style
+    if (!fs.eq(bs)) { return true }
+    return false
+}
+
+// The 1-based ANSI cursor move to (row, col) — matches tty.move_to but is
+// inlined here so buffer.sf stays a leaf that depends only on style.sf.
+fun _move_to(row: Int, col: Int): String {
+    return "\x1b[" + row.to_string() + ";" + col.to_string() + "H"
+}
+
+/// Diff `back` against `front`, returning the ANSI byte stream that transforms
+/// the terminal from front to back. Iterates rows; within each row it finds runs
+/// of changed cells, emits one cursor move per run, and within a run emits a
+/// style SGR only when the style differs from the last one emitted (the terminal
+/// retains style across cursor moves, so `cur_style` persists across runs too).
+/// Width-0 placeholder cells are skipped — they were painted as part of the
+/// preceding wide cell, whose glyph already advances the cursor two columns.
+///
+/// `force` ignores `front` entirely and repaints every cell — used for the first
+/// frame and after a resize. When nothing changed the result is "" (no reset is
+/// emitted, so an idle frame writes nothing). Neither buffer is mutated.
+fun diff(front: Buffer, back: Buffer, force: Bool): String {
+    var sb: StringBuilder = StringBuilder()
+    var emitted_any: Bool = false
+    var have_style: Bool = false
+    var cur_style: St.Style = St.style()
+
+    var w: Int = back.w
+    var h: Int = back.h
+    var y: Int = 0
+    while (y < h) {
+        var x: Int = 0
+        var in_run: Bool = false
+        while (x < w) {
+            var cell: Cell = back.get(x, y)
+            if (cell.width == 0) {
+                // Trailing half of a wide cell — never emitted on its own.
+                x = x + 1
+                continue
+            }
+            var changed: Bool = force
+            if (!force) {
+                changed = _cell_changed(front, back, x, y)
+            }
+            if (changed) {
+                if (!in_run) {
+                    in_run = true
+                    sb.append(_move_to(y + 1, x + 1))
+                }
+                var cs: St.Style = cell.style
+                if (!have_style or !cs.eq(cur_style)) {
+                    sb.append(cs.sgr())
+                    cur_style = cs
+                    have_style = true
+                }
+                var r: String = cell.rune
+                if (r == "") { r = " " }
+                sb.append(r)
+                emitted_any = true
+            } else {
+                in_run = false
+            }
+            x = x + 1
+        }
+        y = y + 1
+    }
+
+    if (emitted_any) {
+        sb.append("\x1b[0m")
+    }
+    return sb.to_string()
+}

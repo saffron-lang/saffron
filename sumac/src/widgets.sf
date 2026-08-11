@@ -1,0 +1,19 @@
+// Sumac widgets — compile aggregator for the Bubbles-equivalent widget set.
+//
+// NOTE: Saffron's `import { ... } from` is NOT a transitive re-export — a symbol
+// resolves to the file that DEFINES it, so apps import each widget from its own
+// file (`import { spinner } from "sumac/widgets/spinner"`), NOT through this
+// barrel. This file exists only to pull every widget module into one
+// compilation unit when building the library artifact (see index.sf), the same
+// role turmeric/src/index.sf plays for Turmeric.
+
+import { KeyHint, Help, key_hint, help, help_styled } from "./widgets/help.sf"
+import { List_, list_widget, list_styled } from "./widgets/list.sf"
+import { Paginator, paginator, paginator_arabic } from "./widgets/paginator.sf"
+import { Progress, progress, progress_styled } from "./widgets/progress.sf"
+import { Spinner, spinner, spinner_styled } from "./widgets/spinner.sf"
+import { Column, Table, column, table, table_styled } from "./widgets/table.sf"
+import { Tabs, tabs, tabs_styled } from "./widgets/tabs.sf"
+import { TextArea, textarea, textarea_styled } from "./widgets/textarea.sf"
+import { TextInput, textinput, textinput_styled } from "./widgets/textinput.sf"
+import { Viewport, viewport, viewport_styled } from "./widgets/viewport.sf"

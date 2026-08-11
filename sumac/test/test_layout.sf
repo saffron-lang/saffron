@@ -1,0 +1,209 @@
+// Verify sumac's layout engine: builders + context stack, measure, borders,
+// vstack/hstack positioning, padding, alignment, and place_centered overlays.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "@test" as T
+import "io" as IO
+
+// NOTE: GC is disabled for this test. There is a pre-existing runtime GC bug
+// class instance (exactly Buffer's List<Cell>) corrupts the heap after ~45
+// allocations, surfacing as "Runtime Error: NullError". Disabling GC sidesteps
+// it so this suite exercises the layout logic itself. The layout code is
+// allocation-clean; the fault is in the collector.
+
+// Read one cell's rune (blank -> "."), for dumping / eyeballing.
+fun cell_rune(buf: Buf.Buffer, x: Int, y: Int): String {
+    var c: Buf.Cell = buf.get(x, y)
+    if (c.rune == " " or c.rune == "") { return "." }
+    return c.rune
+}
+
+// Dump the whole buffer to a multi-line string for visual inspection.
+fun dump(buf: Buf.Buffer): String {
+    var out: String = ""
+    var y: Int = 0
+    while (y < buf.h) {
+        var row: String = ""
+        var x: Int = 0
+        while (x < buf.w) {
+            var c: Buf.Cell = buf.get(x, y)
+            if (c.width == 0) {
+                // trailing half of a wide cell; skip (already counted)
+            } else {
+                var r: String = c.rune
+                if (r == "" or r == " ") { r = "." }
+                row = row + r
+            }
+            x = x + 1
+        }
+        out = out + row + "\n"
+        y = y + 1
+    }
+    return out
+}
+
+fun main() {
+    // ---------------------------------------------------------------------
+    // measure: a text node
+    // ---------------------------------------------------------------------
+    var tn: L.LNode = L.LNode.TextNode("hello", St.style())
+    var m: List<Int> = L.measure(tn)
+    T.assert_eq(m[0], 5, "text 'hello' natural width 5")
+    T.assert_eq(m[1], 1, "text 'hello' natural height 1")
+
+    // multi-line text
+    var tn2: L.LNode = L.LNode.TextNode("ab\ncdef", St.style())
+    var m2: List<Int> = L.measure(tn2)
+    T.assert_eq(m2[0], 4, "multiline width = longest line (4)")
+    T.assert_eq(m2[1], 2, "multiline height = 2 lines")
+
+    // ---------------------------------------------------------------------
+    // vstack of two texts stacks on rows 0 and 1
+    // ---------------------------------------------------------------------
+    var tree: List<L.LNode> = L._collect(fun () {
+        L.vstack(fun () {
+            L.text("AA")
+            L.text("BB")
+        })
+    })
+    T.assert_eq(tree.length(), 1, "collect got one root")
+    var vbuf: Buf.Buffer = Buf.Buffer(6, 3)
+    L.render_node(tree[0], vbuf, 0, 0, 6, 3)
+    T.assert_eq(cell_rune(vbuf, 0, 0), "A", "vstack: AA on row 0")
+    T.assert_eq(cell_rune(vbuf, 1, 0), "A", "vstack: AA on row 0 col1")
+    T.assert_eq(cell_rune(vbuf, 0, 1), "B", "vstack: BB on row 1")
+    T.assert_eq(cell_rune(vbuf, 1, 1), "B", "vstack: BB on row 1 col1")
+    IO.println("vstack:\n" + dump(vbuf))
+
+    // ---------------------------------------------------------------------
+    // hstack places two texts side by side
+    // ---------------------------------------------------------------------
+    var htree: List<L.LNode> = L._collect(fun () {
+        L.hstack(fun () {
+            L.text("AA")
+            L.text("BB")
+        })
+    })
+    var hbuf: Buf.Buffer = Buf.Buffer(6, 2)
+    L.render_node(htree[0], hbuf, 0, 0, 6, 2)
+    T.assert_eq(cell_rune(hbuf, 0, 0), "A", "hstack: AA at col 0")
+    T.assert_eq(cell_rune(hbuf, 1, 0), "A", "hstack: AA at col 1")
+    T.assert_eq(cell_rune(hbuf, 2, 0), "B", "hstack: BB at col 2")
+    T.assert_eq(cell_rune(hbuf, 3, 0), "B", "hstack: BB at col 3")
+    IO.println("hstack:\n" + dump(hbuf))
+
+    // ---------------------------------------------------------------------
+    // bordered box draws corners at the region edges
+    // ---------------------------------------------------------------------
+    var btree: List<L.LNode> = L._collect(fun () {
+        L.box(border=1, block=fun () {
+            L.text("X")
+        })
+    })
+    var bbuf: Buf.Buffer = Buf.Buffer(6, 4)
+    L.render_node(btree[0], bbuf, 0, 0, 6, 4)
+    T.assert_eq(cell_rune(bbuf, 0, 0), "┌", "border top-left corner")
+    T.assert_eq(cell_rune(bbuf, 5, 0), "┐", "border top-right corner")
+    T.assert_eq(cell_rune(bbuf, 0, 3), "└", "border bottom-left corner")
+    T.assert_eq(cell_rune(bbuf, 5, 3), "┘", "border bottom-right corner")
+    T.assert_eq(cell_rune(bbuf, 1, 0), "─", "border top edge")
+    T.assert_eq(cell_rune(bbuf, 0, 1), "│", "border left edge")
+    // content inside the border at (1,1)
+    T.assert_eq(cell_rune(bbuf, 1, 1), "X", "content inside border")
+    IO.println("bordered box:\n" + dump(bbuf))
+
+    // ---------------------------------------------------------------------
+    // rounded border glyphs
+    // ---------------------------------------------------------------------
+    var rtree: List<L.LNode> = L._collect(fun () {
+        L.box(border=2, block=fun () { L.text("R") })
+    })
+    var rbuf: Buf.Buffer = Buf.Buffer(5, 3)
+    L.render_node(rtree[0], rbuf, 0, 0, 5, 3)
+    T.assert_eq(cell_rune(rbuf, 0, 0), "╭", "rounded top-left")
+    T.assert_eq(cell_rune(rbuf, 4, 2), "╯", "rounded bottom-right")
+
+    // ---------------------------------------------------------------------
+    // padding offsets content
+    // ---------------------------------------------------------------------
+    var ptree: List<L.LNode> = L._collect(fun () {
+        L.box(pad_t=1, pad_l=2, block=fun () {
+            L.text("P")
+        })
+    })
+    var pbuf: Buf.Buffer = Buf.Buffer(6, 4)
+    L.render_node(ptree[0], pbuf, 0, 0, 6, 4)
+    T.assert_eq(cell_rune(pbuf, 2, 1), "P", "padding pushes content to (2,1)")
+    T.assert_eq(cell_rune(pbuf, 0, 0), ".", "padding: (0,0) is empty")
+    IO.println("padding:\n" + dump(pbuf))
+
+    // ---------------------------------------------------------------------
+    // centered text in a wide box (align=1 cross-axis of a vstack)
+    // ---------------------------------------------------------------------
+    var ctree: List<L.LNode> = L._collect(fun () {
+        L.box(align=1, width=9, height=1, block=fun () {
+            L.text("hi")
+        })
+    })
+    var cbuf: Buf.Buffer = Buf.Buffer(9, 1)
+    L.render_node(ctree[0], cbuf, 0, 0, 9, 1)
+    // width 9, content "hi" width 2 -> offset (9-2)/2 = 3
+    T.assert_eq(cell_rune(cbuf, 3, 0), "h", "centered text starts at col 3")
+    T.assert_eq(cell_rune(cbuf, 4, 0), "i", "centered text col 4")
+    IO.println("centered:\n" + dump(cbuf))
+
+    // ---------------------------------------------------------------------
+    // justify=2 (end) pushes a short child to the bottom of a tall vstack
+    // ---------------------------------------------------------------------
+    var jtree: List<L.LNode> = L._collect(fun () {
+        L.box(justify=2, height=4, block=fun () {
+            L.text("Z")
+        })
+    })
+    var jbuf: Buf.Buffer = Buf.Buffer(3, 4)
+    L.render_node(jtree[0], jbuf, 0, 0, 3, 4)
+    T.assert_eq(cell_rune(jbuf, 0, 3), "Z", "justify=end puts child on last row")
+
+    // ---------------------------------------------------------------------
+    // spacer grows to push siblings apart in an hstack
+    // ---------------------------------------------------------------------
+    var stree: List<L.LNode> = L._collect(fun () {
+        L.hstack(fun () {
+            L.text("L")
+            L.spacer()
+            L.text("R")
+        })
+    })
+    var sbuf: Buf.Buffer = Buf.Buffer(8, 1)
+    L.render_node(stree[0], sbuf, 0, 0, 8, 1)
+    T.assert_eq(cell_rune(sbuf, 0, 0), "L", "spacer: L stays at left")
+    T.assert_eq(cell_rune(sbuf, 7, 0), "R", "spacer: R pushed to right edge")
+    IO.println("spacer:\n" + dump(sbuf))
+
+    // ---------------------------------------------------------------------
+    // place_centered overlays a modal without wiping the background corners
+    // ---------------------------------------------------------------------
+    var bg: Buf.Buffer = Buf.Buffer(10, 6)
+    // Mark the four corners of the background.
+    bg.put_str(0, 0, "A", St.style())
+    bg.put_str(9, 0, "B", St.style())
+    bg.put_str(0, 5, "C", St.style())
+    bg.put_str(9, 5, "D", St.style())
+    var modal: L.LNode = L.LNode.BoxNode(
+        L.BoxProps(0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, St.style(), "M"), [])
+    L.place_centered(modal, bg, 4, 2)
+    // background corners intact
+    T.assert_eq(cell_rune(bg, 0, 0), "A", "modal overlay: corner A intact")
+    T.assert_eq(cell_rune(bg, 9, 0), "B", "modal overlay: corner B intact")
+    T.assert_eq(cell_rune(bg, 0, 5), "C", "modal overlay: corner C intact")
+    T.assert_eq(cell_rune(bg, 9, 5), "D", "modal overlay: corner D intact")
+    // modal box sits centered: x=(10-4)/2=3, y=(6-2)/2=2
+    T.assert_eq(cell_rune(bg, 3, 2), "┌", "modal top-left at (3,2)")
+    T.assert_eq(cell_rune(bg, 6, 3), "┘", "modal bottom-right at (6,3)")
+    IO.println("place_centered:\n" + dump(bg))
+
+    T.summary()
+}
+
+main()
