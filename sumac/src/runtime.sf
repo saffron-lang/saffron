@@ -1,0 +1,353 @@
+//! Sumac reactive runtime — the event loop and entry point that binds every
+//! module together (the Turmeric `mount()` / render-loop role, for a terminal).
+//!
+//! Pipeline per frame:  view() builds an LNode tree (reading signals) → the tree
+//! is painted into the *back* buffer → `diff` computes the minimal ANSI stream
+//! against the *front* buffer → `tty.write` flushes it → back is copied to front.
+//!
+//! The loop is a plain synchronous blocking-read loop — no async is required for
+//! a v1 TUI. `run()` enters raw/alt-screen mode, sizes the terminal, allocates
+//! the two buffers ONCE, then repeats { if dirty: render one frame; read input
+//! (short timeout so timers/quit are serviced); parse; dispatch }. On quit it
+//! restores the terminal with `tty.leave()`.
+//!
+//! Dirty policy (v1): any dispatched event marks the whole frame dirty and the
+//! next iteration repaints. The diff keeps this flicker-free regardless, so a
+//! blanket "an input almost always changes state" policy is both correct and
+//! cheap. A signal-driven dirty-tracking optimization (only repaint when a
+//! signal the view read actually changed) is a later refinement; `request_render`
+//! is exposed for timers/async callers that need a redraw between inputs.
+//!
+//! Buffers are allocated once and REUSED (clear + repaint), never reallocated per
+//! frame. This is good design AND sidesteps BUGS #192 (a loop repeatedly
+//! allocating a cross-module class holding a `List<class>` — exactly Buffer's
+//! `List<Cell>` — crashes after ~45 allocations under normal GC). The steady
+//! state allocates no Buffers; only `L._collect` allocates (LNodes) per frame,
+//! which is why the smoke test runs under `GC.disable()` until #192 lands.
+//!
+//! Everything that indexes buffers/lists is annotated `Int` (BUGS #72: a `Float`
+//! list index silently reads element 0).
+
+import "./tty.sf" as Tty
+import "./buffer.sf" as Buf
+import "./input.sf" as In
+import "./layout.sf" as L
+import "./style.sf" as St
+import "io" as IO
+
+// =============================================================================
+// Loop tuning
+// =============================================================================
+
+// Input poll timeout, in milliseconds. Short enough that quit / timer-driven
+// redraws are serviced promptly, long enough that an idle loop does not spin.
+let POLL_MS: Int = 50
+
+// =============================================================================
+// Runtime state (module-level singletons — one running app per process)
+// =============================================================================
+
+var _running: Bool = false
+var _dirty: Bool = true
+// `force` ignores the front buffer on the next diff (full repaint). True on the
+// first frame and after a resize.
+var _force: Bool = true
+
+// The user's view builder. Re-run each dirty frame; reads signals + widget views.
+var _view: () => Nil = fun () => nil
+
+// Terminal geometry in cells. Coordinates into the buffers are 0-based.
+var _rows: Int = 24
+var _cols: Int = 80
+
+// The double buffer. `_front` mirrors what the terminal currently shows; `_back`
+// is repainted each frame and diffed against `_front`. The real, screen-sized
+// buffers are allocated in `_setup` (reused every frame, reallocated only on
+// resize). These module-level initializers are deliberately 1x1 — a screen-sized
+// allocation HERE runs at program startup, before an app/test can call
+// GC.disable(), and would trip BUGS #192 (the ~45-allocation cross-module
+// `List<Cell>` GC crash) immediately. One cell is safely under that threshold.
+var _front: Buf.Buffer = Buf.Buffer(1, 1)
+var _back: Buf.Buffer = Buf.Buffer(1, 1)
+
+// When true, `_render_frame` computes the back buffer + diff + front copy but
+// does NOT write to the terminal. Tests set this so they can inspect `_back`
+// without spraying escape sequences at stdout.
+var _test_silent: Bool = false
+
+// --- Handler registries ---------------------------------------------------
+//
+// Key handlers are kept as parallel lists (name -> fn) rather than a
+// `Map<String, () => Nil>`: it sidesteps the union-typed `Map.get` caveat
+// (BUGS #69) entirely, and a keymap is small so a linear scan is fine.
+var _key_names: List<String> = []
+var _key_fns: List<() => Nil> = []
+
+// Optional catch-all handlers. Function-typed vars can't cleanly hold nil, so a
+// Bool gate tracks "registered"; the var itself starts as a no-op.
+var _mouse_handler: (In.MouseEvent) => Nil = fun (m: In.MouseEvent) => nil
+var _has_mouse_handler: Bool = false
+var _event_handler: (In.Event) => Nil = fun (e: In.Event) => nil
+var _has_event_handler: Bool = false
+
+// =============================================================================
+// Handler registration (public)
+// =============================================================================
+
+/// Register (or replace) the handler for a canonical key name, e.g.
+/// `on_key("ctrl+c", quit)` or `on_key("up", fun () => cursor.set(...))`. Names
+/// are `KeyEvent.name()` values: lowercase, modifier-prefixed ("ctrl+c", "up",
+/// "enter", "a", "f1", "space").
+fun on_key(name: String, handler: () => Nil) {
+    var i: Int = 0
+    var n: Int = _key_names.length()
+    while (i < n) {
+        if (_key_names[i] == name) {
+            _key_fns[i] = handler
+            return
+        }
+        i = i + 1
+    }
+    _key_names.push(name)
+    _key_fns.push(handler)
+}
+
+/// Register the mouse handler — called for every parsed mouse event.
+fun on_mouse(handler: (In.MouseEvent) => Nil) {
+    _mouse_handler = handler
+    _has_mouse_handler = true
+}
+
+/// Register a catch-all event handler — called for every event (after any key /
+/// mouse specific handler), so an app can observe paste/focus/resize too.
+fun on_event(handler: (In.Event) => Nil) {
+    _event_handler = handler
+    _has_event_handler = true
+}
+
+// Whether a key name already has a handler (used to decide the default quit).
+fun _has_key(name: String): Bool {
+    var i: Int = 0
+    var n: Int = _key_names.length()
+    while (i < n) {
+        if (_key_names[i] == name) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// =============================================================================
+// Lifecycle (public)
+// =============================================================================
+
+/// Break the render loop; `run()` restores the terminal on the way out.
+fun quit() {
+    _running = false
+}
+
+/// Ask the loop to repaint on its next iteration. Automatic after any input;
+/// exposed for timer / async callers that mutate state between reads.
+fun request_render() {
+    _dirty = true
+}
+
+// =============================================================================
+// Setup (shared by run() and tests)
+// =============================================================================
+
+// Initialize runtime state and allocate the double buffer ONCE. Both `run()`
+// and tests call this; only `run()` follows it with `Tty.enter()` and the loop.
+fun _setup(view: () => Nil, rows: Int, cols: Int) {
+    _view = view
+    _rows = rows
+    _cols = cols
+    // Buffer(w, h): width = cols, height = rows.
+    _front = Buf.Buffer(cols, rows)
+    _back = Buf.Buffer(cols, rows)
+    _running = true
+    _dirty = true
+    _force = true
+}
+
+// If the app registered no Ctrl+C handler, install a default that quits, so a
+// user can always escape a running UI. Overridable via on_key("ctrl+c", ...).
+fun _ensure_default_quit() {
+    if (!_has_key("ctrl+c")) {
+        on_key("ctrl+c", fun () => quit())
+    }
+}
+
+// =============================================================================
+// Rendering
+// =============================================================================
+
+// Wrap the collected root nodes in a full-screen vertical box so multiple roots
+// stack (rather than overwriting each other in the same region). One root — the
+// common case — is just that root filling the screen.
+fun _wrap_roots(nodes: List<L.LNode>): L.LNode {
+    var props: L.BoxProps = L.BoxProps(0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, St.style(), "")
+    return L.LNode.BoxNode(props, nodes)
+}
+
+/// Render exactly one frame: rebuild the view into the back buffer, diff against
+/// the front buffer, flush the diff to the terminal, then copy back → front.
+/// Clears the dirty/force flags. Separately callable so tests can drive frames
+/// without the blocking input loop.
+fun _render_frame() {
+    // Bind buffers to typed locals — never call methods on a bare field/global.
+    var back: Buf.Buffer = _back
+    var front: Buf.Buffer = _front
+
+    back.clear()
+    var nodes: List<L.LNode> = L._collect(_view)
+    var root: L.LNode = _wrap_roots(nodes)
+    L.render_node(root, back, 0, 0, _cols, _rows)
+
+    var ansi: String = Buf.diff(front, back, _force)
+    if (!_test_silent) {
+        Tty.write(ansi)
+    }
+
+    // Copy back → front. Cells are replaced wholesale (never mutated in place)
+    // by clear/render, so sharing the reference here cannot alias-corrupt a
+    // later frame.
+    var y: Int = 0
+    while (y < _rows) {
+        var x: Int = 0
+        while (x < _cols) {
+            front.set(x, y, back.get(x, y))
+            x = x + 1
+        }
+        y = y + 1
+    }
+
+    _dirty = false
+    _force = false
+}
+
+// Reallocate the buffers to a new terminal size and force a full repaint. This
+// is the ONE place outside setup that allocates Buffers; it runs only on an
+// actual resize, not per frame, so it never trips the #192 steady-state trigger.
+fun _resize(rows: Int, cols: Int) {
+    _rows = rows
+    _cols = cols
+    _front = Buf.Buffer(cols, rows)
+    _back = Buf.Buffer(cols, rows)
+    _force = true
+    _dirty = true
+}
+
+// =============================================================================
+// Event dispatch
+// =============================================================================
+
+// Run the handler bound to `name`, if any. Returns whether one was found+run.
+fun _run_key_handler(name: String): Bool {
+    var i: Int = 0
+    var n: Int = _key_names.length()
+    while (i < n) {
+        if (_key_names[i] == name) {
+            var fn: () => Nil = _key_fns[i]
+            fn()
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+/// Dispatch a single parsed event to the registered handlers. Resize events
+/// reallocate the buffers and force a repaint; key events fire the matching
+/// key handler; mouse events fire the mouse handler; every event also reaches
+/// the catch-all. Any non-resize event marks the frame dirty (v1 policy).
+/// Separately callable so tests can feed synthetic events.
+fun _dispatch_event(e: In.Event) {
+    // Resize marker (runtime-injected): re-measure and full-repaint.
+    if (e.resize) {
+        var sz: Tty.TermSize = Tty.size()
+        _resize(sz.rows, sz.cols)
+        return
+    }
+
+    // `is` on the union facets is broken (BUGS #69), so test each with != nil.
+    if (e.key != nil) {
+        var k: In.KeyEvent = e.key
+        _run_key_handler(k.name())
+    } else if (e.mouse != nil) {
+        if (_has_mouse_handler) {
+            var m: In.MouseEvent = e.mouse
+            var mh: (In.MouseEvent) => Nil = _mouse_handler
+            mh(m)
+        }
+    }
+
+    // Catch-all: sees keys, mouse, paste and focus.
+    if (_has_event_handler) {
+        var eh: (In.Event) => Nil = _event_handler
+        eh(e)
+    }
+
+    // v1 dirty policy: an input almost always changes state; repaint next loop.
+    _dirty = true
+}
+
+// =============================================================================
+// Entry point
+// =============================================================================
+
+/// Run the reactive TUI. Enters full-screen terminal mode, sizes the screen,
+/// allocates the double buffer once, installs a default Ctrl+C→quit handler if
+/// the app didn't register one, then loops { render if dirty; read+parse+
+/// dispatch input } until `quit()`. Restores the terminal on the way out.
+///
+/// NOTE: under normal GC this loop needs BUGS #192 fixed — `L._collect` allocates
+/// LNodes every dirty frame, and the #192 crash triggers after ~45 such
+/// cross-module `List<class>` allocations. The buffers themselves are allocated
+/// once (see `_setup`), so the fix scope is #192, not this loop's structure.
+fun run(view: () => Nil) {
+    Tty.enter()
+
+    var sz: Tty.TermSize = Tty.size()
+    _setup(view, sz.rows, sz.cols)
+    _ensure_default_quit()
+
+    while (_running) {
+        if (_dirty) {
+            _render_frame()
+        }
+
+        var bytes: IO.Bytes = Tty.read_input(64, POLL_MS)
+        if (bytes.length() > 0) {
+            var events: List<In.Event> = In.parse(bytes)
+            var i: Int = 0
+            var n: Int = events.length()
+            while (i < n) {
+                _dispatch_event(events[i])
+                i = i + 1
+            }
+        }
+    }
+
+    Tty.leave()
+}
+
+// =============================================================================
+// Test hooks
+// =============================================================================
+
+/// Initialize runtime state without entering the terminal or starting the loop.
+/// Tests call this, then drive `_render_frame` / `_dispatch_event` directly.
+fun _test_setup(view: () => Nil, rows: Int, cols: Int) {
+    _test_silent = true
+    _setup(view, rows, cols)
+}
+
+/// The back buffer, for test inspection after `_render_frame`.
+fun _back_buffer(): Buf.Buffer {
+    return _back
+}
+
+/// Whether the loop is currently marked running (tests assert quit flips it).
+fun _is_running(): Bool {
+    return _running
+}

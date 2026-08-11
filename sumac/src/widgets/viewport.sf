@@ -1,0 +1,321 @@
+//! Sumac viewport widget — a scrollable content region for long text, the
+//! terminal analog of Bubbles' viewport.
+//!
+//! Follows the uniform widget convention (CONTRACT.md > widgets): the class holds
+//! the signals it binds to (`lines` — the content, one String per logical line;
+//! `offset` — the index of the top visible line), `view()` emits LNodes via the
+//! layout builders, and `handle()` reports whether it consumed an event.
+//!
+//! The app owns the content signal. Long logical lines are hard-clipped to
+//! `width` here (a v1 simplification — pre-wrap in the app if you want soft
+//! wrapping). Clipping is done by char index via String.slice, which differs from
+//! display width for wide/CJK runes; Buf.str_width would be more correct but
+//! char-index clipping is acceptable for v1 (documented).
+//!
+//! Integer discipline (BUGS #72): every offset, line count, height, width, and
+//! scrollbar thumb position is computed into an `Int` local before it is used to
+//! index a list. A Float used as a list index silently reads element 0. Scrollbar
+//! thumb math uses Float division then `.floor()` to Int before any indexing.
+
+import "../buffer.sf" as Buf
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+import "../layout.sf" as L
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+// Clip a logical line to at most `width` characters. See the module note: this
+// is char-index clipping (String.slice), not display-width clipping.
+fun _clip_line(line: String, width: Int): String {
+    if (width <= 0) { return "" }
+    if (line.length() > width) {
+        return line.slice(0, width)
+    }
+    return line
+}
+
+// =============================================================================
+// Viewport
+// =============================================================================
+
+/// A scrollable content region bound to a `List<String>` content signal and an
+/// `Int` top-line-offset signal. `width`/`height` are the visible cell region.
+class Viewport {
+    var lines: Sig.Signal<List<String>>
+    var offset: Sig.Signal<Int>
+    var width: Int
+    var height: Int
+    var content_style: St.Style
+    var show_scrollbar: Bool
+
+    fun init(lines: Sig.Signal<List<String>>, offset: Sig.Signal<Int>,
+             width: Int, height: Int, content_style: St.Style,
+             show_scrollbar: Bool) {
+        this.lines = lines
+        this.offset = offset
+        this.width = width
+        this.height = height
+        this.content_style = content_style
+        this.show_scrollbar = show_scrollbar
+    }
+
+    // -------------------------------------------------------------------------
+    // State accessors (bind the signal to a typed local before calling on it —
+    // a method call on an untyped `this.field` receiver can silently drop).
+    // -------------------------------------------------------------------------
+
+    /// The number of logical content lines.
+    fun total(): Int {
+        var ls: Sig.Signal<List<String>> = this.lines
+        var content: List<String> = ls.get()
+        return content.length()
+    }
+
+    /// The current top-line offset.
+    fun get_offset(): Int {
+        var os: Sig.Signal<Int> = this.offset
+        return os.get()
+    }
+
+    /// The largest legal offset: max(0, total - height).
+    fun max_offset(): Int {
+        var m: Int = this.total() - this.height
+        if (m < 0) { m = 0 }
+        return m
+    }
+
+    // Set the offset, clamped to [0, max_offset()].
+    fun _set_offset(v: Int) {
+        var lo: Int = v
+        if (lo < 0) { lo = 0 }
+        var hi: Int = this.max_offset()
+        if (lo > hi) { lo = hi }
+        var os: Sig.Signal<Int> = this.offset
+        os.set(lo)
+    }
+
+    // -------------------------------------------------------------------------
+    // Scrolling operations
+    // -------------------------------------------------------------------------
+
+    fun scroll_down(n: Int) {
+        this._set_offset(this.get_offset() + n)
+    }
+
+    fun scroll_up(n: Int) {
+        this._set_offset(this.get_offset() - n)
+    }
+
+    fun page_down() {
+        this.scroll_down(this.height)
+    }
+
+    fun page_up() {
+        this.scroll_up(this.height)
+    }
+
+    fun to_top() {
+        this._set_offset(0)
+    }
+
+    fun to_bottom() {
+        this._set_offset(this.max_offset())
+    }
+
+    /// Set the offset to the bottom (max_offset). Used for streaming auto-scroll.
+    fun scroll_to_bottom() {
+        this._set_offset(this.max_offset())
+    }
+
+    /// True when the last line is visible (offset at or past the max). Useful for
+    /// auto-stick: only auto-scroll on new content if already at the bottom.
+    fun at_bottom(): Bool {
+        return this.get_offset() >= this.max_offset()
+    }
+
+    // -------------------------------------------------------------------------
+    // View
+    // -------------------------------------------------------------------------
+
+    // Build the `height` visible content lines starting at `off`, each clipped to
+    // width. Rows past the end of the content are blank ("").
+    fun _visible(content: List<String>, off: Int, total: Int, w: Int, h: Int): List<String> {
+        var out: List<String> = []
+        var i: Int = 0
+        while (i < h) {
+            var idx: Int = off + i
+            var line: String = ""
+            if (idx >= 0 and idx < total) {
+                line = _clip_line(content[idx], w)
+            }
+            out.push(line)
+            i = i + 1
+        }
+        return out
+    }
+
+    // Build the `height`-cell scrollbar column: `█` for thumb cells, `░` for the
+    // track. Thumb size is proportional to height/total, its position to offset.
+    fun _scrollbar_cells(off: Int, total: Int, h: Int): List<String> {
+        // Thumb size proportional to the visible fraction, at least 1 cell.
+        var thumb_size: Int = ((h * h) / total).floor()
+        if (thumb_size < 1) { thumb_size = 1 }
+        if (thumb_size > h) { thumb_size = h }
+
+        var travel: Int = h - thumb_size          // cells the thumb can move
+        var max_off: Int = total - h              // > 0 here (caller guards total > h)
+        var thumb_start: Int = 0
+        if (max_off > 0 and travel > 0) {
+            thumb_start = ((off * travel) / max_off).floor()
+        }
+        if (thumb_start < 0) { thumb_start = 0 }
+        if (thumb_start > travel) { thumb_start = travel }
+        var thumb_end: Int = thumb_start + thumb_size
+
+        var out: List<String> = []
+        var i: Int = 0
+        while (i < h) {
+            if (i >= thumb_start and i < thumb_end) {
+                out.push("█")
+            } else {
+                out.push("░")
+            }
+            i = i + 1
+        }
+        return out
+    }
+
+    /// Emit the visible window. When `show_scrollbar` is on and the content is
+    /// taller than the viewport, wrap the content vstack and a 1-wide scrollbar
+    /// column in an hstack; otherwise just the content vstack.
+    fun view() {
+        // Bind fields to typed locals before use.
+        var ls: Sig.Signal<List<String>> = this.lines
+        var content: List<String> = ls.get()
+        var total: Int = content.length()
+        var off: Int = this.get_offset()
+        var w: Int = this.width
+        var h: Int = this.height
+        var cs: St.Style = this.content_style
+        var want_bar: Bool = this.show_scrollbar
+
+        var visible: List<String> = this._visible(content, off, total, w, h)
+
+        var show_bar: Bool = want_bar and total > h
+
+        if (show_bar) {
+            var bar_cells: List<String> = this._scrollbar_cells(off, total, h)
+            L.hstack(fun () {
+                // Fixed-width content column so the scrollbar sits at the right
+                // edge (column `width`) instead of hugging the natural text width.
+                L.box(0, 0, 0, 0, 0, 0, 0, 0, w, h, 0, fun () {
+                    var i: Int = 0
+                    while (i < h) {
+                        L.text_styled(visible[i], cs)
+                        i = i + 1
+                    }
+                })
+                L.vstack(fun () {
+                    var j: Int = 0
+                    while (j < h) {
+                        L.text_styled(bar_cells[j], cs)
+                        j = j + 1
+                    }
+                })
+            })
+        } else {
+            L.vstack(fun () {
+                var i: Int = 0
+                while (i < h) {
+                    L.text_styled(visible[i], cs)
+                    i = i + 1
+                }
+            })
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Input
+    // -------------------------------------------------------------------------
+
+    /// Handle a scroll event, returning true if consumed.
+    ///   down/j        → scroll_down(1)
+    ///   up/k          → scroll_up(1)
+    ///   pgdown/space  → page_down
+    ///   pgup          → page_up
+    ///   home/g        → to_top
+    ///   end/G         → to_bottom
+    ///   mouse wheel   → scroll_up/down(3)
+    fun handle(e: Ev.Event): Bool {
+        if (e.key != nil) {
+            var k: Ev.KeyEvent = e.key
+            var name: String = k.name()
+            if (name == "down" or name == "j") {
+                this.scroll_down(1)
+                return true
+            }
+            if (name == "up" or name == "k") {
+                this.scroll_up(1)
+                return true
+            }
+            if (name == "pgdown" or name == "space") {
+                this.page_down()
+                return true
+            }
+            if (name == "pgup") {
+                this.page_up()
+                return true
+            }
+            if (name == "home" or name == "g") {
+                this.to_top()
+                return true
+            }
+            if (name == "end" or name == "G") {
+                this.to_bottom()
+                return true
+            }
+            return false
+        }
+        if (e.mouse != nil) {
+            var m: Ev.MouseEvent = e.mouse
+            if (m.kind == Ev.MOUSE_WHEEL_UP) {
+                this.scroll_up(3)
+                return true
+            }
+            if (m.kind == Ev.MOUSE_WHEEL_DOWN) {
+                this.scroll_down(3)
+                return true
+            }
+            return false
+        }
+        return false
+    }
+
+    fun focusable(): Bool {
+        return true
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A viewport with an empty content signal, offset 0, and the scrollbar on. The
+/// app sets `.lines` (or replaces the signal) with content, one String per line.
+fun viewport(width: Int, height: Int): Viewport {
+    var lines: Sig.Signal<List<String>> = Sig.signal([])
+    var offset: Sig.Signal<Int> = Sig.signal(0)
+    return Viewport(lines, offset, width, height, St.style(), true)
+}
+
+/// A viewport with explicit content style and scrollbar flag. Creates its own
+/// empty content + zero offset signals; the app drives them.
+fun viewport_styled(width: Int, height: Int, content_style: St.Style,
+                    show_scrollbar: Bool): Viewport {
+    var lines: Sig.Signal<List<String>> = Sig.signal([])
+    var offset: Sig.Signal<Int> = Sig.signal(0)
+    return Viewport(lines, offset, width, height, content_style, show_scrollbar)
+}

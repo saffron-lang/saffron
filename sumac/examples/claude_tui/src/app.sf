@@ -1,0 +1,563 @@
+//! claude_tui — shared application module (state + view + logic).
+//!
+//! This is the "Saffron Dusk" showcase for Sumac: a prettier front-end for the
+//! `claude` CLI. It is imported by BOTH `main.sf` (which enters the terminal and
+//! runs the reactive loop) and `test_render.sf` (which renders one frame into a
+//! Buffer for a golden-style dump). Keeping the state, palette, and view builder
+//! here — with NO top-level side effects beyond signal/widget construction —
+//! means there is a single source of truth and the test can render the exact
+//! tree the app runs, without starting the blocking input loop.
+//!
+//! Integer discipline (BUGS #72): every index / coordinate / size is annotated
+//! `Int`. Signals are bound to typed locals before `.get()/.set()`. `!= nil` is
+//! used for Process results and Event facets (never `is`, BUGS #69). No
+//! `GC.disable()` anywhere — #192 is fixed and the tree rebuilds every frame
+//! under normal GC.
+
+import "../../../src/style.sf" as St
+import "../../../src/layout.sf" as L
+import "../../../src/buffer.sf" as Buf
+import { signal } from "../../../src/signal.sf"
+import "../../../src/signal.sf" as Sig
+import "../../../src/widgets/spinner.sf" as Spin
+import "../../../src/widgets/textarea.sf" as TA
+import "../../../src/widgets/viewport.sf" as VP
+import "@process" as Process
+import "@time" as Time
+import "io" as IO
+
+// =============================================================================
+// Palette — "Saffron Dusk" (truecolor via St.hex, per DESIGN §2)
+// =============================================================================
+
+fun c_bg(): St.Color { return St.hex("#12100E") }
+fun c_surface(): St.Color { return St.hex("#1D1A16") }
+fun c_border(): St.Color { return St.hex("#3A342B") }
+fun c_border_focus(): St.Color { return St.hex("#C8873B") }
+fun c_text(): St.Color { return St.hex("#E8DFD0") }
+fun c_muted(): St.Color { return St.hex("#8A8072") }
+fun c_faint(): St.Color { return St.hex("#5A5348") }
+fun c_primary(): St.Color { return St.hex("#E0A54A") }
+fun c_accent(): St.Color { return St.hex("#D2662E") }
+fun c_user(): St.Color { return St.hex("#7FB08A") }
+fun c_error(): St.Color { return St.hex("#D96C5F") }
+fun c_success(): St.Color { return St.hex("#8FA876") }
+fun c_code_bg(): St.Color { return St.hex("#171410") }
+
+// Base style carrying the app background, so every region sits on warm-black.
+fun st_base(): St.Style { return St.style().with_bg(c_bg()) }
+
+// --- Semantic text styles (all on the bg fill) ---
+fun st_text(): St.Style { return st_base().with_fg(c_text()) }
+fun st_muted(): St.Style { return st_base().with_fg(c_muted()) }
+fun st_faint(): St.Style { return st_base().with_fg(c_faint()) }
+fun st_title(): St.Style { return st_base().with_fg(c_primary()).bold() }
+fun st_user(): St.Style { return st_base().with_fg(c_user()).bold() }
+fun st_assistant(): St.Style { return st_base().with_fg(c_primary()).bold() }
+fun st_accent(): St.Style { return st_base().with_fg(c_accent()) }
+fun st_error(): St.Style { return st_base().with_fg(c_error()).bold() }
+fun st_border(): St.Style { return st_base().with_fg(c_border()) }
+fun st_border_focus(): St.Style { return st_base().with_fg(c_border_focus()) }
+fun st_code(): St.Style { return St.style().with_bg(c_code_bg()).with_fg(c_success()) }
+fun st_spinner(): St.Style { return st_base().with_fg(c_primary()) }
+
+// Line-kind selectors for the flat transcript model.
+let K_PROSE: Int = 0        // assistant/user prose -> text
+let K_USER: Int = 1         // user speaker header  -> user color, bold
+let K_ASSISTANT: Int = 2    // assistant speaker    -> primary, bold
+let K_META: Int = 3         // timestamps / hints   -> muted
+let K_ERROR: Int = 4        // error message        -> coral
+let K_CODE: Int = 5         // fenced code line     -> code style
+
+fun style_for_kind(k: Int): St.Style {
+    if (k == K_USER) { return st_user() }
+    if (k == K_ASSISTANT) { return st_assistant() }
+    if (k == K_META) { return st_faint() }
+    if (k == K_ERROR) { return st_error() }
+    if (k == K_CODE) { return st_code() }
+    return st_text()
+}
+
+// =============================================================================
+// Model + reactive state
+// =============================================================================
+//
+// A message is a [role, text, timestamp] triple (all String). role is one of
+// "user" | "assistant" | "error". Stored as a List of triples in one signal so
+// the whole transcript is a single reactive source of truth.
+
+var MODEL_NAME: String = "sonnet-4.6"
+
+fun _empty_msgs(): List<List<String>> {
+    var m: List<List<String>> = []
+    return m
+}
+
+var messages: Sig.Signal<List<List<String>>> = signal(_empty_msgs())
+var thinking: Sig.Signal<Bool> = signal(false)
+var status: Sig.Signal<String> = signal("ready")
+var turn: Sig.Signal<Int> = signal(0)
+
+// Transcript scroll state. A Viewport owns the offset signal + the scroll math
+// (clamping, page/line steps); the app renders styled lines itself (per-speaker
+// color, which a single-style viewport cannot express) but drives ALL scroll
+// state through this widget instance — its offset signal is the source of truth.
+var transcript: VP.Viewport = VP.viewport(80, 20)
+
+// The prompt editor (multi-line; Enter is intercepted by the app for send, so
+// the textarea only sees printable/edit keys).
+var prompt: TA.TextArea = TA.textarea("ask claude anything…", 80, 3)
+
+// Thinking spinner (braille dot ring, saffron) — DESIGN §7.
+var spin: Spin.Spinner = Spin.spinner_styled("thinking…", Spin.SPINNER_DOTS, st_spinner())
+
+// Terminal geometry, refreshed from Tty.size() by main / seeded by the test.
+var g_cols: Int = 96
+var g_rows: Int = 34
+
+fun set_size(cols: Int, rows: Int) {
+    g_cols = cols
+    g_rows = rows
+}
+
+// =============================================================================
+// State helpers (bind signal to a typed local before calling — untyped receiver
+// on a bare global can silently drop the call).
+// =============================================================================
+
+fun get_messages(): List<List<String>> {
+    var s: Sig.Signal<List<List<String>>> = messages
+    return s.get()
+}
+
+fun is_thinking(): Bool {
+    var s: Sig.Signal<Bool> = thinking
+    return s.get()
+}
+
+fun set_thinking(v: Bool) {
+    var s: Sig.Signal<Bool> = thinking
+    s.set(v)
+}
+
+fun get_status(): String {
+    var s: Sig.Signal<String> = status
+    return s.get()
+}
+
+fun set_status(v: String) {
+    var s: Sig.Signal<String> = status
+    s.set(v)
+}
+
+fun get_turn(): Int {
+    var s: Sig.Signal<Int> = turn
+    return s.get()
+}
+
+fun _now_hhmmss(): String {
+    var h: Int = Time.hour()
+    var mi: Int = Time.minute()
+    var se: Int = Time.second()
+    return _pad2(h) + ":" + _pad2(mi) + ":" + _pad2(se)
+}
+
+fun _pad2(n: Int): String {
+    if (n < 10) { return "0" + n.to_string() }
+    return n.to_string()
+}
+
+/// Append a message triple and bump the turn counter.
+fun append_message(role: String, text: String) {
+    var s: Sig.Signal<List<List<String>>> = messages
+    var cur: List<List<String>> = s.get()
+    var row: List<String> = [role, text, _now_hhmmss()]
+    cur.push(row)
+    s.set(cur)
+    var ts: Sig.Signal<Int> = turn
+    ts.set(ts.get() + 1)
+}
+
+// =============================================================================
+// Word wrap (transcript prose) — a small, self-contained wrapper so the flat
+// line model can be paged by offset without relying on layout internals.
+// =============================================================================
+
+fun _wrap(text: String, width: Int): List<String> {
+    var out: List<String> = []
+    if (width <= 0) {
+        out.push(text)
+        return out
+    }
+    var words: List<String> = text.split(" ")
+    var cur: String = ""
+    var i: Int = 0
+    var n: Int = words.length()
+    while (i < n) {
+        var w: String = words[i]
+        if (cur.length() == 0) {
+            cur = w
+        } else if (cur.length() + 1 + w.length() <= width) {
+            cur = cur + " " + w
+        } else {
+            out.push(cur)
+            cur = w
+        }
+        i = i + 1
+    }
+    out.push(cur)
+    return out
+}
+
+// =============================================================================
+// Flat transcript model: build parallel (text, kind) lists from the messages,
+// wrapped to `width`. Handles fenced ``` code blocks with a distinct style.
+// =============================================================================
+
+class TLines {
+    var texts: List<String>
+    var kinds: List<Int>
+    fun init(texts: List<String>, kinds: List<Int>) {
+        this.texts = texts
+        this.kinds = kinds
+    }
+}
+
+fun _push_line(texts: List<String>, kinds: List<Int>, s: String, k: Int) {
+    texts.push(s)
+    kinds.push(k)
+}
+
+fun build_transcript(width: Int): TLines {
+    var texts: List<String> = []
+    var kinds: List<Int> = []
+    var msgs: List<List<String>> = get_messages()
+    var mi: Int = 0
+    var mn: Int = msgs.length()
+
+    if (mn == 0) {
+        // Empty state (DESIGN §7): an inviting centered-ish prompt.
+        _push_line(texts, kinds, "", K_PROSE)
+        _push_line(texts, kinds, "  ◈  ask claude anything", K_ASSISTANT)
+        _push_line(texts, kinds, "     type below and press enter to begin", K_META)
+        _push_line(texts, kinds, "", K_PROSE)
+        _push_line(texts, kinds, "     · how do i stream a subprocess in saffron?", K_META)
+        _push_line(texts, kinds, "     · explain nan-boxed values", K_META)
+        _push_line(texts, kinds, "     · write a fibonacci function", K_META)
+        return TLines(texts, kinds)
+    }
+
+    while (mi < mn) {
+        var m: List<String> = msgs[mi]
+        var role: String = m[0]
+        var body: String = m[1]
+        var ts: String = m[2]
+
+        // Speaker header row.
+        if (role == "user") {
+            _push_line(texts, kinds, "▌ you                                         " + ts, K_USER)
+        } else if (role == "error") {
+            _push_line(texts, kinds, "✖ error                                       " + ts, K_ERROR)
+        } else {
+            _push_line(texts, kinds, "◈ claude                                      " + ts, K_ASSISTANT)
+        }
+
+        // Body: split on physical newlines, honor fenced code blocks.
+        var phys: List<String> = body.split("\n")
+        var pi: Int = 0
+        var pn: Int = phys.length()
+        var in_code: Bool = false
+        while (pi < pn) {
+            var line: String = phys[pi]
+            if (line.length() >= 3 and line.slice(0, 3) == "```") {
+                in_code = !in_code
+                pi = pi + 1
+                continue
+            }
+            if (in_code) {
+                _push_line(texts, kinds, "  " + line, K_CODE)
+            } else {
+                var body_k: Int = K_PROSE
+                if (role == "error") { body_k = K_ERROR }
+                var wrapped: List<String> = _wrap(line, width - 2)
+                var wi: Int = 0
+                var wnn: Int = wrapped.length()
+                while (wi < wnn) {
+                    _push_line(texts, kinds, "  " + wrapped[wi], body_k)
+                    wi = wi + 1
+                }
+            }
+            pi = pi + 1
+        }
+        // Blank separator between messages.
+        _push_line(texts, kinds, "", K_PROSE)
+        mi = mi + 1
+    }
+    return TLines(texts, kinds)
+}
+
+// Keep the viewport's plaintext line list + geometry in sync so its scroll math
+// (max_offset / clamping / page steps) matches the styled render exactly.
+fun sync_transcript(tl: TLines, height: Int) {
+    transcript.width = g_cols
+    transcript.height = height
+    var ls: Sig.Signal<List<String>> = transcript.lines
+    ls.set(tl.texts)
+}
+
+// =============================================================================
+// View — rebuilt every frame by the runtime (reads signals).
+// =============================================================================
+
+fun _header() {
+    var turn_n: Int = get_turn()
+    var st_run: String = get_status()
+    var right: String = "◇ " + MODEL_NAME + "    ⛁ 12.4k / 200k    ⟳ turn " + turn_n.to_string()
+    // dir=1 (hstack), justify=3 (space-between) pushes status to the left rail
+    // and the model/token/turn cluster to the right. Text children never grow,
+    // so the between-justify slack distributes as expected.
+    L.box_styled(1, 0, 0, 0, 0, 0, 0, 3, -1, 1, 0, st_base(), "", fun () {
+        L.text_styled(st_run, st_accent())
+        L.text_styled(right, st_muted())
+    })
+}
+
+fun _transcript_region(inner_w: Int, height: Int) {
+    var tl: TLines = build_transcript(inner_w)
+    sync_transcript(tl, height)
+    var off: Int = transcript.get_offset()
+    var total: Int = tl.texts.length()
+    var texts: List<String> = tl.texts
+    var kinds: List<Int> = tl.kinds
+
+    // grow=1 so the transcript absorbs all slack between the header rule and the
+    // input well — the input + footer sit flush at the bottom at any terminal
+    // size. `height` fixed rows are emitted so the offset math stays exact.
+    L.box_styled(0, 0, 0, 0, 0, 0, 0, 0, -1, -1, 1, st_base(), "", fun () {
+        var i: Int = 0
+        while (i < height) {
+            var idx: Int = off + i
+            if (idx >= 0 and idx < total) {
+                L.text_styled(texts[idx], style_for_kind(kinds[idx]))
+            } else {
+                L.text_styled("", st_text())
+            }
+            i = i + 1
+        }
+    })
+}
+
+fun _input_region(inner_w: Int) {
+    var think: Bool = is_thinking()
+    // The input well is the focused region by default → amber (border_focus).
+    // While thinking it becomes a thick, read-only "responding" affordance.
+    var bcol: St.Style = st_border_focus()
+    var bcode: Int = 2
+    if (think) { bcode = 3 }
+
+    // Read the prompt value directly (rather than textarea.view(), which draws
+    // its OWN border — that would double the message frame). The leading "▏" bar
+    // + block caret is the DESIGN's input affordance.
+    var t: TA.TextArea = prompt
+    var val: String = t.value_str()
+
+    L.box_styled(0, bcode, 0, 1, 0, 1, 0, 0, -1, 3, 0, bcol, "message", fun () {
+        if (think) {
+            L.hstack(fun () {
+                spin.view()
+                L.box(width=1, block=fun () => nil)
+                L.text_styled("claude is responding…  esc to interrupt", st_error())
+            })
+        } else if (val == "") {
+            L.hstack(fun () {
+                L.text_styled("▏", st_title())
+                L.text_styled("ask claude anything…", st_faint().italic())
+            })
+        } else {
+            L.hstack(fun () {
+                L.text_styled("▏", st_title())
+                L.text_styled(val, st_text())
+                L.text_styled("█", st_title())
+            })
+        }
+    })
+}
+
+// A single footer hint: key run (accent) + width-1 gap + label run (muted).
+// The explicit width-1 box is required because layout word-wrap strips a
+// leading/trailing space inside a text node (see spinner.sf) — a literal " "
+// would collapse and the key/label would render flush.
+fun _hint(key: String, label: String) {
+    L.text_styled(key, st_accent().bold())
+    L.box(width=1, block=fun () => nil)
+    L.text_styled(label, st_muted())
+    L.box(width=3, block=fun () => nil)
+}
+
+fun _footer() {
+    var think: Bool = is_thinking()
+    L.hstack(fun () {
+        if (think) {
+            _hint("⠿", "streaming")
+            _hint("esc", "interrupt")
+            _hint("↑↓", "scroll")
+            _hint("^C", "quit")
+        } else {
+            _hint("⏎", "send")
+            _hint("↑↓", "scroll")
+            _hint("pgup/pgdn", "page")
+            _hint("^L", "clear")
+            _hint("^C", "quit")
+        }
+    })
+}
+
+/// The root view. Appends one full-screen rounded frame containing header,
+/// transcript, divider, input, and footer. Read by `Rt.run` every dirty frame.
+fun view() {
+    var cols: Int = g_cols
+    var rows: Int = g_rows
+    var inner_w: Int = cols - 4          // 2 border + 2 side pad
+    if (inner_w < 4) { inner_w = 4 }
+
+    // Rows budget inside the frame: total - 2 (frame border).
+    // header(1) + divider(1) + input(3 content + 2 border = 5) + footer(1) = 8.
+    var chrome: Int = 10
+    var trans_h: Int = rows - 2 - chrome
+    if (trans_h < 3) { trans_h = 3 }
+
+    L.box_styled(0, 2, 0, 1, 0, 1, 0, 0, -1, -1, 1, st_border(),
+                 "saffron · claude", fun () {
+        _header()
+        L.text_styled(_rule(inner_w), st_border())
+        _transcript_region(inner_w, trans_h)
+        L.text_styled(_rule(inner_w), st_border())
+        _input_region(inner_w)
+        _footer()
+    })
+}
+
+fun _rule(w: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while (i < w) {
+        s = s + "─"
+        i = i + 1
+    }
+    return s
+}
+
+// =============================================================================
+// Actions
+// =============================================================================
+
+/// Read the prompt, append it as a user message, run the `claude` CLI, and
+/// append the reply (or a non-fatal error line if `claude` is missing/fails).
+/// `paint` is a callback the caller supplies to force a repaint of the
+/// "thinking" state before the (blocking) subprocess call — the v1 loop is
+/// synchronous, so without it the spinner state would never reach the screen.
+fun send(paint: () => Nil) {
+    if (is_thinking()) { return }
+    var t: TA.TextArea = prompt
+    var text: String = t.value_str().trim()
+    if (text == "") { return }
+
+    append_message("user", text)
+    // Clear the editor.
+    var vsig: Sig.Signal<String> = t.value
+    vsig.set("")
+    var rsig: Sig.Signal<Int> = t.cursor_row
+    rsig.set(0)
+    var csig: Sig.Signal<Int> = t.cursor_col
+    csig.set(0)
+
+    set_thinking(true)
+    set_status("thinking…")
+    // Stick the transcript to the bottom so the new turn is visible.
+    transcript.scroll_to_bottom()
+    paint()
+
+    var reply: String = _run_claude(text)
+    if (reply == "") {
+        reply = "(claude returned no output)"
+    }
+    append_message("assistant", reply)
+    set_thinking(false)
+    set_status("ready")
+    transcript.scroll_to_bottom()
+}
+
+// Invoke the `claude` CLI once and return its stdout (trimmed). Never crashes:
+// a missing binary or non-zero exit becomes an error-role message string.
+fun _run_claude(promptText: String): String {
+    var path: String = Process.which("claude")
+    if (path == "") {
+        append_message("error", "`claude` CLI not found on PATH. Install it, or set PATH, then retry.")
+        return ""
+    }
+    var args: List<String> = ["-p", promptText]
+    var res: Process.ProcessResult = Process.exec("claude", args)
+    if (res == nil) {
+        append_message("error", "failed to spawn `claude`.")
+        return ""
+    }
+    if (!res.success) {
+        var err: String = res.stderr.trim()
+        if (err == "") { err = "claude exited with code " + res.exit_code.to_string() }
+        append_message("error", err)
+        return ""
+    }
+    return res.stdout.trim()
+}
+
+// =============================================================================
+// Scroll actions (driven by key handlers in main.sf)
+// =============================================================================
+
+fun scroll_up() { transcript.scroll_up(1) }
+fun scroll_down() { transcript.scroll_down(1) }
+fun page_up() { transcript.page_up() }
+fun page_down() { transcript.page_down() }
+
+// Advance the thinking spinner one frame (called by a tick / on each send-paint).
+fun tick_spinner() {
+    spin.tick()
+}
+
+// =============================================================================
+// Render-to-text (for the render test)
+// =============================================================================
+//
+// Renders the app view ONCE into a fresh Buffer(w, h) and returns the row dump.
+// This MUST live in app.sf: Saffron keys module instances by the literal import
+// path string, so a test file reaching layout/buffer through a different-length
+// relative path ("../../src" vs app.sf's "../../../src") would get a SEPARATE
+// layout instance with its own empty `_ctx_stack` — `_collect` there sees zero
+// of the nodes app.sf emitted. Building the tree here uses app.sf's own layout +
+// buffer instances, so the render is faithful to what `Rt.run` paints.
+fun render_to_text(w: Int, h: Int): String {
+    set_size(w, h)
+    var nodes: List<L.LNode> = L._collect(fun () { view() })
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    var i: Int = 0
+    var n: Int = nodes.length()
+    while (i < n) {
+        L.render_node(nodes[i], buf, 0, 0, w, h)
+        i = i + 1
+    }
+    var out: String = ""
+    var y: Int = 0
+    while (y < h) {
+        if (y > 0) { out = out + "\n" }
+        var x: Int = 0
+        while (x < w) {
+            var c: Buf.Cell = buf.get(x, y)
+            var r: String = c.rune
+            if (r == "") { r = " " }
+            out = out + r
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return out
+}

@@ -1,0 +1,25 @@
+//! Render-once test for claude_tui.
+//!
+//! Seeds a short exchange, then renders the app's real `view()` ONCE into a
+//! Buffer(100, 30) — the same tree `Rt.run` paints each frame — and dumps it to
+//! text so the layout can be eyeballed without a TTY or the blocking loop.
+//!
+//! The buffer render itself lives in `app.sf` (`render_to_text`): Saffron keys
+//! module instances by the literal import-path string, so reaching layout/buffer
+//! from here through a shorter relative path than app.sf uses would yield a
+//! SEPARATE layout instance whose `_collect` context never sees app.sf's emitted
+//! nodes. Delegating keeps everything on one instance. No GC.disable() — #192 is
+//! fixed.
+
+import "./src/app.sf" as App
+import "io" as IO
+
+fun main() {
+    App.append_message("user", "how do i stream a subprocess line-by-line in saffron?")
+    App.append_message("assistant",
+        "Open the process with a pipe and read stdout in a loop.\n```saffron\nvar p = Process.open(\"claude -p hi\")\nvar out = p.stdout.read_all()\n```\nThe handle is buffered, so the loop blocks until a line is ready.")
+
+    IO.println(App.render_to_text(100, 30))
+}
+
+main()

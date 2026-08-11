@@ -1,0 +1,157 @@
+//! Sumac spinner widget — an animated "work in progress" indicator.
+//!
+//! A `Spinner` cycles a small vocabulary of frame glyphs (dots, a spinning
+//! line, a braille bounce, moving points) next to an optional label. It holds a
+//! `frame` signal (the current frame index) so the reactive runtime re-renders
+//! whenever the frame advances; a timer in the runtime calls `.tick()` on an
+//! interval to advance it.
+//!
+//! Everything index-shaped is annotated `Int`: the frame index, the frame
+//! count, and the style selector. A `Float` used as a list index silently reads
+//! element 0 (BUGS #72), which for a spinner would freeze it on the first glyph
+//! forever, so the index math stays strictly integer.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+
+// =============================================================================
+// Style selectors
+// =============================================================================
+//
+// Each constant names a spinner "vocabulary" — a fixed array of frame glyphs
+// that `_spinner_frames` returns. `style_kind` on a Spinner is one of these.
+
+let SPINNER_DOTS: Int = 0      // ⠋⠙⠹… braille dot ring (the classic)
+let SPINNER_LINE: Int = 1      // | / - \  ASCII line spinner
+let SPINNER_BRAILLE: Int = 2   // a single braille dot bouncing around
+let SPINNER_POINTS: Int = 3    // ∙∙∙ ●∙∙ ∙●∙ ∙∙● moving point
+
+/// The frame glyphs for a style selector. Unknown selectors fall back to the
+/// dot ring. Kept as a free function (not a stored field) so a Spinner carries
+/// only its selector `Int`, and the glyph table lives in one place.
+fun _spinner_frames(kind: Int): List<String> {
+    if (kind == SPINNER_LINE) {
+        return ["|", "/", "-", "\\"]
+    }
+    if (kind == SPINNER_BRAILLE) {
+        // A single raised dot bouncing around the braille cell.
+        return ["⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"]
+    }
+    if (kind == SPINNER_POINTS) {
+        return ["∙∙∙", "●∙∙", "∙●∙", "∙∙●"]
+    }
+    // SPINNER_DOTS (default): the braille dot ring.
+    return ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+}
+
+// =============================================================================
+// Spinner
+// =============================================================================
+
+/// An animated spinner. Holds the frame index as a signal so the runtime knows
+/// to repaint when it advances; the glyph vocabulary is chosen by `style_kind`
+/// and the glyph is drawn in `text_style`, followed by an optional label.
+class Spinner {
+    var frame: Sig.Signal<Int>
+    var style_kind: Int
+    var label: String
+    var text_style: St.Style
+
+    fun init(frame: Sig.Signal<Int>, style_kind: Int, label: String,
+             text_style: St.Style) {
+        this.frame = frame
+        this.style_kind = style_kind
+        this.label = label
+        this.text_style = text_style
+    }
+
+    /// Advance to the next frame, wrapping modulo the current style's frame
+    /// count. The runtime's timer calls this on an interval; it writes the
+    /// `frame` signal, which drives a re-render.
+    fun tick() {
+        var frames: List<String> = _spinner_frames(this.style_kind)
+        var nframes: Int = frames.length()
+        // Bind the signal to a typed local before calling methods on it — a
+        // method call straight on `this.frame` reads as an untyped receiver and
+        // can be silently dropped.
+        var sig: Sig.Signal<Int> = this.frame
+        var cur: Int = sig.get()
+        var next: Int = 0
+        if (nframes > 0) {
+            next = (cur + 1) % nframes
+        }
+        sig.set(next)
+    }
+
+    /// Emit the spinner subtree: the current glyph styled with `text_style`,
+    /// then a space + label if the label is non-empty. Reads the `frame` signal
+    /// so the runtime re-renders on each tick.
+    fun view() {
+        var frames: List<String> = _spinner_frames(this.style_kind)
+        var nframes: Int = frames.length()
+        var sig: Sig.Signal<Int> = this.frame
+        var idx: Int = sig.get()
+        // Defensive clamp: a freshly resized vocabulary or an out-of-range
+        // signal must never index past the end (which would read element 0 or
+        // fault); wrap it into range instead.
+        if (nframes > 0) {
+            idx = idx % nframes
+            if (idx < 0) { idx = idx + nframes }
+        } else {
+            idx = 0
+        }
+        var glyph: String = ""
+        if (nframes > 0) {
+            glyph = frames[idx]
+        }
+        var st: St.Style = this.text_style
+        var lbl: String = this.label
+        L.hstack(fun () {
+            L.text_styled(glyph, st)
+            if (lbl != "") {
+                // A fixed 1-column gap between glyph and label. A leading space
+                // in the label text does NOT work: layout's word-wrap collapses
+                // leading/trailing spaces (split on " "), so "⠋" and the label
+                // would render flush together. A width-1 empty box is a blank
+                // column the layout preserves.
+                L.box(width=1, block=fun () => nil)
+                L.text(lbl)
+            }
+        })
+    }
+
+    /// A spinner consumes no input — it is a passive indicator. Always false so
+    /// the runtime keeps propagating the event.
+    fun handle(e: Ev.Event): Bool {
+        return false
+    }
+
+    /// Spinners are not focusable (nothing to interact with).
+    fun focusable(): Bool {
+        return false
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A spinner with the default dot-ring style and a default text style, owning a
+/// fresh frame signal starting at frame 0.
+fun spinner(label: String): Spinner {
+    // The frame index must be Int, so seed the signal from an Int local — a
+    // bare `0` literal is a Float and would poison the index math (BUGS #72).
+    var zero: Int = 0
+    var frame: Sig.Signal<Int> = Sig.signal(zero)
+    return Spinner(frame, SPINNER_DOTS, label, St.style())
+}
+
+/// A spinner with an explicit style vocabulary and text style, owning a fresh
+/// frame signal starting at frame 0.
+fun spinner_styled(label: String, style_kind: Int, text_style: St.Style): Spinner {
+    var zero: Int = 0
+    var frame: Sig.Signal<Int> = Sig.signal(zero)
+    return Spinner(frame, style_kind, label, text_style)
+}

@@ -1,0 +1,175 @@
+// Verify sumac's cell buffer + minimal-diff renderer: rune/string widths
+// (incl. wide chars and combining accents), Buffer get/set/put_str with wide
+// placeholders and edge clipping, and the diff() ANSI stream (minimal change,
+// force full repaint, no-op on identical buffers).
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "@test" as T
+import "io" as IO
+
+fun main() {
+    // --- rune_width ---
+    T.assert_eq(Buf.rune_width("a"), 1, "ascii is 1 col")
+    T.assert_eq(Buf.rune_width(" "), 1, "space is 1 col")
+    T.assert_eq(Buf.rune_width(""), 0, "empty rune is 0 col")
+    T.assert_eq(Buf.rune_width("é"), 1, "precomposed accent is 1 col")
+    T.assert_eq(Buf.rune_width("世"), 2, "CJK is 2 cols")
+    T.assert_eq(Buf.rune_width("あ"), 2, "hiragana is 2 cols")
+
+    // --- str_width ---
+    // "héllo" with a precomposed é is 5 graphemes, all narrow -> 5.
+    T.assert_eq(Buf.str_width("héllo"), 5, "héllo is 5 cols")
+    T.assert_eq(Buf.str_width("hello"), 5, "hello is 5 cols")
+    // A CJK string: each char 2 cols. "世界" = 4.
+    T.assert_eq(Buf.str_width("世界"), 4, "世界 is 4 cols (2*2)")
+    T.assert_eq(Buf.str_width(""), 0, "empty string is 0 cols")
+
+    // --- Buffer basics ---
+    var buf: Buf.Buffer = Buf.Buffer(10, 3)
+    T.assert_eq(buf.w, 10, "width")
+    T.assert_eq(buf.h, 3, "height")
+    // Fresh buffer is all blanks.
+    var b00: Buf.Cell = buf.get(0, 0)
+    T.assert_eq(b00.rune, " ", "fresh cell is blank space")
+    T.assert_eq(b00.width, 1, "fresh cell width 1")
+
+    // Off-grid get returns a blank, no crash.
+    var off: Buf.Cell = buf.get(99, 99)
+    T.assert_eq(off.rune, " ", "off-grid get is blank")
+
+    // --- put_str, narrow ---
+    var endx: Int = buf.put_str(2, 1, "Hi", St.style())
+    T.assert_eq(endx, 4, "put_str advances by 2 for 'Hi'")
+    T.assert_eq(buf.get(2, 1).rune, "H", "H written at (2,1)")
+    T.assert_eq(buf.get(3, 1).rune, "i", "i written at (3,1)")
+    T.assert_eq(buf.get(2, 1).width, 1, "H width 1")
+
+    // --- put_str, wide char leaves a width-0 placeholder ---
+    var buf2: Buf.Buffer = Buf.Buffer(10, 1)
+    var wend: Int = buf2.put_str(0, 0, "世", St.style())
+    T.assert_eq(wend, 2, "wide char advances x by 2")
+    var wcell: Buf.Cell = buf2.get(0, 0)
+    T.assert_eq(wcell.rune, "世", "wide rune at (0,0)")
+    T.assert_eq(wcell.width, 2, "wide cell width 2")
+    var placeholder: Buf.Cell = buf2.get(1, 0)
+    T.assert_eq(placeholder.width, 0, "placeholder width 0")
+    T.assert_eq(placeholder.rune, "", "placeholder rune empty")
+
+    // --- put_str clips at right edge ---
+    var buf3: Buf.Buffer = Buf.Buffer(3, 1)
+    var cend: Int = buf3.put_str(0, 0, "abcdef", St.style())
+    T.assert_eq(cend, 3, "clip stops at width 3")
+    T.assert_eq(buf3.get(2, 0).rune, "c", "third char written")
+
+    // A wide char that would straddle the right edge becomes a blank.
+    var buf4: Buf.Buffer = Buf.Buffer(3, 1)
+    buf4.put_str(0, 0, "ab", St.style())   // fills cols 0,1
+    buf4.put_str(2, 0, "世", St.style())    // only col 2 free -> blank
+    T.assert_eq(buf4.get(2, 0).rune, " ", "wide char at edge becomes blank")
+    T.assert_eq(buf4.get(2, 0).width, 1, "edge-blank width 1")
+
+    // --- fill ---
+    var buf5: Buf.Buffer = Buf.Buffer(4, 4)
+    buf5.fill(1, 1, 2, 2, Buf.Cell("#", St.style(), 1))
+    T.assert_eq(buf5.get(1, 1).rune, "#", "fill (1,1)")
+    T.assert_eq(buf5.get(2, 2).rune, "#", "fill (2,2)")
+    T.assert_eq(buf5.get(0, 0).rune, " ", "fill left (0,0) untouched")
+    T.assert_eq(buf5.get(3, 3).rune, " ", "fill left (3,3) untouched")
+
+    // --- clear ---
+    buf5.clear()
+    T.assert_eq(buf5.get(1, 1).rune, " ", "clear resets to blank")
+
+    // --- resize preserves overlap ---
+    var buf6: Buf.Buffer = Buf.Buffer(3, 2)
+    buf6.put_str(0, 0, "XY", St.style())
+    buf6.resize(5, 4)
+    T.assert_eq(buf6.w, 5, "resized width")
+    T.assert_eq(buf6.h, 4, "resized height")
+    T.assert_eq(buf6.get(0, 0).rune, "X", "resize preserves X")
+    T.assert_eq(buf6.get(1, 0).rune, "Y", "resize preserves Y")
+    T.assert_eq(buf6.get(4, 3).rune, " ", "new region blank")
+
+    // --- diff: identical buffers -> "" ---
+    var fa: Buf.Buffer = Buf.Buffer(5, 2)
+    var ba: Buf.Buffer = Buf.Buffer(5, 2)
+    T.assert_eq(Buf.diff(fa, ba, false), "", "identical buffers diff empty")
+
+    // --- diff: one changed cell -> short, has cursor move + new rune ---
+    ba.put_str(2, 1, "Z", St.style())
+    var d1: String = Buf.diff(fa, ba, false)
+    T.assert(d1.length() > 0, "single-change diff is non-empty")
+    T.assert_contains(d1, "Z", "diff contains the new rune")
+    // Cursor move to row 2, col 3 (0-based (2,1) -> 1-based (2,3)).
+    T.assert_contains(d1, "\x1b[2;3H", "diff has 1-based cursor move")
+    T.assert_contains(d1, "\x1b[0m", "diff ends with a style reset")
+    // It should be short: one move + one SGR + "Z" + reset, well under 40 bytes.
+    T.assert(d1.length() < 40, "single-cell diff is short")
+
+    // diff must not have mutated either buffer's front.
+    T.assert_eq(fa.get(2, 1).rune, " ", "diff did not mutate front")
+    T.assert_eq(ba.get(2, 1).rune, "Z", "back still holds Z")
+
+    // --- diff force: full repaint of a fresh 3x2 grid ---
+    var ff: Buf.Buffer = Buf.Buffer(3, 2)
+    var fbk: Buf.Buffer = Buf.Buffer(3, 2)
+    var dforce: String = Buf.diff(ff, fbk, true)
+    T.assert(dforce.length() > 0, "force diff paints even when equal")
+    // Two rows -> two cursor moves to column 1.
+    T.assert_contains(dforce, "\x1b[1;1H", "force paints row 1")
+    T.assert_contains(dforce, "\x1b[2;1H", "force paints row 2")
+
+    // --- diff redundant-SGR suppression: two adjacent same-style changes emit
+    //     one SGR, not two. Count "\x1b[0" occurrences (each SGR starts "\x1b[0").
+    var f2: Buf.Buffer = Buf.Buffer(4, 1)
+    var b2: Buf.Buffer = Buf.Buffer(4, 1)
+    b2.put_str(0, 0, "AB", St.style())
+    var d2: String = Buf.diff(f2, b2, false)
+    // Exactly one style-setting SGR (the shared style) plus the final reset,
+    // so "\x1b[0" appears twice.
+    var sgr_count: Int = _count_occurrences(d2, "\x1b[0")
+    T.assert_eq(sgr_count, 2, "adjacent same-style cells share one SGR")
+
+    // --- visual sanity: escape-dump the single-change diff ---
+    IO.println("single-change diff bytes: " + _escape_dump(d1))
+    IO.println("force 3x2 diff bytes: " + _escape_dump(dforce))
+
+    T.summary()
+}
+
+// Count non-overlapping occurrences of `needle` in `hay`.
+fun _count_occurrences(hay: String, needle: String): Int {
+    var count: Int = 0
+    var from: Int = 0
+    var hlen: Int = hay.length()
+    var nlen: Int = needle.length()
+    while (from <= hlen - nlen) {
+        var window: String = hay.slice(from, from + nlen)
+        if (window == needle) {
+            count = count + 1
+            from = from + nlen
+        } else {
+            from = from + 1
+        }
+    }
+    return count
+}
+
+// Render a string with ESC shown as "\e" so escapes are readable in output.
+fun _escape_dump(s: String): String {
+    var out: String = ""
+    var i: Int = 0
+    var n: Int = s.length()
+    while (i < n) {
+        var ch: String = s.char_at(i)
+        if (ch == "\x1b") {
+            out = out + "\\e"
+        } else {
+            out = out + ch
+        }
+        i = i + 1
+    }
+    return out
+}
+
+main()

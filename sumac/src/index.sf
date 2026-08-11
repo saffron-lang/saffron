@@ -1,0 +1,40 @@
+// Sumac — Reactive TUI Framework for Saffron.
+//
+// This is the LIBRARY COMPILE AGGREGATOR: it imports every module so the whole
+// framework compiles into one artifact. It is NOT a re-export API — Saffron's
+// `import { ... } from` resolves a symbol to the file that DEFINES it, so apps
+// import each module by its own path, e.g.:
+//
+//     import { signal, computed, effect } from "sumac/signal"
+//     import { vstack, hstack, box, text, text_styled } from "sumac/layout"
+//     import { rgb, hex, style } from "sumac/style"
+//     import { spinner } from "sumac/widgets/spinner"
+//     import "sumac/tty" as Tty
+//     import "sumac/runtime" as Runtime   // once runtime.sf lands
+//
+// (This mirrors how Turmeric apps import turmeric/signal, turmeric/style, etc.,
+// never through turmeric/src/index.sf.)
+
+// --- Reactive core ---
+import { signal, computed, effect, batch, untrack, Signal, Computed, EffectHandle, Subscription } from "./signal.sf"
+
+// --- Style / color ---
+import { Color, Style, style, color_default, ansi, ansi256, rgb, hex, adaptive, downsample } from "./style.sf"
+
+// --- Cell buffer + diff renderer ---
+import { Cell, Buffer, diff, str_width, rune_width } from "./buffer.sf"
+
+// --- Input events ---
+import { Event, KeyEvent, MouseEvent, parse, key_event, mouse_event, paste_event, focus_event, resize_event } from "./input.sf"
+
+// --- Layout engine ---
+import { LNode, BoxProps, LayoutCtx, text, text_styled, vstack, hstack, spacer, box, box_styled, padding, measure, measure_w, render_node, place, place_centered } from "./layout.sf"
+
+// --- Widget set (compile aggregator; import each from its own file in apps) ---
+import "./widgets.sf" as _widgets
+
+// --- TTY layer (native raw mode / alt-screen / input) ---
+import "./tty.sf" as _tty
+
+// --- Reactive event loop + entry point ---
+import { run, on_key, on_mouse, on_event, quit, request_render } from "./runtime.sf"

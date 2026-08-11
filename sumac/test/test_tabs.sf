@@ -1,0 +1,124 @@
+// Verify sumac's tabs widget: active index, next/prev wrapping, set_active
+// clamping, key handling (tab/left/right/digit), and that view() renders the
+// labels into a buffer.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/tabs.sf" as Tabs
+import "@test" as T
+import "io" as IO
+
+// Render an LNode tree into a fresh buffer and return the row-0 contents as a
+// string (blanks preserved as spaces) so we can search for label text.
+fun render_row0(node: L.LNode, w: Int, h: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var x: Int = 0
+    while (x < w) {
+        var c: Buf.Cell = buf.get(x, 0)
+        var r: String = c.rune
+        if (r == "") { r = " " }
+        out = out + r
+        x = x + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // ---------------------------------------------------------------------
+    // construction + initial active index
+    // ---------------------------------------------------------------------
+    var tb: Tabs.Tabs = Tabs.tabs(["A", "B", "C"])
+    T.assert_eq(tb.count(), 3, "three tabs")
+    T.assert_eq(tb.active_index(), 0, "starts active on tab 0")
+
+    // ---------------------------------------------------------------------
+    // next() advances
+    // ---------------------------------------------------------------------
+    tb.next()
+    T.assert_eq(tb.active_index(), 1, "next: 0 -> 1")
+
+    // next() from the last tab wraps to 0
+    tb.set_active(2)
+    T.assert_eq(tb.active_index(), 2, "set_active(2) -> 2")
+    tb.next()
+    T.assert_eq(tb.active_index(), 0, "next from last wraps to 0")
+
+    // ---------------------------------------------------------------------
+    // prev() from 0 wraps to last
+    // ---------------------------------------------------------------------
+    T.assert_eq(tb.active_index(), 0, "back at 0 before prev")
+    tb.prev()
+    T.assert_eq(tb.active_index(), 2, "prev from 0 wraps to 2")
+
+    // ---------------------------------------------------------------------
+    // set_active clamps out-of-range
+    // ---------------------------------------------------------------------
+    tb.set_active(99)
+    T.assert_eq(tb.active_index(), 2, "set_active clamps high to 2")
+    tb.set_active(-5)
+    T.assert_eq(tb.active_index(), 0, "set_active clamps low to 0")
+    tb.set_active(1)
+    T.assert_eq(tb.active_index(), 1, "set_active(1) -> 1")
+
+    // ---------------------------------------------------------------------
+    // handle: a synthetic "tab" key advances and is consumed
+    // ---------------------------------------------------------------------
+    var tab_ev: Ev.Event = Ev.key_event(Ev.KEY_TAB, "", Ev.MOD_NONE)
+    var consumed: Bool = tb.handle(tab_ev)
+    T.assert(consumed, "tab key consumed")
+    T.assert_eq(tb.active_index(), 2, "tab key advanced 1 -> 2")
+
+    // handle: "left" goes back and is consumed
+    var left_ev: Ev.Event = Ev.key_event(Ev.KEY_LEFT, "", Ev.MOD_NONE)
+    var consumed_left: Bool = tb.handle(left_ev)
+    T.assert(consumed_left, "left key consumed")
+    T.assert_eq(tb.active_index(), 1, "left key: 2 -> 1")
+
+    // handle: "right" advances
+    var right_ev: Ev.Event = Ev.key_event(Ev.KEY_RIGHT, "", Ev.MOD_NONE)
+    var consumed_right: Bool = tb.handle(right_ev)
+    T.assert(consumed_right, "right key consumed")
+    T.assert_eq(tb.active_index(), 2, "right key: 1 -> 2")
+
+    // handle: digit "2" jumps to tab index 1 (1-based)
+    var two_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "2", Ev.MOD_NONE)
+    var consumed_two: Bool = tb.handle(two_ev)
+    T.assert(consumed_two, "digit '2' consumed")
+    T.assert_eq(tb.active_index(), 1, "digit '2' jumps to tab index 1")
+
+    // handle: an out-of-range digit "9" is NOT consumed (only 3 tabs)
+    var nine_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "9", Ev.MOD_NONE)
+    var consumed_nine: Bool = tb.handle(nine_ev)
+    T.assert(!consumed_nine, "out-of-range digit '9' not consumed")
+    T.assert_eq(tb.active_index(), 1, "digit '9' left active unchanged")
+
+    // handle: an unrelated key "x" is not consumed
+    var x_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "x", Ev.MOD_NONE)
+    var consumed_x: Bool = tb.handle(x_ev)
+    T.assert(!consumed_x, "unrelated key 'x' not consumed")
+
+    // ---------------------------------------------------------------------
+    // view(): the labels render into the buffer
+    // ---------------------------------------------------------------------
+    var vt: Tabs.Tabs = Tabs.tabs(["Counter", "About", "Help"])
+    var tree: List<L.LNode> = L._collect(fun () {
+        vt.view()
+    })
+    T.assert_eq(tree.length(), 1, "view emits one root hstack")
+    var row: String = render_row0(tree[0], 60, 1)
+    T.assert(row.contains("Counter"), "row shows 'Counter'")
+    T.assert(row.contains("About"), "row shows 'About'")
+    T.assert(row.contains("Help"), "row shows 'Help'")
+    // The active (first) tab carries the "▎" bar prefix.
+    T.assert(row.contains("▎"), "active tab shows the ▎ bar")
+    IO.println("tabs row: [" + row + "]")
+
+    T.summary()
+}
+
+main()

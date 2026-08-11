@@ -1,0 +1,139 @@
+// Verify the Progress widget: empty/full/half fill, percent label, and ramp-mode
+// partial glyph selection. Renders view() into a Buffer via L._collect +
+// L.render_node and asserts on cell runes.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/signal.sf" as Sig
+import "../src/layout.sf" as L
+import "../src/input.sf" as Ev
+import "../src/widgets/progress.sf" as P
+import "@test" as T
+import "io" as IO
+
+// another cross-module class instance (Buffer's List<Cell>) corrupts the heap
+// after ~45 allocations. Disabling GC sidesteps it for this logic test.
+
+// Read one cell's rune from row 0 (blank -> ".").
+fun rune_at(buf: Buf.Buffer, x: Int): String {
+    var c: Buf.Cell = buf.get(x, 0)
+    if (c.rune == " " or c.rune == "") { return "." }
+    return c.rune
+}
+
+// Dump row 0 as a display string (blanks as ".").
+fun row0(buf: Buf.Buffer): String {
+    var out: String = ""
+    var x: Int = 0
+    while (x < buf.w) {
+        out = out + rune_at(buf, x)
+        x = x + 1
+    }
+    return out
+}
+
+// Render a Progress widget's view() into a fresh Buffer of the given size.
+fun render_widget(pw: P.Progress, w: Int, h: Int): Buf.Buffer {
+    var tree: List<L.LNode> = L._collect(fun () {
+        pw.view()
+    })
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(tree[0], buf, 0, 0, w, h)
+    return buf
+}
+
+fun main() {
+
+    // -----------------------------------------------------------------
+    // width 10, plain fill, percent on.
+    // -----------------------------------------------------------------
+    var sig: Sig.Signal<Float> = Sig.signal(0.0)
+    var bar: P.Progress = P.progress_styled(10,
+        St.style().with_fg(St.rgb(80, 200, 160)), St.style().faint(), true, false)
+    bar.value = sig
+
+    // 0.0 -> all empty (no █ anywhere in the 10-cell bar).
+    bar.set(0.0)
+    var b0: Buf.Buffer = render_widget(bar, 20, 1)
+    var any_full_0: Bool = false
+    var x0: Int = 0
+    while (x0 < 10) {
+        if (rune_at(b0, x0) == "█") { any_full_0 = true }
+        x0 = x0 + 1
+    }
+    T.assert(!any_full_0, "0.0: no filled cells")
+    T.assert_eq(bar.percent(), 0, "0.0: percent is 0")
+
+    // 1.0 -> all 10 cells full █.
+    bar.set(1.0)
+    var b1: Buf.Buffer = render_widget(bar, 20, 1)
+    var full_count_1: Int = 0
+    var x1: Int = 0
+    while (x1 < 10) {
+        if (rune_at(b1, x1) == "█") { full_count_1 = full_count_1 + 1 }
+        x1 = x1 + 1
+    }
+    T.assert_eq(full_count_1, 10, "1.0: all 10 cells filled")
+    T.assert_eq(bar.percent(), 100, "1.0: percent is 100")
+
+    // 0.5 with width 10 -> exactly 5 filled cells, 5 empty.
+    bar.set(0.5)
+    var b5: Buf.Buffer = render_widget(bar, 20, 1)
+    var full_count_5: Int = 0
+    var xi: Int = 0
+    while (xi < 10) {
+        if (rune_at(b5, xi) == "█") { full_count_5 = full_count_5 + 1 }
+        xi = xi + 1
+    }
+    T.assert_eq(full_count_5, 5, "0.5 width 10: 5 filled cells")
+    T.assert_eq(rune_at(b5, 0), "█", "0.5: cell 0 filled")
+    T.assert_eq(rune_at(b5, 4), "█", "0.5: cell 4 filled")
+    T.assert_eq(rune_at(b5, 5), ".", "0.5: cell 5 empty")
+    IO.println("0.5 bar:\n[" + row0(b5) + "]")
+
+    // percent label "50%" appears somewhere on the row (after the 10-cell bar).
+    T.assert_eq(bar.percent(), 50, "0.5: percent is 50")
+    var row: String = row0(b5)
+    T.assert(row.contains("50%"), "0.5: label shows 50%")
+
+    // -----------------------------------------------------------------
+    // ramp mode: a fractional value picks a partial glyph at the boundary.
+    // width 10, value 0.55 -> exact = 5.5 -> 5 full cells + a half glyph "▌".
+    // -----------------------------------------------------------------
+    var rsig: Sig.Signal<Float> = Sig.signal(0.0)
+    var rbar: P.Progress = P.progress_styled(10,
+        St.style().with_fg(St.rgb(200, 120, 40)), St.style().faint(), false, true)
+    rbar.value = rsig
+    rbar.set(0.55)
+    var br: Buf.Buffer = render_widget(rbar, 20, 1)
+    var full_r: Int = 0
+    var xr: Int = 0
+    while (xr < 10) {
+        if (rune_at(br, xr) == "█") { full_r = full_r + 1 }
+        xr = xr + 1
+    }
+    T.assert_eq(full_r, 5, "ramp 0.55: 5 full cells")
+    // (0.55*10 - 5) = 0.5 -> round(0.5*8)=4 eighths -> glyphs[3] = "▌"
+    T.assert_eq(rune_at(br, 5), "▌", "ramp 0.55: boundary cell is half block")
+    IO.println("ramp 0.55 bar:\n[" + row0(br) + "]")
+
+    // A smaller fraction picks a narrower glyph: 0.51 -> 5.1 -> frac 0.1 ->
+    // round(0.8)=1 eighth -> glyphs[0] = "▏".
+    rbar.set(0.51)
+    var br2: Buf.Buffer = render_widget(rbar, 20, 1)
+    T.assert_eq(rune_at(br2, 5), "▏", "ramp 0.51: boundary cell is one-eighth block")
+
+    // clamp: over-range set is pinned to 1.0.
+    bar.set(1.7)
+    T.assert_eq(bar.percent(), 100, "clamp: 1.7 pins to 100%")
+    bar.set(-0.3)
+    T.assert_eq(bar.percent(), 0, "clamp: -0.3 pins to 0%")
+
+    // handle() is inert: a progress bar consumes no input.
+    var ev: Ev.Event = Ev.key_event(5, "", 0)   // KEY_UP
+    T.assert(!bar.handle(ev), "handle returns false (not interactive)")
+    T.assert(!bar.focusable(), "progress bar is not focusable")
+
+    T.summary()
+}
+
+main()

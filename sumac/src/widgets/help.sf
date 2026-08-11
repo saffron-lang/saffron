@@ -1,0 +1,110 @@
+//! Sumac help widget — renders a keymap as a single line of aligned hint text,
+//! the way Bubbles' `help` model shows a short-help footer.
+//!
+//! Each hint pairs a key label (e.g. "ctrl+c") with a description ("quit"). The
+//! widget emits one `hstack` of styled runs: the key in an accent style, the
+//! description in a faint style, entries separated by a small glyph. It is
+//! non-interactive — `handle` always returns false — so the runtime never
+//! routes input to it; it is purely a display element.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../input.sf" as Ev
+
+// =============================================================================
+// KeyHint — one (key, description) pair
+// =============================================================================
+
+/// A single key binding hint: the key label and what it does. `key` is the
+/// canonical name a keymap would match ("ctrl+c", "up", "q"); `desc` is the
+/// human-readable action ("quit", "move up").
+class KeyHint {
+    var key: String
+    var desc: String
+
+    fun init(key: String, desc: String) {
+        this.key = key
+        this.desc = desc
+    }
+}
+
+/// Construct a KeyHint.
+fun key_hint(key: String, desc: String): KeyHint {
+    return KeyHint(key, desc)
+}
+
+// =============================================================================
+// Help — a short-help one-liner
+// =============================================================================
+
+/// Renders a list of KeyHints as a single aligned line. The key label uses
+/// `key_style` (bold accent by default), the description `desc_style` (faint),
+/// and entries are joined by `separator` (default " • ").
+class Help {
+    var hints: List<KeyHint>
+    var key_style: St.Style
+    var desc_style: St.Style
+    var separator: String
+
+    fun init(hints: List<KeyHint>, key_style: St.Style, desc_style: St.Style,
+             separator: String) {
+        this.hints = hints
+        this.key_style = key_style
+        this.desc_style = desc_style
+        this.separator = separator
+    }
+
+    /// Emit a single-line hstack of the hints. For each hint we emit the key
+    /// run then the description run; between entries we emit the separator run.
+    fun view(): L.LNode {
+        // Bind fields to typed locals before use — calling methods on / passing
+        // `this.<field>` straight through can silently drop under an untyped
+        // receiver (see style.sf's note). Typed copies keep the shapes explicit.
+        var hints: List<KeyHint> = this.hints
+        var ks: St.Style = this.key_style
+        var ds: St.Style = this.desc_style
+        var sep: String = this.separator
+        var n: Int = hints.length()
+        return L.hstack(fun () {
+            var i: Int = 0
+            while (i < n) {
+                if (i > 0) {
+                    L.text_styled(sep, ds)
+                }
+                var h: KeyHint = hints[i]
+                var key: String = h.key
+                var desc: String = h.desc
+                L.text_styled(key, ks)
+                L.text_styled(" " + desc, ds)
+                i = i + 1
+            }
+        })
+    }
+
+    /// Help is not interactive: it never consumes input.
+    fun handle(e: Ev.Event): Bool {
+        return false
+    }
+
+    /// Not focusable — the runtime should skip it in the focus ring.
+    fun focusable(): Bool {
+        return false
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A Help with default styling: keys bold, descriptions faint, " • " separator.
+fun help(hints: List<KeyHint>): Help {
+    var key_style: St.Style = St.style().bold()
+    var desc_style: St.Style = St.style().faint()
+    return Help(hints, key_style, desc_style, " • ")
+}
+
+/// A Help with explicit key/description styles and separator.
+fun help_styled(hints: List<KeyHint>, key_style: St.Style, desc_style: St.Style,
+                separator: String): Help {
+    return Help(hints, key_style, desc_style, separator)
+}

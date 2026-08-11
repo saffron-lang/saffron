@@ -1,0 +1,114 @@
+// Verify sumac's style layer: color SGR emission, hex parsing, attribute
+// bitflags, immutable style builders, adaptive selection, and downsampling.
+import "../src/style.sf" as St
+import "@test" as T
+
+fun main() {
+    // --- Color.sgr(fg) ---
+    var red: St.Color = St.rgb(255, 0, 0)
+    T.assert_eq(red.sgr(true), "38;2;255;0;0", "truecolor fg")
+    T.assert_eq(red.sgr(false), "48;2;255;0;0", "truecolor bg")
+
+    var c256: St.Color = St.ansi256(200)
+    T.assert_eq(c256.sgr(true), "38;5;200", "ansi256 fg")
+    T.assert_eq(c256.sgr(false), "48;5;200", "ansi256 bg")
+
+    // ANSI-16: normal range 0..7 and bright range 8..15.
+    T.assert_eq(St.ansi(1).sgr(true), "31", "ansi16 fg normal (red)")
+    T.assert_eq(St.ansi(1).sgr(false), "41", "ansi16 bg normal (red)")
+    T.assert_eq(St.ansi(9).sgr(true), "91", "ansi16 fg bright (idx 9 -> 91)")
+    T.assert_eq(St.ansi(9).sgr(false), "101", "ansi16 bg bright (idx 9 -> 101)")
+
+    // Default color emits nothing.
+    T.assert_eq(St.color_default().sgr(true), "", "default fg empty")
+    T.assert_eq(St.color_default().sgr(false), "", "default bg empty")
+
+    // --- hex parsing ---
+    var h6: St.Color = St.hex("#ff0000")
+    T.assert_eq(h6.r, 255, "#ff0000 r")
+    T.assert_eq(h6.g, 0, "#ff0000 g")
+    T.assert_eq(h6.b, 0, "#ff0000 b")
+    T.assert_eq(h6.sgr(true), "38;2;255;0;0", "#ff0000 sgr")
+
+    var h3: St.Color = St.hex("#0f0")     // shorthand -> #00ff00
+    T.assert_eq(h3.r, 0, "#0f0 r")
+    T.assert_eq(h3.g, 255, "#0f0 g")
+    T.assert_eq(h3.b, 0, "#0f0 b")
+
+    var hnohash: St.Color = St.hex("336699")
+    T.assert_eq(hnohash.r, 51, "no-hash r")
+    T.assert_eq(hnohash.g, 102, "no-hash g")
+    T.assert_eq(hnohash.b, 153, "no-hash b")
+
+    // --- Style.sgr() ---
+    var s0: St.Style = St.style()
+    T.assert_eq(s0.sgr(), "\x1b[0m", "default style is bare reset")
+
+    var sred: St.Style = St.style().with_fg(St.rgb(255, 0, 0)).bold()
+    T.assert_eq(sred.sgr(), "\x1b[0;1;38;2;255;0;0m", "bold truecolor-red fg")
+
+    var sfull: St.Style = St.style()
+        .with_fg(St.ansi(2))
+        .with_bg(St.ansi256(17))
+        .underline()
+    T.assert_eq(sfull.sgr(), "\x1b[0;4;32;48;5;17m", "underline + fg16 + bg256")
+
+    // Attribute ordering is fixed ascending by SGR code.
+    var sattrs: St.Style = St.style().italic().strike().bold()
+    T.assert_eq(sattrs.sgr(), "\x1b[0;1;3;9m", "attrs emitted in code order")
+
+    // --- attribute bitflags ---
+    var attrs: Int = St.ATTR_BOLD | St.ATTR_UNDERLINE
+    T.assert((attrs & St.ATTR_BOLD) != 0, "bold bit set")
+    T.assert((attrs & St.ATTR_UNDERLINE) != 0, "underline bit set")
+    T.assert((attrs & St.ATTR_ITALIC) == 0, "italic bit clear")
+
+    // --- immutability: builders return new styles ---
+    var base: St.Style = St.style()
+    var derived: St.Style = base.bold()
+    T.assert_eq(base.attrs, St.ATTR_NONE, "base style unchanged by builder")
+    T.assert_eq(derived.attrs, St.ATTR_BOLD, "derived style has bold")
+
+    // --- Style.eq ---
+    var a: St.Style = St.style().with_fg(St.rgb(1, 2, 3)).bold()
+    var b: St.Style = St.style().with_fg(St.rgb(1, 2, 3)).bold()
+    var c: St.Style = St.style().with_fg(St.rgb(1, 2, 4)).bold()
+    T.assert(a.eq(b), "equal styles compare equal")
+    T.assert(!a.eq(c), "differing fg compares unequal")
+
+    // --- adaptive ---
+    var lightc: St.Color = St.rgb(0, 0, 0)
+    var darkc: St.Color = St.rgb(255, 255, 255)
+    T.assert_eq(St.adaptive(lightc, darkc, true).r, 255, "adaptive picks dark")
+    T.assert_eq(St.adaptive(lightc, darkc, false).r, 0, "adaptive picks light")
+
+    // --- downsampling ---
+    // A color already within the supported kind is unchanged.
+    var keep: St.Color = St.downsample(St.rgb(10, 20, 30), 3)
+    T.assert_eq(keep.kind, 3, "truecolor kept at max_kind 3")
+
+    // Truecolor pure red -> ansi256 index 196 (cube corner 5,0,0).
+    var d256: St.Color = St.downsample(St.rgb(255, 0, 0), 2)
+    T.assert_eq(d256.kind, 2, "downsample to 256 yields ansi256")
+    T.assert_eq(d256.idx, 196, "pure red maps to 256-color 196")
+
+    // Truecolor pure red -> nearest ANSI-16 is bright red (idx 9).
+    var d16: St.Color = St.downsample(St.rgb(255, 0, 0), 1)
+    T.assert_eq(d16.kind, 1, "downsample to 16 yields ansi16")
+    T.assert_eq(d16.idx, 9, "pure red maps to ANSI-16 bright red (9)")
+
+    // 256 -> 16: index 196 (pure red in the cube) also lands on bright red.
+    var d256to16: St.Color = St.downsample(St.ansi256(196), 1)
+    T.assert_eq(d256to16.idx, 9, "256 red down to ANSI-16 bright red (9)")
+
+    // Anything down to a monochrome terminal collapses to default.
+    var dmono: St.Color = St.downsample(St.rgb(120, 200, 40), 0)
+    T.assert_eq(dmono.kind, 0, "downsample to 0 yields default")
+
+    // Emit a colored line so a human eye can sanity-check the escapes.
+    IO.println(sred.sgr() + "sumac style: bold red" + "\x1b[0m")
+
+    T.summary()
+}
+
+main()

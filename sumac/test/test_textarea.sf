@@ -1,0 +1,200 @@
+// Verify sumac's textarea widget: insertion, newline splitting, backspace line
+// joins, cursor movement with column clamping, event handling through handle(),
+// and that view() renders the visible lines into a buffer.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/textarea.sf" as TA
+import "@test" as T
+import "io" as IO
+
+// Render an LNode tree into a fresh buffer and return the full grid as one
+// newline-joined string (blanks preserved as spaces) so we can search for text.
+fun render_grid(node: L.LNode, w: Int, h: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var y: Int = 0
+    while (y < h) {
+        var x: Int = 0
+        while (x < w) {
+            var c: Buf.Cell = buf.get(x, y)
+            var r: String = c.rune
+            if (r == "") { r = " " }
+            out = out + r
+            x = x + 1
+        }
+        out = out + "\n"
+        y = y + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // ---------------------------------------------------------------------
+    // construction + initial state
+    // ---------------------------------------------------------------------
+    var ta: TA.TextArea = TA.textarea("type here", 20, 4)
+    T.assert_eq(ta.value_str(), "", "starts empty")
+    T.assert_eq(ta.row(), 0, "starts at row 0")
+    T.assert_eq(ta.col(), 0, "starts at col 0")
+
+    // ---------------------------------------------------------------------
+    // insert("ab") → value "ab", row 0 col 2
+    // ---------------------------------------------------------------------
+    ta.insert("ab")
+    T.assert_eq(ta.value_str(), "ab", "insert 'ab' -> value 'ab'")
+    T.assert_eq(ta.row(), 0, "insert leaves row 0")
+    T.assert_eq(ta.col(), 2, "insert advances col to 2")
+
+    // ---------------------------------------------------------------------
+    // newline() → value "ab\n", row 1 col 0
+    // ---------------------------------------------------------------------
+    ta.newline()
+    T.assert_eq(ta.value_str(), "ab\n", "newline -> 'ab\\n'")
+    T.assert_eq(ta.row(), 1, "newline moves to row 1")
+    T.assert_eq(ta.col(), 0, "newline moves to col 0")
+
+    // ---------------------------------------------------------------------
+    // insert("cd") → value "ab\ncd", row 1 col 2
+    // ---------------------------------------------------------------------
+    ta.insert("cd")
+    T.assert_eq(ta.value_str(), "ab\ncd", "insert 'cd' -> 'ab\\ncd'")
+    T.assert_eq(ta.row(), 1, "still on row 1")
+    T.assert_eq(ta.col(), 2, "col advanced to 2")
+
+    // ---------------------------------------------------------------------
+    // up() → row 0, col clamped to line "ab" length (2), stays 2 here
+    // ---------------------------------------------------------------------
+    ta.up()
+    T.assert_eq(ta.row(), 0, "up -> row 0")
+    T.assert_eq(ta.col(), 2, "col clamped to 'ab' length (2)")
+
+    // up-clamp with a genuinely shorter target line
+    var ta2: TA.TextArea = TA.textarea("", 20, 4)
+    ta2.insert("hi")          // "hi", col 2
+    ta2.newline()             // "hi\n"
+    ta2.insert("world")       // "hi\nworld", row1 col5
+    T.assert_eq(ta2.col(), 5, "on 'world' at col 5")
+    ta2.up()                  // to row0 'hi' (len 2) -> col clamped to 2
+    T.assert_eq(ta2.row(), 0, "up to row 0")
+    T.assert_eq(ta2.col(), 2, "col clamped from 5 down to 2")
+
+    // ---------------------------------------------------------------------
+    // backspace at row 1 col 0 joins with the previous line
+    // ---------------------------------------------------------------------
+    var ta3: TA.TextArea = TA.textarea("", 20, 4)
+    ta3.insert("ab")          // "ab"
+    ta3.newline()             // "ab\n" row1 col0
+    ta3.insert("cd")          // "ab\ncd" row1 col2
+    ta3.home()                // row1 col0
+    T.assert_eq(ta3.col(), 0, "at start of row 1")
+    ta3.backspace()           // join -> "abcd", caret at old end of prev (col 2)
+    T.assert_eq(ta3.value_str(), "abcd", "backspace at col0 joins lines -> 'abcd'")
+    T.assert_eq(ta3.row(), 0, "backspace join -> row 0")
+    T.assert_eq(ta3.col(), 2, "backspace join -> col 2 (old prev length)")
+
+    // in-line backspace deletes the char before the caret
+    ta3.backspace()           // "acd" ... wait: "abcd" col2 -> delete 'b' -> "acd"
+    T.assert_eq(ta3.value_str(), "acd", "in-line backspace deletes char before caret")
+    T.assert_eq(ta3.col(), 1, "col decremented to 1")
+
+    // ---------------------------------------------------------------------
+    // delete_forward joins the next line at end of line
+    // ---------------------------------------------------------------------
+    var ta4: TA.TextArea = TA.textarea("", 20, 4)
+    ta4.insert("ab")
+    ta4.newline()
+    ta4.insert("cd")          // "ab\ncd"
+    ta4.up()                  // row0 col2 (end of "ab")
+    ta4.end()                 // col2
+    ta4.delete_forward()      // end of line -> join with next -> "abcd"
+    T.assert_eq(ta4.value_str(), "abcd", "delete_forward at eol joins next line")
+
+    // ---------------------------------------------------------------------
+    // multi-line paste via insert
+    // ---------------------------------------------------------------------
+    var ta5: TA.TextArea = TA.textarea("", 20, 6)
+    ta5.insert("one\ntwo\nthree")
+    T.assert_eq(ta5.value_str(), "one\ntwo\nthree", "multi-line insert splits lines")
+    T.assert_eq(ta5.row(), 2, "caret on last inserted row")
+    T.assert_eq(ta5.col(), 5, "caret at end of 'three'")
+
+    // ---------------------------------------------------------------------
+    // handle(): synthetic events drive edits and report consumed
+    // ---------------------------------------------------------------------
+    var ha: TA.TextArea = TA.textarea("", 20, 4)
+    ha.focus()
+    var rune_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "x", Ev.MOD_NONE)
+    var c1: Bool = ha.handle(rune_ev)
+    T.assert(c1, "rune event consumed")
+    T.assert_eq(ha.value_str(), "x", "rune 'x' inserted")
+
+    var space_ev: Ev.Event = Ev.key_event(Ev.KEY_SPACE, " ", Ev.MOD_NONE)
+    var c2: Bool = ha.handle(space_ev)
+    T.assert(c2, "space event consumed")
+    T.assert_eq(ha.value_str(), "x ", "space inserted")
+
+    var enter_ev: Ev.Event = Ev.key_event(Ev.KEY_ENTER, "", Ev.MOD_NONE)
+    var c3: Bool = ha.handle(enter_ev)
+    T.assert(c3, "enter event consumed")
+    T.assert_eq(ha.value_str(), "x \n", "enter splits line")
+
+    var y_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "y", Ev.MOD_NONE)
+    ha.handle(y_ev)
+    T.assert_eq(ha.value_str(), "x \ny", "typed 'y' on new line")
+
+    var bs_ev: Ev.Event = Ev.key_event(Ev.KEY_BACKSPACE, "", Ev.MOD_NONE)
+    var c4: Bool = ha.handle(bs_ev)
+    T.assert(c4, "backspace event consumed")
+    T.assert_eq(ha.value_str(), "x \n", "backspace removed 'y'")
+
+    // an unrelated key (esc) is not consumed
+    var esc_ev: Ev.Event = Ev.key_event(Ev.KEY_ESC, "", Ev.MOD_NONE)
+    var c5: Bool = ha.handle(esc_ev)
+    T.assert(!c5, "esc not consumed")
+
+    // a ctrl-modified rune is not typed as text
+    var ctrl_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "a", Ev.MOD_CTRL)
+    var c6: Bool = ha.handle(ctrl_ev)
+    T.assert(!c6, "ctrl+a not consumed as text")
+    T.assert_eq(ha.value_str(), "x \n", "ctrl+a did not insert")
+
+    // paste event consumed and inserted
+    var paste_ev: Ev.Event = Ev.paste_event("PASTE")
+    var c7: Bool = ha.handle(paste_ev)
+    T.assert(c7, "paste event consumed")
+    T.assert(ha.value_str().contains("PASTE"), "paste text inserted")
+
+    // ---------------------------------------------------------------------
+    // view(): both lines render into a buffer
+    // ---------------------------------------------------------------------
+    var va: TA.TextArea = TA.textarea("", 20, 4)
+    va.insert("hello")
+    va.newline()
+    va.insert("world")
+    var tree: List<L.LNode> = L._collect(fun () {
+        va.view()
+    })
+    T.assert_eq(tree.length(), 1, "view emits one root box")
+    var grid: String = render_grid(tree[0], 24, 8)
+    T.assert(grid.contains("hello"), "grid shows 'hello'")
+    T.assert(grid.contains("world"), "grid shows 'world'")
+    IO.println("textarea grid:")
+    IO.println(grid)
+
+    // placeholder shows when empty + unfocused
+    var pa: TA.TextArea = TA.textarea("enter text", 20, 4)
+    var ptree: List<L.LNode> = L._collect(fun () {
+        pa.view()
+    })
+    var pgrid: String = render_grid(ptree[0], 24, 8)
+    T.assert(pgrid.contains("enter text"), "placeholder shown when empty + unfocused")
+
+    T.summary()
+}
+
+main()

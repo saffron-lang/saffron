@@ -1,0 +1,182 @@
+//! Sumac tabs widget — a horizontal tab bar (à la Bubbletea's tab component).
+//!
+//! A `Tabs` renders a single row of labels; the label whose index equals the
+//! `active` signal is drawn in `active_style` (bold/accent, maybe reversed), the
+//! rest in `inactive_style` (faint). Each label is padded with a space on each
+//! side (` Counter `) for breathing room, and a `separator` string is drawn
+//! between tabs. The active tab is additionally prefixed with a "▎" bar so it
+//! reads as selected even on a monochrome terminal.
+//!
+//! It holds the active-index signal so the reactive runtime repaints when the
+//! selection changes. Everything index-shaped — the active index, the tab count,
+//! loop counters — is annotated `Int`: a `Float` used as a list index silently
+//! reads element 0 (BUGS #72), which for a tab bar would pin the highlight to
+//! the first tab forever, so the index math stays strictly integer.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+
+// =============================================================================
+// Tabs
+// =============================================================================
+
+/// A horizontal tab bar. `labels` are the tab titles; `active` is the 0-based
+/// index of the selected tab (a signal, so the runtime repaints on change).
+/// `active_style` / `inactive_style` style the selected vs. unselected labels,
+/// and `separator` is drawn between adjacent tabs.
+class Tabs {
+    var labels: List<String>
+    var active: Sig.Signal<Int>
+    var active_style: St.Style
+    var inactive_style: St.Style
+    var separator: String
+
+    fun init(labels: List<String>, active: Sig.Signal<Int>,
+             active_style: St.Style, inactive_style: St.Style,
+             separator: String) {
+        this.labels = labels
+        this.active = active
+        this.active_style = active_style
+        this.inactive_style = inactive_style
+        this.separator = separator
+    }
+
+    /// The number of tabs.
+    fun count(): Int {
+        var labels: List<String> = this.labels
+        return labels.length()
+    }
+
+    /// The current active index, read from the signal (bind to a typed local
+    /// first — a method call straight on `this.active` reads as an untyped
+    /// receiver and can be silently dropped).
+    fun active_index(): Int {
+        var sig: Sig.Signal<Int> = this.active
+        return sig.get()
+    }
+
+    /// Emit the tab bar: a single-row hstack of styled labels with separators
+    /// between them. Reads the `active` signal so the runtime re-renders on
+    /// selection change. The active label is styled with `active_style` and
+    /// prefixed with a "▎" bar; the rest use `inactive_style`.
+    fun view() {
+        var labels: List<String> = this.labels
+        var n: Int = labels.length()
+        var cur: Int = this.active_index()
+        var as_: St.Style = this.active_style
+        var is_: St.Style = this.inactive_style
+        var sep: String = this.separator
+        L.hstack(fun () {
+            var i: Int = 0
+            while (i < n) {
+                if (i > 0 and sep != "") {
+                    L.text_styled(sep, is_)
+                }
+                var label: String = labels[i]
+                if (i == cur) {
+                    // Active: a leading bar + padded label, in the active style.
+                    L.text_styled("▎ " + label + " ", as_)
+                } else {
+                    L.text_styled(" " + label + " ", is_)
+                }
+                i = i + 1
+            }
+        })
+    }
+
+    /// Move to the next tab, wrapping around modulo the tab count.
+    fun next() {
+        var n: Int = this.count()
+        if (n <= 0) { return }
+        var sig: Sig.Signal<Int> = this.active
+        var cur: Int = sig.get()
+        var nxt: Int = (cur + 1) % n
+        sig.set(nxt)
+    }
+
+    /// Move to the previous tab, wrapping around modulo the tab count.
+    fun prev() {
+        var n: Int = this.count()
+        if (n <= 0) { return }
+        var sig: Sig.Signal<Int> = this.active
+        var cur: Int = sig.get()
+        // + n before the modulo so a decrement from 0 wraps to n-1 rather than
+        // going negative (a negative index reads element 0 — BUGS #72).
+        var prv: Int = ((cur - 1) + n) % n
+        sig.set(prv)
+    }
+
+    /// Set the active tab, clamped to [0, count-1]. Out-of-range requests are
+    /// pinned to the nearest valid tab rather than corrupting the index.
+    fun set_active(i: Int) {
+        var n: Int = this.count()
+        if (n <= 0) { return }
+        var idx: Int = i
+        if (idx < 0) { idx = 0 }
+        if (idx > n - 1) { idx = n - 1 }
+        var sig: Sig.Signal<Int> = this.active
+        sig.set(idx)
+    }
+
+    /// Handle a key event. Tab / right / l advance; left / h go back; a digit
+    /// "1".."9" jumps to that tab (1-based) when it is in range. Returns true if
+    /// the event was consumed so the runtime can stop propagation.
+    fun handle(e: Ev.Event): Bool {
+        var k: Ev.KeyEvent = e.key
+        if (k == nil) { return false }
+        var name: String = k.name()
+        if (name == "tab" or name == "right" or name == "l") {
+            this.next()
+            return true
+        }
+        if (name == "left" or name == "h") {
+            this.prev()
+            return true
+        }
+        // Digit "1".."9" → jump to that tab (1-based). index_of on "123456789"
+        // returns 0..8 for "1".."9" and -1 otherwise, so it doubles as both the
+        // digit test and the 0-based index. Guard on a single-char name so a
+        // named key like "f1" can't accidentally match.
+        if (name.length() == 1) {
+            var digit: Int = "123456789".index_of(name)
+            if (digit != -1 and digit < this.count()) {
+                this.set_active(digit)
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Tab bars are focusable — they consume navigation keys.
+    fun focusable(): Bool {
+        return true
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A tab bar over `labels` with sensible default styles: the active tab bold,
+/// the inactive tabs faint, separated by two spaces. Owns a fresh active-index
+/// signal starting at tab 0.
+fun tabs(labels: List<String>): Tabs {
+    // The active index must be Int, so seed the signal from an Int local — a
+    // bare `0` literal is a Float and would poison the index math (BUGS #72).
+    var zero: Int = 0
+    var active: Sig.Signal<Int> = Sig.signal(zero)
+    var active_style: St.Style = St.style().bold()
+    var inactive_style: St.Style = St.style().faint()
+    return Tabs(labels, active, active_style, inactive_style, "  ")
+}
+
+/// A tab bar with explicit styles and separator, owning a fresh active-index
+/// signal starting at tab 0.
+fun tabs_styled(labels: List<String>, active_style: St.Style,
+                inactive_style: St.Style, separator: String): Tabs {
+    var zero: Int = 0
+    var active: Sig.Signal<Int> = Sig.signal(zero)
+    return Tabs(labels, active, active_style, inactive_style, separator)
+}

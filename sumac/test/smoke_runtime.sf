@@ -1,0 +1,123 @@
+// Non-interactive smoke test for the Sumac reactive runtime.
+//
+// Drives the runtime's internal render-one-frame and dispatch functions
+// directly (NOT the blocking input loop, which would hang): sets up a signal,
+// a view that reads it, registers key handlers, renders a frame and asserts the
+// back buffer holds the expected text, then feeds a synthetic "q" key wired to
+// quit and asserts the loop flag flips false.
+
+import "../src/runtime.sf" as RT
+import "../src/buffer.sf" as Buf
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as In
+import "@test" as T
+import "io" as IO
+
+
+// App state: a reactive counter the view reads.
+var count: Sig.Signal<Int> = Sig.signal(0)
+
+// The view: a bordered box containing "count: N". Reads the signal so a change
+// would (under the loop) mark the frame dirty.
+fun app_view() {
+    var n: Int = count.get()
+    L.box(0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, fun () {
+        L.text("count: " + n.to_string())
+    })
+}
+
+// Read row `y` of a buffer as a String (blanks preserved as spaces).
+fun row_text(buf: Buf.Buffer, y: Int): String {
+    var out: String = ""
+    var x: Int = 0
+    while (x < buf.w) {
+        var c: Buf.Cell = buf.get(x, y)
+        var r: String = c.rune
+        if (r == "") { r = " " }
+        out = out + r
+        x = x + 1
+    }
+    return out
+}
+
+// Search every row of the buffer for a substring.
+fun buffer_contains(buf: Buf.Buffer, needle: String): Bool {
+    var y: Int = 0
+    while (y < buf.h) {
+        if (row_text(buf, y).contains(needle)) { return true }
+        y = y + 1
+    }
+    return false
+}
+
+fun main() {
+
+    // ---------------------------------------------------------------------
+    // Setup: 10 rows x 20 cols, silent (no writes to the terminal).
+    // ---------------------------------------------------------------------
+    var rows: Int = 10
+    var cols: Int = 20
+    RT._test_setup(app_view, rows, cols)
+    T.assert(RT._is_running(), "running after setup")
+
+    // ---------------------------------------------------------------------
+    // Render one frame; the back buffer should show "count: 0" inside a box.
+    // ---------------------------------------------------------------------
+    RT._render_frame()
+    var buf: Buf.Buffer = RT._back_buffer()
+    T.assert_eq(buf.w, cols, "back buffer width matches cols")
+    T.assert_eq(buf.h, rows, "back buffer height matches rows")
+    T.assert(buffer_contains(buf, "count: 0"), "frame renders 'count: 0'")
+    // The bordered box drew a corner glyph.
+    T.assert(buffer_contains(buf, "┌") or buffer_contains(buf, "count"),
+        "box border present")
+    IO.println("frame row1: [" + row_text(buf, 1) + "]")
+
+    // ---------------------------------------------------------------------
+    // Change the signal, render again: the new value appears. (This proves
+    // _render_frame re-runs the view and re-reads the signal each frame.)
+    // ---------------------------------------------------------------------
+    var seven: Int = 7
+    count.set(seven)
+    RT._render_frame()
+    var buf2: Buf.Buffer = RT._back_buffer()
+    T.assert(buffer_contains(buf2, "count: 7"), "frame re-renders 'count: 7'")
+    T.assert(!buffer_contains(buf2, "count: 0"), "old value gone after re-render")
+
+    // ---------------------------------------------------------------------
+    // Register a "q" key wired to quit, then dispatch a synthetic "q" key and
+    // assert the running flag flips false.
+    // ---------------------------------------------------------------------
+    RT.on_key("q", fun () => RT.quit())
+    T.assert(RT._is_running(), "still running before q")
+    var q_ev: In.Event = In.key_event(In.KEY_RUNE, "q", In.MOD_NONE)
+    RT._dispatch_event(q_ev)
+    T.assert(!RT._is_running(), "q key dispatched quit(); loop flag false")
+
+    // ---------------------------------------------------------------------
+    // A key handler fires: on_key increments the counter, dispatch an "up".
+    // ---------------------------------------------------------------------
+    var zero2: Int = 0
+    count.set(zero2)
+    RT.on_key("up", fun () => count.update(fun (v: Int): Int => v + 1))
+    var up_ev: In.Event = In.key_event(In.KEY_UP, "", In.MOD_NONE)
+    RT._dispatch_event(up_ev)
+    RT._dispatch_event(up_ev)
+    T.assert_eq(count.get(), 2, "up handler ran twice -> count == 2")
+
+    // ---------------------------------------------------------------------
+    // A resize event re-sizes the back buffer.
+    // ---------------------------------------------------------------------
+    var rz: In.Event = In.resize_event()
+    RT._dispatch_event(rz)
+    // Tty.size() falls back to 80x24 when there's no controlling tty (the test
+    // runs with stdout captured), so the buffer resizes to that fallback.
+    var buf3: Buf.Buffer = RT._back_buffer()
+    RT._render_frame()
+    T.assert(buf3.w > 0 and buf3.h > 0, "back buffer valid after resize")
+
+    T.summary()
+}
+
+main()

@@ -1,0 +1,136 @@
+//! Sumac paginator widget — a page indicator, like Bubbles' `paginator`.
+//!
+//! Two render modes:
+//!   0 = dots    — a row of glyphs, the current page a filled "●", the rest "○"
+//!   1 = arabic  — a compact "N/M" label (1-based page over total)
+//!
+//! The current page is a `Sig.Signal<Int>` (0-based) owned by the app, so
+//! reading it in `view` makes the runtime re-render when it changes. `total` is
+//! the (fixed) page count. `next`/`prev` move the page, clamped to [0, total-1],
+//! and `handle` maps right/l → next, left/h → prev (Vim-style + arrows).
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+
+// =============================================================================
+// Paginator
+// =============================================================================
+
+/// A page indicator bound to a 0-based current-page signal.
+///   page       : Sig.Signal<Int> — current page, 0-based
+///   total      : Int — number of pages
+///   dot_style  : style for inactive dots
+///   active_dot_style : style for the current-page dot
+///   mode       : 0 dots, 1 arabic
+class Paginator {
+    var page: Sig.Signal<Int>
+    var total: Int
+    var dot_style: St.Style
+    var active_dot_style: St.Style
+    var mode: Int
+
+    fun init(page: Sig.Signal<Int>, total: Int, dot_style: St.Style,
+             active_dot_style: St.Style, mode: Int) {
+        this.page = page
+        this.total = total
+        this.dot_style = dot_style
+        this.active_dot_style = active_dot_style
+        this.mode = mode
+    }
+
+    /// Emit the indicator. Reads the page signal so the runtime tracks it.
+    fun view(): L.LNode {
+        // Bind fields to typed locals first: an untyped `this.<field>` receiver
+        // can silently drop method calls (see style.sf). Typed copies fix that.
+        var pg: Sig.Signal<Int> = this.page
+        var cur: Int = pg.get()
+        var total: Int = this.total
+        var mode: Int = this.mode
+        var ds: St.Style = this.dot_style
+        var ads: St.Style = this.active_dot_style
+
+        if (mode == 1) {
+            // Arabic "N/M" — display page is 1-based. Build the label from
+            // typed Int locals' .to_string(): string interpolation of an Int
+            // loses its static type and dispatches to_string on an untyped
+            // value (a codegen warning, and an untyped receiver can silently
+            // drop the call). The explicit form keeps the receiver typed.
+            var shown: Int = cur + 1
+            var label: String = shown.to_string() + "/" + total.to_string()
+            return L.text(label)
+        }
+
+        // Dots mode: one glyph per page, active filled.
+        return L.hstack(fun () {
+            var i: Int = 0
+            while (i < total) {
+                if (i == cur) {
+                    L.text_styled("●", ads)
+                } else {
+                    L.text_styled("○", ds)
+                }
+                i = i + 1
+            }
+        })
+    }
+
+    /// Advance one page, clamped to the last page.
+    fun next() {
+        var pg: Sig.Signal<Int> = this.page
+        var total: Int = this.total
+        var cur: Int = pg.get()
+        var nxt: Int = cur + 1
+        if (nxt > total - 1) { nxt = total - 1 }
+        if (nxt < 0) { nxt = 0 }
+        pg.set(nxt)
+    }
+
+    /// Go back one page, clamped to the first page.
+    fun prev() {
+        var pg: Sig.Signal<Int> = this.page
+        var cur: Int = pg.get()
+        var prv: Int = cur - 1
+        if (prv < 0) { prv = 0 }
+        pg.set(prv)
+    }
+
+    /// Right / l → next; Left / h → prev. Returns true when it consumed a key.
+    fun handle(e: Ev.Event): Bool {
+        if (e.key != nil) {
+            var k: Ev.KeyEvent = e.key
+            var name: String = k.name()
+            if (name == "right" or name == "l") {
+                this.next()
+                return true
+            }
+            if (name == "left" or name == "h") {
+                this.prev()
+                return true
+            }
+        }
+        return false
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A dots-mode paginator over `total` pages, current page signal created at 0.
+/// Active dot bold, inactive dots faint.
+fun paginator(total: Int): Paginator {
+    var page: Sig.Signal<Int> = Sig.signal(0)
+    var dot_style: St.Style = St.style().faint()
+    var active_dot_style: St.Style = St.style().bold()
+    return Paginator(page, total, dot_style, active_dot_style, 0)
+}
+
+/// An arabic-mode ("N/M") paginator over `total` pages, page signal at 0.
+fun paginator_arabic(total: Int): Paginator {
+    var page: Sig.Signal<Int> = Sig.signal(0)
+    var dot_style: St.Style = St.style().faint()
+    var active_dot_style: St.Style = St.style().bold()
+    return Paginator(page, total, dot_style, active_dot_style, 1)
+}

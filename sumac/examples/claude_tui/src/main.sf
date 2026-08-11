@@ -1,0 +1,73 @@
+//! claude_tui — entry point.
+//!
+//! Wires the shared app module (state + view + logic) to the Sumac reactive
+//! runtime: sizes the terminal, focuses the prompt, registers key handlers, and
+//! enters the render loop with `Rt.run(App.view)`. All UI state and the view
+//! builder live in `app.sf` so the render test can exercise the exact same tree.
+//!
+//! No `GC.disable()` — BUGS #192 is fixed; the tree rebuilds every dirty frame
+//! under normal GC.
+
+import "../../../src/runtime.sf" as Rt
+import "../../../src/tty.sf" as Tty
+import "../../../src/input.sf" as Ev
+import "../../../src/widgets/textarea.sf" as TA
+import "./app.sf" as App
+
+fun main() {
+    // Size the app to the real terminal before the first frame.
+    var sz: Tty.TermSize = Tty.size()
+    App.set_size(sz.cols, sz.rows)
+
+    // Focus the prompt editor so typing goes straight into it.
+    var t: TA.TextArea = App.prompt
+    t.focus()
+
+    // --- Global key handlers -------------------------------------------------
+
+    // Enter sends the current prompt (unless empty / already thinking). The
+    // paint callback forces the "thinking" frame to the screen before the
+    // blocking subprocess call in a synchronous v1 loop.
+    Rt.on_key("enter", fun () {
+        App.tick_spinner()
+        App.send(fun () {
+            App.tick_spinner()
+            Rt._render_frame()
+        })
+        Rt.request_render()
+    })
+
+    // Quit on ctrl+c / ctrl+d.
+    Rt.on_key("ctrl+c", fun () => Rt.quit())
+    Rt.on_key("ctrl+d", fun () => Rt.quit())
+
+    // Transcript scrolling.
+    Rt.on_key("up", fun () { App.scroll_up(); Rt.request_render() })
+    Rt.on_key("down", fun () { App.scroll_down(); Rt.request_render() })
+    Rt.on_key("pgup", fun () { App.page_up(); Rt.request_render() })
+    Rt.on_key("pgdown", fun () { App.page_down(); Rt.request_render() })
+
+    // Everything else (printable keys, backspace, arrows-in-text) goes to the
+    // focused prompt editor via the catch-all handler.
+    Rt.on_event(fun (e: Ev.Event) {
+        if (App.is_thinking()) { return }
+        if (e.key != nil) {
+            var k: Ev.KeyEvent = e.key
+            var name: String = k.name()
+            // Keys already claimed by a global handler must not double-fire into
+            // the editor.
+            if (name == "enter" or name == "up" or name == "down" or
+                name == "pgup" or name == "pgdown" or
+                name == "ctrl+c" or name == "ctrl+d") {
+                return
+            }
+        }
+        var ed: TA.TextArea = App.prompt
+        ed.handle(e)
+        Rt.request_render()
+    })
+
+    Rt.run(App.view)
+}
+
+main()

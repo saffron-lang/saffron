@@ -1,0 +1,155 @@
+// Verify sumac's textinput widget: insert/backspace/delete editing, cursor
+// movement + clamping, key + paste handling through handle(), and that view()
+// renders the value (and the placeholder when empty + unfocused) into a buffer.
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/layout.sf" as L
+import "../src/signal.sf" as Sig
+import "../src/input.sf" as Ev
+import "../src/widgets/textinput.sf" as TI
+import "@test" as T
+import "io" as IO
+
+// Render an LNode tree into a fresh buffer and return the row-0 contents as a
+// string (blanks preserved as spaces) so we can search for the field text.
+fun render_row0(node: L.LNode, w: Int, h: Int): String {
+    var buf: Buf.Buffer = Buf.Buffer(w, h)
+    L.render_node(node, buf, 0, 0, w, h)
+    var out: String = ""
+    var x: Int = 0
+    while (x < w) {
+        var c: Buf.Cell = buf.get(x, 0)
+        var r: String = c.rune
+        if (r == "") { r = " " }
+        out = out + r
+        x = x + 1
+    }
+    return out
+}
+
+fun main() {
+
+    // ---------------------------------------------------------------------
+    // construction: empty value, cursor 0
+    // ---------------------------------------------------------------------
+    var ti: TI.TextInput = TI.textinput("type here", 20)
+    T.assert_eq(ti.text(), "", "starts empty")
+    T.assert_eq(ti.cursor_pos(), 0, "cursor starts at 0")
+
+    // ---------------------------------------------------------------------
+    // insert advances the cursor
+    // ---------------------------------------------------------------------
+    ti.insert("hello")
+    T.assert_eq(ti.text(), "hello", "insert 'hello'")
+    T.assert_eq(ti.cursor_pos(), 5, "cursor after insert is 5")
+
+    // ---------------------------------------------------------------------
+    // left() moves the cursor, insert splits at the cursor
+    // ---------------------------------------------------------------------
+    ti.left()
+    ti.left()
+    T.assert_eq(ti.cursor_pos(), 3, "two lefts -> cursor 3")
+    ti.insert("X")
+    T.assert_eq(ti.text(), "helXlo", "insert 'X' mid-string")
+    T.assert_eq(ti.cursor_pos(), 4, "cursor after mid insert is 4")
+
+    // ---------------------------------------------------------------------
+    // backspace removes the char before the cursor and moves left
+    // ---------------------------------------------------------------------
+    ti.backspace()
+    T.assert_eq(ti.text(), "hello", "backspace removes the 'X' -> 'hello'")
+    T.assert_eq(ti.cursor_pos(), 3, "cursor after backspace is 3")
+
+    // ---------------------------------------------------------------------
+    // home / end
+    // ---------------------------------------------------------------------
+    ti.home()
+    T.assert_eq(ti.cursor_pos(), 0, "home -> cursor 0")
+    ti.end()
+    T.assert_eq(ti.cursor_pos(), 5, "end -> cursor 5 (len)")
+
+    // right() at end is clamped
+    ti.right()
+    T.assert_eq(ti.cursor_pos(), 5, "right at end stays clamped at 5")
+    // left() at 0 is clamped
+    ti.home()
+    ti.left()
+    T.assert_eq(ti.cursor_pos(), 0, "left at start stays clamped at 0")
+
+    // ---------------------------------------------------------------------
+    // delete_fwd at start removes the first char, cursor unchanged
+    // ---------------------------------------------------------------------
+    ti.home()
+    ti.delete_fwd()
+    T.assert_eq(ti.text(), "ello", "delete_fwd at start removes first char")
+    T.assert_eq(ti.cursor_pos(), 0, "delete_fwd leaves cursor at 0")
+    // delete_fwd at end is a no-op
+    ti.end()
+    ti.delete_fwd()
+    T.assert_eq(ti.text(), "ello", "delete_fwd at end is a no-op")
+
+    // ---------------------------------------------------------------------
+    // handle: a synthetic rune 'z' inserts and is consumed
+    // ---------------------------------------------------------------------
+    ti.end()
+    var z_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "z", Ev.MOD_NONE)
+    var consumed_z: Bool = ti.handle(z_ev)
+    T.assert(consumed_z, "rune 'z' consumed")
+    T.assert_eq(ti.text(), "elloz", "rune 'z' inserted at end")
+
+    // handle: a space key inserts a space
+    var sp_ev: Ev.Event = Ev.key_event(Ev.KEY_SPACE, " ", Ev.MOD_NONE)
+    var consumed_sp: Bool = ti.handle(sp_ev)
+    T.assert(consumed_sp, "space consumed")
+    T.assert_eq(ti.text(), "elloz ", "space inserted")
+
+    // handle: backspace key removes it again
+    var bs_ev: Ev.Event = Ev.key_event(Ev.KEY_BACKSPACE, "", Ev.MOD_NONE)
+    var consumed_bs: Bool = ti.handle(bs_ev)
+    T.assert(consumed_bs, "backspace consumed")
+    T.assert_eq(ti.text(), "elloz", "backspace removed the space")
+
+    // handle: an unrelated key (enter) is not consumed
+    var enter_ev: Ev.Event = Ev.key_event(Ev.KEY_ENTER, "", Ev.MOD_NONE)
+    var consumed_enter: Bool = ti.handle(enter_ev)
+    T.assert(!consumed_enter, "enter not consumed")
+
+    // ---------------------------------------------------------------------
+    // handle: a paste event inserts the whole block
+    // ---------------------------------------------------------------------
+    ti.end()
+    var paste_ev: Ev.Event = Ev.paste_event("ABC")
+    var consumed_paste: Bool = ti.handle(paste_ev)
+    T.assert(consumed_paste, "paste consumed")
+    T.assert_eq(ti.text(), "ellozABC", "paste inserted at end")
+
+    // ---------------------------------------------------------------------
+    // view(): the value renders into the buffer
+    // ---------------------------------------------------------------------
+    var vf: TI.TextInput = TI.textinput("placeholder", 20)
+    vf.focus()
+    vf.insert("world")
+    var tree: List<L.LNode> = L._collect(fun () {
+        vf.view()
+    })
+    T.assert_eq(tree.length(), 1, "focused view emits one root node")
+    var row: String = render_row0(tree[0], 40, 1)
+    T.assert(row.contains("world") or (row.contains("worl") and row.contains("█")),
+             "focused row shows the value")
+    IO.println("textinput row: [" + row + "]")
+
+    // ---------------------------------------------------------------------
+    // view(): placeholder shows when empty + unfocused
+    // ---------------------------------------------------------------------
+    var pf: TI.TextInput = TI.textinput("enter name", 20)
+    var ptree: List<L.LNode> = L._collect(fun () {
+        pf.view()
+    })
+    var prow: String = render_row0(ptree[0], 40, 1)
+    T.assert(prow.contains("enter name"), "empty+unfocused shows placeholder")
+    IO.println("placeholder row: [" + prow + "]")
+
+    T.summary()
+}
+
+main()

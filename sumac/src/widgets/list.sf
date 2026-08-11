@@ -1,0 +1,296 @@
+//! Sumac list widget — a scrollable, selectable list (à la Bubbletea's list).
+//!
+//! A `List_` renders a fixed-height *window* onto a list of string items. The
+//! `selected` signal is the 0-based cursor into the (optionally filtered) item
+//! list; the internal `offset` signal is the index of the top visible row. As
+//! the selection moves, the offset scrolls just enough to keep the cursor inside
+//! the `height`-row viewport. The selected row is drawn with `cursor_style` (a
+//! reverse/accent highlight) and prefixed with `marker` ("▸ " by default); the
+//! other rows are drawn with `item_style` behind a blank spacer column the same
+//! width as the marker so the text stays column-aligned.
+//!
+//! The marker/spacer column is a `box(width=N)` rather than literal leading
+//! spaces on purpose: layout word-wrap collapses leading/trailing spaces in a
+//! text node (so "  item" would lose its indent), but a fixed-width box reserves
+//! the columns regardless. The selected row's marker is a non-space glyph, which
+//! survives wrapping, so it is emitted as styled text.
+//!
+//! Everything index-shaped — the selection, the scroll offset, the height, the
+//! item count, every loop counter — is annotated `Int`: a `Float` used as a list
+//! index silently reads element 0 (BUGS #72), which for a list widget would pin
+//! the cursor to the first item forever, so the index math stays strictly
+//! integer. Signals are read into typed locals before use, because a method call
+//! straight on `this.<field>` reads as an untyped receiver and can be silently
+//! dropped.
+
+import "../layout.sf" as L
+import "../style.sf" as St
+import "../signal.sf" as Sig
+import "../input.sf" as Ev
+import "../buffer.sf" as Buf
+
+// =============================================================================
+// List_
+// =============================================================================
+
+/// A scrollable, selectable list. `items` is the backing content (a signal, so
+/// the runtime repaints when it changes); `selected` is the 0-based cursor into
+/// the displayed (post-filter) items; `offset` is the top visible row; `height`
+/// is the number of visible rows. `cursor_style` highlights the selected row,
+/// `item_style` styles the rest, `marker` is drawn before the selected item, and
+/// `filter` (when non-empty) restricts the visible items to those containing it.
+class List_ {
+    var items: Sig.Signal<List<String>>
+    var selected: Sig.Signal<Int>
+    var height: Int
+    var offset: Sig.Signal<Int>
+    var cursor_style: St.Style
+    var item_style: St.Style
+    var marker: String
+    var filter: Sig.Signal<String>
+
+    fun init(items: Sig.Signal<List<String>>, selected: Sig.Signal<Int>,
+             height: Int, offset: Sig.Signal<Int>, cursor_style: St.Style,
+             item_style: St.Style, marker: String,
+             filter: Sig.Signal<String>) {
+        this.items = items
+        this.selected = selected
+        this.height = height
+        this.offset = offset
+        this.cursor_style = cursor_style
+        this.item_style = item_style
+        this.marker = marker
+        this.filter = filter
+    }
+
+    // --- Signal readers (bind to a typed local first, then read) ---
+
+    /// The full backing item list.
+    fun all_items(): List<String> {
+        var sig: Sig.Signal<List<String>> = this.items
+        return sig.get()
+    }
+
+    /// The current filter substring ("" = no filtering).
+    fun filter_text(): String {
+        var sig: Sig.Signal<String> = this.filter
+        return sig.get()
+    }
+
+    /// The items actually shown: the backing list when the filter is empty,
+    /// otherwise only the items containing the filter substring.
+    fun visible_items(): List<String> {
+        var items: List<String> = this.all_items()
+        var f: String = this.filter_text()
+        if (f == "") { return items }
+        var out: List<String> = []
+        var i: Int = 0
+        var n: Int = items.length()
+        while (i < n) {
+            var it: String = items[i]
+            if (it.contains(f)) { out.push(it) }
+            i = i + 1
+        }
+        return out
+    }
+
+    /// The number of displayed (post-filter) items.
+    fun count(): Int {
+        var items: List<String> = this.visible_items()
+        return items.length()
+    }
+
+    /// The current selection index (0-based cursor into the displayed items).
+    fun selected_index(): Int {
+        var sig: Sig.Signal<Int> = this.selected
+        return sig.get()
+    }
+
+    /// The current scroll offset (index of the top visible row).
+    fun offset_index(): Int {
+        var sig: Sig.Signal<Int> = this.offset
+        return sig.get()
+    }
+
+    fun _set_selected(v: Int) {
+        var sig: Sig.Signal<Int> = this.selected
+        sig.set(v)
+    }
+
+    fun _set_offset(v: Int) {
+        var sig: Sig.Signal<Int> = this.offset
+        sig.set(v)
+    }
+
+    // --- Scrolling / movement ---
+
+    /// Scroll the offset so `sel` sits inside the [offset, offset+height) window.
+    /// Clamps the offset to be non-negative — a negative offset would index
+    /// element 0 (BUGS #72) and pin the window to the top.
+    fun _ensure_visible(sel: Int) {
+        var off: Int = this.offset_index()
+        var h: Int = this.height
+        if (sel < off) { off = sel }
+        if (sel >= off + h) { off = (sel - h) + 1 }
+        if (off < 0) { off = 0 }
+        this._set_offset(off)
+    }
+
+    /// Move the cursor to `idx`, clamped to [0, count-1], and scroll to keep it
+    /// visible. A no-op when the list is empty.
+    fun select(idx: Int) {
+        var n: Int = this.count()
+        if (n <= 0) { return }
+        var sel: Int = idx
+        if (sel < 0) { sel = 0 }
+        if (sel > n - 1) { sel = n - 1 }
+        this._set_selected(sel)
+        this._ensure_visible(sel)
+    }
+
+    /// Move the cursor down one row (toward the end), stopping at the last item.
+    fun move_down() {
+        var sel: Int = this.selected_index()
+        this.select(sel + 1)
+    }
+
+    /// Move the cursor up one row (toward the start), stopping at the first item.
+    fun move_up() {
+        var sel: Int = this.selected_index()
+        this.select(sel - 1)
+    }
+
+    /// Jump the cursor down by one viewport height.
+    fun page_down() {
+        var sel: Int = this.selected_index()
+        var h: Int = this.height
+        this.select(sel + h)
+    }
+
+    /// Jump the cursor up by one viewport height.
+    fun page_up() {
+        var sel: Int = this.selected_index()
+        var h: Int = this.height
+        this.select(sel - h)
+    }
+
+    /// Select the first item.
+    fun select_first() {
+        this.select(0)
+    }
+
+    /// Select the last item.
+    fun select_last() {
+        var n: Int = this.count()
+        this.select(n - 1)
+    }
+
+    // --- Rendering ---
+
+    /// Emit the window of items from `offset` to `offset + height` as a vstack of
+    /// rows. Each row is an hstack of a marker/spacer column and the item text.
+    /// The selected row uses `cursor_style` with the `marker` glyph; the rest use
+    /// `item_style` behind a blank box the marker's width, keeping text aligned.
+    /// Reads the items/selected/offset/filter signals so the runtime re-renders
+    /// on any change.
+    fun view() {
+        var items: List<String> = this.visible_items()
+        var n: Int = items.length()
+        var sel: Int = this.selected_index()
+        var off: Int = this.offset_index()
+        var h: Int = this.height
+        var cs: St.Style = this.cursor_style
+        var is_: St.Style = this.item_style
+        var marker: String = this.marker
+        var mw: Int = Buf.str_width(marker)
+        L.vstack(fun () {
+            var i: Int = off
+            var last: Int = off + h
+            while (i < last and i < n) {
+                var item: String = items[i]
+                var is_selected: Bool = (i == sel)
+                L.hstack(fun () {
+                    if (is_selected) {
+                        L.text_styled(marker, cs)
+                        L.text_styled(item, cs)
+                    } else {
+                        // A blank column the marker's width. A fixed-width box
+                        // (not literal spaces) survives layout's space collapse.
+                        L.box(0, 0, 0, 0, 0, 0, 0, 0, mw, 1, 0, fun () => nil)
+                        L.text_styled(item, is_)
+                    }
+                })
+                i = i + 1
+            }
+        })
+    }
+
+    // --- Input ---
+
+    /// Handle a key or mouse event. down/j and up/k move by one; pgdown/pgup move
+    /// by a page; home/end jump to the ends; the mouse wheel (kind 3 up, 4 down)
+    /// scrolls the selection. Returns true if the event was consumed so the
+    /// runtime can stop propagation.
+    fun handle(e: Ev.Event): Bool {
+        var k: Ev.KeyEvent = e.key
+        if (k != nil) {
+            var name: String = k.name()
+            if (name == "down" or name == "j") { this.move_down(); return true }
+            if (name == "up" or name == "k") { this.move_up(); return true }
+            if (name == "pgdown") { this.page_down(); return true }
+            if (name == "pgup") { this.page_up(); return true }
+            if (name == "home") { this.select_first(); return true }
+            if (name == "end") { this.select_last(); return true }
+            return false
+        }
+        var m: Ev.MouseEvent = e.mouse
+        if (m != nil) {
+            var kind: Int = m.kind
+            // MOUSE_WHEEL_UP = 3, MOUSE_WHEEL_DOWN = 4 (see input.sf).
+            if (kind == 3) { this.move_up(); return true }
+            if (kind == 4) { this.move_down(); return true }
+            return false
+        }
+        return false
+    }
+
+    /// Lists are focusable — they consume navigation keys.
+    fun focusable(): Bool {
+        return true
+    }
+}
+
+// =============================================================================
+// Constructors
+// =============================================================================
+
+/// A list over `items` with the given `selected`-index signal and viewport
+/// `height`. Owns a fresh scroll-offset signal (starting at 0) and an empty
+/// filter signal, with a reverse-video cursor highlight and the default "▸ "
+/// marker.
+fun list_widget(items: Sig.Signal<List<String>>, selected: Sig.Signal<Int>,
+                height: Int): List_ {
+    // Seed the offset from an Int local — a bare `0` literal is a Float and
+    // would poison the index math (BUGS #72).
+    var zero: Int = 0
+    var offset: Sig.Signal<Int> = Sig.signal(zero)
+    var empty: String = ""
+    var filter: Sig.Signal<String> = Sig.signal(empty)
+    var cursor_style: St.Style = St.style().reverse()
+    var item_style: St.Style = St.style()
+    return List_(items, selected, height, offset, cursor_style, item_style,
+                 "▸ ", filter)
+}
+
+/// A list with explicit cursor/item styles and marker. Owns a fresh scroll
+/// offset (0) and empty filter signal.
+fun list_styled(items: Sig.Signal<List<String>>, selected: Sig.Signal<Int>,
+                height: Int, cursor_style: St.Style, item_style: St.Style,
+                marker: String): List_ {
+    var zero: Int = 0
+    var offset: Sig.Signal<Int> = Sig.signal(zero)
+    var empty: String = ""
+    var filter: Sig.Signal<String> = Sig.signal(empty)
+    return List_(items, selected, height, offset, cursor_style, item_style,
+                 marker, filter)
+}

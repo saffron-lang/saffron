@@ -1,0 +1,166 @@
+// Golden-buffer test suite for Sumac.
+//
+// Each scene renders a layout/widget tree into a cell Buffer via golden_util's
+// render_tree (or a direct Buffer for the overlay case) and asserts the exact
+// text grid (dump_buffer / dump_region) or key cells. Exact multi-line golden
+// strings are the strongest regression guards, so they are preferred; a few
+// finicky-spacing scenes assert key cells + substrings instead.
+//
+// No real TTY, no event loop: this is pure render-to-grid, fully deterministic.
+
+import "../src/buffer.sf" as Buf
+import "../src/style.sf" as St
+import "../src/signal.sf" as Sig
+import "../src/layout.sf" as L
+import "./golden_util.sf" as G
+import "../src/widgets/progress.sf" as P
+import "../src/widgets/tabs.sf" as Tb
+import "../src/widgets/spinner.sf" as Sp
+import "../src/widgets/table.sf" as Tbl
+import "@test" as T
+import "io" as IO
+
+
+// Render a single bordered box of the given border code at a fixed 4x3 size.
+fun box_4x3(border: Int): Buf.Buffer {
+    return G.render_tree(fun () {
+        L.box(0, border, 0, 0, 0, 0, 0, 0, -1, -1, 0, fun () => nil)
+    }, 4, 3)
+}
+
+fun main() {
+
+    // -----------------------------------------------------------------
+    // Bordered boxes: normal / rounded / thick / double, each 4x3.
+    // The exact corner/edge glyphs are the golden form.
+    // -----------------------------------------------------------------
+    var rounded: String = G.dump_buffer(box_4x3(2))
+    T.assert_eq(rounded, "╭──╮\n│  │\n╰──╯", "rounded 4x3 box glyphs")
+
+    var normal: String = G.dump_buffer(box_4x3(1))
+    T.assert_eq(normal, "┌──┐\n│  │\n└──┘", "normal 4x3 box glyphs")
+
+    var thick: String = G.dump_buffer(box_4x3(3))
+    T.assert_eq(thick, "┏━━┓\n┃  ┃\n┗━━┛", "thick 4x3 box glyphs")
+
+    var double: String = G.dump_buffer(box_4x3(4))
+    T.assert_eq(double, "╔══╗\n║  ║\n╚══╝", "double 4x3 box glyphs")
+
+    IO.println("rounded 4x3:\n" + rounded)
+
+    // -----------------------------------------------------------------
+    // vstack of three text lines -> three stacked rows in order.
+    // -----------------------------------------------------------------
+    var v: Buf.Buffer = G.render_tree(fun () {
+        L.vstack(fun () {
+            L.text("aaa")
+            L.text("bbb")
+            L.text("ccc")
+        })
+    }, 5, 3)
+    T.assert_eq(G.dump_buffer(v), "aaa  \nbbb  \nccc  ", "vstack stacks three rows in order")
+    // Column check: each label starts at x=0 on its own row.
+    T.assert_eq(v.get(0, 0).rune, "a", "vstack row0 begins with a")
+    T.assert_eq(v.get(0, 2).rune, "c", "vstack row2 begins with c")
+
+    // -----------------------------------------------------------------
+    // hstack of two texts -> side by side with correct column offsets.
+    // "AB" then "CD" -> A@0 B@1 C@2 D@3.
+    // -----------------------------------------------------------------
+    var h: Buf.Buffer = G.render_tree(fun () {
+        L.hstack(fun () {
+            L.text("AB")
+            L.text("CD")
+        })
+    }, 6, 1)
+    T.assert_eq(G.dump_region(h, 0, 0, 4, 1), "ABCD", "hstack places texts side by side")
+    T.assert_eq(h.get(2, 0).rune, "C", "hstack second text starts at column 2")
+
+    // -----------------------------------------------------------------
+    // box with padding offsets its inner text. pad_t=1, pad_l=2 -> "X" at (2,1).
+    // -----------------------------------------------------------------
+    var pb: Buf.Buffer = G.render_tree(fun () {
+        L.box(0, 0, 1, 0, 0, 2, 0, 0, -1, -1, 0, fun () {
+            L.text("X")
+        })
+    }, 5, 3)
+    T.assert_eq(pb.get(2, 1).rune, "X", "padding offsets inner text to (2,1)")
+    T.assert_eq(pb.get(0, 0).rune, " ", "padding leaves top-left blank")
+    T.assert_eq(pb.get(0, 1).rune, " ", "padding leaves left column blank")
+
+    // -----------------------------------------------------------------
+    // place_centered overlays a small box in the middle of a bigger buffer
+    // WITHOUT wiping the surrounding cells. Paint sentinel rows first.
+    // 4x3 box centered in 10x5 -> x = (10-4)/2 = 3, y = (5-3)/2 = 1.
+    // -----------------------------------------------------------------
+    var big: Buf.Buffer = Buf.Buffer(10, 5)
+    big.put_str(0, 0, "##########", St.style())
+    big.put_str(0, 4, "##########", St.style())
+    var boxn: L.LNode = L.box(0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, fun () => nil)
+    L.place_centered(boxn, big, 4, 3)
+    // Surrounding sentinel rows survive intact.
+    T.assert_eq(G.dump_region(big, 0, 0, 10, 1), "##########", "overlay preserves top sentinel row")
+    T.assert_eq(G.dump_region(big, 0, 4, 10, 1), "##########", "overlay preserves bottom sentinel row")
+    // Overlay corners present at the centered position.
+    T.assert_eq(big.get(3, 1).rune, "┌", "overlay top-left corner at (3,1)")
+    T.assert_eq(big.get(6, 3).rune, "┘", "overlay bottom-right corner at (6,3)")
+    // Sentinel cells at the row edges (outside the 4-wide overlay band) survive.
+    T.assert_eq(big.get(0, 1).rune, " ", "cell left of overlay untouched")
+    IO.println("place_centered:\n" + G.dump_buffer(big))
+
+    // -----------------------------------------------------------------
+    // progress(width 10) at 0.5 -> five full blocks + empties.
+    // -----------------------------------------------------------------
+    var prg: P.Progress = P.progress_styled(10, St.style(), St.style(), false, false)
+    prg.set(0.5)
+    var pbuf: Buf.Buffer = G.render_tree(fun () { prg.view() }, 12, 1)
+    T.assert_eq(G.dump_region(pbuf, 0, 0, 10, 1), "█████     ", "progress 0.5: 5 blocks + 5 empty")
+    T.assert_eq(pbuf.get(0, 0).rune, "█", "progress cell 0 filled")
+    T.assert_eq(pbuf.get(4, 0).rune, "█", "progress cell 4 filled")
+    T.assert_eq(pbuf.get(5, 0).rune, " ", "progress cell 5 empty")
+    IO.println("progress 0.5:\n[" + G.dump_region(pbuf, 0, 0, 10, 1) + "]")
+
+    // -----------------------------------------------------------------
+    // tabs(["A","B","C"]) -> labels in a row, active tab marked with "▎".
+    // Active is tab 0 by default; its cell 0 carries the "▎" marker glyph.
+    // -----------------------------------------------------------------
+    var tabs: Tb.Tabs = Tb.tabs(["A", "B", "C"])
+    var tbuf: Buf.Buffer = G.render_tree(fun () { tabs.view() }, 20, 1)
+    var trow: String = G.dump_region(tbuf, 0, 0, 20, 1)
+    T.assert_eq(tbuf.get(0, 0).rune, "▎", "tabs active marker at cell 0")
+    T.assert_eq(tbuf.get(2, 0).rune, "A", "tabs active label A after marker")
+    T.assert(trow.contains("A"), "tabs row shows label A")
+    T.assert(trow.contains("B"), "tabs row shows label B")
+    T.assert(trow.contains("C"), "tabs row shows label C")
+    IO.println("tabs:\n[" + trow + "]")
+
+    // -----------------------------------------------------------------
+    // spinner default (dot ring): frame 0 renders its glyph "⠋".
+    // -----------------------------------------------------------------
+    var spn: Sp.Spinner = Sp.spinner("")
+    var sbuf: Buf.Buffer = G.render_tree(fun () { spn.view() }, 3, 1)
+    T.assert_eq(sbuf.get(0, 0).rune, "⠋", "spinner frame 0 glyph")
+
+    // -----------------------------------------------------------------
+    // table: 2 columns (Name w6, Age w4) + 2 rows. Header + aligned columns.
+    // Column 2 (Age) starts at x = 6 (the width of column 0). So the "Age"
+    // header cell and each row's second-column cell land at x=6.
+    // -----------------------------------------------------------------
+    var rows: Sig.Signal<List<List<String>>> = Sig.signal([["Al", "30"], ["Bo", "25"]])
+    var zero: Int = 0
+    var sel: Sig.Signal<Int> = Sig.signal(zero)
+    var cols: List<Tbl.Column> = [Tbl.column("Name", 6), Tbl.column("Age", 4)]
+    var tbl: Tbl.Table = Tbl.table(cols, rows, sel, 5)
+    var tblbuf: Buf.Buffer = G.render_tree(fun () { tbl.view() }, 12, 5)
+    // Header: "Name" at x=0, "Age" at x=6 (column-2 offset).
+    T.assert_eq(tblbuf.get(0, 0).rune, "N", "table header col 0 at x=0")
+    T.assert_eq(tblbuf.get(6, 0).rune, "A", "table header col 1 (Age) at x=6")
+    // Row 2 (after header + separator) col-1 cell "30" begins at x=6.
+    T.assert_eq(tblbuf.get(0, 2).rune, "A", "table first data row col 0 at x=0")
+    T.assert_eq(tblbuf.get(6, 2).rune, "3", "table first data row col 1 at x=6")
+    IO.println("table:\n" + G.dump_buffer(tblbuf))
+
+    T.summary()
+}
+
+main()
