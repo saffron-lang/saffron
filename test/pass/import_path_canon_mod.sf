@@ -1,0 +1,18 @@
+// Fixture for import_path_canonicalization.sf (BUGS #194).
+//
+// A module carrying mutable top-level state. The regression test imports THIS
+// file under two different path spellings that name the same file; with the
+// #194 fix both spellings resolve to one module instance, so the two aliases
+// share this single `counter`. Before the fix each spelling was a separate
+// module with its own `counter`, and (when both landed in one link) the two
+// copies of this global collided as `redefinition of global '@__g_...'`.
+//
+// Standalone this file is a pure-declaration TU: no top-level code and no
+// `fun main`, so the pass suite compiles and runs it to a clean exit 0 with no
+// output — exactly like every other cross-module fixture in test/pass/.
+var counter: Int = 0
+
+fun bump(): Int {
+    counter = counter + 1
+    return counter
+}

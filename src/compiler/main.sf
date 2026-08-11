@@ -200,13 +200,33 @@ fun _no_package_marker(): String { return Checker.no_package_marker() }
 // This also makes the answer independent of how a file was *named*: the nearest
 // manifest above a file is a fact about the filesystem, not about cwd. Before
 // canonicalisation a relative walk stopped at "." and never looked above cwd.
-fun _canon_dir(dir: String): String {
-    var d: String = dir
+//
+// The same lexical normalisation is what MODULE identity needs. A module is its
+// FILE, so two import spellings that name one file — `./sub/mod.sf` and
+// `./sub/../sub/mod.sf`, or a relative spelling and an absolute one — must reduce
+// to a single path before that path becomes (a) the module-dedup key and (b) the
+// basis of the module's mangled symbol prefix. Keying the module cache on the raw
+// specifier made each spelling a separate module instance with its own
+// module-level globals: a shared `var` split into two independent copies, and
+// when both spellings landed in one link the duplicated globals collided as
+// `redefinition of global '@__g_...'` and the build failed in `opt` (BUGS #194,
+// the file-level twin of the directory-level #57). `_canon_path` is the ONE
+// reduction both the key and the prefix are taken through — `resolve_import_path`
+// routes every specifier through it, and `path_based_prefix` derives the prefix
+// from the same canonical path — so all spellings share one instance and one set
+// of globals.
+//
+// This is purely LEXICAL: it absolutises against cwd and collapses "."/".."/
+// duplicate slashes, but does NOT resolve symlinks (OS has no realpath binding).
+// Two DIFFERENT symlinks to one file therefore still read as two modules — an
+// accepted v1 limitation; every spelling this bug is about reduces here.
+fun _canon_path(path: String): String {
+    var d: String = path
     if (d == ".") { d = OS.cwd() }
     if (d.starts_with("./")) { d = OS.cwd() + "/" + d.slice(2, d.length()) }
     if (!d.starts_with("/")) { d = OS.cwd() + "/" + d }
 
-    // Collapse "." and ".." segments so "a/b/../c" and "a/c" are one directory.
+    // Collapse "." and ".." segments so "a/b/../c" and "a/c" are one path.
     var parts: List<String> = d.split("/")
     var stack: List<String> = []
     var i: Float = 0
@@ -231,6 +251,11 @@ fun _canon_dir(dir: String): String {
     var out: String = result.to_string()
     if (out.length() == 0) { return "/" }
     return out
+}
+
+// A directory is canonicalised exactly like any other path — same lexical rules.
+fun _canon_dir(dir: String): String {
+    return _canon_path(dir)
 }
 
 // directory → tagged package entry, so the upward walk runs once per directory
@@ -410,7 +435,12 @@ fun print_package_map() {
     }
 }
 
-fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: String): String {
+// Turn an import specifier into a path, WITHOUT canonicalising. The public
+// `resolve_import_path` wraps this and routes the result through `_canon_path`;
+// this raw form exists only so the wrapper has one thing to canonicalise. Every
+// module-identity consumer (the dedup key, the symbol prefix) must see the
+// canonical spelling, so nothing outside the wrapper should call this.
+fun _resolve_import_path_raw(base_path: String, import_path: String, stdlib_dir: String): String {
     if (import_path.starts_with("@")) {
         var name: String = import_path.slice(1, import_path.length())
         return _find_in_lib_paths(name, stdlib_dir)
@@ -440,6 +470,17 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
     }
     // Bare import without slash: "turmeric" → search lib paths
     return _find_in_lib_paths(import_path, stdlib_dir)
+}
+
+// Resolve an import specifier to the CANONICAL absolute path of the file it
+// names. This is the single choke point that turns a specifier into the path
+// used everywhere as module identity: the `visited` / `path_to_prefix` /
+// `module_file_paths` key AND, via that same path fed to `path_based_prefix`,
+// the module's mangled symbol prefix. Canonicalising here (rather than at each
+// of the ~10 call sites) is what makes two spellings of one file collapse to a
+// single module with a single set of globals — BUGS #194. See `_canon_path`.
+fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: String): String {
+    return _canon_path(_resolve_import_path_raw(base_path, import_path, stdlib_dir))
 }
 
 // The one place an import is turned into a path that must exist.
@@ -1731,8 +1772,11 @@ fun main(): Int {
         nppi = nppi + 1
     }
 
-    // Auto-import prelude (interfaces available in all programs)
-    var prelude_path: String = stdlib_dir + "/prelude.sf"
+    // Auto-import prelude (interfaces available in all programs). Canonicalised
+    // to the same spelling `resolve_import_path` produces for `@prelude`, so a
+    // module that imports the prelude explicitly hits the same `visited` /
+    // path_to_prefix key and does not load it a second time (BUGS #194).
+    var prelude_path: String = _canon_path(stdlib_dir + "/prelude.sf")
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
@@ -1846,7 +1890,12 @@ fun main(): Int {
     // globals). runtime.sf has neither top-level code nor a main, so it declines
     // here; that is what keeps runtime.ll clean and lets every async program own
     // the single definition. BUGS #181.
-    var sched_auto: String = _find_in_lib_paths("scheduler", stdlib_dir)
+    // Canonicalised so this ambient collection and an explicit `@scheduler`
+    // import (reached via resolve_import_path, now canonical) share one key —
+    // otherwise the scheduler's 18 top-level globals would be emitted twice and
+    // collide at link (the #194 mechanism meeting the #181 scheduler). The
+    // visited guard below dedupes against the later @async→@scheduler import.
+    var sched_auto: String = _canon_path(_find_in_lib_paths("scheduler", stdlib_dir))
     if (_entry_emits_program(program) and OS.file_exists(sched_auto) and !visited.has(sched_auto)) {
         if (!path_to_prefix.has(sched_auto)) {
             path_to_prefix.set(sched_auto, path_based_prefix("@scheduler", sched_auto, stdlib_dir))
