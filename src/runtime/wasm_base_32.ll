@@ -999,6 +999,13 @@ entry:
   ret i64 9221683186994511874
 }
 
+define i64 @__rt_tag_ptr(i64 %raw) {
+entry:
+  %ptr = inttoptr i64 %raw to i8*
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  ret i64 %tagged
+}
+
 ; --- Type Checking ---
 
 ; @override wasm32 -- DRIFT: lacks the raw-GC-pointer probe that native grew
@@ -1476,14 +1483,6 @@ finish_int:
   ; __wasm_uint_to_str already NUL-terminated; nothing fractional to add.
   %r0 = ptrtoint i8* %buf to i64
   ret i64 %r0
-}
-
-; Wrapper: tag a raw pointer as a Saffron string value (i64 -> i64)
-define i64 @__rt_tag_ptr(i64 %raw) {
-entry:
-  %ptr = inttoptr i64 %raw to i8*
-  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
-  ret i64 %tagged
 }
 
 ; =============================================================================

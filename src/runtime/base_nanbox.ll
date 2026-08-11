@@ -179,13 +179,6 @@ no:
   ret i64 %r2
 }
 
-; Wrapper: tag a raw pointer as a Saffron string value (i64 → i64)
-define i64 @__rt_tag_ptr(i64 %raw) {
-entry:
-  %ptr = inttoptr i64 %raw to i8*
-  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
-  ret i64 %tagged
-}
 define i64 @__nil_to_string() {
 entry:
   %s = getelementptr [4 x i8], [4 x i8]* @.str.nil_nl, i64 0, i64 0
@@ -432,6 +425,13 @@ entry:
   ret i64 9221683186994511874
 }
 
+define i64 @__rt_tag_ptr(i64 %raw) {
+entry:
+  %ptr = inttoptr i64 %raw to i8*
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  ret i64 %tagged
+}
+
 ; --- Type Checking ---
 
 define i1 @__val_is_float(i64 %v) {
@@ -670,6 +670,14 @@ read_gc_tag:
   ret i1 %gc_is_map
 no:
   ret i1 false
+}
+
+; --- Allocation Shims ---
+
+define weak i8* @__sf_calloc(i64 %n, i64 %size) {
+entry:
+  %p = call i8* @calloc(i64 %n, i64 %size)
+  ret i8* %p
 }
 
 ; @generated-values:end
@@ -1020,12 +1028,6 @@ entry:
 define weak i8* @__sf_realloc(i8* %old, i64 %size) {
 entry:
   %p = call i8* @realloc(i8* %old, i64 %size)
-  ret i8* %p
-}
-
-define weak i8* @__sf_calloc(i64 %n, i64 %size) {
-entry:
-  %p = call i8* @calloc(i64 %n, i64 %size)
   ret i8* %p
 }
 
