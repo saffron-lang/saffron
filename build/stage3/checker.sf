@@ -78,7 +78,12 @@ class TypeEnv {
     var overload_names: Map<String, Bool>
     var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
-    var enum_fields: Map<String, String>
+    // Declared payload fields per variant, as nodes — same pattern as
+    // class_fields. Keyed "EnumName.Variant"; only non-empty (payload-carrying)
+    // variants are stored, so `has(key)` still answers "does this variant carry
+    // fields". The loss-LESS render (type_to_source, NOT type_to_string) is the
+    // whole risk of this table — see get_enum_binding_type.
+    var enum_fields: Map<String, List<AST.Param>>
     // Declared fields per class, as nodes. Same pattern as func_params: the
     // producer already had List<AST.Param>; the lossy CSV render moves to read
     // time in get_class_fields_str so every consumer sees byte-identical strings.
@@ -1816,7 +1821,11 @@ class NullChecker {
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
             var vname: String = match (v) { Variant(n, f, __ns) => n }
-            var vfields: String = AST.variant_fields_string(v)
+            // Store the AST.Param nodes straight off the Variant. Keep the
+            // non-empty gate: a fieldless variant was never in enum_fields (its
+            // CSV render was ""), and check_pattern_arity/check_let_pattern still
+            // read `has(key)` to mean "carries a payload".
+            var vfields: List<AST.Param> = match (v) { Variant(n, f, __ns) => f }
             variant_names.push(vname)
             if (vfields.length() > 0) {
                 this.env.enum_fields.set(name + "." + vname, vfields)
@@ -1842,7 +1851,7 @@ class NullChecker {
         // It deliberately is not, because unlike class_fields the enum side is
         // two tables and enum_fields' key is already compound — "EnumName.Variant"
         // — so a prefix would make it three-part and every one of the ~10 read
-        // sites (resolve_enum_key_name, get_variant_fields, check_variant_arity,
+        // sites (resolve_enum_key_name, get_variant_field_params, check_variant_arity,
         // check_exhaustiveness, the two MemberAccess arms, is_type_param, ...)
         // would have to agree on the new spelling at once. That is a larger and
         // riskier change than the collision it fixes, and it is not needed by any
@@ -4112,7 +4121,7 @@ class NullChecker {
         // file may be the other module's, so a type read from it is invented.
         // `Any` is the honest answer — it widens rather than reporting a
         // mismatch about a field the receiver does not have. Same posture as
-        // get_variant_fields for an ambiguous enum.
+        // get_variant_field_params for an ambiguous enum.
         if (lookup == this.generic_base(class_name) and this.is_ambiguous_class(class_name)) {
             return "Any"
         }
@@ -5125,30 +5134,29 @@ class NullChecker {
         return enum_type.slice(dot_pos + 1, enum_type.length())
     }
 
-    // The declared field list of a variant, one "name:Type" per entry, or an
-    // empty list if the variant is unknown or carries no payload.
-    fun get_variant_fields(enum_type: String, variant: String): List<String> {
+    // The declared payload fields of a variant as AST.Param nodes, or an empty
+    // list if the variant is unknown or carries no payload. enum_fields holds
+    // the nodes now, so there is nothing to split — the node list IS the field
+    // sequence the old CSV was rendered from.
+    fun get_variant_field_params(enum_type: String, variant: String): List<AST.Param> {
         // Ambiguous name: the field list on file may be the other module's, and
         // typing a binding from it is worse than Any. See register_enum.
         if (this.is_ambiguous_enum(enum_type)) return []
         var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
         if (!this.env.enum_fields.has(key)) return []
-        var fields_str: String = this.env.enum_fields.get(key)
-        if (fields_str.length() == 0) return []
-        // Split on top-level commas only: `Map<String, Int>` is ONE field, and
-        // splitting it in two shifted every later field's type by one position.
-        return AST.split_type_args(fields_str)
+        return this.env.enum_fields.get(key)
     }
 
     fun get_enum_binding_type(enum_type: String, variant: String, field_idx: Float): String {
-        var parts: List<String> = this.get_variant_fields(enum_type, variant)
-        if (field_idx >= parts.length()) return "Any"
-        // First colon only. A field is "name:Type" and the type may itself
-        // contain a colon, so split(":") could not be trusted to give two parts.
-        var field_def: String = parts[field_idx.floor()]
-        var colon: Float = field_def.index_of(":")
-        if (colon < 0) return "Any"
-        return field_def.slice(colon + 1, field_def.length()).trim()
+        var params: List<AST.Param> = this.get_variant_field_params(enum_type, variant)
+        if (field_idx >= params.length()) return "Any"
+        // Read the field's declared type node directly. The old CSV path rendered
+        // "name:" + type_to_source(pt) and sliced back everything after the first
+        // ":", i.e. type_to_source(pt).trim(); type_to_source emits no surrounding
+        // whitespace, so this is byte-identical — and it must be type_to_source,
+        // NOT type_to_string, or Map<String,Int> collapses to Map.
+        var pt: AST.Type = match (params[field_idx.floor()]) { Param(n, t, d, p_vis, __ns) => t }
+        return AST.type_to_source(pt)
     }
 
     // Node view. Every current caller of get_enum_binding_type immediately wraps
@@ -5177,7 +5185,7 @@ class NullChecker {
         var key: String = this.resolve_enum_key_name(enum_type) + "." + variant
         var declared: Float = 0
         if (this.env.enum_fields.has(key)) {
-            declared = this.get_variant_fields(enum_type, variant).length()
+            declared = this.get_variant_field_params(enum_type, variant).length()
         } else if (!this.env.enum_variants.has(this.resolve_enum_key_name(enum_type))) {
             // Unknown enum — nothing to compare against. Not an arity problem.
             return

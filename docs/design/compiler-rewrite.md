@@ -638,11 +638,22 @@ render CSV on read, migrate consumers, delete the shim):
   payload fields (`Fun(A):R`) where both old and new truncate the source at the first
   `:`, confirmed byte-identical.
 
-- **Steps 3–4 — NOT STARTED.** Step 3: migrate the checker's `enum_fields` table to
-  nodes (`get_enum_binding_type`/`_node` read `type_ann` directly). Step 4: delete both
-  render shims and the now-dead `split_respecting_generics`/`split(":")` on enum-field
-  strings. Deliberately excluded from this slice: the bare-name `enum_variants`/`enum_fields`
-  key-ambiguity change (`checker.sf` ~1836) — larger, ~10 read sites, its own slice.
+- **Step 3 — LANDED.** The checker's `enum_fields` table becomes
+  `Map<String, List<AST.Param>>`; `register_enum` stores the `AST.Param` nodes
+  (keeping the non-empty gate, so `has(key)` still means "carries a payload").
+  `get_variant_fields` (string) → `get_variant_field_params` (nodes), and
+  `get_enum_binding_type` reads `type_ann` directly via `AST.type_to_source` instead
+  of splitting a CSV at the first `:` — byte-identical, since the old path returned
+  `type_to_source(pt).trim()` and `type_to_source` emits no surrounding whitespace.
+  `get_enum_binding_type_node` is unchanged (`parse_type_node(get_enum_binding_type(…))`).
+  `AST.variant_fields_string` stays alive for the codegen `get_variant_field_str` shim
+  until Step 4. Verified: gen4 fixed-point, 0 fallbacks, suite 369/0, oracle 0 mismatches.
+
+- **Step 4 — NOT STARTED.** Delete both render shims (`AST.variant_fields_string`, the
+  codegen `get_variant_field_str`) and the now-dead `split_respecting_generics`/`split(":")`
+  on enum-field strings. Deliberately excluded from this slice: the bare-name
+  `enum_variants`/`enum_fields` key-ambiguity change (`checker.sf` ~1836) — larger,
+  ~10 read sites, its own slice.
 
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
