@@ -2734,9 +2734,8 @@ class Parser {
             }
             var vname_span: AST.Span = this.ident_span()
             var vname: String = this.expect_ident()
-            var fields: String = ""
+            var fields: List<AST.Param> = []
             if (this.match_kind("(")) {
-                var fields_sb: StringBuilder = StringBuilder()
                 var first: Bool = true
                 // The `eof` half of this condition is what keeps a truncated
                 // `enum E { V(` from spinning forever. `current()` clamps to the
@@ -2748,19 +2747,23 @@ class Parser {
                 // guard; `consume(")")` below still reports the missing paren.
                 while (!this.match_kind_check(")") and !this.match_kind_check("eof")) {
                     if (!first) {
-                        fields_sb.append(",")
                         this.consume(",")
                     }
+                    var fname_span: AST.Span = this.ident_span()
                     var fname: String = this.expect_ident()
                     this.consume(":")
                     var ftype: String = this.parse_type()
-                    fields_sb.append(fname)
-                    fields_sb.append(":")
-                    fields_sb.append(ftype)
+                    // Store the field as an AST.Param node carrying a loss-less
+                    // type node. type_to_source(this.parse_type_ast(ftype))
+                    // reproduces the original parse_type() source form, which
+                    // variant_fields_string re-renders to the old CSV byte for
+                    // byte. Payload fields have no default and no visibility of
+                    // their own (enum variant visibility is a compile error above).
+                    fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype),
+                        AST.Expr.NilLit, "public", fname_span))
                     first = false
                 }
                 this.consume(")")
-                fields = fields_sb.to_string()
             }
             variants.push(AST.Variant.Variant(vname, fields, vname_span))
             this.match_kind(",")

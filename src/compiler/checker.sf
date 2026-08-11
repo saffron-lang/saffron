@@ -1816,7 +1816,7 @@ class NullChecker {
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
             var vname: String = match (v) { Variant(n, f, __ns) => n }
-            var vfields: String = match (v) { Variant(n, f, __ns) => f }
+            var vfields: String = AST.variant_fields_string(v)
             variant_names.push(vname)
             if (vfields.length() > 0) {
                 this.env.enum_fields.set(name + "." + vname, vfields)
@@ -2528,15 +2528,15 @@ class NullChecker {
                 }
             }
             EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
-                // A variant's payload spelling is a String on the Variant node
-                // ("field:Type,field:Type"), and mentioned_type_names splits on
-                // the punctuation that separates them, so a private type anywhere
-                // in a payload is found without parsing the payload.
+                // A variant's payload renders to the "field:Type,field:Type"
+                // string via variant_fields_string, and mentioned_type_names
+                // splits on the punctuation that separates them, so a private
+                // type anywhere in a payload is found without walking the nodes.
                 if (e_vis != "private") {
                     var vi: Float = 0
                     while (vi < variants.length()) {
                         var v_name: String = match (variants[vi]) { Variant(vn, vf, __ns) => vn }
-                        var v_fields: String = match (variants[vi]) { Variant(vn, vf, __ns) => vf }
+                        var v_fields: String = AST.variant_fields_string(variants[vi])
                         this.check_leak(this.exposure_label(e_vis) + " enum '" + name + "." + v_name + "'",
                             "its payload", v_fields)
                         vi = vi + 1
