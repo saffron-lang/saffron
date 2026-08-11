@@ -4616,7 +4616,7 @@ class NullChecker {
             if (name == "exit") return "Nil"
             if (name == "lex") return "List"
             if (name == "parse") return "List"
-            if (name == "generate" or name == "generate_with_imports") return "String"
+            if (name == "generate") return "String"
             if (name == "check" or name == "check_with_imports") return "String"
             if (name == "resolve_import_path") return "String"
             if (name == "extract_imports") return "List<String>"
