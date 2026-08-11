@@ -6,3 +6,4 @@ a.out
 # Example binaries
 examples/*/claude-tui
 examples/**/*.bin
+examples/claude_tui/sclaude-bin
