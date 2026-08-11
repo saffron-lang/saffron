@@ -56,3 +56,6 @@ build/wasm_counter/
 # Python bytecode from tools/*.py
 __pycache__/
 *.pyc
+
+# Stray MCP tool log written at repo root
+dsai-mcp-log.json
