@@ -625,18 +625,18 @@ render CSV on read, migrate consumers, delete the shim):
   `type_to_source(parse_type_ast(...))` round-trips every enum-payload shape (unions,
   `T?` desugaring, `Fun` types, tuples, nested generics).
 
-- **Step 2 — WIP, UNVERIFIED (branch `wip/i3-step2-enum-nodes`, commit `ab8c6b45`; NOT
-  on `main`).** Codegen reads the nodes directly: `enum_variant_fields` table →
+- **Step 2 — LANDED.** Codegen reads the nodes directly: `enum_variant_fields` table →
   `Map<String, List<AST.Param>>`; `get_variant_field_type` and `ensure_enum_eq` read
   `type_ann` nodes instead of splitting the CSV. **This removes the first of the five
   `record_unresolved` sites** — `match_body.sf`'s ":638" ("field definition has no
   name:type split"), which cannot occur once name and type are separate slots. The
   other three diagnostics (variant-not-registered, no-recorded-fields, index-out-of-bounds)
-  are kept and adapted to list ops. **The edits are complete but have NOT been through
-  bootstrap/suite/oracle.** The one flagged shape needing the differential check:
-  Fun-typed payload fields (`Fun(A):R`), where both old and new truncate the source at
-  the first `:` — believed byte-identical, must be proven. See the resume file
-  `docs/design/I3_STEP2_RESUME.md`.
+  are kept and adapted to list ops. String consumers that still want the legacy CSV
+  (`get_max_fields`, plus the emit paths through `get_variant_fields`) route through a
+  `get_variant_field_str` render-on-read shim. Verified: gen4 fixed-point, 0 fallbacks,
+  suite 369/0, differential oracle 0 mismatches — the one flagged shape, Fun-typed
+  payload fields (`Fun(A):R`) where both old and new truncate the source at the first
+  `:`, confirmed byte-identical.
 
 - **Steps 3–4 — NOT STARTED.** Step 3: migrate the checker's `enum_fields` table to
   nodes (`get_enum_binding_type`/`_node` read `type_ann` directly). Step 4: delete both

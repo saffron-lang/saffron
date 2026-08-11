@@ -1010,14 +1010,52 @@
         // Render-on-read shim: the Variant node now stores List<AST.Param>, not
         // a CSV string. variant_fields_string re-emits the legacy "name:Type,…"
         // form via type_to_source so every store/emit path here stays byte-
-        // identical. This is the single choke point for the 3 codegen store
-        // paths plus the emit read.
+        // identical. This is the single choke point for the emit reads that still
+        // want the CSV (gen_enum_to_string, gen_enum_decl's length gate feeding
+        // emit_enum_constructor).
         return AST.variant_fields_string(v)
+    }
+
+    // The variant payload as AST.Param nodes, straight off the node. This is what
+    // the 3 codegen store paths (register_variant, output_body's prescan,
+    // codegen.sf's prescan) now push into `enum_variant_fields`, which holds
+    // List<AST.Param> rather than a CSV string. Empty list == a fieldless variant.
+    fun get_variant_field_nodes(v: AST.Variant): List<AST.Param> {
+        return match (v) { Variant(n, f, __ns) => f
+            _ => []
+        }
+    }
+
+    // Render the legacy "name:Type,…" CSV for one stored variant key from the
+    // AST.Param nodes now held in `enum_variant_fields`. The single read-side
+    // choke point for the table's string consumers (get_max_fields, and — before
+    // its 2b node rewrite — get_variant_field_type / ensure_enum_eq). Renders each
+    // field via AST.type_to_source, EXACTLY as the old table value was produced by
+    // variant_fields_string, so the string every consumer sees is byte-identical
+    // to what the Map used to hold. An absent key or empty list renders "".
+    fun get_variant_field_str(key: String): String {
+        if (!this.enum_variant_fields.has(key)) { return "" }
+        var params: List<AST.Param> = this.enum_variant_fields.get(key)
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(AST.type_to_source(pt))
+            i = i + 1
+        }
+        return sb.to_string()
     }
 
     fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
         var vname: String = this.get_variant_name(v)
-        var vfields: String = this.get_variant_fields(v)
+        // Store the AST.Param nodes directly — the table holds List<AST.Param>
+        // now. get_variant_field_str renders the same CSV on read.
+        var vfields: List<AST.Param> = this.get_variant_field_nodes(v)
         variant_names.push(vname)
         this.enum_variant_tags.set(name + "." + vname, idx)
         this.enum_variant_fields.set(name + "." + vname, vfields)
