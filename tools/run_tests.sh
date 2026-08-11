@@ -163,6 +163,30 @@ if [[ ! -x "$SAFFRONC" ]]; then
     exit 2
 fi
 
+# --- Runtime value-layer drift gate ------------------------------------------
+#
+# The four IR bases share ~21 NaN-box value helpers, generated from
+# src/runtime/values.spec by tools/gen_runtime_values.py. When the spec and the
+# committed .ll bases disagree, a hand-edit to one base has silently diverged
+# from the others — exactly the class of drift that shipped BUGS #77/#82/#83/#39
+# (and, later, #154/#189). Catch it here, before spending minutes compiling
+# every test against a base that no longer matches its source of truth.
+#
+# If python3 is unavailable this is a warning, not a hard failure: a missing
+# interpreter must not take down the whole suite. But when python3 IS present
+# and reports drift, fail fast with a pointer at the spec.
+if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "$ROOT/tools/gen_runtime_values.py" --check >/dev/null 2>&1; then
+        echo "run_tests.sh: src/runtime/values.spec has drifted from the IR bases." >&2
+        echo "  The generated NaN-box value helpers in src/runtime/*.ll no longer" >&2
+        echo "  match values.spec. Run: python3 tools/gen_runtime_values.py" >&2
+        echo "  (then review the diff) — see src/runtime/values.spec." >&2
+        exit 2
+    fi
+else
+    echo "run_tests.sh: python3 not found — skipping values.spec drift check" >&2
+fi
+
 # --- Counters ----------------------------------------------------------------
 
 FAILURES=()

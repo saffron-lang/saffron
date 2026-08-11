@@ -445,8 +445,33 @@ entry:
   %not_int = xor i1 %is_int, true
   %not_spec = xor i1 %is_spec, true
   %a = and i1 %not_ptr, %not_int
-  %result = and i1 %a, %not_spec
-  ret i1 %result
+  %notag = and i1 %a, %not_spec
+  ; BUGS #189: ruling out the three tags is not enough. A class instance (and any
+  ; heap object) passed through an `Any` binding arrives as a RAW untagged GC
+  ; pointer whose upper 16 bits are clear — neither PTR nor int/spec — so this
+  ; predicate used to call it a float. `Json.to_string(obj)` then took the number
+  ; branch and returned a corrupt value (and the roundtrip trapped out of bounds).
+  ; Mirror __val_is_list's probe: when upper == 0 and v != 0, check the GC magic
+  ; sentinel at v-8; a GC object is not a float. A normalized double always has a
+  ; non-zero exponent up top, so only upper == 0 is safe to dereference.
+  br i1 %notag, label %maybe, label %no
+maybe:
+  %hi_clear = icmp eq i64 %upper, 0
+  br i1 %hi_clear, label %probe, label %yes
+probe:
+  %nonzero = icmp ne i64 %v, 0
+  br i1 %nonzero, label %deref, label %yes
+deref:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  %is_float = xor i1 %has_gc, true
+  ret i1 %is_float
+yes:
+  ret i1 true
+no:
+  ret i1 false
 }
 
 [helper __val_is_int]
@@ -559,6 +584,17 @@ targets = native wasm64 wasm32
 define i64 @__val_class_tag(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
+  ; TAG_ENUM 0x7FFB: a fieldless enum immediate carries its type_id in bits
+  ; 32..47 and the variant in bits 0..31 (BUGS #154). No heap read — the id is
+  ; in the value itself. Answer with the type_id so __val_to_string's switch
+  ; dispatches it to <Enum>__to_string, exactly as a payload enum's GC tag does.
+  %is_enum = icmp eq i64 %upper, 32763         ; TAG_ENUM
+  br i1 %is_enum, label %enum_tag, label %check_ptrlike
+enum_tag:
+  %etid_shifted = lshr i64 %v, 32
+  %etid = and i64 %etid_shifted, 65535         ; type_id in bits 32..47
+  ret i64 %etid
+check_ptrlike:
   %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
   %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
   %ptr_like = or i1 %is_tagged, %is_raw
@@ -594,6 +630,17 @@ reason = Same logic as native with ONE deliberate difference: the 4 GB lower bou
 define i64 @__val_class_tag(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
+  ; TAG_ENUM 0x7FFB: a fieldless enum immediate carries its type_id in bits
+  ; 32..47 and the variant in bits 0..31 (BUGS #154). No heap read — the id is
+  ; in the value itself. Answer with the type_id so __val_to_string's switch
+  ; dispatches it to <Enum>__to_string, exactly as a payload enum's GC tag does.
+  %is_enum = icmp eq i64 %upper, 32763         ; TAG_ENUM
+  br i1 %is_enum, label %enum_tag, label %check_ptrlike
+enum_tag:
+  %etid_shifted = lshr i64 %v, 32
+  %etid = and i64 %etid_shifted, 65535         ; type_id in bits 32..47
+  ret i64 %etid
+check_ptrlike:
   %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
   %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
   %ptr_like = or i1 %is_tagged, %is_raw
