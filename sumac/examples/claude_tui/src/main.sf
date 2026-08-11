@@ -59,8 +59,20 @@ fun main() {
     // Clear the transcript (^L).
     Rt.on_key("ctrl+l", fun () { App.clear_transcript(); Rt.request_render() })
 
-    // Transcript scrolling.
-    Rt.on_key("up", fun () { App.scroll_up(); Rt.request_render() })
+    // Shift+Tab cycles the permission-mode indicator (normal → accept edits →
+    // bypass). Visual parity only — the wrapper can't change claude's real mode
+    // over -p. `backtab` is the alternate name some terminals send for shift+tab.
+    Rt.on_key("shift+tab", fun () { App.cycle_perm_mode(); Rt.request_render() })
+    Rt.on_key("backtab", fun () { App.cycle_perm_mode(); Rt.request_render() })
+
+    // Up-arrow precedence: when the input is EMPTY and a queue exists, up pops
+    // the last queued message back into the input for editing; otherwise up
+    // scrolls the transcript. This keeps the common "scroll" flow intact while
+    // adding Claude-Code's "edit queued messages" affordance.
+    Rt.on_key("up", fun () {
+        if (!App.edit_last_queued()) { App.scroll_up() }
+        Rt.request_render()
+    })
     Rt.on_key("down", fun () { App.scroll_down(); Rt.request_render() })
     Rt.on_key("pgup", fun () { App.page_up(); Rt.request_render() })
     Rt.on_key("pgdown", fun () { App.page_down(); Rt.request_render() })
@@ -76,6 +88,7 @@ fun main() {
             // the editor.
             if (name == "enter" or name == "esc" or name == "up" or name == "down" or
                 name == "pgup" or name == "pgdown" or
+                name == "shift+tab" or name == "backtab" or
                 name == "ctrl+c" or name == "ctrl+d" or name == "ctrl+l") {
                 return
             }

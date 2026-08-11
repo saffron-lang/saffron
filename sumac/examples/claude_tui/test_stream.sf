@@ -14,37 +14,37 @@ fun main() {
     // text block + a Read tool_use + a Bash tool_use + a Task (subagent) spawn,
     // a tool_result user turn, more assistant text, then the final result.
     var lines: String =
-        "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"claude-opus-4\"}\n" +
-        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Let me look at the code. This uses **NaN-boxing** and a `Subprocess` handle.\"}]}}\n" +
+        "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"Opus 4.8 (1M context)\"}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"usage\":{\"output_tokens\":14600,\"input_tokens\":320},\"content\":[{\"type\":\"text\",\"text\":\"Let me look at the code. This uses **NaN-boxing** and a `Subprocess` handle.\"}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Fix BUGS #194: module path-identity\",\"status\":\"completed\",\"activeForm\":\"Fixing module path-identity\"},{\"content\":\"Enhance claude_tui chrome\",\"status\":\"in_progress\",\"activeForm\":\"Enhancing claude_tui\"},{\"content\":\"Regenerate artifacts\",\"status\":\"pending\",\"activeForm\":\"Regenerating artifacts\"}]}}]}}\n" +
         "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"src/lib/process.sf\"}}]}}\n" +
         "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"tools/saffron run test.sf\"}}]}}\n" +
-        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Task\",\"input\":{\"description\":\"audit the parser\",\"subagent_type\":\"Explore\"}}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Task\",\"input\":{\"description\":\"Fix module path-identity bug #194\",\"subagent_type\":\"general-purpose\"}}]}}\n" +
         "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"content\":\"ok\"}]}}\n" +
-        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\" Here is the *async* version wrapped in a task.\"}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"usage\":{\"output_tokens\":101100,\"input_tokens\":1200},\"content\":[{\"type\":\"text\",\"text\":\" Here is the *async* version wrapped in a task.\"}]}}\n" +
         "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"done\",\"total_cost_usd\":0.0123,\"num_turns\":3}\n"
 
-    // Redirect the auto-start-next-queued path to a hermetic `sh` stub so the
-    // queued prompt runs without the real `claude` binary.
-    App._set_test_stub("sh")
-
-    var args: List<String> = ["%s", lines]
-    App._test_spawn("stream a subprocess with tools + a subagent", "printf", args)
-
-    // Enqueue a second prompt WHILE the first is in flight — proves the queue.
+    // Feed the stream directly while holding the thinking state LIVE, so the
+    // rendered frame shows the thinking-only panels (status line + todo
+    // checklist) that a full drain would tear down. Enqueue a prompt too so the
+    // "edit queued messages" hint appears, and cycle the permission mode.
+    App._test_feed_live("stream a subprocess with tools + a subagent", lines)
     App._test_enqueue("and now explain nan-boxing")
+    App._test_cycle_perm()     // normal → accept edits on
 
-    IO.println("active before drain: " + App._test_active().to_string())
-    IO.println("queued before drain: " + App.queue_len().to_string())
-
-    // Drive the real pump to completion over the stub. When it finishes it will
-    // try to auto-start the queued prompt via the real `claude` path; with no
-    // claude on PATH that yields a graceful error row but still drains the queue.
-    var iters: Int = App._test_drain(200000)
-    IO.println("pump iterations: " + iters.to_string())
-    IO.println("model after init: " + App.MODEL_NAME)
-    IO.println("status after result: " + App.get_status())
+    IO.println("=== Panel assertions ===")
+    IO.println("model after init:   " + App.MODEL_NAME + "   (expect: Opus 4.8 (1M context))")
+    IO.println("tokens_out:         " + App._test_tokens_out().to_string() + "   (expect: 115700 = 14600+101100)")
+    IO.println("tokens_total:       " + App._test_tokens_total().to_string())
+    IO.println("context %:          " + App._test_context_pct().to_string() + "%")
+    IO.println("todo count:         " + App._test_todo_count().to_string() + "   (expect: 3)")
+    IO.println("agent count:        " + App._test_agent_count().to_string() + "   (expect: 1)")
+    IO.println("status line:        " + App._test_status_line())
+    IO.println("queued:             " + App.queue_len().to_string())
+    IO.println("thinking:           " + App.is_thinking().to_string())
     IO.println("")
-    IO.println(App.render_to_text(100, 34))
+    IO.println("=== Rendered frame (100x40) ===")
+    IO.println(App.render_to_text(100, 40))
 }
 
 main()
