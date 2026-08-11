@@ -730,6 +730,13 @@ entry:
   ret i64 0
 }
 
+define i64 @__rt_tag_ptr(i64 %raw) {
+entry:
+  %ptr = inttoptr i64 %raw to i8*
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  ret i64 %tagged
+}
+
 ; --- Type Checking ---
 
 ; @override wasm64 -- wasm64 spells the same three-tag rejection with or/xor
@@ -848,14 +855,6 @@ entry:
   %ival = fptosi double %f to i64
   %result = call i64 @__int_to_string(i64 %ival)
   ret i64 %result
-}
-
-; Wrapper: tag a raw pointer as a Saffron string value (i64 -> i64)
-define i64 @__rt_tag_ptr(i64 %raw) {
-entry:
-  %ptr = inttoptr i64 %raw to i8*
-  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
-  ret i64 %tagged
 }
 
 ; =============================================================================

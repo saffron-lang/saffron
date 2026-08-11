@@ -354,6 +354,20 @@ entry:
   ret i64 9221683186994511874
 }
 
+[helper __rt_tag_ptr]
+targets = boot native wasm64 wasm32
+# Runtime wrapper: tag a raw i64 as a Saffron string/heap value. Delegates to
+# __val_tag_ptr, so its body does not depend on discipline — @both. Byte-identical
+# in all four bases before this file owned it; brought under management so the
+# wrapper cannot silently drift from the __val_tag_ptr it forwards to.
+@both
+define i64 @__rt_tag_ptr(i64 %raw) {
+entry:
+  %ptr = inttoptr i64 %raw to i8*
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  ret i64 %tagged
+}
+
 [section Type Checking]
 
 [helper __val_is_float]
@@ -798,5 +812,21 @@ reason = wasm64 has no heap type tags at all (its __gc_alloc is a bare malloc wi
 define i1 @__val_is_map(i64 %v) {
 entry:
   ret i1 false
+}
+
+[section Allocation Shims]
+
+[helper __sf_calloc]
+targets = boot native
+# Zeroed allocation shim. Only base.ll (boot) and base_nanbox.ll (native) define
+# it — the wasm bases use their own bump allocator and never declare it, so this
+# helper is restricted to boot+native via `targets =`. Discipline-independent
+# (it just forwards to libc calloc), so @both. Byte-identical in both bases
+# before this file owned it.
+@both
+define weak i8* @__sf_calloc(i64 %n, i64 %size) {
+entry:
+  %p = call i8* @calloc(i64 %n, i64 %size)
+  ret i8* %p
 }
 
