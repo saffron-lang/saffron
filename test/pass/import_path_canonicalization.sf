@@ -1,0 +1,31 @@
+// BUGS #194 regression: a module imported under two different path spellings
+// that name the SAME file must resolve to ONE module instance with ONE set of
+// module-level globals — not two.
+//
+// `A` and `B` below both name test/pass/import_path_canon_mod.sf; `B` reaches it
+// through a redundant `.../ . /...` and a `foo/../foo` detour. The compiler keys
+// its module cache (and derives each module's mangled symbol prefix) from the
+// resolved path, so before the fix these two spellings were two modules: `A` and
+// `B` had independent `counter` globals, and this program printed 1, 1, 2, 1.
+// Worse, both copies of the top-level `var counter` landed in one link and
+// collided as `redefinition of global '@__g_...'`, failing in `opt`.
+//
+// With the fix (main.sf: resolve_import_path canonicalises via _canon_path
+// before the path becomes the dedup key / prefix basis), both aliases share one
+// counter, so the increments interleave: 1, 2, 3, 4.
+import "./import_path_canon_mod.sf" as A
+import "./import_path_canon_mod.sf/../import_path_canon_mod.sf" as B
+import "@test" as T
+
+fun main() {
+    var a1: Int = A.bump()   // 1
+    var b1: Int = B.bump()   // 2  (shared counter — NOT a fresh 1)
+    var a2: Int = A.bump()   // 3
+    var b2: Int = B.bump()   // 4
+
+    T.assert_eq(a1, 1, "A.bump() is 1")
+    T.assert_eq(b1, 2, "B is the SAME instance as A (shared counter -> 2, not 1)")
+    T.assert_eq(a2, 3, "A sees B's increment")
+    T.assert_eq(b2, 4, "both aliases advance one shared counter")
+    T.summary()
+}
