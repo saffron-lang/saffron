@@ -1,0 +1,78 @@
+//! Non-interactive resume-picker harness for claude_tui.
+//!
+//! Proves the session scan + first-user-message preview extraction + selection
+//! → resume wiring WITHOUT a TTY and without the real `~/.claude/projects` dir.
+//! It scans a stub directory of jsonl files (created by the test runner under
+//! /tmp) and asserts: the rows are newest-first, previews are pulled from the
+//! first *human* user message (system pseudo-messages skipped, id fallback when
+//! none), moving + choosing sets `_session_id`, and the filter narrows the list.
+//! No GC.disable().
+
+import "./src/app.sf" as App
+import "io" as IO
+
+fun main() {
+    // The runner passes the stub dir; default to /tmp/ct_sessions.
+    var glob: String = "/tmp/ct_sessions/*.jsonl"
+
+    App._test_open_picker(glob, 50)
+
+    IO.println("=== Picker scan assertions ===")
+    IO.println("mode:          " + App._test_mode() + "   (expect: picker)")
+    IO.println("session count: " + App._test_picker_count().to_string() + "   (expect: 4)")
+    IO.println("")
+    IO.println("rows (newest first):")
+    var i: Int = 0
+    var n: Int = App._test_picker_count()
+    while (i < n) {
+        IO.println("  [" + i.to_string() + "] " + App._test_picker_id(i).to_string() +
+                   "  ::  " + App._test_picker_label(i))
+        i = i + 1
+    }
+    IO.println("")
+    // Row 0 is newest (session B, list-of-blocks content).
+    IO.println("row0 preview: " + App._test_picker_label(0) +
+               "   (expect: explain nan-boxed values in detail please)")
+    // The session whose first user record is a <command-name> pseudo-message
+    // must show the SECOND, real user message.
+    var fib_ok: Bool = false
+    var orphan_id_ok: Bool = false
+    var j: Int = 0
+    while (j < n) {
+        var lbl: String = App._test_picker_label(j)
+        var sid: String = App._test_picker_id(j)
+        if (lbl == "write a fibonacci function") { fib_ok = true }
+        // session D has no user text → preview falls back to the id.
+        if (sid == "dddd1111-2222-3333-4444-555566667777" and lbl == sid) { orphan_id_ok = true }
+        j = j + 1
+    }
+    IO.println("skips system pseudo-msg (shows fib): " + fib_ok.to_string() + "   (expect: true)")
+    IO.println("id fallback when no user text:       " + orphan_id_ok.to_string() + "   (expect: true)")
+    IO.println("")
+
+    IO.println("=== Selection → resume ===")
+    // Move down one and choose → resumes row 1's session.
+    var want_id: String = App._test_picker_id(1)
+    App._test_picker_move_down()
+    App._test_picker_choose()
+    IO.println("chose id:       " + App.get_session_id() + "   (expect: " + want_id + ")")
+    IO.println("mode after:     " + App._test_mode() + "   (expect: chat)")
+    // The resumed session must drive the next turn's argv.
+    var next_args: List<String> = App._test_build_args("continue please")
+    var have: Bool = false
+    var k: Int = 0
+    while (k < next_args.length() - 1) {
+        if (next_args[k] == "--resume" and next_args[k + 1] == want_id) { have = true }
+        k = k + 1
+    }
+    IO.println("next argv resumes it: " + have.to_string() + "   (expect: true)")
+    IO.println("")
+
+    IO.println("=== Filter ===")
+    App._test_open_picker(glob, 50)     // reopen fresh
+    App._test_picker_set_filter("fib")
+    IO.println("visible with 'fib' filter: " + App._test_picker_visible_count().to_string() +
+               "   (expect: 1)")
+}
+
+main()

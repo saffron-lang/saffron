@@ -33,9 +33,12 @@ import "../../../src/signal.sf" as Sig
 import "../../../src/widgets/spinner.sf" as Spin
 import "../../../src/widgets/textarea.sf" as TA
 import "../../../src/widgets/viewport.sf" as VP
+import "../../../src/widgets/list.sf" as Lst
+import "../../../src/input.sf" as Ev
 import "@process" as Process
 import "@json" as JSON
 import "@time" as Time
+import "@os" as OS
 import "io" as IO
 
 // =============================================================================
@@ -176,6 +179,23 @@ var _assistant_text: String = ""        // its accumulated text
 var _saw_json: Bool = false             // did we see at least one JSON event?
 var _plain_mode: Bool = false           // degraded: treat stdout as plain text
 var _decided_mode: Bool = false         // have we classified the first line yet?
+
+// =============================================================================
+// Conversation-session state (continuity BETWEEN turns).
+// =============================================================================
+//
+// `_session_id` is claude's session uuid, captured from the stream-json
+// `system/init` event's `.session_id`. Empty until the first run reports it.
+// Once known, every subsequent `_start` passes `--resume <id>` so the whole
+// run shares ONE conversation and claude keeps full context turn to turn.
+//
+// `_launch_continue` is set by `main.sf` from `sclaude --continue`/`-c`: the
+// FIRST run then passes `--continue` (resume the most recent conversation).
+// The flag is one-shot — consumed by the first `_start`, after which the
+// captured `_session_id` drives resumption. When `_session_id` is already set
+// (picker choice or `--resume <id>`) it takes precedence over `--continue`.
+var _session_id: String = ""            // claude session uuid (from init)
+var _launch_continue: Bool = false      // one-shot: first run uses --continue
 
 // =============================================================================
 // Live-meta state (Claude-Code parity chrome). All counts are Int (BUGS #72);
@@ -325,6 +345,172 @@ fun j_int(v: Any): Int {
     if (v is Int) { return v }
     if (v is Float) { return v.floor() }
     return 0
+}
+
+// =============================================================================
+// Conversation-session enumeration + preview (for `--resume` picker).
+// =============================================================================
+//
+// Sessions live at `~/.claude/projects/<mangled-cwd>/<session-id>.jsonl`, one
+// JSONL file per conversation. The picker scans ALL projects (most useful —
+// you can resume a conversation from any directory) newest-first, capped at
+// `_PICKER_CAP` (50) so the scan stays snappy. For each file we read only the
+// first handful of lines to pull the first user message as a preview label,
+// falling back to the session id. Enumeration + mtime-sort + cap is done with
+// one `ls -1t … | head` shell call (via OS.exec) — robust and cheap; per-file
+// we stop reading the moment a usable user line is found.
+
+let _PICKER_CAP: Int = 50          // most-recent sessions shown
+let _PICKER_SCAN_LINES: Int = 40   // lines read per file hunting the 1st user msg
+
+// One resumable conversation: its uuid, jsonl path, and a preview label.
+class Session {
+    var id: String
+    var path: String
+    var preview: String
+    fun init(id: String, path: String, preview: String) {
+        this.id = id
+        this.path = path
+        this.preview = preview
+    }
+}
+
+// The session-id (uuid) is the jsonl file's basename without ".jsonl".
+fun _basename_id(path: String): String {
+    var slash: Int = -1
+    var i: Int = 0
+    var n: Int = path.length()
+    while (i < n) {
+        if (path.char_at(i) == "/") { slash = i }
+        i = i + 1
+    }
+    var base: String = path
+    if (slash >= 0) { base = path.slice(slash + 1, n) }
+    // Strip a trailing ".jsonl" (6 chars) if present.
+    var bl: Int = base.length()
+    if (bl > 6 and base.slice(bl - 6, bl) == ".jsonl") {
+        base = base.slice(0, bl - 6)
+    }
+    return base
+}
+
+// Collapse whitespace/newlines to single spaces and cap the length so a preview
+// is one tidy line in the list.
+fun _one_line(s: String, cap: Int): String {
+    var out: String = ""
+    var i: Int = 0
+    var n: Int = s.length()
+    var last_space: Bool = false
+    while (i < n) {
+        var c: String = s.char_at(i)
+        if (c == "\n" or c == "\t" or c == "\r") { c = " " }
+        if (c == " ") {
+            if (!last_space) { out = out + " " }
+            last_space = true
+        } else {
+            out = out + c
+            last_space = false
+        }
+        i = i + 1
+    }
+    out = out.trim()
+    if (out.length() > cap) { out = out.slice(0, cap) + "…" }
+    return out
+}
+
+// Extract the preview text from one parsed jsonl record if it is a user message
+// carrying human text. content is either a String or a List of blocks; a text
+// block is {type:"text", text:"…"}. Returns "" when the record isn't a usable
+// user message. Every access is guarded (is Map/List/String) — a bare .get() on
+// a non-Map Any segfaults.
+fun _preview_from_record(ev: Any): String {
+    if (!(ev is Map)) { return "" }
+    var t: String = j_str(j_get(ev, "type"))
+    if (t != "user") { return "" }
+    var msg: Any = j_get(ev, "message")
+    var content: Any = j_get(msg, "content")
+    var text: String = ""
+    if (content is String) {
+        text = content
+    } else if (content is List) {
+        var blocks: List<Any> = j_list(content)
+        var i: Int = 0
+        var n: Int = blocks.length()
+        while (i < n) {
+            var blk: Any = blocks[i]
+            if (blk is Map) {
+                if (j_str(j_get(blk, "type")) == "text") {
+                    var bt: String = j_str(j_get(blk, "text"))
+                    if (bt != "") { text = bt; i = n }
+                }
+            }
+            i = i + 1
+        }
+    }
+    if (text == "") { return "" }
+    // Skip system/command/tool-injected pseudo-messages (they start with "<" or
+    // are the caveat banner) so the label reflects the real first prompt.
+    var trimmed: String = text.trim()
+    if (trimmed == "") { return "" }
+    if (trimmed.char_at(0) == "<") { return "" }
+    if (trimmed.length() >= 7 and trimmed.slice(0, 7) == "Caveat:") { return "" }
+    return _one_line(trimmed, 68)
+}
+
+// Read the first user-message preview from a jsonl file, scanning at most
+// `_PICKER_SCAN_LINES` lines. Falls back to "" (caller substitutes the id).
+fun _preview_for_file(path: String): String {
+    var f: IO.File = IO.open(path, "r")
+    var out: String = ""
+    var scanned: Int = 0
+    while (scanned < _PICKER_SCAN_LINES) {
+        var line: String = f.read_line()
+        if (line == "") { scanned = _PICKER_SCAN_LINES }   // EOF
+        else {
+            var trimmed: String = line.trim()
+            if (trimmed != "" and trimmed.char_at(0) == "{") {
+                var ev: Any = JSON.parse(trimmed)
+                var p: String = _preview_from_record(ev)
+                if (p != "") { out = p; scanned = _PICKER_SCAN_LINES }
+            }
+            scanned = scanned + 1
+        }
+    }
+    f.close()
+    return out
+}
+
+// Enumerate resumable sessions newest-first, capped at `limit`. `base_glob` is
+// the shell glob to scan (defaults to all projects); a test overrides it to a
+// stub dir. Returns Session rows with id + path + preview label.
+fun scan_sessions_at(base_glob: String, limit: Int): List<Session> {
+    var out: List<Session> = []
+    // ls -1t emits full paths, newest first; head caps the count. 2>/dev/null so
+    // a missing projects dir yields empty output rather than an error line.
+    var cmd: String = "ls -1t " + base_glob + " 2>/dev/null | head -" + limit.to_string()
+    var listing: String = OS.exec(cmd)
+    var paths: List<String> = listing.split("\n")
+    var i: Int = 0
+    var n: Int = paths.length()
+    while (i < n) {
+        var path: String = paths[i].trim()
+        if (path != "" and path.length() > 6 and path.slice(path.length() - 6, path.length()) == ".jsonl") {
+            var id: String = _basename_id(path)
+            var preview: String = _preview_for_file(path)
+            if (preview == "") { preview = id }
+            out.push(Session(id, path, preview))
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// Scan the real `~/.claude/projects/*/*.jsonl` (all projects, newest first).
+fun scan_sessions(): List<Session> {
+    var home: String = OS.home()
+    if (home == "") { return [] }
+    var glob: String = home + "/.claude/projects/*/*.jsonl"
+    return scan_sessions_at(glob, _PICKER_CAP)
 }
 
 // =============================================================================
@@ -647,6 +833,128 @@ var prompt: TA.TextArea = TA.textarea("ask claude anything…", 80, 3)
 // after the glyph, so a baked-in "thinking…" label would double up.
 var spin: Spin.Spinner = Spin.spinner_styled("", Spin.SPINNER_DOTS, st_spinner())
 
+// =============================================================================
+// Resume picker — a distinct view mode shown BEFORE the chat when the user
+// launches `sclaude --resume` (bare). `_mode` gates the view + key routing.
+// =============================================================================
+
+var _mode: String = "chat"                 // "picker" | "chat"
+
+// The picker's backing rows (parallel to `_picker_sessions`), the List_ widget,
+// and its selection/filter signals. `_picker_sessions` holds the Session models
+// so a chosen index maps back to a session id.
+var _picker_sessions: List<Session> = []
+fun _empty_labels(): List<String> {
+    var l: List<String> = []
+    return l
+}
+var _picker_labels: Sig.Signal<List<String>> = signal(_empty_labels())
+var _picker_selected: Sig.Signal<Int> = signal(0)
+var _picker_list: Lst.List_ = Lst.list_widget(_picker_labels, _picker_selected, 14)
+
+fun in_picker(): Bool { return _mode == "picker" }
+
+// Enter picker mode: scan sessions, build the labelled list. Called by main.sf
+// when `--resume` is present with no value. Falls back to chat mode with a note
+// if there are no resumable sessions.
+fun enter_picker() {
+    var sessions: List<Session> = scan_sessions()
+    _open_picker_with(sessions)
+}
+
+// Shared picker setup (real scan or a test's stub list): populate the labels
+// signal + session models and switch to picker mode.
+fun _open_picker_with(sessions: List<Session>) {
+    _picker_sessions = sessions
+    var labels: List<String> = []
+    var i: Int = 0
+    var n: Int = sessions.length()
+    while (i < n) {
+        var s: Session = sessions[i]
+        labels.push(s.preview)
+        i = i + 1
+    }
+    var lsig: Sig.Signal<List<String>> = _picker_labels
+    lsig.set(labels)
+    var sel: Sig.Signal<Int> = _picker_selected
+    sel.set(0)
+    if (n == 0) {
+        // Nothing to resume — start a fresh session instead.
+        _mode = "chat"
+        set_status("no conversations to resume — new session")
+        return
+    }
+    _mode = "picker"
+    set_status("pick a conversation to resume")
+}
+
+// Confirm the current picker selection: resume the chosen session (its id
+// becomes `_session_id` so the first `_start` passes `--resume <id>`), then
+// switch to chat mode. A no-op if the list is empty.
+fun picker_choose() {
+    var lst: Lst.List_ = _picker_list
+    var idx: Int = lst.selected_index()
+    var sessions: List<Session> = _picker_sessions
+    if (idx < 0 or idx >= sessions.length()) { _mode = "chat"; return }
+    var s: Session = sessions[idx]
+    _session_id = s.id
+    _mode = "chat"
+    set_status("resuming " + session_short())
+}
+
+// Cancel the picker (esc): start a brand-new session instead.
+fun picker_cancel() {
+    _mode = "chat"
+    set_status("ready")
+}
+
+// Route an event to the picker list (navigation) — called by main.sf while in
+// picker mode. Returns true if the list consumed it.
+fun picker_handle(e: Ev.Event): Bool {
+    var lst: Lst.List_ = _picker_list
+    return lst.handle(e)
+}
+
+// Move the picker selection by a named navigation key (main.sf's global up/down/
+// pgup/pgdown handlers route here while in picker mode).
+fun picker_key(name: String) {
+    var lst: Lst.List_ = _picker_list
+    if (name == "up") { lst.move_up(); return }
+    if (name == "down") { lst.move_down(); return }
+    if (name == "pgup") { lst.page_up(); return }
+    if (name == "pgdown") { lst.page_down(); return }
+}
+
+// Feed a printable rune / backspace into the picker's filter, so typing narrows
+// the list live. Returns true if it changed the filter.
+fun picker_filter_key(name: String): Bool {
+    var fsig: Sig.Signal<String> = _picker_list.filter
+    var cur: String = fsig.get()
+    if (name == "backspace") {
+        if (cur.length() > 0) {
+            fsig.set(cur.slice(0, cur.length() - 1))
+            _reset_picker_selection()
+            return true
+        }
+        return false
+    }
+    if (name == "space") { fsig.set(cur + " "); _reset_picker_selection(); return true }
+    // Single printable char (a..z, digits, punctuation) — append to the filter.
+    if (name.length() == 1) {
+        fsig.set(cur + name)
+        _reset_picker_selection()
+        return true
+    }
+    return false
+}
+
+// After a filter change the selection may point past the shrunken list; clamp
+// it back to the top.
+fun _reset_picker_selection() {
+    var sel: Sig.Signal<Int> = _picker_selected
+    sel.set(0)
+}
+
 // Terminal geometry, refreshed from Tty.size() by main / seeded by the test.
 var g_cols: Int = 96
 var g_rows: Int = 34
@@ -663,7 +971,10 @@ fun set_size(cols: Int, rows: Int) {
 fun _header() {
     var turn_n: Int = get_turn()
     var st_run: String = get_status()
-    var right: String = "◇ " + MODEL_NAME + "    ⛁ 12.4k / 200k    ⟳ turn " + turn_n.to_string()
+    var sid: String = session_short()
+    var sess: String = ""
+    if (sid != "") { sess = "⟐ session " + sid + "    " }
+    var right: String = sess + "◇ " + MODEL_NAME + "    ⛁ 12.4k / 200k    ⟳ turn " + turn_n.to_string()
     // dir=1 (hstack), justify=3 (space-between) pushes status to the left rail
     // and the model/token/turn cluster to the right. Text children never grow,
     // so the between-justify slack distributes as expected.
@@ -957,9 +1268,47 @@ fun _fleet_region() {
     }
 }
 
+// The resume picker: a titled box ("Resume a conversation") over the List_ of
+// session previews, with a filter line and a footer of hints, all in the
+// Saffron Dusk palette. Rendered in place of the chat when in picker mode.
+fun _picker_view() {
+    var cols: Int = g_cols
+    var lst: Lst.List_ = _picker_list
+    var fsig: Sig.Signal<String> = lst.filter
+    var filt: String = fsig.get()
+    var count: Int = lst.count()
+    L.box_styled(0, 2, 0, 1, 0, 1, 0, 0, -1, -1, 1, st_border_focus(),
+                 "Resume a conversation", fun () {
+        // Title + count line.
+        L.text_styled(count.to_string() + " recent conversations", st_title())
+        // Live filter line (only when the user has typed a filter).
+        if (filt != "") {
+            L.hstack(fun () {
+                L.text_styled("filter: ", st_muted())
+                L.text_styled(filt, st_accent())
+                L.text_styled("█", st_title())
+            })
+        } else {
+            L.text_styled("type to filter", st_faint())
+        }
+        L.text_styled(_rule(cols - 4), st_border())
+        // The scrollable, selectable list of previews.
+        lst.view()
+        L.text_styled(_rule(cols - 4), st_border())
+        L.hstack(fun () {
+            _hint("↑↓", "select")
+            _hint("/", "filter")
+            _hint("⏎", "resume")
+            _hint("esc", "new")
+        })
+    })
+}
+
 /// The root view. Appends one full-screen rounded frame containing header,
 /// transcript, divider, input, and footer. Read by `Rt.run` every dirty frame.
+/// In picker mode it renders the resume picker instead.
 fun view() {
+    if (_mode == "picker") { _picker_view(); return }
     var cols: Int = g_cols
     var rows: Int = g_rows
     var inner_w: Int = cols - 4          // 2 border + 2 side pad
@@ -1051,6 +1400,73 @@ var _test_stub_program: String = ""
 
 fun _set_test_stub(program: String) { _test_stub_program = program }
 
+// =============================================================================
+// Session-launch setters (called from main.sf after parsing sclaude's argv).
+// =============================================================================
+
+// `sclaude --continue` / `-c`: the first run resumes the most recent
+// conversation. One-shot — the first `_start` consumes it, then the captured
+// session id drives resumption for the rest of the run.
+fun set_continue_mode() { _launch_continue = true }
+
+// `sclaude --resume <id>` (direct) or the picker's choice: resume this exact
+// session. The first `_start` then passes `--resume <id>`.
+fun set_session_id(id: String) { _session_id = id }
+
+fun get_session_id(): String { return _session_id }
+
+// A short, glanceable session tag (first 8 chars of the uuid) for the header.
+fun session_short(): String {
+    var s: String = _session_id
+    if (s == "") { return "" }
+    if (s.length() <= 8) { return s }
+    return s.slice(0, 8)
+}
+
+// Test accessor: the argv `_start` would build for `text` right now.
+fun _test_build_args(text: String): List<String> { return _build_args(text) }
+
+// =============================================================================
+// Picker test hooks — drive the resume picker headlessly against stub files.
+// =============================================================================
+
+// Scan a caller-supplied glob (e.g. a /tmp stub dir) and open the picker over
+// the result, exactly as `enter_picker` does for the real projects dir.
+fun _test_open_picker(base_glob: String, limit: Int) {
+    var sessions: List<Session> = scan_sessions_at(base_glob, limit)
+    _open_picker_with(sessions)
+}
+
+fun _test_picker_count(): Int { return _picker_sessions.length(); }
+
+// The preview label of the i-th picker row.
+fun _test_picker_label(i: Int): String {
+    if (i < 0 or i >= _picker_sessions.length()) { return "" }
+    var s: Session = _picker_sessions[i]
+    return s.preview
+}
+
+// The session id of the i-th picker row.
+fun _test_picker_id(i: Int): String {
+    if (i < 0 or i >= _picker_sessions.length()) { return "" }
+    var s: Session = _picker_sessions[i]
+    return s.id
+}
+
+// Move + choose helpers so a headless harness can prove selection → resume.
+fun _test_picker_move_down() { picker_key("down") }
+fun _test_picker_choose() { picker_choose() }
+fun _test_picker_set_filter(f: String) {
+    var fsig: Sig.Signal<String> = _picker_list.filter
+    fsig.set(f)
+    _reset_picker_selection()
+}
+fun _test_picker_visible_count(): Int {
+    var lst: Lst.List_ = _picker_list
+    return lst.count()
+}
+fun _test_mode(): String { return _mode }
+
 // Reset the per-run live meta: arm the elapsed timer, zero this run's token
 // counts, clear the active-tool word + todo list + agent fleet. The cumulative
 // session total (`_tokens_total`) and the permission mode deliberately persist.
@@ -1105,6 +1521,33 @@ fun _status_line_text(): String {
     return meta
 }
 
+// Build the claude argv for a prompt, threading conversation continuity:
+//   - `_session_id` known (from a prior init, the picker, or `--resume <id>`):
+//     ["--resume", <id>, "-p", text, "--output-format", "stream-json", "--verbose"]
+//   - else launch `--continue`/`-c` requested (first run only):
+//     ["--continue", "-p", text, ...]
+//   - else a fresh session (claude allocates the id; init reports it):
+//     ["-p", text, ...]
+// Every run after the first therefore continues the SAME conversation, so
+// claude retains full context across turns within one sclaude session.
+fun _build_args(text: String): List<String> {
+    var tail: List<String> = ["-p", text, "--output-format", "stream-json", "--verbose"]
+    var args: List<String> = []
+    if (_session_id != "") {
+        args.push("--resume")
+        args.push(_session_id)
+    } else if (_launch_continue) {
+        args.push("--continue")
+    }
+    var i: Int = 0
+    var n: Int = tail.length()
+    while (i < n) {
+        args.push(tail[i])
+        i = i + 1
+    }
+    return args
+}
+
 // Start a claude run for `text`: append the user message, spawn the streaming
 // subprocess, and arm the pump. Returns immediately.
 fun _start(text: String) {
@@ -1120,7 +1563,7 @@ fun _start(text: String) {
     _reset_run_meta()
 
     var program: String = "claude"
-    var args: List<String> = ["-p", text, "--output-format", "stream-json", "--verbose"]
+    var args: List<String> = _build_args(text)
     if (_test_stub_program != "") {
         program = _test_stub_program
         // The stub is `sh -c <script> _ <prompt>`: emits canned stream-json.
@@ -1133,6 +1576,8 @@ fun _start(text: String) {
             return
         }
     }
+    // The launch-time --continue is one-shot: only the first run consumes it.
+    _launch_continue = false
 
     var pr: Process.Subprocess = Process.open_args(program, args)
     _proc_holder = [pr]
@@ -1178,7 +1623,13 @@ fun pump(): Bool {
 
     // Animate the spinner while a response streams.
     spin.tick()
-    return changed
+    // Repaint on EVERY tick while a run is active, not only when new stdout
+    // arrived: during claude's long thinking gaps no data lands for seconds,
+    // but the spinner frame still advanced above, so the screen must repaint to
+    // show it. `_active` is false the instant a run finishes (set in
+    // `_finish_stream` above), so an idle loop returns `false` at the top and
+    // the runtime stays quiet — no permanent 20Hz repaint when nothing runs.
+    return changed or _active
 }
 
 // Fold a raw stdout chunk into state: buffer partial lines, and process every
@@ -1251,6 +1702,10 @@ fun _handle_system(ev: Any) {
     if (sub == "init") {
         var model: String = j_str(j_get(ev, "model"))
         if (model != "") { MODEL_NAME = model }
+        // Capture the conversation session id so every later turn resumes it.
+        // Guarded is String — a bare .get() on a non-Map Any segfaults.
+        var sid: String = j_str(j_get(ev, "session_id"))
+        if (sid != "") { _session_id = sid }
         set_status("session started")
     }
 }
