@@ -601,6 +601,49 @@ without any reassignment at all. Grep the predicate, not the symptom. And the se
 half of the withdrawn claim generalises: a comment asserting a behavioural
 consequence is a measurement, and belongs in the file only after it has been taken.
 
+#### Landed 2026-08-11: the sixth slice — enum `Variant.fields` → `List<AST.Param>`
+
+The `enum_variant_fields` antipattern (§6 of `codegen-refactors.md`): a variant's
+payload fields were an unparsed `"name:Type,other:Type2"` CSV string, re-split by hand
+at every use — and, uniquely among the type-carrying tables, it stored the *loss-less*
+parser source form (`Map<String,Int>` kept whole), where the `func_params`/`class_fields`
+slices stored the *lossy* `type_to_string` spelling. That difference is the whole risk
+of this slice: the transition shim must render via **`type_to_source`, not
+`type_to_string`**, or `Map<String,Int>` collapses to `Map` and the `split_respecting_generics`
+that exists to protect that comma stops matching.
+
+Executed in four bootstrappable steps (the func_params template — introduce nodes,
+render CSV on read, migrate consumers, delete the shim):
+
+- **Step 1 — LANDED (`a77ffa2d`).** `ast.sf`: `Variant(name, fields: String, name_span)`
+  → `fields: List<Param>` (reuse `AST.Param`; node stays 3 fields so the enum heap
+  layout is unchanged). New `AST.variant_fields_string` renders the old CSV via
+  `type_to_source`. Parser builds the node list via `parse_type_ast`; every string
+  reader (checker `register_enum`, codegen `get_variant_fields`, LSP detail, leak scan)
+  routes through the shim, byte-identical. Verified: gen4 fixed-point, 0 fallbacks,
+  suite 369/0, differential oracle 0 mismatches — the empirical proof that
+  `type_to_source(parse_type_ast(...))` round-trips every enum-payload shape (unions,
+  `T?` desugaring, `Fun` types, tuples, nested generics).
+
+- **Step 2 — WIP, UNVERIFIED (branch `wip/i3-step2-enum-nodes`, commit `ab8c6b45`; NOT
+  on `main`).** Codegen reads the nodes directly: `enum_variant_fields` table →
+  `Map<String, List<AST.Param>>`; `get_variant_field_type` and `ensure_enum_eq` read
+  `type_ann` nodes instead of splitting the CSV. **This removes the first of the five
+  `record_unresolved` sites** — `match_body.sf`'s ":638" ("field definition has no
+  name:type split"), which cannot occur once name and type are separate slots. The
+  other three diagnostics (variant-not-registered, no-recorded-fields, index-out-of-bounds)
+  are kept and adapted to list ops. **The edits are complete but have NOT been through
+  bootstrap/suite/oracle.** The one flagged shape needing the differential check:
+  Fun-typed payload fields (`Fun(A):R`), where both old and new truncate the source at
+  the first `:` — believed byte-identical, must be proven. See the resume file
+  `docs/design/I3_STEP2_RESUME.md`.
+
+- **Steps 3–4 — NOT STARTED.** Step 3: migrate the checker's `enum_fields` table to
+  nodes (`get_enum_binding_type`/`_node` read `type_ann` directly). Step 4: delete both
+  render shims and the now-dead `split_respecting_generics`/`split(":")` on enum-field
+  strings. Deliberately excluded from this slice: the bare-name `enum_variants`/`enum_fields`
+  key-ambiguity change (`checker.sf` ~1836) — larger, ~10 read sites, its own slice.
+
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 
 A dedicated resolve pass sits between parse and check. It walks scopes and
