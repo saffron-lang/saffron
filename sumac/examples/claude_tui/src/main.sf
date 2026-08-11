@@ -14,9 +14,28 @@ import "../../../src/runtime.sf" as Rt
 import "../../../src/tty.sf" as Tty
 import "../../../src/input.sf" as Ev
 import "../../../src/widgets/textarea.sf" as TA
+import "@args" as Args
 import "./app.sf" as App
 
 fun main() {
+    // --- Launch flags --------------------------------------------------------
+    //
+    // Parse sclaude's OWN argv for the session-launch flags:
+    //   --continue / -c        resume the most recent conversation (first turn)
+    //   --resume               show the interactive picker before the chat
+    //   --resume=<id>          resume that session directly (skip the picker)
+    // Args.parse() splits short flags char-by-char, so `-c` lands as flag "c".
+    var pa: Args.ParsedArgs = Args.parse()
+    if (pa.has("continue") or pa.has("c")) {
+        App.set_continue_mode()
+    }
+    // `--resume` bare is a flag; `--resume=<id>` is an option carrying the id.
+    if (pa.options.has("resume")) {
+        App.set_session_id(pa.get("resume"))
+    } else if (pa.flags.has("resume")) {
+        App.enter_picker()
+    }
+
     // Size the app to the real terminal before the first frame.
     var sz: Tty.TermSize = Tty.size()
     App.set_size(sz.cols, sz.rows)
@@ -39,16 +58,19 @@ fun main() {
 
     // --- Global key handlers -------------------------------------------------
 
-    // Enter submits the current prompt. When idle it starts immediately; when a
-    // response is streaming it enqueues (never blocks). The pump drives the rest.
+    // Enter: in picker mode it resumes the highlighted conversation; otherwise
+    // it submits the prompt (start immediately when idle, enqueue while busy).
     Rt.on_key("enter", fun () {
-        App.submit()
+        if (App.in_picker()) { App.picker_choose() }
+        else { App.submit() }
         Rt.request_render()
     })
 
-    // Esc interrupts a running generation (no-op when idle).
+    // Esc: in picker mode it cancels to a fresh session; otherwise it interrupts
+    // a running generation (no-op when idle).
     Rt.on_key("esc", fun () {
-        App.interrupt()
+        if (App.in_picker()) { App.picker_cancel() }
+        else { App.interrupt() }
         Rt.request_render()
     })
 
@@ -70,12 +92,26 @@ fun main() {
     // scrolls the transcript. This keeps the common "scroll" flow intact while
     // adding Claude-Code's "edit queued messages" affordance.
     Rt.on_key("up", fun () {
-        if (!App.edit_last_queued()) { App.scroll_up() }
+        if (App.in_picker()) {
+            App.picker_key("up")
+        } else if (!App.edit_last_queued()) { App.scroll_up() }
         Rt.request_render()
     })
-    Rt.on_key("down", fun () { App.scroll_down(); Rt.request_render() })
-    Rt.on_key("pgup", fun () { App.page_up(); Rt.request_render() })
-    Rt.on_key("pgdown", fun () { App.page_down(); Rt.request_render() })
+    Rt.on_key("down", fun () {
+        if (App.in_picker()) { App.picker_key("down") }
+        else { App.scroll_down() }
+        Rt.request_render()
+    })
+    Rt.on_key("pgup", fun () {
+        if (App.in_picker()) { App.picker_key("pgup") }
+        else { App.page_up() }
+        Rt.request_render()
+    })
+    Rt.on_key("pgdown", fun () {
+        if (App.in_picker()) { App.picker_key("pgdown") }
+        else { App.page_down() }
+        Rt.request_render()
+    })
 
     // Everything else (printable keys, backspace, arrows/word-edits in text) goes
     // to the focused prompt editor via the catch-all handler. Typing is always
@@ -90,6 +126,13 @@ fun main() {
                 name == "pgup" or name == "pgdown" or
                 name == "shift+tab" or name == "backtab" or
                 name == "ctrl+c" or name == "ctrl+d" or name == "ctrl+l") {
+                return
+            }
+            // In picker mode, printable keys + backspace narrow the filter
+            // rather than typing into the (hidden) prompt editor.
+            if (App.in_picker()) {
+                App.picker_filter_key(name)
+                Rt.request_render()
                 return
             }
         }

@@ -9,12 +9,36 @@
 import "./src/app.sf" as App
 import "io" as IO
 
+// Join an argv list into a single inspectable string like ["--resume", "id"].
+fun show_args(args: List<String>): String {
+    var out: String = "["
+    var i: Int = 0
+    var n: Int = args.length()
+    while (i < n) {
+        if (i > 0) { out = out + ", " }
+        out = out + "\"" + args[i] + "\""
+        i = i + 1
+    }
+    return out + "]"
+}
+
+// Assert `args` contains `flag` immediately followed by `val`.
+fun args_have_pair(args: List<String>, flag: String, val: String): Bool {
+    var i: Int = 0
+    var n: Int = args.length()
+    while (i < n - 1) {
+        if (args[i] == flag and args[i + 1] == val) { return true }
+        i = i + 1
+    }
+    return false
+}
+
 fun main() {
     // A realistic stream-json transcript: system init, an assistant turn with a
     // text block + a Read tool_use + a Bash tool_use + a Task (subagent) spawn,
     // a tool_result user turn, more assistant text, then the final result.
     var lines: String =
-        "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"Opus 4.8 (1M context)\"}\n" +
+        "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"Opus 4.8 (1M context)\",\"session_id\":\"abcd1234-5678-90ef-1234-567890abcdef\"}\n" +
         "{\"type\":\"assistant\",\"message\":{\"usage\":{\"output_tokens\":14600,\"input_tokens\":320},\"content\":[{\"type\":\"text\",\"text\":\"Let me look at the code. This uses **NaN-boxing** and a `Subprocess` handle.\"}]}}\n" +
         "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Fix BUGS #194: module path-identity\",\"status\":\"completed\",\"activeForm\":\"Fixing module path-identity\"},{\"content\":\"Enhance claude_tui chrome\",\"status\":\"in_progress\",\"activeForm\":\"Enhancing claude_tui\"},{\"content\":\"Regenerate artifacts\",\"status\":\"pending\",\"activeForm\":\"Regenerating artifacts\"}]}}]}}\n" +
         "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"src/lib/process.sf\"}}]}}\n" +
@@ -32,6 +56,21 @@ fun main() {
     App._test_enqueue("and now explain nan-boxing")
     App._test_cycle_perm()     // normal → accept edits on
 
+    IO.println("=== Session continuity assertions ===")
+    // The system/init above carried a session_id — it must have been captured.
+    IO.println("session_id captured: " + App.get_session_id() +
+               "   (expect: abcd1234-5678-90ef-1234-567890abcdef)")
+    IO.println("session_short:       " + App.session_short() + "   (expect: abcd1234)")
+    // The FIRST turn's argv was fresh (no --resume); a SUBSEQUENT turn must now
+    // resume the captured session so claude keeps full context.
+    var first_args: List<String> = ["-p", "hello", "--output-format", "stream-json", "--verbose"]
+    var next_args: List<String> = App._test_build_args("explain nan-boxing")
+    IO.println("first-turn argv:     " + show_args(first_args))
+    IO.println("resume-turn argv:    " + show_args(next_args))
+    var ok_resume: Bool = args_have_pair(next_args, "--resume", "abcd1234-5678-90ef-1234-567890abcdef")
+    IO.println("resume-turn has --resume <id>: " + ok_resume.to_string() + "   (expect: true)")
+    IO.println("")
+
     IO.println("=== Panel assertions ===")
     IO.println("model after init:   " + App.MODEL_NAME + "   (expect: Opus 4.8 (1M context))")
     IO.println("tokens_out:         " + App._test_tokens_out().to_string() + "   (expect: 115700 = 14600+101100)")
@@ -45,6 +84,29 @@ fun main() {
     IO.println("")
     IO.println("=== Rendered frame (100x40) ===")
     IO.println(App.render_to_text(100, 40))
+
+    // --- Spinner-repaint regression (UI-lag fix) --------------------------
+    // Spawn a stub that emits NOTHING then stalls (sleep). While it runs, each
+    // pump() advances the spinner internally but no stdout arrives, so
+    // `changed` is false. The fix makes pump() return true whenever a run is
+    // active, so main.sf repaints ~20Hz and the spinner animates during the
+    // stall. Assert pump() returns true on stalled ticks with no new data.
+    IO.println("")
+    IO.println("=== Spinner-repaint (UI-lag) assertions ===")
+    App._test_spawn("stall test", "sh", ["-c", "sleep 2"]);
+    var t1: Bool = App.pump()   // no stdout yet, process still running
+    var t2: Bool = App.pump()   // still stalled
+    IO.println("active during stall:        " + App._test_active().to_string() + "   (expect: true)")
+    IO.println("pump() true on stalled tick: " + (t1 and t2).to_string() + "   (expect: true — repaint each tick)")
+    // Interrupt until fully idle. `interrupt()` finalizes the run and may
+    // auto-start a queued prompt, so loop until no run is active.
+    var guard: Int = 0
+    while (App._test_active() and guard < 8) {
+        App.interrupt()
+        guard = guard + 1
+    }
+    var t3: Bool = App.pump()   // now idle → must stay quiet
+    IO.println("pump() false when idle:      " + (!t3).to_string() + "   (expect: true — loop stays quiet)")
 }
 
 main()
