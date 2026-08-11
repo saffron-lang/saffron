@@ -70,9 +70,22 @@
 - [Basil (Data Fetching)](./turmeric/basil.md)
 - [Parsley (API Framework)](./turmeric/parsley.md)
 
+# Sumac (Terminal UI Framework)
+
+- [Introduction](./sumac/introduction.md)
+- [Architecture](./sumac/architecture.md)
+- [Reactivity](./sumac/reactivity.md)
+- [Layout](./sumac/layout.md)
+- [Styling & Color](./sumac/styling.md)
+- [Input Handling](./sumac/input.md)
+- [Widgets](./sumac/widgets.md)
+- [API Reference](./sumac/api-reference.md)
+- [Comparison to Bubbletea](./sumac/comparison.md)
+
 # Guides
 
 - [Turmeric Quickstart](./guides/turmeric-quickstart.md)
+- [Sumac Quickstart](./guides/sumac-quickstart.md)
 - [Bazaar Package Registry](./guides/bazaar.md)
 
 # Reference
