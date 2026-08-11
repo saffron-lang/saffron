@@ -427,8 +427,8 @@ class NullChecker {
     // are different questions:
     //
     //   file-scope   ("private")  → decl_module_file, populated here. A module
-    //                               IS a file: main.sf's module_prefix_from_file
-    //                               derives the prefix from the file path, so
+    //                               IS a file: main.sf's path_based_prefix
+    //                               derives the prefix from the import path, so
     //                               the file prefix already is the file's
     //                               identity and no second notion is needed.
     //   package-scope ("internal") → decl_module_package, populated from

@@ -53,6 +53,13 @@
         return false
     }
 
+    // True when `method` is the name of a builtin container/string/number method.
+    // Extracted from two byte-identical inline disjunctions in gen_method_call so
+    // the list lives in one place.
+    fun is_builtin_method_name(method: String): Bool {
+        return method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
+    }
+
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
         MethodCall(o, m, a, __ks) => "method_call"
@@ -2488,7 +2495,7 @@
     // Fallback: if type resolution failed but a user class defines this method,
     // treat as user class dispatch. Skip known builtin methods (length, push, etc.)
     // to avoid hijacking built-in container dispatch.
-    var __uc_is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
+    var __uc_is_builtin_method: Bool = this.is_builtin_method_name(method)
     // The find_class_for_method fallback is a heuristic for a receiver whose type
     // codegen could not resolve — it must not fire when the receiver has a KNOWN
     // concrete builtin type, or an unrelated user class declaring `method` hijacks
@@ -3492,7 +3499,7 @@
     // these should dispatch to runtime builtins (Map/List/String/Int/Float) not user classes.
     // Includes type-class methods (to_string, abs, floor, ceil, to_float) that are
     // handled by inline codegen above for known primitive types.
-    var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
+    var is_builtin_method: Bool = this.is_builtin_method_name(method)
     // Same guard as the is_user_class fallback above: a non-builtin method on a
     // concrete builtin receiver must NOT resolve to an unrelated user class that
     // happens to declare the name (BUGS #134). Leave it empty so the terminal
