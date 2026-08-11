@@ -75,6 +75,8 @@ fun st_spinner(): St.Style { return st_base().with_fg(c_primary()) }
 fun st_tool(): St.Style { return st_base().with_fg(c_accent()) }
 fun st_subagent(): St.Style { return st_base().with_fg(c_primary()) }
 fun st_pending(): St.Style { return st_base().with_fg(c_faint()).italic() }
+fun st_primary_bold(): St.Style { return st_base().with_fg(c_primary()).bold() }
+fun st_success_style(): St.Style { return st_base().with_fg(c_success()) }
 
 // Line-kind selectors for the flat transcript model.
 let K_PROSE: Int = 0        // assistant/user prose -> text
@@ -174,6 +176,45 @@ var _assistant_text: String = ""        // its accumulated text
 var _saw_json: Bool = false             // did we see at least one JSON event?
 var _plain_mode: Bool = false           // degraded: treat stdout as plain text
 var _decided_mode: Bool = false         // have we classified the first line yet?
+
+// =============================================================================
+// Live-meta state (Claude-Code parity chrome). All counts are Int (BUGS #72);
+// timers are Float wall-clock (Time.timestamp) formatted through Int math.
+// =============================================================================
+
+// Panel 1 — status line. `_run_start` is the wall-clock at _start; elapsed is
+// now-start each tick. `_tokens_out`/`_tokens_in` accumulate this run's usage.
+// `_tool_active` names the tool a tool_use is currently exercising ("Read",
+// "Bash", …) so the state word becomes "using Read" / "running Bash"; "" =
+// plain "thinking". `_tokens_total` is the cumulative session output for the
+// footer context gauge and never resets.
+var _run_start: Float = 0.0
+var _tokens_out: Int = 0
+var _tokens_in: Int = 0
+var _tokens_total: Int = 0
+var _tool_active: String = ""
+
+// Panel 2 — todo checklist. Each entry is [content, status, activeForm] (all
+// String); captured from a TodoWrite tool_use's input.todos.
+fun _empty_todos(): List<List<String>> {
+    var t: List<List<String>> = []
+    return t
+}
+var _todos: List<List<String>> = _empty_todos()
+
+// Panel 3 — footer permission-mode indicator (visual only for v1 — the wrapper
+// can't change claude's real mode over -p). Cycles on shift+tab.
+var _perm_mode: Int = 0                 // 0 normal, 1 auto-accept, 2 bypass
+var _ctx_window: Int = 200000           // context window; init may override
+
+// Panel 4 — agent fleet. Parallel lists indexed together: description, type,
+// start wall-clock, per-agent token count, and a done flag. A tool_use named
+// "Task" appends a row; the final result marks all done.
+var _agent_descs: List<String> = []
+var _agent_types: List<String> = []
+var _agent_starts: List<Float> = []
+var _agent_tokens: List<Int> = []
+var _agent_done: List<Bool> = []
 
 // =============================================================================
 // State helpers (bind signal to a typed local before calling — untyped receiver
@@ -276,6 +317,44 @@ fun j_list(v: Any): List<Any> {
     }
     var e: List<Any> = []
     return e
+}
+
+// Coerce an Any JSON number to Int. JSON integers parse as Int, but a value
+// spelled with a fraction/exponent arrives as Float; floor it. Non-numbers → 0.
+fun j_int(v: Any): Int {
+    if (v is Int) { return v }
+    if (v is Float) { return v.floor() }
+    return 0
+}
+
+// =============================================================================
+// Live-meta formatting (Int math only — no bare `${int}` interpolation).
+// =============================================================================
+
+// Format an elapsed span of `secs` whole seconds as "10s" / "1m 23s".
+fun _fmt_elapsed(secs: Int): String {
+    if (secs < 0) { secs = 0 }
+    if (secs < 60) { return secs.to_string() + "s" }
+    var m: Int = secs / 60
+    var s: Int = secs % 60
+    return m.to_string() + "m " + s.to_string() + "s"
+}
+
+// Format a token count "14.6k" (thousands, one decimal ≥1000) or the raw count.
+fun _fmt_tokens(n: Int): String {
+    if (n < 1000) { return n.to_string() }
+    var whole: Int = n / 1000
+    var tenths: Int = (n % 1000) / 100
+    return whole.to_string() + "." + tenths.to_string() + "k"
+}
+
+// Whole seconds elapsed since a wall-clock start (0 if the timer isn't armed).
+fun _elapsed_since(start: Float): Int {
+    if (start <= 0.0) { return 0 }
+    var now: Float = Time.timestamp()
+    var d: Float = now - start
+    if (d < 0.0) { d = 0.0 }
+    return d.floor()
 }
 
 // =============================================================================
@@ -564,7 +643,9 @@ var transcript: VP.Viewport = VP.viewport(80, 20)
 var prompt: TA.TextArea = TA.textarea("ask claude anything…", 80, 3)
 
 // Thinking spinner (braille dot ring, saffron) — DESIGN §7.
-var spin: Spin.Spinner = Spin.spinner_styled("thinking…", Spin.SPINNER_DOTS, st_spinner())
+// Label is empty: the status line and input well each supply their own text
+// after the glyph, so a baked-in "thinking…" label would double up.
+var spin: Spin.Spinner = Spin.spinner_styled("", Spin.SPINNER_DOTS, st_spinner())
 
 // Terminal geometry, refreshed from Tty.size() by main / seeded by the test.
 var g_cols: Int = 96
@@ -726,6 +807,156 @@ fun _footer() {
     })
 }
 
+// =============================================================================
+// Panel 1 + 2 — status line + todo checklist (rendered above the input while
+// thinking). Panel 1 is the spinner glyph + gerund action + live meta cluster;
+// Panel 2 is the `⎿  ◼/▣/◻` checklist captured from a TodoWrite tool_use.
+// =============================================================================
+
+// How many rows the status/todo panel occupies this frame (for height budgeting).
+fun _status_panel_rows(): Int {
+    if (!is_thinking()) { return 0 }
+    var rows: Int = 1                     // the status line itself
+    var nt: Int = _todos.length()
+    if (nt > 0) { rows = rows + nt }
+    return rows
+}
+
+// The glyph for a todo status: ◼ completed, ▣ in_progress, ◻ pending.
+fun _todo_glyph(st: String): String {
+    if (st == "completed") { return "◼" }
+    if (st == "in_progress") { return "▣" }
+    return "◻"
+}
+
+fun _status_region(inner_w: Int) {
+    if (!is_thinking()) { return }
+    var line: String = _status_line_text()
+    var action: String = _status_action()
+    // Spinner glyph + gerund action + meta cluster.
+    L.hstack(fun () {
+        spin.view()
+        L.box(width=1, block=fun () => nil)
+        L.text_styled(action, st_primary_bold())
+        L.box(width=1, block=fun () => nil)
+        L.text_styled(line, st_muted())
+    })
+    // Todo checklist under the status line.
+    var todos: List<List<String>> = _todos
+    var i: Int = 0
+    var n: Int = todos.length()
+    while (i < n) {
+        var td: List<String> = todos[i]
+        var content: String = td[0]
+        var tstatus: String = td[1]
+        var glyph: String = _todo_glyph(tstatus)
+        var prefix: String = "     "
+        if (i == 0) { prefix = "  ⎿  " }
+        // The in_progress row is drawn in accent; others muted.
+        var body_st: St.Style = st_muted()
+        if (tstatus == "in_progress") { body_st = st_accent() }
+        var glyph_st: St.Style = st_faint()
+        if (tstatus == "in_progress") { glyph_st = st_accent() }
+        if (tstatus == "completed") { glyph_st = st_success_style() }
+        L.hstack(fun () {
+            L.text_styled(prefix, st_faint())
+            L.text_styled(glyph, glyph_st)
+            L.box(width=1, block=fun () => nil)
+            L.text_styled(content, body_st)
+        })
+        i = i + 1
+    }
+}
+
+// Panel 3: the "Press up to edit queued messages" hint. Always emits one row
+// (blank when there's no queue) so the height budget is stable.
+fun _queue_hint() {
+    var qn: Int = queue_len()
+    if (qn > 0) {
+        L.text_styled("❯ Press up to edit queued messages", st_faint())
+    } else {
+        L.text_styled("", st_base())
+    }
+}
+
+// =============================================================================
+// Panel 3 — footer modes line: model (window) │ Context: N% │ ⏵⏵ mode.
+// =============================================================================
+
+fun _perm_mode_label(): String {
+    if (_perm_mode == 1) { return "accept edits on" }
+    if (_perm_mode == 2) { return "bypass permissions on" }
+    return "normal mode" }
+
+// Context percentage: cumulative session output tokens against the window.
+fun _context_pct(): Int {
+    var win: Int = _ctx_window
+    if (win <= 0) { win = 200000 }
+    var used: Int = _tokens_total
+    var pct: Int = (used * 100) / win
+    if (pct < 0) { pct = 0 }
+    if (pct > 100) { pct = 100 }
+    return pct
+}
+
+fun _modes_line() {
+    var pct: Int = _context_pct()
+    // MODEL_NAME already carries its window (e.g. "Opus 4.8 (1M context)"), so
+    // the line reads: <model> │ Context: N% │ ⏵⏵ <mode> (shift+tab to cycle).
+    var line: String = MODEL_NAME + " │ Context: " + pct.to_string() +
+                       "% │ ⏵⏵ " + _perm_mode_label() + " (shift+tab to cycle)"
+    L.text_styled("  " + line, st_muted())
+}
+
+// =============================================================================
+// Panel 4 — agent-fleet panel: `⏺ main` then one `◯ …` row per active subagent.
+// =============================================================================
+
+fun _fleet_rows(): Int {
+    var n: Int = _agent_descs.length()
+    if (n == 0) { return 0 }
+    return n + 1                          // the `⏺ main` header + one row each
+}
+
+fun _fleet_region() {
+    var n: Int = _agent_descs.length()
+    if (n == 0) { return }
+    L.text_styled("  ⏺ main", st_primary_bold())
+    var i: Int = 0
+    while (i < n) {
+        var desc: String = _agent_descs[i]
+        var atype: String = _agent_types[i]
+        var done: Bool = _agent_done[i]
+        var start: Float = _agent_starts[i]
+        var toks: Int = _agent_tokens[i]
+        // Per-agent token count falls back to the running total when we can't
+        // attribute tokens to a specific subagent from the stream.
+        if (toks <= 0) { toks = _tokens_out }
+        var secs: Int = _elapsed_since(start)
+        var glyph: String = "◯"
+        var glyph_st: St.Style = st_muted()
+        if (done) {
+            glyph = "⏺"
+            glyph_st = st_success_style()
+        }
+        var meta: String = _fmt_elapsed(secs) + " · ↓" + _fmt_tokens(toks) + " tokens"
+        var atype_l: String = atype
+        var desc_l: String = desc
+        var meta_l: String = meta
+        L.hstack(fun () {
+            L.text_styled("  ", st_faint())
+            L.text_styled(glyph, glyph_st)
+            L.box(width=1, block=fun () => nil)
+            L.text_styled(atype_l, st_subagent())
+            L.box(width=2, block=fun () => nil)
+            L.text_styled(desc_l, st_text())
+            L.box(width=2, block=fun () => nil)
+            L.text_styled(meta_l, st_faint())
+        })
+        i = i + 1
+    }
+}
+
 /// The root view. Appends one full-screen rounded frame containing header,
 /// transcript, divider, input, and footer. Read by `Rt.run` every dirty frame.
 fun view() {
@@ -735,8 +966,14 @@ fun view() {
     if (inner_w < 4) { inner_w = 4 }
 
     // Rows budget inside the frame: total - 2 (frame border).
-    // header(1) + divider(1) + input(3 content + 2 border = 5) + footer(1) = 8.
-    var chrome: Int = 10
+    // header(1) + divider(1) + input(3 content + 2 border = 5) + footer(1) = 8,
+    // plus the dynamic Claude-Code chrome: status/todo panel above the input,
+    // the modes line, and the agent-fleet panel below the footer.
+    var status_rows: Int = _status_panel_rows()
+    var fleet_rows: Int = _fleet_rows()
+    var modes_rows: Int = 1
+    var hint_rows: Int = 1
+    var chrome: Int = 10 + status_rows + fleet_rows + modes_rows + hint_rows
     var trans_h: Int = rows - 2 - chrome
     if (trans_h < 3) { trans_h = 3 }
 
@@ -746,8 +983,13 @@ fun view() {
         L.text_styled(_rule(inner_w), st_border())
         _transcript_region(inner_w, trans_h)
         L.text_styled(_rule(inner_w), st_border())
+        _status_region(inner_w)
         _input_region(inner_w)
+        _queue_hint()
+        L.text_styled(_rule(inner_w), st_border())
+        _modes_line()
         _footer()
+        _fleet_region()
     })
 }
 
@@ -809,6 +1051,60 @@ var _test_stub_program: String = ""
 
 fun _set_test_stub(program: String) { _test_stub_program = program }
 
+// Reset the per-run live meta: arm the elapsed timer, zero this run's token
+// counts, clear the active-tool word + todo list + agent fleet. The cumulative
+// session total (`_tokens_total`) and the permission mode deliberately persist.
+fun _reset_run_meta() {
+    _run_start = Time.timestamp()
+    _tokens_out = 0
+    _tokens_in = 0
+    _tool_active = ""
+    _todos = _empty_todos()
+    _agent_descs = []
+    _agent_types = []
+    _agent_starts = []
+    _agent_tokens = []
+    _agent_done = []
+}
+
+// The status word that trails the meta cluster: "using Read" while a read-ish
+// tool runs, "running Bash" for Bash, else plain "thinking".
+fun _state_word(): String {
+    var tool: String = _tool_active
+    if (tool == "") { return "thinking" }
+    if (tool == "Bash") { return "running Bash" }
+    return "using " + tool
+}
+
+// Panel 1: the gerund action shown after the spinner. Prefers the in-progress
+// todo's activeForm (e.g. "Enhancing claude_tui"), else a generic "Working…".
+fun _status_action(): String {
+    var todos: List<List<String>> = _todos
+    var i: Int = 0
+    var n: Int = todos.length()
+    while (i < n) {
+        var td: List<String> = todos[i]
+        if (td[1] == "in_progress") {
+            var af: String = td[2]
+            if (af != "") { return af + "…" }
+            return td[0] + "…"
+        }
+        i = i + 1
+    }
+    return "Working…"
+}
+
+// Panel 1: the animated status line shown while thinking, e.g.
+//   ✢ Working…  (10s · ↓ 14.6k tokens · thinking)
+// The glyph is the live spinner frame; elapsed + tokens + state are live.
+fun _status_line_text(): String {
+    var secs: Int = _elapsed_since(_run_start)
+    var toks: Int = _tokens_out
+    var meta: String = "(" + _fmt_elapsed(secs) + " · ↓ " + _fmt_tokens(toks) +
+                       " tokens · " + _state_word() + ")"
+    return meta
+}
+
 // Start a claude run for `text`: append the user message, spawn the streaming
 // subprocess, and arm the pump. Returns immediately.
 fun _start(text: String) {
@@ -821,6 +1117,7 @@ fun _start(text: String) {
     _saw_json = false
     _plain_mode = false
     _decided_mode = false
+    _reset_run_meta()
 
     var program: String = "claude"
     var args: List<String> = ["-p", text, "--output-format", "stream-json", "--verbose"]
@@ -963,6 +1260,17 @@ fun _handle_system(ev: Any) {
 // Task/Agent shown as a subagent spawn).
 fun _handle_assistant(ev: Any) {
     var msg: Any = j_get(ev, "message")
+    // Accumulate usage tokens (message.usage.output_tokens / input_tokens).
+    var usage: Any = j_get(msg, "usage")
+    if (usage is Map) {
+        var out_t: Int = j_int(j_get(usage, "output_tokens"))
+        var in_t: Int = j_int(j_get(usage, "input_tokens"))
+        if (out_t > 0) {
+            _tokens_out = _tokens_out + out_t
+            _tokens_total = _tokens_total + out_t
+        }
+        if (in_t > 0) { _tokens_in = _tokens_in + in_t }
+    }
     var content: List<Any> = j_list(j_get(msg, "content"))
     var i: Int = 0
     var n: Int = content.length()
@@ -971,7 +1279,11 @@ fun _handle_assistant(ev: Any) {
         var bt: String = j_str(j_get(blk, "type"))
         if (bt == "text") {
             var txt: String = j_str(j_get(blk, "text"))
-            if (txt != "") { _append_assistant(txt) }
+            if (txt != "") {
+                // Streamed prose means claude is no longer inside a tool call.
+                _tool_active = ""
+                _append_assistant(txt)
+            }
         } else if (bt == "tool_use") {
             _render_tool_use(blk)
         }
@@ -985,10 +1297,21 @@ fun _render_tool_use(blk: Any) {
     var name: String = j_str(j_get(blk, "name"))
     var input: Any = j_get(blk, "input")
 
+    // Panel 2: TodoWrite carries the checklist state — capture it, no row.
+    if (name == "TodoWrite") {
+        _capture_todos(input)
+        _tool_active = name
+        return
+    }
+
     if (name == "Task" or name == "Agent") {
         var desc: String = j_str(j_get(input, "description"))
-        if (desc == "") { desc = j_str(j_get(input, "subagent_type")) }
+        var atype: String = j_str(j_get(input, "subagent_type"))
+        if (desc == "") { desc = atype }
         if (desc == "") { desc = "spawned" }
+        // Panel 4: register a live fleet row for this subagent.
+        _add_agent(desc, atype)
+        _tool_active = name
         // Break the streaming assistant row so the subagent line sits after the
         // text captured so far (the next text block reopens a fresh row).
         _break_assistant_row()
@@ -997,10 +1320,59 @@ fun _render_tool_use(blk: Any) {
         return
     }
 
+    // Panel 1: record the active tool so the status word reads "using Read" etc.
+    _tool_active = name
+
     var label: String = _tool_label(name, input)
     _break_assistant_row()
     append_message("tool", "⚒ " + label)
     transcript.scroll_to_bottom()
+}
+
+// Panel 2: capture input.todos (a list of {content, status, activeForm} maps)
+// into `_todos`. Every field access is guarded (is Map/List/String) because a
+// bare .get() on a non-Map Any segfaults.
+fun _capture_todos(input: Any) {
+    var todos: List<Any> = j_list(j_get(input, "todos"))
+    var out: List<List<String>> = []
+    var i: Int = 0
+    var n: Int = todos.length()
+    while (i < n) {
+        var td: Any = todos[i]
+        if (td is Map) {
+            var content: String = j_str(j_get(td, "content"))
+            var st: String = j_str(j_get(td, "status"))
+            var active: String = j_str(j_get(td, "activeForm"))
+            var row: List<String> = [content, st, active]
+            out.push(row)
+        }
+        i = i + 1
+    }
+    _todos = out
+}
+
+// Panel 4: append a live agent-fleet row (parallel lists indexed together).
+fun _add_agent(desc: String, atype: String) {
+    var t: String = atype
+    if (t == "") { t = "general-purpose" }
+    _agent_descs.push(desc)
+    _agent_types.push(t)
+    _agent_starts.push(Time.timestamp())
+    var zero: Int = 0
+    _agent_tokens.push(zero)
+    _agent_done.push(false)
+}
+
+// Mark every tracked agent as finished (called on the terminal result event).
+fun _finish_agents() {
+    var out: List<Bool> = []
+    var i: Int = 0
+    var n: Int = _agent_done.length()
+    while (i < n) {
+        out.push(true)
+        i = i + 1
+    }
+    _agent_done = out
 }
 
 // End the current streaming assistant row: the next text block starts a fresh
@@ -1044,6 +1416,20 @@ fun _handle_result(ev: Any) {
         var res: String = j_str(j_get(ev, "result"))
         if (res != "") { _append_assistant(res) }
     }
+    // Final usage totals (result.usage.output_tokens/input_tokens), if present.
+    var rusage: Any = j_get(ev, "usage")
+    if (rusage is Map) {
+        var fout: Int = j_int(j_get(rusage, "output_tokens"))
+        if (fout > _tokens_out) {
+            // Result totals are cumulative for the turn; adopt the larger figure.
+            _tokens_total = _tokens_total + (fout - _tokens_out)
+            _tokens_out = fout
+        }
+    }
+    // Panel 1 + 4: the tool word clears and the fleet rows settle as done.
+    _tool_active = ""
+    _finish_agents()
+
     // Cost / turns into the status line, if present.
     var status_line: String = "done"
     var turns: Any = j_get(ev, "num_turns")
@@ -1180,6 +1566,63 @@ fun scroll_down() { transcript.scroll_down(1) }
 fun page_up() { transcript.page_up() }
 fun page_down() { transcript.page_down() }
 
+// Panel 3: cycle the permission-mode indicator normal → accept edits → bypass
+// → normal. Visual/display only for v1 (the wrapper can't change claude's real
+// permission mode through `-p`).
+fun cycle_perm_mode() {
+    _perm_mode = (_perm_mode + 1) % 3
+}
+
+// Panel 3: up-arrow "edit queued message" — when the input is empty AND a queue
+// exists, pop the LAST queued prompt back into the input for editing and drop
+// its pending transcript row. Returns true if it consumed the up-arrow (so the
+// key handler knows not to also scroll). When the input is non-empty or there
+// is no queue, returns false and the caller scrolls the transcript instead.
+fun edit_last_queued(): Bool {
+    var t: TA.TextArea = prompt
+    if (t.value_str() != "") { return false }
+    var s: Sig.Signal<List<String>> = queue
+    var q: List<String> = s.get()
+    if (q.length() == 0) { return false }
+    var last: String = q[q.length() - 1]
+    var rest: List<String> = []
+    var i: Int = 0
+    while (i < q.length() - 1) {
+        rest.push(q[i])
+        i = i + 1
+    }
+    s.set(rest)
+    _drop_last_pending()
+    // Load the popped text into the prompt for editing.
+    var vsig: Sig.Signal<String> = t.value
+    vsig.set(last)
+    var csig: Sig.Signal<Int> = t.cursor_col
+    csig.set(last.length())
+    if (get_status() != "thinking…") { set_status("editing queued message") }
+    return true
+}
+
+// Remove the LAST "pending" message row (the queued turn we just popped to edit).
+fun _drop_last_pending() {
+    var s: Sig.Signal<List<List<String>>> = messages
+    var cur: List<List<String>> = s.get()
+    var last_pending: Int = -1
+    var i: Int = 0
+    while (i < cur.length()) {
+        var row: List<String> = cur[i]
+        if (row[0] == "pending") { last_pending = i }
+        i = i + 1
+    }
+    if (last_pending == -1) { return }
+    var out: List<List<String>> = []
+    var j: Int = 0
+    while (j < cur.length()) {
+        if (j != last_pending) { out.push(cur[j]) }
+        j = j + 1
+    }
+    s.set(out)
+}
+
 // Advance the thinking spinner one frame (kept for the render test / callers).
 fun tick_spinner() {
     spin.tick()
@@ -1200,6 +1643,7 @@ fun _test_spawn(user_text: String, program: String, args: List<String>) {
     _saw_json = false
     _plain_mode = false
     _decided_mode = false
+    _reset_run_meta()
     var pr: Process.Subprocess = Process.open_args(program, args)
     _proc_holder = [pr]
     _active = true
@@ -1219,6 +1663,41 @@ fun _test_drain(max_iters: Int): Int {
 }
 
 fun _test_active(): Bool { return _active }
+
+// Feed newline-delimited stream-json directly into the parser while holding the
+// thinking state live (no subprocess) — so a harness can render a MID-STREAM
+// frame showing the thinking-only panels (status line + todo checklist) that
+// `_finish_stream` would otherwise tear down. Arms the run meta first.
+fun _test_feed_live(user_text: String, json_lines: String) {
+    append_message("user", user_text)
+    _line_buf = ""
+    _assistant_text = ""
+    _assistant_idx = -1
+    _saw_json = false
+    _plain_mode = false
+    _decided_mode = false
+    _reset_run_meta()
+    set_thinking(true)
+    set_status("Working…")
+    var parts: List<String> = json_lines.split("\n")
+    var i: Int = 0
+    var n: Int = parts.length()
+    while (i < n) {
+        var ln: String = parts[i]
+        if (ln.trim() != "") { _process_line(ln) }
+        i = i + 1
+    }
+    spin.tick()
+}
+
+// Read accessors so the harness can assert live-meta state directly.
+fun _test_tokens_out(): Int { return _tokens_out }
+fun _test_tokens_total(): Int { return _tokens_total }
+fun _test_todo_count(): Int { return _todos.length() }
+fun _test_agent_count(): Int { return _agent_descs.length() }
+fun _test_status_line(): String { return _status_line_text() }
+fun _test_context_pct(): Int { return _context_pct() }
+fun _test_cycle_perm() { cycle_perm_mode() }
 
 // Enqueue as if the user pressed Enter while busy (skips the prompt widget).
 fun _test_enqueue(text: String) { _enqueue(text) }
