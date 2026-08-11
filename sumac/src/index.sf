@@ -37,4 +37,4 @@ import "./widgets.sf" as _widgets
 import "./tty.sf" as _tty
 
 // --- Reactive event loop + entry point ---
-import { run, on_key, on_mouse, on_event, quit, request_render } from "./runtime.sf"
+import { run, on_key, on_mouse, on_event, on_tick, quit, request_render } from "./runtime.sf"

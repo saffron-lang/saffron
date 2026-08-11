@@ -5,8 +5,10 @@
 //! enters the render loop with `Rt.run(App.view)`. All UI state and the view
 //! builder live in `app.sf` so the render test can exercise the exact same tree.
 //!
-//! No `GC.disable()` — BUGS #192 is fixed; the tree rebuilds every dirty frame
-//! under normal GC.
+//! The `claude` subprocess is driven NON-BLOCKING: `submit()` spawns it and
+//! returns immediately, and an `Rt.on_tick` handler pumps its streaming stdout a
+//! little per loop iteration. Enter therefore never blocks — while a response is
+//! in flight it enqueues the next prompt. No `GC.disable()` — BUGS #192 is fixed.
 
 import "../../../src/runtime.sf" as Rt
 import "../../../src/tty.sf" as Tty
@@ -23,17 +25,30 @@ fun main() {
     var t: TA.TextArea = App.prompt
     t.focus()
 
+    // --- Idle/tick pump ------------------------------------------------------
+    //
+    // Fires ~every 50ms after input dispatch, whether or not input arrived. This
+    // is what makes streaming non-blocking: it reads whatever the claude child
+    // has produced, folds it into the transcript, advances the spinner, and
+    // requests a repaint only when something changed. Bind the module function to
+    // a typed local (an untyped module-global call can be silently dropped).
+    Rt.on_tick(fun () {
+        var changed: Bool = App.pump()
+        if (changed) { Rt.request_render() }
+    })
+
     // --- Global key handlers -------------------------------------------------
 
-    // Enter sends the current prompt (unless empty / already thinking). The
-    // paint callback forces the "thinking" frame to the screen before the
-    // blocking subprocess call in a synchronous v1 loop.
+    // Enter submits the current prompt. When idle it starts immediately; when a
+    // response is streaming it enqueues (never blocks). The pump drives the rest.
     Rt.on_key("enter", fun () {
-        App.tick_spinner()
-        App.send(fun () {
-            App.tick_spinner()
-            Rt._render_frame()
-        })
+        App.submit()
+        Rt.request_render()
+    })
+
+    // Esc interrupts a running generation (no-op when idle).
+    Rt.on_key("esc", fun () {
+        App.interrupt()
         Rt.request_render()
     })
 
@@ -41,24 +56,27 @@ fun main() {
     Rt.on_key("ctrl+c", fun () => Rt.quit())
     Rt.on_key("ctrl+d", fun () => Rt.quit())
 
+    // Clear the transcript (^L).
+    Rt.on_key("ctrl+l", fun () { App.clear_transcript(); Rt.request_render() })
+
     // Transcript scrolling.
     Rt.on_key("up", fun () { App.scroll_up(); Rt.request_render() })
     Rt.on_key("down", fun () { App.scroll_down(); Rt.request_render() })
     Rt.on_key("pgup", fun () { App.page_up(); Rt.request_render() })
     Rt.on_key("pgdown", fun () { App.page_down(); Rt.request_render() })
 
-    // Everything else (printable keys, backspace, arrows-in-text) goes to the
-    // focused prompt editor via the catch-all handler.
+    // Everything else (printable keys, backspace, arrows/word-edits in text) goes
+    // to the focused prompt editor via the catch-all handler. Typing is always
+    // allowed — even while streaming — so the user can compose the next prompt.
     Rt.on_event(fun (e: Ev.Event) {
-        if (App.is_thinking()) { return }
         if (e.key != nil) {
             var k: Ev.KeyEvent = e.key
             var name: String = k.name()
             // Keys already claimed by a global handler must not double-fire into
             // the editor.
-            if (name == "enter" or name == "up" or name == "down" or
+            if (name == "enter" or name == "esc" or name == "up" or name == "down" or
                 name == "pgup" or name == "pgdown" or
-                name == "ctrl+c" or name == "ctrl+d") {
+                name == "ctrl+c" or name == "ctrl+d" or name == "ctrl+l") {
                 return
             }
         }

@@ -153,6 +153,75 @@ class TextInput {
         csig.set(len)
     }
 
+    // --- word-wise movement / deletion ---------------------------------------
+    //
+    // A "word" is a maximal run of non-space characters. Backward ops skip spaces
+    // behind the cursor then the word behind that; forward ops skip spaces ahead
+    // then the word ahead (the emacs/macOS convention). All indices are Int.
+
+    /// The index at the start of the word preceding `c` in `v`.
+    fun _prev_word(v: String, c: Int): Int {
+        var i: Int = c
+        var len: Int = v.length()
+        if (i > len) { i = len }
+        while (i > 0 and v.char_at(i - 1) == " ") { i = i - 1 }
+        while (i > 0 and v.char_at(i - 1) != " ") { i = i - 1 }
+        return i
+    }
+
+    /// The index just past the word following `c` in `v`.
+    fun _next_word(v: String, c: Int): Int {
+        var n: Int = v.length()
+        var i: Int = c
+        if (i < 0) { i = 0 }
+        while (i < n and v.char_at(i) == " ") { i = i + 1 }
+        while (i < n and v.char_at(i) != " ") { i = i + 1 }
+        return i
+    }
+
+    /// Move the cursor to the previous word boundary.
+    fun word_left() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = this.text()
+        var c: Int = csig.get()
+        csig.set(this._prev_word(v, c))
+    }
+
+    /// Move the cursor to the next word boundary.
+    fun word_right() {
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = this.text()
+        var c: Int = csig.get()
+        csig.set(this._next_word(v, c))
+    }
+
+    /// Delete the word before the cursor.
+    fun delete_word_left() {
+        var vsig: Sig.Signal<String> = this.value
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = vsig.get()
+        var len: Int = v.length()
+        var c: Int = csig.get()
+        if (c > len) { c = len }
+        if (c <= 0) { return }
+        var start: Int = this._prev_word(v, c)
+        vsig.set(v.slice(0, start) + v.slice(c, len))
+        csig.set(start)
+    }
+
+    /// Delete the word after the cursor (cursor unchanged).
+    fun delete_word_right() {
+        var vsig: Sig.Signal<String> = this.value
+        var csig: Sig.Signal<Int> = this.cursor
+        var v: String = vsig.get()
+        var len: Int = v.length()
+        var c: Int = csig.get()
+        if (c < 0) { c = 0 }
+        if (c >= len) { return }
+        var stop: Int = this._next_word(v, c)
+        vsig.set(v.slice(0, c) + v.slice(stop, len))
+    }
+
     // --- focus ---------------------------------------------------------------
 
     fun focus() {
@@ -181,7 +250,23 @@ class TextInput {
         var k: Ev.KeyEvent = e.key
         if (k == nil) { return false }
         var kind: Int = k.kind
+        var mods: Int = k.mods
+        var ctrl: Bool = (mods & Ev.MOD_CTRL) != 0
+        var alt: Bool = (mods & Ev.MOD_ALT) != 0
+
+        // Word-wise + line editing chords (alt / ctrl), checked before the plain
+        // handlers. See textarea.sf for the full key table.
+        if (kind == Ev.KEY_LEFT and alt) { this.word_left(); return true }
+        if (kind == Ev.KEY_RIGHT and alt) { this.word_right(); return true }
+        if (kind == Ev.KEY_BACKSPACE and alt) { this.delete_word_left(); return true }
+        if (kind == Ev.KEY_DELETE and alt) { this.delete_word_right(); return true }
+        if (kind == Ev.KEY_RUNE and ctrl and k.rune == "w") { this.delete_word_left(); return true }
+        if (kind == Ev.KEY_RUNE and alt and k.rune == "d") { this.delete_word_right(); return true }
+        if (kind == Ev.KEY_RUNE and ctrl and k.rune == "a") { this.home(); return true }
+        if (kind == Ev.KEY_RUNE and ctrl and k.rune == "e") { this.end(); return true }
+
         if (kind == Ev.KEY_RUNE) {
+            if (ctrl or alt) { return false }
             this.insert(k.rune)
             return true
         }

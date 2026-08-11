@@ -1,0 +1,50 @@
+//! Non-interactive streaming/queue harness for claude_tui.
+//!
+//! Proves the on_tick pump + stream-json parser + tool/subagent/result rendering
+//! + queue logic WITHOUT invoking the real `claude` binary. A stub `printf`
+//! command emits a few newline-delimited stream-json events (including a Task
+//! subagent spawn and a final result with cost/turns); the harness drains the
+//! real pump over that stub, then dumps the transcript render. No GC.disable().
+
+import "./src/app.sf" as App
+import "io" as IO
+
+fun main() {
+    // A realistic stream-json transcript: system init, an assistant turn with a
+    // text block + a Read tool_use + a Bash tool_use + a Task (subagent) spawn,
+    // a tool_result user turn, more assistant text, then the final result.
+    var lines: String =
+        "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"claude-opus-4\"}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Let me look at the code. This uses **NaN-boxing** and a `Subprocess` handle.\"}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"src/lib/process.sf\"}}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"tools/saffron run test.sf\"}}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Task\",\"input\":{\"description\":\"audit the parser\",\"subagent_type\":\"Explore\"}}]}}\n" +
+        "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"content\":\"ok\"}]}}\n" +
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\" Here is the *async* version wrapped in a task.\"}]}}\n" +
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"done\",\"total_cost_usd\":0.0123,\"num_turns\":3}\n"
+
+    // Redirect the auto-start-next-queued path to a hermetic `sh` stub so the
+    // queued prompt runs without the real `claude` binary.
+    App._set_test_stub("sh")
+
+    var args: List<String> = ["%s", lines]
+    App._test_spawn("stream a subprocess with tools + a subagent", "printf", args)
+
+    // Enqueue a second prompt WHILE the first is in flight — proves the queue.
+    App._test_enqueue("and now explain nan-boxing")
+
+    IO.println("active before drain: " + App._test_active().to_string())
+    IO.println("queued before drain: " + App.queue_len().to_string())
+
+    // Drive the real pump to completion over the stub. When it finishes it will
+    // try to auto-start the queued prompt via the real `claude` path; with no
+    // claude on PATH that yields a graceful error row but still drains the queue.
+    var iters: Int = App._test_drain(200000)
+    IO.println("pump iterations: " + iters.to_string())
+    IO.println("model after init: " + App.MODEL_NAME)
+    IO.println("status after result: " + App.get_status())
+    IO.println("")
+    IO.println(App.render_to_text(100, 34))
+}
+
+main()

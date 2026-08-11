@@ -8,11 +8,22 @@
 //! means there is a single source of truth and the test can render the exact
 //! tree the app runs, without starting the blocking input loop.
 //!
+//! Streaming model (v2): `send()` spawns `claude -p <prompt> --output-format
+//! stream-json --verbose` via `Process.open_args` and returns IMMEDIATELY. A
+//! `Rt.on_tick` handler (`_pump`) does a little non-blocking work per loop
+//! iteration: `read_available()`, split complete newline-delimited JSON lines,
+//! parse each with `@json`, and fold the structured events (assistant text,
+//! tool_use, subagent Task spawns, final result) into the transcript live. The
+//! spinner advances on each pumped tick. When the process exits, the assistant
+//! message is finalized and the next QUEUED prompt (if any) starts. If the
+//! stream-json invocation is unavailable (old CLI: a non-JSON first line), the
+//! pump degrades to treating stdout as plain text.
+//!
 //! Integer discipline (BUGS #72): every index / coordinate / size is annotated
 //! `Int`. Signals are bound to typed locals before `.get()/.set()`. `!= nil` is
-//! used for Process results and Event facets (never `is`, BUGS #69). No
-//! `GC.disable()` anywhere — #192 is fixed and the tree rebuilds every frame
-//! under normal GC.
+//! used for Process results and Event facets, and `is Map/List/String/Int` (which
+//! DOES work on concrete Any values) guards every JSON field access — a bare
+//! `.get()`/`.has()` on a non-Map Any segfaults. No `GC.disable()` anywhere.
 
 import "../../../src/style.sf" as St
 import "../../../src/layout.sf" as L
@@ -23,6 +34,7 @@ import "../../../src/widgets/spinner.sf" as Spin
 import "../../../src/widgets/textarea.sf" as TA
 import "../../../src/widgets/viewport.sf" as VP
 import "@process" as Process
+import "@json" as JSON
 import "@time" as Time
 import "io" as IO
 
@@ -60,6 +72,9 @@ fun st_border(): St.Style { return st_base().with_fg(c_border()) }
 fun st_border_focus(): St.Style { return st_base().with_fg(c_border_focus()) }
 fun st_code(): St.Style { return St.style().with_bg(c_code_bg()).with_fg(c_success()) }
 fun st_spinner(): St.Style { return st_base().with_fg(c_primary()) }
+fun st_tool(): St.Style { return st_base().with_fg(c_accent()) }
+fun st_subagent(): St.Style { return st_base().with_fg(c_primary()) }
+fun st_pending(): St.Style { return st_base().with_fg(c_faint()).italic() }
 
 // Line-kind selectors for the flat transcript model.
 let K_PROSE: Int = 0        // assistant/user prose -> text
@@ -68,6 +83,9 @@ let K_ASSISTANT: Int = 2    // assistant speaker    -> primary, bold
 let K_META: Int = 3         // timestamps / hints   -> muted
 let K_ERROR: Int = 4        // error message        -> coral
 let K_CODE: Int = 5         // fenced code line     -> code style
+let K_TOOL: Int = 6         // tool-call row        -> ember accent
+let K_SUBAGENT: Int = 7     // subagent spawn row   -> saffron
+let K_PENDING: Int = 8      // queued user prompt   -> faint italic
 
 fun style_for_kind(k: Int): St.Style {
     if (k == K_USER) { return st_user() }
@@ -75,7 +93,38 @@ fun style_for_kind(k: Int): St.Style {
     if (k == K_META) { return st_faint() }
     if (k == K_ERROR) { return st_error() }
     if (k == K_CODE) { return st_code() }
+    if (k == K_TOOL) { return st_tool() }
+    if (k == K_SUBAGENT) { return st_subagent() }
+    if (k == K_PENDING) { return st_pending() }
     return st_text()
+}
+
+// --- Inline markdown span selectors (segment styling within a prose line) ---
+let SPAN_PLAIN: Int = 0
+let SPAN_BOLD: Int = 1
+let SPAN_ITALIC: Int = 2
+let SPAN_CODE: Int = 3
+
+// A styled run within one displayed line: `text` drawn in the style named by
+// `span`, on top of the base kind's style. Lets a single prose line carry
+// **bold**, *italic*, and `code` runs without enriching the whole line model.
+class Seg {
+    var text: String
+    var span: Int
+    fun init(text: String, span: Int) {
+        this.text = text
+        this.span = span
+    }
+}
+
+// Resolve a segment's style: start from the line-kind's base style, then apply
+// the inline span attribute. Code spans get the code fg/bg for a distinct look.
+fun style_for_span(base_kind: Int, span: Int): St.Style {
+    if (span == SPAN_CODE) { return st_code() }
+    var base: St.Style = style_for_kind(base_kind)
+    if (span == SPAN_BOLD) { return base.bold() }
+    if (span == SPAN_ITALIC) { return base.italic() }
+    return base
 }
 
 // =============================================================================
@@ -83,8 +132,9 @@ fun style_for_kind(k: Int): St.Style {
 // =============================================================================
 //
 // A message is a [role, text, timestamp] triple (all String). role is one of
-// "user" | "assistant" | "error". Stored as a List of triples in one signal so
-// the whole transcript is a single reactive source of truth.
+// "user" | "assistant" | "error" | "tool" | "subagent". Stored as a List of
+// triples in one signal so the whole transcript is a single reactive source of
+// truth. Tool/subagent rows carry their rendered label in the text slot.
 
 var MODEL_NAME: String = "sonnet-4.6"
 
@@ -98,27 +148,32 @@ var thinking: Sig.Signal<Bool> = signal(false)
 var status: Sig.Signal<String> = signal("ready")
 var turn: Sig.Signal<Int> = signal(0)
 
-// Transcript scroll state. A Viewport owns the offset signal + the scroll math
-// (clamping, page/line steps); the app renders styled lines itself (per-speaker
-// color, which a single-style viewport cannot express) but drives ALL scroll
-// state through this widget instance — its offset signal is the source of truth.
-var transcript: VP.Viewport = VP.viewport(80, 20)
-
-// The prompt editor (multi-line; Enter is intercepted by the app for send, so
-// the textarea only sees printable/edit keys).
-var prompt: TA.TextArea = TA.textarea("ask claude anything…", 80, 3)
-
-// Thinking spinner (braille dot ring, saffron) — DESIGN §7.
-var spin: Spin.Spinner = Spin.spinner_styled("thinking…", Spin.SPINNER_DOTS, st_spinner())
-
-// Terminal geometry, refreshed from Tty.size() by main / seeded by the test.
-var g_cols: Int = 96
-var g_rows: Int = 34
-
-fun set_size(cols: Int, rows: Int) {
-    g_cols = cols
-    g_rows = rows
+// Prompt queue: prompts submitted while a response is in flight. The head starts
+// automatically when the current response finishes (see `_finish_stream`).
+fun _empty_q(): List<String> {
+    var q: List<String> = []
+    return q
 }
+var queue: Sig.Signal<List<String>> = signal(_empty_q())
+
+// =============================================================================
+// Streaming subprocess state (module-level; the on_tick pump reads/writes it).
+// =============================================================================
+//
+// A class-typed var cannot hold nil, so the live Subprocess lives in a 0-or-1
+// element holder list; `_active` gates the pump. `_partial` accumulates raw
+// stdout across ticks; `_line_buf` holds the bytes after the last complete '\n'
+// (a JSON line can split across reads). `_assistant_idx` is the messages-index
+// of the in-progress assistant message so streamed text folds into one row.
+
+var _proc_holder: List<Process.Subprocess> = []
+var _active: Bool = false
+var _line_buf: String = ""              // incomplete trailing line, buffered
+var _assistant_idx: Int = -1            // index of the streaming assistant msg
+var _assistant_text: String = ""        // its accumulated text
+var _saw_json: Bool = false             // did we see at least one JSON event?
+var _plain_mode: Bool = false           // degraded: treat stdout as plain text
+var _decided_mode: Bool = false         // have we classified the first line yet?
 
 // =============================================================================
 // State helpers (bind signal to a typed local before calling — untyped receiver
@@ -155,6 +210,15 @@ fun get_turn(): Int {
     return s.get()
 }
 
+fun get_queue(): List<String> {
+    var s: Sig.Signal<List<String>> = queue
+    return s.get()
+}
+
+fun queue_len(): Int {
+    return get_queue().length()
+}
+
 fun _now_hhmmss(): String {
     var h: Int = Time.hour()
     var mi: Int = Time.minute()
@@ -167,8 +231,9 @@ fun _pad2(n: Int): String {
     return n.to_string()
 }
 
-/// Append a message triple and bump the turn counter.
-fun append_message(role: String, text: String) {
+/// Append a message triple and bump the turn counter. Returns the new message's
+/// index so a streaming caller can keep folding text into that same row.
+fun append_message(role: String, text: String): Int {
     var s: Sig.Signal<List<List<String>>> = messages
     var cur: List<List<String>> = s.get()
     var row: List<String> = [role, text, _now_hhmmss()]
@@ -176,6 +241,41 @@ fun append_message(role: String, text: String) {
     s.set(cur)
     var ts: Sig.Signal<Int> = turn
     ts.set(ts.get() + 1)
+    return cur.length() - 1
+}
+
+// Replace the text of an existing message row in place (for streaming updates).
+fun _set_message_text(idx: Int, text: String) {
+    var s: Sig.Signal<List<List<String>>> = messages
+    var cur: List<List<String>> = s.get()
+    if (idx < 0 or idx >= cur.length()) { return }
+    var row: List<String> = cur[idx]
+    var updated: List<String> = [row[0], text, row[2]]
+    cur.set(idx, updated)
+    s.set(cur)
+}
+
+// =============================================================================
+// JSON access helpers (concrete `is` checks DO work on Any values; a bare
+// `.get()`/`.has()` on a non-Map Any segfaults, so every access is guarded).
+// =============================================================================
+
+fun j_get(v: Any, key: String): Any {
+    if (v is Map) { return v.get(key) }
+    return nil
+}
+
+fun j_str(v: Any): String {
+    if (v is String) { return v }
+    return ""
+}
+
+fun j_list(v: Any): List<Any> {
+    if (v is List) {
+        return v
+    }
+    var e: List<Any> = []
+    return e
 }
 
 // =============================================================================
@@ -210,41 +310,137 @@ fun _wrap(text: String, width: Int): List<String> {
 }
 
 // =============================================================================
-// Flat transcript model: build parallel (text, kind) lists from the messages,
-// wrapped to `width`. Handles fenced ``` code blocks with a distinct style.
+// Inline markdown → styled segments.
+// =============================================================================
+//
+// Parse a single (already-wrapped) prose line into a list of `Seg`s, stripping
+// the markers and tagging the runs: `**bold**`, `*italic*` / `_italic_`, and
+// `` `code` ``. Deliberately approximate ("syntax-ish", DESIGN §6): a marker that
+// never closes on the same line is emitted as literal text. This keeps the
+// segmenter a single left-to-right pass with no backtracking.
+
+fun _emit_seg(out: List<Seg>, text: String, span: Int) {
+    if (text == "") { return }
+    out.push(Seg(text, span))
+}
+
+// Find the next index >= start where `marker` occurs in `s`, or -1.
+fun _find_from(s: String, marker: String, start: Int): Int {
+    var n: Int = s.length()
+    var ml: Int = marker.length()
+    var i: Int = start
+    while (i + ml <= n) {
+        if (s.slice(i, i + ml) == marker) { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+fun _parse_inline(line: String): List<Seg> {
+    var out: List<Seg> = []
+    var n: Int = line.length()
+    var i: Int = 0
+    var plain: String = ""       // accumulates plain text between markers
+    while (i < n) {
+        var c: String = line.char_at(i)
+        // Inline code: `...`
+        if (c == "`") {
+            var close: Int = _find_from(line, "`", i + 1)
+            if (close != -1) {
+                _emit_seg(out, plain, SPAN_PLAIN)
+                plain = ""
+                _emit_seg(out, line.slice(i + 1, close), SPAN_CODE)
+                i = close + 1
+                continue
+            }
+        }
+        // Bold: **...**
+        if (c == "*" and i + 1 < n and line.char_at(i + 1) == "*") {
+            var closeb: Int = _find_from(line, "**", i + 2)
+            if (closeb != -1) {
+                _emit_seg(out, plain, SPAN_PLAIN)
+                plain = ""
+                _emit_seg(out, line.slice(i + 2, closeb), SPAN_BOLD)
+                i = closeb + 2
+                continue
+            }
+        }
+        // Italic: *...* or _..._  (single marker; require a non-space after it
+        // so a bare "*" or "3 * 4" doesn't trigger).
+        if ((c == "*" or c == "_") and i + 1 < n and line.char_at(i + 1) != " ") {
+            var closei: Int = _find_from(line, c, i + 1)
+            if (closei != -1) {
+                _emit_seg(out, plain, SPAN_PLAIN)
+                plain = ""
+                _emit_seg(out, line.slice(i + 1, closei), SPAN_ITALIC)
+                i = closei + 1
+                continue
+            }
+        }
+        plain = plain + c
+        i = i + 1
+    }
+    _emit_seg(out, plain, SPAN_PLAIN)
+    if (out.length() == 0) { out.push(Seg("", SPAN_PLAIN)) }
+    return out
+}
+
+// A whole line rendered as a single plain segment (headers, code, tool rows —
+// anything that is not inline-markdown prose).
+fun _one_seg(text: String, span: Int): List<Seg> {
+    var out: List<Seg> = []
+    out.push(Seg(text, span))
+    return out
+}
+
+// =============================================================================
+// Flat transcript model: parallel (text, kind, segments) lists, wrapped to
+// `width`. `texts` feeds the viewport's scroll math; `segs` drives the styled
+// render. Handles fenced ``` code blocks and inline markdown in prose.
 // =============================================================================
 
 class TLines {
     var texts: List<String>
     var kinds: List<Int>
-    fun init(texts: List<String>, kinds: List<Int>) {
+    var segs: List<List<Seg>>
+    fun init(texts: List<String>, kinds: List<Int>, segs: List<List<Seg>>) {
         this.texts = texts
         this.kinds = kinds
+        this.segs = segs
     }
 }
 
-fun _push_line(texts: List<String>, kinds: List<Int>, s: String, k: Int) {
+fun _push_line(texts: List<String>, kinds: List<Int>, segs: List<List<Seg>>,
+               s: String, k: Int, sg: List<Seg>) {
     texts.push(s)
     kinds.push(k)
+    segs.push(sg)
+}
+
+// Convenience: push a whole line as one plain segment styled by its kind.
+fun _push_plain(texts: List<String>, kinds: List<Int>, segs: List<List<Seg>>,
+                s: String, k: Int) {
+    _push_line(texts, kinds, segs, s, k, _one_seg(s, SPAN_PLAIN))
 }
 
 fun build_transcript(width: Int): TLines {
     var texts: List<String> = []
     var kinds: List<Int> = []
+    var segs: List<List<Seg>> = []
     var msgs: List<List<String>> = get_messages()
     var mi: Int = 0
     var mn: Int = msgs.length()
 
     if (mn == 0) {
         // Empty state (DESIGN §7): an inviting centered-ish prompt.
-        _push_line(texts, kinds, "", K_PROSE)
-        _push_line(texts, kinds, "  ◈  ask claude anything", K_ASSISTANT)
-        _push_line(texts, kinds, "     type below and press enter to begin", K_META)
-        _push_line(texts, kinds, "", K_PROSE)
-        _push_line(texts, kinds, "     · how do i stream a subprocess in saffron?", K_META)
-        _push_line(texts, kinds, "     · explain nan-boxed values", K_META)
-        _push_line(texts, kinds, "     · write a fibonacci function", K_META)
-        return TLines(texts, kinds)
+        _push_plain(texts, kinds, segs, "", K_PROSE)
+        _push_plain(texts, kinds, segs, "  ◈  ask claude anything", K_ASSISTANT)
+        _push_plain(texts, kinds, segs, "     type below and press enter to begin", K_META)
+        _push_plain(texts, kinds, segs, "", K_PROSE)
+        _push_plain(texts, kinds, segs, "     · how do i stream a subprocess in saffron?", K_META)
+        _push_plain(texts, kinds, segs, "     · explain nan-boxed values", K_META)
+        _push_plain(texts, kinds, segs, "     · write a fibonacci function", K_META)
+        return TLines(texts, kinds, segs)
     }
 
     while (mi < mn) {
@@ -253,16 +449,33 @@ fun build_transcript(width: Int): TLines {
         var body: String = m[1]
         var ts: String = m[2]
 
-        // Speaker header row.
-        if (role == "user") {
-            _push_line(texts, kinds, "▌ you                                         " + ts, K_USER)
-        } else if (role == "error") {
-            _push_line(texts, kinds, "✖ error                                       " + ts, K_ERROR)
-        } else {
-            _push_line(texts, kinds, "◈ claude                                      " + ts, K_ASSISTANT)
+        // Tool-call and subagent rows are single-line, no speaker header.
+        if (role == "tool") {
+            _push_plain(texts, kinds, segs, "  " + body, K_TOOL)
+            mi = mi + 1
+            continue
+        }
+        if (role == "subagent") {
+            _push_plain(texts, kinds, segs, "  " + body, K_SUBAGENT)
+            mi = mi + 1
+            continue
+        }
+        if (role == "pending") {
+            _push_plain(texts, kinds, segs, "  ⋯ " + body, K_PENDING)
+            mi = mi + 1
+            continue
         }
 
-        // Body: split on physical newlines, honor fenced code blocks.
+        // Speaker header row.
+        if (role == "user") {
+            _push_plain(texts, kinds, segs, "▌ you                                         " + ts, K_USER)
+        } else if (role == "error") {
+            _push_plain(texts, kinds, segs, "✖ error                                       " + ts, K_ERROR)
+        } else {
+            _push_plain(texts, kinds, segs, "◈ claude                                      " + ts, K_ASSISTANT)
+        }
+
+        // Body: split on physical newlines, honor fenced code blocks + markdown.
         var phys: List<String> = body.split("\n")
         var pi: Int = 0
         var pn: Int = phys.length()
@@ -275,25 +488,56 @@ fun build_transcript(width: Int): TLines {
                 continue
             }
             if (in_code) {
-                _push_line(texts, kinds, "  " + line, K_CODE)
+                _push_plain(texts, kinds, segs, "  " + line, K_CODE)
             } else {
                 var body_k: Int = K_PROSE
                 if (role == "error") { body_k = K_ERROR }
-                var wrapped: List<String> = _wrap(line, width - 2)
-                var wi: Int = 0
-                var wnn: Int = wrapped.length()
-                while (wi < wnn) {
-                    _push_line(texts, kinds, "  " + wrapped[wi], body_k)
-                    wi = wi + 1
+                // Headings: "# " / "## " → bold accent line (markers stripped).
+                var heading: Bool = false
+                var htext: String = line
+                if (line.length() >= 2 and line.slice(0, 2) == "# ") {
+                    heading = true
+                    htext = line.slice(2, line.length())
+                } else if (line.length() >= 3 and line.slice(0, 3) == "## ") {
+                    heading = true
+                    htext = line.slice(3, line.length())
+                }
+                if (heading) {
+                    var wrapped_h: List<String> = _wrap(htext, width - 2)
+                    var hi: Int = 0
+                    var hn: Int = wrapped_h.length()
+                    while (hi < hn) {
+                        var hl: String = "  " + wrapped_h[hi]
+                        _push_line(texts, kinds, segs, hl, K_ASSISTANT,
+                                   _one_seg(hl, SPAN_BOLD))
+                        hi = hi + 1
+                    }
+                } else {
+                    var wrapped: List<String> = _wrap(line, width - 2)
+                    var wi: Int = 0
+                    var wnn: Int = wrapped.length()
+                    while (wi < wnn) {
+                        // Segment each wrapped display line for inline markdown,
+                        // then prepend a fixed 2-col indent segment.
+                        var inner: List<Seg> = _parse_inline(wrapped[wi])
+                        var full: List<Seg> = [Seg("  ", SPAN_PLAIN)]
+                        var si: Int = 0
+                        while (si < inner.length()) {
+                            full.push(inner[si])
+                            si = si + 1
+                        }
+                        _push_line(texts, kinds, segs, "  " + wrapped[wi], body_k, full)
+                        wi = wi + 1
+                    }
                 }
             }
             pi = pi + 1
         }
         // Blank separator between messages.
-        _push_line(texts, kinds, "", K_PROSE)
+        _push_plain(texts, kinds, segs, "", K_PROSE)
         mi = mi + 1
     }
-    return TLines(texts, kinds)
+    return TLines(texts, kinds, segs)
 }
 
 // Keep the viewport's plaintext line list + geometry in sync so its scroll math
@@ -303,6 +547,32 @@ fun sync_transcript(tl: TLines, height: Int) {
     transcript.height = height
     var ls: Sig.Signal<List<String>> = transcript.lines
     ls.set(tl.texts)
+}
+
+// =============================================================================
+// Widgets + geometry
+// =============================================================================
+
+// Transcript scroll state. A Viewport owns the offset signal + the scroll math
+// (clamping, page/line steps); the app renders styled lines itself and drives
+// ALL scroll state through this widget instance — its offset signal is the
+// source of truth.
+var transcript: VP.Viewport = VP.viewport(80, 20)
+
+// The prompt editor (multi-line; Enter is intercepted by the app for send, so
+// the textarea only sees printable/edit keys).
+var prompt: TA.TextArea = TA.textarea("ask claude anything…", 80, 3)
+
+// Thinking spinner (braille dot ring, saffron) — DESIGN §7.
+var spin: Spin.Spinner = Spin.spinner_styled("thinking…", Spin.SPINNER_DOTS, st_spinner())
+
+// Terminal geometry, refreshed from Tty.size() by main / seeded by the test.
+var g_cols: Int = 96
+var g_rows: Int = 34
+
+fun set_size(cols: Int, rows: Int) {
+    g_cols = cols
+    g_rows = rows
 }
 
 // =============================================================================
@@ -322,13 +592,36 @@ fun _header() {
     })
 }
 
+// Emit one styled segment as alternating spacer-box / text-node runs, so no
+// space ever sits at a text node's leading edge (where layout would collapse
+// it). A run of K spaces becomes a width-K empty box; a run of non-spaces
+// becomes a styled text node.
+fun _emit_seg_runs(text: String, st: St.Style) {
+    var n: Int = text.length()
+    var i: Int = 0
+    while (i < n) {
+        if (text.char_at(i) == " ") {
+            var j: Int = i
+            while (j < n and text.char_at(j) == " ") { j = j + 1 }
+            var wsp: Int = j - i
+            L.box(width=wsp, block=fun () => nil)
+            i = j
+        } else {
+            var j2: Int = i
+            while (j2 < n and text.char_at(j2) != " ") { j2 = j2 + 1 }
+            L.text_styled(text.slice(i, j2), st)
+            i = j2
+        }
+    }
+}
+
 fun _transcript_region(inner_w: Int, height: Int) {
     var tl: TLines = build_transcript(inner_w)
     sync_transcript(tl, height)
     var off: Int = transcript.get_offset()
     var total: Int = tl.texts.length()
-    var texts: List<String> = tl.texts
     var kinds: List<Int> = tl.kinds
+    var segs: List<List<Seg>> = tl.segs
 
     // grow=1 so the transcript absorbs all slack between the header rule and the
     // input well — the input + footer sit flush at the bottom at any terminal
@@ -338,7 +631,25 @@ fun _transcript_region(inner_w: Int, height: Int) {
         while (i < height) {
             var idx: Int = off + i
             if (idx >= 0 and idx < total) {
-                L.text_styled(texts[idx], style_for_kind(kinds[idx]))
+                var k: Int = kinds[idx]
+                var row_segs: List<Seg> = segs[idx]
+                // Render the line as an hstack of styled segments so inline
+                // **bold** / *italic* / `code` each carry their own attributes.
+                // Each segment is emitted as alternating space-runs (width-N
+                // spacer boxes) and text-runs: layout's word-wrap collapses a
+                // text node's LEADING space, so a bare " and a " segment would
+                // render flush against the run before it. Spacer boxes are blank
+                // columns the layout preserves exactly (same trick spinner.sf
+                // uses for its 1-col gap).
+                L.hstack(fun () {
+                    var si: Int = 0
+                    var sn: Int = row_segs.length()
+                    while (si < sn) {
+                        var seg: Seg = row_segs[si]
+                        _emit_seg_runs(seg.text, style_for_span(k, seg.span))
+                        si = si + 1
+                    }
+                })
             } else {
                 L.text_styled("", st_text())
             }
@@ -360,13 +671,16 @@ fun _input_region(inner_w: Int) {
     // + block caret is the DESIGN's input affordance.
     var t: TA.TextArea = prompt
     var val: String = t.value_str()
+    var qn: Int = queue_len()
 
     L.box_styled(0, bcode, 0, 1, 0, 1, 0, 0, -1, 3, 0, bcol, "message", fun () {
         if (think) {
             L.hstack(fun () {
                 spin.view()
                 L.box(width=1, block=fun () => nil)
-                L.text_styled("claude is responding…  esc to interrupt", st_error())
+                var msg: String = "claude is responding…  esc to interrupt"
+                if (qn > 0) { msg = msg + "   ·   " + qn.to_string() + " queued" }
+                L.text_styled(msg, st_error())
             })
         } else if (val == "") {
             L.hstack(fun () {
@@ -399,7 +713,7 @@ fun _footer() {
     L.hstack(fun () {
         if (think) {
             _hint("⠿", "streaming")
-            _hint("esc", "interrupt")
+            _hint("⏎", "queue")
             _hint("↑↓", "scroll")
             _hint("^C", "quit")
         } else {
@@ -448,66 +762,413 @@ fun _rule(w: Int): String {
 }
 
 // =============================================================================
-// Actions
+// Actions — submit + streaming pump
 // =============================================================================
 
-/// Read the prompt, append it as a user message, run the `claude` CLI, and
-/// append the reply (or a non-fatal error line if `claude` is missing/fails).
-/// `paint` is a callback the caller supplies to force a repaint of the
-/// "thinking" state before the (blocking) subprocess call — the v1 loop is
-/// synchronous, so without it the spinner state would never reach the screen.
-fun send(paint: () => Nil) {
-    if (is_thinking()) { return }
+/// Handle Enter: read + clear the prompt, then either start it immediately (if
+/// idle) or enqueue it (if a response is in flight). Never blocks; when busy the
+/// queued text is shown as a pending row + a "queued (N)" status.
+fun submit() {
     var t: TA.TextArea = prompt
     var text: String = t.value_str().trim()
     if (text == "") { return }
+    _clear_prompt()
 
-    append_message("user", text)
-    // Clear the editor.
+    if (_active or is_thinking()) {
+        _enqueue(text)
+        return
+    }
+    _start(text)
+}
+
+fun _clear_prompt() {
+    var t: TA.TextArea = prompt
     var vsig: Sig.Signal<String> = t.value
     vsig.set("")
     var rsig: Sig.Signal<Int> = t.cursor_row
     rsig.set(0)
     var csig: Sig.Signal<Int> = t.cursor_col
     csig.set(0)
+}
 
-    set_thinking(true)
-    set_status("thinking…")
-    // Stick the transcript to the bottom so the new turn is visible.
-    transcript.scroll_to_bottom()
-    paint()
-
-    var reply: String = _run_claude(text)
-    if (reply == "") {
-        reply = "(claude returned no output)"
-    }
-    append_message("assistant", reply)
-    set_thinking(false)
-    set_status("ready")
+fun _enqueue(text: String) {
+    var s: Sig.Signal<List<String>> = queue
+    var q: List<String> = s.get()
+    q.push(text)
+    s.set(q)
+    // A muted "pending" transcript row makes the queued turn visible.
+    append_message("pending", text)
+    set_status("queued (" + q.length().to_string() + ")")
     transcript.scroll_to_bottom()
 }
 
-// Invoke the `claude` CLI once and return its stdout (trimmed). Never crashes:
-// a missing binary or non-zero exit becomes an error-role message string.
-fun _run_claude(promptText: String): String {
-    var path: String = Process.which("claude")
-    if (path == "") {
-        append_message("error", "`claude` CLI not found on PATH. Install it, or set PATH, then retry.")
-        return ""
+// Test seam: when non-empty, `_start` spawns this stub program (fed the queued
+// prompt as a trailing arg) instead of the real `claude`. Lets a harness prove
+// the auto-start-next-queued path end to end without the real binary / network.
+var _test_stub_program: String = ""
+
+fun _set_test_stub(program: String) { _test_stub_program = program }
+
+// Start a claude run for `text`: append the user message, spawn the streaming
+// subprocess, and arm the pump. Returns immediately.
+fun _start(text: String) {
+    append_message("user", text)
+
+    // Reset per-run streaming state.
+    _line_buf = ""
+    _assistant_text = ""
+    _assistant_idx = -1
+    _saw_json = false
+    _plain_mode = false
+    _decided_mode = false
+
+    var program: String = "claude"
+    var args: List<String> = ["-p", text, "--output-format", "stream-json", "--verbose"]
+    if (_test_stub_program != "") {
+        program = _test_stub_program
+        // The stub is `sh -c <script> _ <prompt>`: emits canned stream-json.
+        args = ["-c", _test_stub_script(), "_", text]
+    } else {
+        var path: String = Process.which("claude")
+        if (path == "") {
+            append_message("error", "`claude` CLI not found on PATH. Install it, or set PATH, then retry.")
+            set_status("ready")
+            return
+        }
     }
-    var args: List<String> = ["-p", promptText]
-    var res: Process.ProcessResult = Process.exec("claude", args)
-    if (res == nil) {
-        append_message("error", "failed to spawn `claude`.")
-        return ""
+
+    var pr: Process.Subprocess = Process.open_args(program, args)
+    _proc_holder = [pr]
+    _active = true
+
+    set_thinking(true)
+    set_status("thinking…")
+    transcript.scroll_to_bottom()
+}
+
+// A tiny stub script the harness runs in place of claude: emits two stream-json
+// events (assistant text echoing the prompt + a success result). "$2" is the
+// prompt passed after the "_" placeholder.
+fun _test_stub_script(): String {
+    return "printf '%s\\n' '{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"queued reply: '\"$1\"'\"}]}}' '{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"ok\",\"num_turns\":1}'"
+}
+
+// Non-blocking pump: called once per loop iteration by Rt.on_tick. Reads any
+// available stdout, folds complete JSON lines into the transcript, advances the
+// spinner, and finalizes on process exit — starting the next queued prompt.
+// Returns true if anything changed (so the caller can request a render).
+fun pump(): Bool {
+    if (!_active) { return false }
+    if (_proc_holder.length() == 0) { _active = false; return false }
+    var p: Process.Subprocess = _proc_holder[0]
+
+    var changed: Bool = false
+    var chunk: String = p.stdout.read_available()
+    if (chunk.length() > 0) {
+        _ingest(chunk)
+        changed = true
     }
-    if (!res.success) {
-        var err: String = res.stderr.trim()
-        if (err == "") { err = "claude exited with code " + res.exit_code.to_string() }
+
+    var code: Int = p.poll()
+    if (code != -1) {
+        // Drain any final buffered output, then process the trailing line.
+        var rest: String = p.stdout.read_available()
+        if (rest.length() > 0) { _ingest(rest); changed = true }
+        var errtail: String = p.stderr.read_available()
+        _finish_stream(code, errtail)
+        changed = true
+    }
+
+    // Animate the spinner while a response streams.
+    spin.tick()
+    return changed
+}
+
+// Fold a raw stdout chunk into state: buffer partial lines, and process every
+// complete newline-terminated line.
+fun _ingest(chunk: String) {
+    _line_buf = _line_buf + chunk
+    // Split on "\n"; the last element is the (possibly incomplete) trailing line.
+    var parts: List<String> = _line_buf.split("\n")
+    var n: Int = parts.length()
+    var i: Int = 0
+    while (i < n - 1) {
+        _process_line(parts[i])
+        i = i + 1
+    }
+    _line_buf = parts[n - 1]
+}
+
+// Classify + process one complete output line.
+fun _process_line(line: String) {
+    var trimmed: String = line.trim()
+    if (trimmed == "") { return }
+
+    // Decide the mode from the first non-empty line: a '{' means stream-json;
+    // anything else means the CLI printed plain text (old CLI / error) — degrade.
+    if (!_decided_mode) {
+        _decided_mode = true
+        if (trimmed.char_at(0) != "{") {
+            _plain_mode = true
+        }
+    }
+
+    if (_plain_mode) {
+        _append_assistant(line + "\n")
+        return
+    }
+
+    var ev: Any = JSON.parse(trimmed)
+    if (!(ev is Map)) {
+        // Not an object — ignore gracefully.
+        return
+    }
+    _saw_json = true
+    _handle_event(ev)
+}
+
+// Dispatch one parsed stream-json event on its top-level "type".
+fun _handle_event(ev: Any) {
+    var t: String = j_str(j_get(ev, "type"))
+    if (t == "system") {
+        _handle_system(ev)
+        return
+    }
+    if (t == "assistant") {
+        _handle_assistant(ev)
+        return
+    }
+    if (t == "user") {
+        // A tool result came back — advance state; nothing loud to show.
+        return
+    }
+    if (t == "result") {
+        _handle_result(ev)
+        return
+    }
+    // Unknown type: ignore gracefully.
+}
+
+fun _handle_system(ev: Any) {
+    var sub: String = j_str(j_get(ev, "subtype"))
+    if (sub == "init") {
+        var model: String = j_str(j_get(ev, "model"))
+        if (model != "") { MODEL_NAME = model }
+        set_status("session started")
+    }
+}
+
+// An assistant message: walk its content blocks. Text blocks stream into the
+// in-progress assistant message; tool_use blocks render their own row (with
+// Task/Agent shown as a subagent spawn).
+fun _handle_assistant(ev: Any) {
+    var msg: Any = j_get(ev, "message")
+    var content: List<Any> = j_list(j_get(msg, "content"))
+    var i: Int = 0
+    var n: Int = content.length()
+    while (i < n) {
+        var blk: Any = content[i]
+        var bt: String = j_str(j_get(blk, "type"))
+        if (bt == "text") {
+            var txt: String = j_str(j_get(blk, "text"))
+            if (txt != "") { _append_assistant(txt) }
+        } else if (bt == "tool_use") {
+            _render_tool_use(blk)
+        }
+        i = i + 1
+    }
+}
+
+// Render a tool_use block as a distinct transcript row. Task/Agent is a subagent
+// spawn and gets its own accent row + glyph.
+fun _render_tool_use(blk: Any) {
+    var name: String = j_str(j_get(blk, "name"))
+    var input: Any = j_get(blk, "input")
+
+    if (name == "Task" or name == "Agent") {
+        var desc: String = j_str(j_get(input, "description"))
+        if (desc == "") { desc = j_str(j_get(input, "subagent_type")) }
+        if (desc == "") { desc = "spawned" }
+        // Break the streaming assistant row so the subagent line sits after the
+        // text captured so far (the next text block reopens a fresh row).
+        _break_assistant_row()
+        append_message("subagent", "◆ subagent: " + desc)
+        transcript.scroll_to_bottom()
+        return
+    }
+
+    var label: String = _tool_label(name, input)
+    _break_assistant_row()
+    append_message("tool", "⚒ " + label)
+    transcript.scroll_to_bottom()
+}
+
+// End the current streaming assistant row: the next text block starts a fresh
+// message. Reset BOTH the index and the accumulator, else the new row would be
+// seeded with the previous row's text and duplicate it.
+fun _break_assistant_row() {
+    _assistant_idx = -1
+    _assistant_text = ""
+}
+
+// Build a compact, human tool label from the tool name + its input map.
+fun _tool_label(name: String, input: Any): String {
+    if (name == "Bash") {
+        var cmd: String = j_str(j_get(input, "command"))
+        if (cmd.length() > 60) { cmd = cmd.slice(0, 60) + "…" }
+        return "Bash: " + cmd
+    }
+    if (name == "Read" or name == "Edit" or name == "Write") {
+        var fp: String = j_str(j_get(input, "file_path"))
+        return name + " " + fp
+    }
+    if (name == "Grep") {
+        var pat: String = j_str(j_get(input, "pattern"))
+        return "Grep " + pat
+    }
+    if (name == "Glob") {
+        return "Glob " + j_str(j_get(input, "pattern"))
+    }
+    return name
+}
+
+// The final result event: finalize the assistant message and surface cost/turns.
+fun _handle_result(ev: Any) {
+    var sub: String = j_str(j_get(ev, "subtype"))
+    if (sub == "error") {
+        var errtext: String = j_str(j_get(ev, "result"))
+        if (errtext == "") { errtext = "claude reported an error" }
+        append_message("error", errtext)
+    } else if (!_saw_json_text()) {
+        // A success with no streamed assistant text: fall back to the result blob.
+        var res: String = j_str(j_get(ev, "result"))
+        if (res != "") { _append_assistant(res) }
+    }
+    // Cost / turns into the status line, if present.
+    var status_line: String = "done"
+    var turns: Any = j_get(ev, "num_turns")
+    if (turns is Int) { status_line = status_line + " · " + turns.to_string() + " turns" }
+    var cost: Any = j_get(ev, "total_cost_usd")
+    if (cost is Float) {
+        var cs: String = _fmt_cost(cost)
+        if (cs != "") { status_line = status_line + " · " + cs }
+    }
+    set_status(status_line)
+}
+
+fun _saw_json_text(): Bool {
+    return _assistant_idx != -1 and _assistant_text != ""
+}
+
+// Format a USD cost float as "$D.DDDD" (4 decimals) without float interpolation.
+fun _fmt_cost(c: Float): String {
+    if (c <= 0.0) { return "" }
+    var micro: Int = (c * 1000000.0).floor()
+    var dollars: Int = micro / 1000000
+    var frac: Int = micro % 1000000
+    var milli: Int = frac / 100
+    var ms: String = milli.to_string()
+    while (ms.length() < 4) { ms = "0" + ms }
+    return "$" + dollars.to_string() + "." + ms
+}
+
+// Append streamed assistant text, folding into one in-progress message row.
+fun _append_assistant(txt: String) {
+    _assistant_text = _assistant_text + txt
+    if (_assistant_idx == -1) {
+        _assistant_idx = append_message("assistant", _assistant_text)
+    } else {
+        _set_message_text(_assistant_idx, _assistant_text)
+    }
+    transcript.scroll_to_bottom()
+}
+
+// Finalize the current run: close the process, clear active state, and start the
+// next queued prompt (if any).
+fun _finish_stream(code: Int, errtail: String) {
+    if (_proc_holder.length() > 0) {
+        var p: Process.Subprocess = _proc_holder[0]
+        p.close()
+    }
+    _proc_holder = []
+    _active = false
+
+    // If nothing came back at all, surface a non-fatal note.
+    if (_assistant_idx == -1 and !_plain_mode) {
+        var err: String = errtail.trim()
+        if (err == "") {
+            if (code != 0) {
+                err = "claude exited with code " + code.to_string()
+            } else {
+                err = "(claude returned no output)"
+            }
+        }
         append_message("error", err)
-        return ""
     }
-    return res.stdout.trim()
+
+    set_thinking(false)
+    if (get_status() == "thinking…") { set_status("ready") }
+    _assistant_idx = -1
+
+    // Start the next queued prompt, if any.
+    _start_next_queued()
+}
+
+fun _start_next_queued() {
+    var s: Sig.Signal<List<String>> = queue
+    var q: List<String> = s.get()
+    if (q.length() == 0) { return }
+    var next: String = q[0]
+    // Drop the head.
+    var rest: List<String> = []
+    var i: Int = 1
+    while (i < q.length()) {
+        rest.push(q[i])
+        i = i + 1
+    }
+    s.set(rest)
+    // Remove the matching leading "pending" row so it re-renders as a real turn.
+    _drop_first_pending()
+    _start(next)
+}
+
+// Remove the first "pending" message row (the one we're about to run for real).
+fun _drop_first_pending() {
+    var s: Sig.Signal<List<List<String>>> = messages
+    var cur: List<List<String>> = s.get()
+    var out: List<List<String>> = []
+    var removed: Bool = false
+    var i: Int = 0
+    while (i < cur.length()) {
+        var row: List<String> = cur[i]
+        if (!removed and row[0] == "pending") {
+            removed = true
+        } else {
+            out.push(row)
+        }
+        i = i + 1
+    }
+    s.set(out)
+}
+
+// Interrupt the running generation (esc): kill the child and finalize.
+fun interrupt() {
+    if (!_active) { return }
+    if (_proc_holder.length() > 0) {
+        var p: Process.Subprocess = _proc_holder[0]
+        p.terminate()
+    }
+    append_message("error", "interrupted")
+    _finish_stream(-1, "")
+}
+
+fun clear_transcript() {
+    var s: Sig.Signal<List<List<String>>> = messages
+    s.set(_empty_msgs())
+    var ts: Sig.Signal<Int> = turn
+    ts.set(0)
+    set_status("ready")
+    transcript.to_top()
 }
 
 // =============================================================================
@@ -519,10 +1180,52 @@ fun scroll_down() { transcript.scroll_down(1) }
 fun page_up() { transcript.page_up() }
 fun page_down() { transcript.page_down() }
 
-// Advance the thinking spinner one frame (called by a tick / on each send-paint).
+// Advance the thinking spinner one frame (kept for the render test / callers).
 fun tick_spinner() {
     spin.tick()
 }
+
+// =============================================================================
+// Test hooks — spawn an arbitrary stub command into the real streaming pipeline
+// so a non-interactive harness can prove the pump/parse/render/queue logic
+// without invoking the real `claude` binary. `_test_spawn` mirrors `_start`
+// except it skips the user-message append + `which` check and runs `program`.
+// =============================================================================
+
+fun _test_spawn(user_text: String, program: String, args: List<String>) {
+    append_message("user", user_text)
+    _line_buf = ""
+    _assistant_text = ""
+    _assistant_idx = -1
+    _saw_json = false
+    _plain_mode = false
+    _decided_mode = false
+    var pr: Process.Subprocess = Process.open_args(program, args)
+    _proc_holder = [pr]
+    _active = true
+    set_thinking(true)
+    set_status("thinking…")
+}
+
+// Drive the pump until the active run completes (bounded), returning the number
+// of pump iterations. A harness calls this instead of the reactive loop.
+fun _test_drain(max_iters: Int): Int {
+    var i: Int = 0
+    while (_active and i < max_iters) {
+        pump()
+        i = i + 1
+    }
+    return i
+}
+
+fun _test_active(): Bool { return _active }
+
+// Enqueue as if the user pressed Enter while busy (skips the prompt widget).
+fun _test_enqueue(text: String) { _enqueue(text) }
+
+// Start the next queued prompt using a stub command rather than real `claude`.
+// Used by the harness after a run finishes to prove the queue advances.
+fun _test_has_queue(): Bool { return queue_len() > 0 }
 
 // =============================================================================
 // Render-to-text (for the render test)

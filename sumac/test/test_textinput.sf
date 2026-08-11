@@ -124,6 +124,37 @@ fun main() {
     T.assert_eq(ti.text(), "ellozABC", "paste inserted at end")
 
     // ---------------------------------------------------------------------
+    // word-wise movement + deletion
+    // ---------------------------------------------------------------------
+    var wi: TI.TextInput = TI.textinput("", 40)
+    wi.insert("hello big world")     // cursor at 15 (end)
+    wi.word_left()                   // -> 10 (start of "world")
+    T.assert_eq(wi.cursor_pos(), 10, "word_left to start of 'world'")
+    wi.word_left()                   // -> 6 (start of "big")
+    T.assert_eq(wi.cursor_pos(), 6, "word_left to start of 'big'")
+    wi.word_right()                  // -> 9 (end of "big")
+    T.assert_eq(wi.cursor_pos(), 9, "word_right to end of 'big'")
+    wi.end()                         // 15
+    wi.delete_word_left()            // "hello big "
+    T.assert_eq(wi.text(), "hello big ", "delete_word_left removes 'world'")
+    T.assert_eq(wi.cursor_pos(), 10, "cursor after delete_word_left")
+    wi.home()
+    wi.delete_word_right()           // removes "hello" -> " big "
+    T.assert_eq(wi.text(), " big ", "delete_word_right removes 'hello'")
+
+    // alt+left / alt+backspace / ctrl+w via handle()
+    var wih: TI.TextInput = TI.textinput("", 40)
+    wih.focus()
+    wih.insert("one two three")
+    var ti_alt_left: Ev.Event = Ev.key_event(Ev.KEY_LEFT, "", Ev.MOD_ALT)
+    var tic1: Bool = wih.handle(ti_alt_left)
+    T.assert(tic1, "alt+left consumed")
+    T.assert_eq(wih.cursor_pos(), 8, "alt+left to start of 'three'")
+    var ti_ctrl_w: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "w", Ev.MOD_CTRL)
+    wih.handle(ti_ctrl_w)            // delete "two " before cursor
+    T.assert_eq(wih.text(), "one three", "ctrl+w deletes previous word")
+
+    // ---------------------------------------------------------------------
     // view(): the value renders into the buffer
     // ---------------------------------------------------------------------
     var vf: TI.TextInput = TI.textinput("placeholder", 20)

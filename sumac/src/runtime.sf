@@ -90,6 +90,15 @@ var _has_mouse_handler: Bool = false
 var _event_handler: (In.Event) => Nil = fun (e: In.Event) => nil
 var _has_event_handler: Bool = false
 
+// Optional idle/tick handler — called once per loop iteration, AFTER any input
+// is dispatched, whether or not input arrived (the input read has a POLL_MS
+// timeout, so this fires ~every POLL_MS when idle). This is the hook an app uses
+// to animate a spinner or pump a non-blocking streaming subprocess WITHOUT
+// blocking the loop: do a bit of incremental work, call `request_render()` if
+// something changed, and return promptly. The handler MUST NOT block.
+var _tick_handler: () => Nil = fun () => nil
+var _has_tick_handler: Bool = false
+
 // =============================================================================
 // Handler registration (public)
 // =============================================================================
@@ -123,6 +132,15 @@ fun on_mouse(handler: (In.MouseEvent) => Nil) {
 fun on_event(handler: (In.Event) => Nil) {
     _event_handler = handler
     _has_event_handler = true
+}
+
+/// Register the idle/tick handler — called once per loop iteration (≈ every
+/// POLL_MS ms while idle), after input dispatch. Use it to animate a spinner or
+/// service a non-blocking streaming subprocess without blocking the UI: do a
+/// little incremental work, `request_render()` if the view changed, return fast.
+fun on_tick(handler: () => Nil) {
+    _tick_handler = handler
+    _has_tick_handler = true
 }
 
 // Whether a key name already has a handler (used to decide the default quit).
@@ -325,6 +343,14 @@ fun run(view: () => Nil) {
                 _dispatch_event(events[i])
                 i = i + 1
             }
+        }
+
+        // Idle/tick work (spinner animation, streaming subprocess pump). Runs
+        // every iteration — after input, whether or not any arrived — so an app
+        // can make progress and request a redraw between keystrokes.
+        if (_has_tick_handler) {
+            var th: () => Nil = _tick_handler
+            th()
         }
     }
 
