@@ -1007,9 +1007,12 @@
     }
 
     fun get_variant_fields(v: AST.Variant): String {
-        return match (v) { Variant(n, f, __ns) => f
-            _ => ""
-        }
+        // Render-on-read shim: the Variant node now stores List<AST.Param>, not
+        // a CSV string. variant_fields_string re-emits the legacy "name:Type,…"
+        // form via type_to_source so every store/emit path here stays byte-
+        // identical. This is the single choke point for the 3 codegen store
+        // paths plus the emit read.
+        return AST.variant_fields_string(v)
     }
 
     fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
@@ -1039,12 +1042,8 @@
         i = 0
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
-            var vname: String = match (v) { Variant(n, f, __ns) => n
-                _ => ""
-            }
-            var vfields: String = match (v) { Variant(n, f, __ns) => f
-                _ => ""
-            }
+            var vname: String = this.get_variant_name(v)
+            var vfields: String = this.get_variant_fields(v)
             if (vfields.length() > 0) {
                 this.emit_enum_constructor(vname, i, vfields, max_fields, name)
             }

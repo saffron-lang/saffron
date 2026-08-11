@@ -339,11 +339,18 @@ enum Stmt {
 }
 
 enum Variant {
-    // `fields` is an unparsed "name:Type,…" string. Do not add structured data by
-    // widening it — a comma-joined encoding already corrupts on `Map<String,Int>`.
+    // `fields` holds the variant payload as parsed AST.Param nodes — one per
+    // field, each carrying the field name and a loss-less type node built from
+    // parse_type() (so `Map<String,Int>` stays whole, unlike the old CSV which
+    // corrupted on the inner comma). Consumers that still want the legacy
+    // "name:Type,…" string get it on read from variant_fields_string, which
+    // renders each field's type via type_to_source (NOT type_to_string, which
+    // would collapse `Map<String,Int>`→"Map"). Stays at EXACTLY 3 fields — do
+    // NOT widen; a fourth field would shift `name_span` and reintroduce a
+    // mis-bind bug class.
     // `name_span` is the variant name's own region, so an outline can list enum
     // variants as children and rename can retarget one.
-    Variant(name: String, fields: String, name_span: Span)
+    Variant(name: String, fields: List<Param>, name_span: Span)
 }
 
 // Typed value — tracks both the LLVM register name and its Saffron type
@@ -437,6 +444,32 @@ fun type_to_source(t: Type): String {
         UnknownType => "Unknown"
         NeverType => "Never"
     }
+}
+
+/// Render an enum variant's payload back to the legacy "name:Type,…" CSV that
+/// every current consumer still reads. The Variant node now stores parsed
+/// AST.Param nodes, so this is the render-on-read shim keeping those consumers
+/// byte-identical during the migration. Types go through type_to_source, NOT
+/// type_to_string: the parser stored the LOSS-LESS source form (`Map<String,Int>`
+/// kept whole), and type_to_string would collapse it to "Map". An empty payload
+/// renders "" — the same value the old empty-string field held for a fieldless
+/// variant like `None`.
+fun variant_fields_string(v: Variant): String {
+    var params: List<Param> = match (v) { Variant(n, f, __ns) => f
+        _ => []
+    }
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < params.length()) {
+        if (i > 0) { sb.append(",") }
+        var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+        var pt: Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+        sb.append(pname)
+        sb.append(":")
+        sb.append(type_to_source(pt))
+        i = i + 1
+    }
+    return sb.to_string()
 }
 
 /// Split a type string on TOP-LEVEL commas, respecting `<>`/`()`/`[]` nesting,

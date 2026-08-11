@@ -686,8 +686,9 @@ fun collect_symbols_json(program: List<AST.Stmt>): String {
                         // A variant's container is its enum: `Some` alone does not
                         // say which enum it belongs to, and several enums in a file
                         // may declare the same variant name.
+                        var v_detail: String = AST.variant_fields_string(variants[vi])
                         a2 = match (variants[vi]) {
-                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns, e_vis, n, vf, "", AST.span_none())
+                            Variant(vn, vf, vns) => push_symbol(a2, vn, "variant", vns, e_vis, n, v_detail, "", AST.span_none())
                         }
                         vi = vi + 1
                     }
