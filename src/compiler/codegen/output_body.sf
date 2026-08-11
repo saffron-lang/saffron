@@ -1117,7 +1117,9 @@
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        var pr_vfields: String = this.get_variant_fields(pr_variants[pr_vi])
+                        // Store AST.Param nodes directly — enum_variant_fields is
+                        // List<AST.Param> now (get_variant_field_str renders CSV on read).
+                        var pr_vfields: List<AST.Param> = this.get_variant_field_nodes(pr_variants[pr_vi])
                         if (pr_vname.length() > 0) {
                             if (!this.str_in_list(this.known_functions,pr_vname)) {
                                 this.known_functions.push(pr_vname)

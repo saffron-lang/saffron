@@ -622,23 +622,34 @@
             Diag.record_unresolved("get_variant_field_type: variant not registered", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var fields: String = this.enum_variant_fields.get(key)
-        if (fields.length() == 0) {
+        // The table now holds List<AST.Param> nodes, one per field, each with a
+        // separate name and type_ann slot. The old code parsed a "name:Type,…"
+        // CSV here (split on commas, then split each entry on ":"). Reading the
+        // nodes directly removes the parse — and with it the ":"-split failure
+        // mode the fourth record_unresolved used to guard, which cannot occur
+        // when name and type live in distinct slots.
+        var nodes: List<AST.Param> = this.enum_variant_fields.get(key)
+        if (nodes.length() == 0) {
             Diag.record_unresolved("get_variant_field_type: variant has no recorded fields", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var parts: List<String> = this.split_respecting_generics(fields, ",")
-        if (field_idx >= parts.length()) {
-            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + parts.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+        if (field_idx >= nodes.length()) {
+            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + nodes.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var field_def: String = parts[field_idx.floor()]
-        var name_type: List<String> = field_def.split(":")
-        if (name_type.length() < 2) {
-            Diag.record_unresolved("get_variant_field_type: field definition has no name:type split", "'" + field_def + "' in " + key, "Int")
-            return "Int"
-        }
-        var ftype: String = name_type[1]
+        var field_param: AST.Param = nodes[field_idx.floor()]
+        var field_ann: AST.Type = match (field_param) { Param(n, t, d, p_vis, __ns) => t }
+        // Derive `ftype` byte-identically to the old string path. That path did
+        // `field_def.split(":")[1]` on "name:" + type_to_source(pt), so it TAKES
+        // the type source and TRUNCATES it at its first ":". Only a FuncType
+        // renders with a ":" ("Fun(A,B):R"), so this strips the return-type tail
+        // for a Fun-typed field exactly as before — dropping to "Fun(A,B)", which
+        // then falls through the same arms below — and is a no-op for every other
+        // shape (no other type_to_source output contains a ":"). The dispatch
+        // chain from here on is unchanged, so its output is identical.
+        var type_src: String = AST.type_to_source(field_ann)
+        var ftype: String = type_src
+        if (type_src.contains(":")) { ftype = type_src.slice(0, type_src.index_of(":")) }
         if (ftype == "String") return "String"
         // `Int` was never in this list, so an honestly-Int field fell all the way
         // through to the bottom and was answered by the *fallback* — the right
@@ -717,7 +728,9 @@
             var vname: String = variants[i]
             var key: String = enum_name + "." + vname
             if (this.enum_variant_fields.has(key)) {
-                var fields: String = this.enum_variant_fields.get(key)
+                // The table holds List<AST.Param> now; render the legacy CSV via
+                // the shim so this count stays byte-identical to the old behavior.
+                var fields: String = this.get_variant_field_str(key)
                 if (fields.length() > 0) {
                     var parts: List<String> = this.split_respecting_generics(fields, ",")
                     // Each part is "name:Type", count them

@@ -23,7 +23,7 @@ class Codegen {
     var block_terminated: Bool
     var enum_defs: Map<String, List<String>>
     var enum_variant_tags: Map<String, Float>
-    var enum_variant_fields: Map<String, String>
+    var enum_variant_fields: Map<String, List<AST.Param>>
     var type_defs: StringBuilder
     var known_functions: List<String>
     var func_ret_types: Map<String, AST.Type>
@@ -5466,19 +5466,24 @@ class Codegen {
         while (ai < variants.length()) {
             var vname: String = variants[ai]
             var vkey: String = enum_name + "." + vname
-            var vfields: String = ""
-            if (this.enum_variant_fields.has(vkey)) { vfields = this.enum_variant_fields.get(vkey) }
+            // Read the payload nodes straight from the table (List<AST.Param>).
+            // The old code rendered a CSV and re-split it with
+            // split_respecting_generics; the node list is the same field sequence
+            // (variant_fields_string joins with "," and the split reverses that
+            // exactly), so iterating it drops the round-trip with no change in
+            // field count or order.
+            var vnodes: List<AST.Param> = []
+            if (this.enum_variant_fields.has(vkey)) { vnodes = this.enum_variant_fields.get(vkey) }
             this.start_block(arm_labels[ai])
-            if (vfields.length() == 0) {
+            if (vnodes.length() == 0) {
                 // Fieldless variant of a heap-encoded enum: a one-slot [tag]
                 // array. The tags already matched and there is nothing else
                 // allocated to read, so these two values ARE equal — the case
                 // that made `Option.None == Option.None` false.
                 this.emit_terminator("br label %" + l_eq)
             } else {
-                var fparts: List<String> = this.split_respecting_generics(vfields, ",")
                 var fi: Float = 0
-                while (fi < fparts.length()) {
+                while (fi < vnodes.length()) {
                     var slot_idx: Float = fi + 1
                     var a_slot: String = this.fresh_local()
                     this.emit_indent(a_slot + " = getelementptr i64, i64* " + pa + ", i64 " + slot_idx.floor().to_string())
@@ -5488,7 +5493,7 @@ class Codegen {
                     this.emit_indent(b_slot + " = getelementptr i64, i64* " + pb + ", i64 " + slot_idx.floor().to_string())
                     var b_val: String = this.fresh_local()
                     this.emit_indent(b_val + " = load i64, i64* " + b_slot)
-                    var f_type: String = this.declared_field_type(fparts[fi])
+                    var f_type: String = this.declared_field_type_node(vnodes[fi])
                     var f_eq: String = this.emit_enum_field_eq(f_type, a_val, b_val)
                     // Fields are compared in order and short-circuit to "not
                     // equal", so a difference in the FIRST field and a difference
@@ -5530,6 +5535,24 @@ class Codegen {
         var parts: List<String> = field_def.split(":")
         if (parts.length() < 2) { return "Any" }
         return parts[1]
+    }
+
+    /// Node form of declared_field_type, for ensure_enum_eq now that the table
+    /// holds AST.Param nodes rather than a "name:Type" CSV. Byte-identical to
+    /// declared_field_type("<name>:" + type_to_source(type_ann)): a field always
+    /// has a type_ann, so the old ":"-absent → "Any" arm never fired for a real
+    /// field. The old code took `.split(":")[1]` — the SECOND colon-delimited
+    /// segment of "name:TypeSrc" — which is the type source truncated at its
+    /// first embedded ":". Only a FuncType renders a ":" ("Fun(A):R"), so this
+    /// keeps that same truncation to "Fun(A)"; every other shape has no ":" and
+    /// passes through whole. emit_enum_field_eq's generic_base_name then treats
+    /// "Fun(A)" as base "Fun(A)", which matches no arm and falls to bit-equality
+    /// — exactly the pre-migration behavior.
+    fun declared_field_type_node(p: AST.Param): String {
+        var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
+        var type_src: String = AST.type_to_source(pt)
+        if (type_src.contains(":")) { return type_src.slice(0, type_src.index_of(":")) }
+        return type_src
     }
 
     /// Emit the comparison of one enum payload slot and return the `i1` register
@@ -6306,23 +6329,34 @@ class Codegen {
             Diag.record_unresolved("get_variant_field_type: variant not registered", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var fields: String = this.enum_variant_fields.get(key)
-        if (fields.length() == 0) {
+        // The table now holds List<AST.Param> nodes, one per field, each with a
+        // separate name and type_ann slot. The old code parsed a "name:Type,…"
+        // CSV here (split on commas, then split each entry on ":"). Reading the
+        // nodes directly removes the parse — and with it the ":"-split failure
+        // mode the fourth record_unresolved used to guard, which cannot occur
+        // when name and type live in distinct slots.
+        var nodes: List<AST.Param> = this.enum_variant_fields.get(key)
+        if (nodes.length() == 0) {
             Diag.record_unresolved("get_variant_field_type: variant has no recorded fields", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var parts: List<String> = this.split_respecting_generics(fields, ",")
-        if (field_idx >= parts.length()) {
-            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + parts.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
+        if (field_idx >= nodes.length()) {
+            Diag.record_unresolved("get_variant_field_type: field index out of bounds (" + nodes.length().floor().to_string() + " fields)", "field " + field_idx.floor().to_string() + " of " + key, "Int")
             return "Int"
         }
-        var field_def: String = parts[field_idx.floor()]
-        var name_type: List<String> = field_def.split(":")
-        if (name_type.length() < 2) {
-            Diag.record_unresolved("get_variant_field_type: field definition has no name:type split", "'" + field_def + "' in " + key, "Int")
-            return "Int"
-        }
-        var ftype: String = name_type[1]
+        var field_param: AST.Param = nodes[field_idx.floor()]
+        var field_ann: AST.Type = match (field_param) { Param(n, t, d, p_vis, __ns) => t }
+        // Derive `ftype` byte-identically to the old string path. That path did
+        // `field_def.split(":")[1]` on "name:" + type_to_source(pt), so it TAKES
+        // the type source and TRUNCATES it at its first ":". Only a FuncType
+        // renders with a ":" ("Fun(A,B):R"), so this strips the return-type tail
+        // for a Fun-typed field exactly as before — dropping to "Fun(A,B)", which
+        // then falls through the same arms below — and is a no-op for every other
+        // shape (no other type_to_source output contains a ":"). The dispatch
+        // chain from here on is unchanged, so its output is identical.
+        var type_src: String = AST.type_to_source(field_ann)
+        var ftype: String = type_src
+        if (type_src.contains(":")) { ftype = type_src.slice(0, type_src.index_of(":")) }
         if (ftype == "String") return "String"
         // `Int` was never in this list, so an honestly-Int field fell all the way
         // through to the bottom and was answered by the *fallback* — the right
@@ -6401,7 +6435,9 @@ class Codegen {
             var vname: String = variants[i]
             var key: String = enum_name + "." + vname
             if (this.enum_variant_fields.has(key)) {
-                var fields: String = this.enum_variant_fields.get(key)
+                // The table holds List<AST.Param> now; render the legacy CSV via
+                // the shim so this count stays byte-identical to the old behavior.
+                var fields: String = this.get_variant_field_str(key)
                 if (fields.length() > 0) {
                     var parts: List<String> = this.split_respecting_generics(fields, ",")
                     // Each part is "name:Type", count them
@@ -8827,14 +8863,52 @@ class Codegen {
         // Render-on-read shim: the Variant node now stores List<AST.Param>, not
         // a CSV string. variant_fields_string re-emits the legacy "name:Type,…"
         // form via type_to_source so every store/emit path here stays byte-
-        // identical. This is the single choke point for the 3 codegen store
-        // paths plus the emit read.
+        // identical. This is the single choke point for the emit reads that still
+        // want the CSV (gen_enum_to_string, gen_enum_decl's length gate feeding
+        // emit_enum_constructor).
         return AST.variant_fields_string(v)
+    }
+
+    // The variant payload as AST.Param nodes, straight off the node. This is what
+    // the 3 codegen store paths (register_variant, output_body's prescan,
+    // codegen.sf's prescan) now push into `enum_variant_fields`, which holds
+    // List<AST.Param> rather than a CSV string. Empty list == a fieldless variant.
+    fun get_variant_field_nodes(v: AST.Variant): List<AST.Param> {
+        return match (v) { Variant(n, f, __ns) => f
+            _ => []
+        }
+    }
+
+    // Render the legacy "name:Type,…" CSV for one stored variant key from the
+    // AST.Param nodes now held in `enum_variant_fields`. The single read-side
+    // choke point for the table's string consumers (get_max_fields, and — before
+    // its 2b node rewrite — get_variant_field_type / ensure_enum_eq). Renders each
+    // field via AST.type_to_source, EXACTLY as the old table value was produced by
+    // variant_fields_string, so the string every consumer sees is byte-identical
+    // to what the Map used to hold. An absent key or empty list renders "".
+    fun get_variant_field_str(key: String): String {
+        if (!this.enum_variant_fields.has(key)) { return "" }
+        var params: List<AST.Param> = this.enum_variant_fields.get(key)
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
+            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(AST.type_to_source(pt))
+            i = i + 1
+        }
+        return sb.to_string()
     }
 
     fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
         var vname: String = this.get_variant_name(v)
-        var vfields: String = this.get_variant_fields(v)
+        // Store the AST.Param nodes directly — the table holds List<AST.Param>
+        // now. get_variant_field_str renders the same CSV on read.
+        var vfields: List<AST.Param> = this.get_variant_field_nodes(v)
         variant_names.push(vname)
         this.enum_variant_tags.set(name + "." + vname, idx)
         this.enum_variant_fields.set(name + "." + vname, vfields)
@@ -13322,7 +13396,9 @@ class Codegen {
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        var pr_vfields: String = this.get_variant_fields(pr_variants[pr_vi])
+                        // Store AST.Param nodes directly — enum_variant_fields is
+                        // List<AST.Param> now (get_variant_field_str renders CSV on read).
+                        var pr_vfields: List<AST.Param> = this.get_variant_field_nodes(pr_variants[pr_vi])
                         if (pr_vname.length() > 0) {
                             if (!this.str_in_list(this.known_functions,pr_vname)) {
                                 this.known_functions.push(pr_vname)
@@ -18504,7 +18580,9 @@ fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AS
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                var pr_vfields2: String = gen.get_variant_fields(pr_variants2[pr_vi2])
+                // Store AST.Param nodes directly — enum_variant_fields is
+                // List<AST.Param> now (get_variant_field_str renders CSV on read).
+                var pr_vfields2: List<AST.Param> = gen.get_variant_field_nodes(pr_variants2[pr_vi2])
                 if (pr_vname2.length() > 0) {
                     if (!gen.str_in_list(gen.known_functions,pr_vname2)) {
                         gen.known_functions.push(pr_vname2)

@@ -19,7 +19,7 @@ collapse `Map<String,Int>` → `Map`).
 | Step | What | State | Where |
 |---|---|---|---|
 | 1 | `ast.sf` node → `List<Param>` + parser + `variant_fields_string` render shim; all readers routed through shim | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main`, commit `a77ffa2d` |
-| 2 | codegen reads nodes directly (`enum_variant_fields` table → `Map<String,List<AST.Param>>`; `get_variant_field_type` + `ensure_enum_eq` read `type_ann`); removes `record_unresolved` site `match_body.sf:638` | ⚠️ COMPLETE but UNVERIFIED (no bootstrap/suite/oracle) | branch `origin/wip/i3-step2-enum-nodes`, commit `ab8c6b45`; patch backup `.claude/i3_step2.patch` |
+| 2 | codegen reads nodes directly (`enum_variant_fields` table → `Map<String,List<AST.Param>>`; `get_variant_field_type` + `ensure_enum_eq` read `type_ann`); removes `record_unresolved` site `match_body.sf:638` | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main` |
 | 3 | migrate checker `enum_fields` table to nodes (`get_enum_binding_type`/`_node` read `type_ann`) | ❌ NOT STARTED | — |
 | 4 | delete both render shims + dead `split_respecting_generics`/`split(":")` on enum strings | ❌ NOT STARTED | — |
 

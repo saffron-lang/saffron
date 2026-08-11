@@ -3800,19 +3800,24 @@
         while (ai < variants.length()) {
             var vname: String = variants[ai]
             var vkey: String = enum_name + "." + vname
-            var vfields: String = ""
-            if (this.enum_variant_fields.has(vkey)) { vfields = this.enum_variant_fields.get(vkey) }
+            // Read the payload nodes straight from the table (List<AST.Param>).
+            // The old code rendered a CSV and re-split it with
+            // split_respecting_generics; the node list is the same field sequence
+            // (variant_fields_string joins with "," and the split reverses that
+            // exactly), so iterating it drops the round-trip with no change in
+            // field count or order.
+            var vnodes: List<AST.Param> = []
+            if (this.enum_variant_fields.has(vkey)) { vnodes = this.enum_variant_fields.get(vkey) }
             this.start_block(arm_labels[ai])
-            if (vfields.length() == 0) {
+            if (vnodes.length() == 0) {
                 // Fieldless variant of a heap-encoded enum: a one-slot [tag]
                 // array. The tags already matched and there is nothing else
                 // allocated to read, so these two values ARE equal — the case
                 // that made `Option.None == Option.None` false.
                 this.emit_terminator("br label %" + l_eq)
             } else {
-                var fparts: List<String> = this.split_respecting_generics(vfields, ",")
                 var fi: Float = 0
-                while (fi < fparts.length()) {
+                while (fi < vnodes.length()) {
                     var slot_idx: Float = fi + 1
                     var a_slot: String = this.fresh_local()
                     this.emit_indent(a_slot + " = getelementptr i64, i64* " + pa + ", i64 " + slot_idx.floor().to_string())
@@ -3822,7 +3827,7 @@
                     this.emit_indent(b_slot + " = getelementptr i64, i64* " + pb + ", i64 " + slot_idx.floor().to_string())
                     var b_val: String = this.fresh_local()
                     this.emit_indent(b_val + " = load i64, i64* " + b_slot)
-                    var f_type: String = this.declared_field_type(fparts[fi])
+                    var f_type: String = this.declared_field_type_node(vnodes[fi])
                     var f_eq: String = this.emit_enum_field_eq(f_type, a_val, b_val)
                     // Fields are compared in order and short-circuit to "not
                     // equal", so a difference in the FIRST field and a difference
@@ -3864,6 +3869,24 @@
         var parts: List<String> = field_def.split(":")
         if (parts.length() < 2) { return "Any" }
         return parts[1]
+    }
+
+    /// Node form of declared_field_type, for ensure_enum_eq now that the table
+    /// holds AST.Param nodes rather than a "name:Type" CSV. Byte-identical to
+    /// declared_field_type("<name>:" + type_to_source(type_ann)): a field always
+    /// has a type_ann, so the old ":"-absent → "Any" arm never fired for a real
+    /// field. The old code took `.split(":")[1]` — the SECOND colon-delimited
+    /// segment of "name:TypeSrc" — which is the type source truncated at its
+    /// first embedded ":". Only a FuncType renders a ":" ("Fun(A):R"), so this
+    /// keeps that same truncation to "Fun(A)"; every other shape has no ":" and
+    /// passes through whole. emit_enum_field_eq's generic_base_name then treats
+    /// "Fun(A)" as base "Fun(A)", which matches no arm and falls to bit-equality
+    /// — exactly the pre-migration behavior.
+    fun declared_field_type_node(p: AST.Param): String {
+        var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
+        var type_src: String = AST.type_to_source(pt)
+        if (type_src.contains(":")) { return type_src.slice(0, type_src.index_of(":")) }
+        return type_src
     }
 
     /// Emit the comparison of one enum payload slot and return the `i1` register
