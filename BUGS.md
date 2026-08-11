@@ -2,8 +2,8 @@
 
 ## Open
 
-**3 open entries:** #107, #131, #132.
-Next free number is **#192**.
+**4 open entries:** #107, #131, #132, #194.
+Next free number is **#196**.
 
 #190 (a named nested fun captured enclosing locals by SLOT ADDRESS, so a RETURNED
 nested fun read a dead stack slot once its frame returned — garbage at -O0, luck at
@@ -571,6 +571,42 @@ log for that work, including the ones fixed along the way and the workarounds
 each forced, is at `docs/design/playground-bug-log.md`. Those entries are under
 `## Resolved` now. The log also contains entries that no longer reproduce, noted
 there rather than carried forward.
+
+### 194. Modules are keyed by literal import-path string, not canonical path — same file imported two ways becomes two instances
+
+**Severity: medium — duplicate module state, or invalid IR, in any multi-file project.**
+
+Surfaced building `sumac/examples/claude_tui` (a file importing `../../src/layout.sf`
+got a DIFFERENT `layout` instance than one importing `../../../src/layout.sf`, so
+`_collect` saw an empty `_ctx_stack` and rendered nothing). The compiler's
+module-dedup map is keyed on the path *string* (`src/compiler/main.sf` ~547), so two
+spellings that resolve to the same file are treated as two modules. Minimal repro:
+
+```saffron
+// sub/mod.sf
+var counter: Int = 0
+fun bump(): Int { counter = counter + 1 return counter }
+
+// main.sf
+import "./sub/mod.sf" as A
+import "./sub/../sub/mod.sf" as B   // same file, different spelling
+fun main() {
+    IO.println("${A.bump()}")   // 1
+    IO.println("${B.bump()}")   // 1  ← should be 2; B is a SECOND instance
+    IO.println("${A.bump()}")   // 2
+}
+```
+
+Two independent `counter` globals. In the worse case (both spellings pulled into one
+link) the duplicated module globals collide as `redefinition of global '@__g_...'`
+and the build fails in `opt` — exactly the shape of the Turmeric-side path-identity
+bug **#57** (relative vs absolute prelude path emitted twice). Same root cause.
+
+**Root cause & fix:** canonicalise (realpath) every import specifier to an absolute
+path BEFORE using it as the module-cache key, so all spellings of one file share one
+instance. Workaround until then: within a project, spell every import of a given
+module identically (this is why claude_tui forces the 3-level `../../../src/...`
+spelling across its files).
 
 ### 107. LARGELY CLOSED — 43 positive tests asserted nothing and would pass on any output
 

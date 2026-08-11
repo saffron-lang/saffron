@@ -1,0 +1,31 @@
+// BUGS #192 fixture: a class whose field is a List of ANOTHER class instance,
+// both defined here (cross-module relative to the entry file that imports this).
+// The module-qualified constructor path used to skip rooting the fresh instance
+// across its own `__init`, so a collection during `__init` (it allocates a list
+// plus n nested objects) freed the still-reachable instance.
+class Inner {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+class Holder {
+    var items: List<Inner>
+    fun init(n: Int) {
+        this.items = []
+        var i: Int = 0
+        while (i < n) {
+            this.items.push(Inner(i))
+            i = i + 1
+        }
+    }
+
+    fun total(): Int {
+        var s: Int = 0
+        var i: Int = 0
+        while (i < this.items.length()) {
+            s = s + this.items[i].v
+            i = i + 1
+        }
+        return s
+    }
+}

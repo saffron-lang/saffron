@@ -6725,6 +6725,16 @@ class Codegen {
         // notion of where it is survives.
         var saved_in_function: Bool = this.in_function
         this.in_function = true
+        // Save and zero the enclosing frame's GC-root count. This body is a
+        // SEPARATE function: any `__gc_push_root` it emits is its own, and its
+        // `Return` must `__gc_pop_roots` only that count. Without this reset the
+        // lambda inherited the ENCLOSING function's `gc_root_count`, so returning
+        // from the closure popped the caller's live frame roots off the shadow
+        // stack — the next collection then swept a still-live captured value
+        // (BUGS #195). The FunDecl path in output_body.sf already does this;
+        // gen_closure_function was the one body emitter that did not.
+        var saved_gc_root_count_cl: Float = this.gc_root_count
+        this.gc_root_count = 0
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}
         var oci: Float = 0
@@ -6890,6 +6900,8 @@ class Codegen {
         this.block_terminated = false
         this.is_coroutine = false
         this.in_function = saved_in_function
+        // Restore the enclosing frame's GC-root count (see the save above, #195).
+        this.gc_root_count = saved_gc_root_count_cl
     }
 
 
@@ -15557,13 +15569,23 @@ class Codegen {
             if (this.str_in_list(this.known_functions, __pe_init)) {
                 var __pe_init_args: List<String> = []
                 __pe_init_args.push("i64 " + __pe_instance)
+                // BUGS #192: `__pe_instance` is live across every argument, and
+                // `__init` itself allocates (a List<T> field, nested objects).
+                // Root the instance and each arg temp for the width of the call
+                // window, exactly as the primary constructor path does — without
+                // this the fresh instance sits only in an SSA temp and a
+                // collection during `__init` frees it while it is still reachable.
+                var __pe_roots: Float = this.gen_root_arg_temp(__pe_instance)
                 var __pei: Float = 0
                 while (__pei < args.length()) {
-                    __pe_init_args.push("i64 " + this.gen_arg_value(args[__pei]))
+                    var __pe_av: String = this.gen_arg_value(args[__pei])
+                    __pe_roots = __pe_roots + this.gen_root_arg_temp(__pe_av)
+                    __pe_init_args.push("i64 " + __pe_av)
                     __pei = __pei + 1
                 }
                 var __pe_discard: String = this.fresh_local()
                 this.emit_indent(__pe_discard + " = call i64 @" + __pe_init + "(" + __pe_init_args.join(", ") + ")")
+                this.gen_pop_arg_roots(__pe_roots)
             }
             this.last_type = this.str_to_type(method)
             return __pe_instance
@@ -15661,13 +15683,22 @@ class Codegen {
                 if (this.str_in_list(this.known_functions,__mp_init)) {
                     var __mp_init_args: List<String> = []
                     __mp_init_args.push("i64 " + __mp_instance)
+                    // BUGS #192: root the instance and each arg temp across the
+                    // `__init` call. `__init` allocates (List<T> field + nested
+                    // objects), so a collection there would otherwise free the
+                    // fresh instance, which is live only in this SSA temp. Mirrors
+                    // the primary constructor path (expr_body.sf).
+                    var __mp_roots: Float = this.gen_root_arg_temp(__mp_instance)
                     var __mpi: Float = 0
                     while (__mpi < args.length()) {
-                        __mp_init_args.push("i64 " + this.gen_arg_value(args[__mpi]))
+                        var __mp_av: String = this.gen_arg_value(args[__mpi])
+                        __mp_roots = __mp_roots + this.gen_root_arg_temp(__mp_av)
+                        __mp_init_args.push("i64 " + __mp_av)
                         __mpi = __mpi + 1
                     }
                     var __mp_discard: String = this.fresh_local()
                     this.emit_indent(__mp_discard + " = call i64 @" + __mp_init + "(" + __mp_init_args.join(", ") + ")")
+                    this.gen_pop_arg_roots(__mp_roots)
                 }
                 // BUGS #161: type the result by the module-prefixed class (__mp_func,
                 // e.g. ta_Marker) — the symbol the instance was actually allocated
@@ -15974,13 +16005,19 @@ class Codegen {
             if (this.str_in_list(this.known_functions, __pe2_init)) {
                 var __pe2_iargs: List<String> = []
                 __pe2_iargs.push("i64 " + __pe2_inst)
+                // BUGS #192: root the instance and each arg temp across `__init`
+                // (which allocates), same as the primary constructor path.
+                var __pe2_roots: Float = this.gen_root_arg_temp(__pe2_inst)
                 var __pe2i: Float = 0
                 while (__pe2i < args.length()) {
-                    __pe2_iargs.push("i64 " + this.gen_arg_value(args[__pe2i]))
+                    var __pe2_av: String = this.gen_arg_value(args[__pe2i])
+                    __pe2_roots = __pe2_roots + this.gen_root_arg_temp(__pe2_av)
+                    __pe2_iargs.push("i64 " + __pe2_av)
                     __pe2i = __pe2i + 1
                 }
                 var __pe2_d: String = this.fresh_local()
                 this.emit_indent(__pe2_d + " = call i64 @" + __pe2_init + "(" + __pe2_iargs.join(", ") + ")")
+                this.gen_pop_arg_roots(__pe2_roots)
             }
             this.last_type = this.str_to_type(method)
             return __pe2_inst

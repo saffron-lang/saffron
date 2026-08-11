@@ -274,6 +274,16 @@
         // notion of where it is survives.
         var saved_in_function: Bool = this.in_function
         this.in_function = true
+        // Save and zero the enclosing frame's GC-root count. This body is a
+        // SEPARATE function: any `__gc_push_root` it emits is its own, and its
+        // `Return` must `__gc_pop_roots` only that count. Without this reset the
+        // lambda inherited the ENCLOSING function's `gc_root_count`, so returning
+        // from the closure popped the caller's live frame roots off the shadow
+        // stack — the next collection then swept a still-live captured value
+        // (BUGS #195). The FunDecl path in output_body.sf already does this;
+        // gen_closure_function was the one body emitter that did not.
+        var saved_gc_root_count_cl: Float = this.gc_root_count
+        this.gc_root_count = 0
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}
         var oci: Float = 0
@@ -439,6 +449,8 @@
         this.block_terminated = false
         this.is_coroutine = false
         this.in_function = saved_in_function
+        // Restore the enclosing frame's GC-root count (see the save above, #195).
+        this.gc_root_count = saved_gc_root_count_cl
     }
 
 

@@ -1451,7 +1451,36 @@ fun __str_split(input: Int, delim: Int): Int {
     rt_strcpy(buf, ri)
     var dlen: Int = rt_strlen(rd)
     var pos: Int = buf
-    while (rt_strlen(pos) > 0) {
+    // Empty delimiter is an undefined/edge case; preserve the historical
+    // content-driven behaviour (non-empty input -> one segment per return path,
+    // empty input -> []). strstr(pos, "") returns pos, so a delimiter-driven
+    // loop would spin forever here — keep the old "content remains" loop.
+    if (dlen == 0) {
+        while (rt_strlen(pos) > 0) {
+            var m0: Int = rt_strstr(pos, rd)
+            if (m0 == 0) {
+                var lb0: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
+                rt_strcpy(lb0, pos)
+                __split_push(list, __rt_tag_ptr(lb0))
+                rt_free(buf)
+                return list
+            }
+            store8(m0, 0)
+            var tb0: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
+            rt_strcpy(tb0, pos)
+            __split_push(list, __rt_tag_ptr(tb0))
+            pos = m0 + dlen
+        }
+        rt_free(buf)
+        return list
+    }
+    // Delimiter-driven: iterate over delimiter matches rather than over "content
+    // remains". Each match pushes the segment before it; after the last match the
+    // final trailing segment (possibly "") is still pushed, and an empty input
+    // pushes exactly one "" segment. This yields delimiter_count + 1 segments,
+    // matching Python/JS/Go/Rust. Every segment is allocated via __gc_alloc_safe
+    // and pushed via __split_push to preserve the no-GC-during-split discipline.
+    while (true) {
         var m: Int = rt_strstr(pos, rd)
         if (m == 0) {
             var lb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
