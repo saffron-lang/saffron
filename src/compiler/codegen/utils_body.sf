@@ -1341,6 +1341,26 @@
         return lib_ir.slice(2, lib_ir.length())
     }
 
+    /// Emit the common `<result> = call <ret_type> @<fn_name>(<args_str>)` shape,
+    /// switching on use_llvm_lib exactly the way the ~40 hand-written fork sites
+    /// used to. This is a byte-for-byte extraction of that idiom:
+    ///
+    ///   if (this.use_llvm_lib) {
+    ///       this.emit_indent(this.lib_call(result, ret_type, fn_name, args_str))
+    ///   } else {
+    ///       this.emit_indent(result + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")")
+    ///   }
+    ///
+    /// Only collapse a fork here when BOTH branches are exactly this — no extra
+    /// bookkeeping (llvm_values tracking, verify_call) inside either arm.
+    fun emit_runtime_call(result: String, ret_type: String, fn_name: String, args_str: String) {
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(result, ret_type, fn_name, args_str))
+        } else {
+            this.emit_indent(result + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")")
+        }
+    }
+
     fun lib_ptrtoint(result_name: String, val_name: String): String {
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
