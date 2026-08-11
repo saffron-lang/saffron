@@ -157,11 +157,11 @@ fun main() {
     var c5: Bool = ha.handle(esc_ev)
     T.assert(!c5, "esc not consumed")
 
-    // a ctrl-modified rune is not typed as text
-    var ctrl_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "a", Ev.MOD_CTRL)
+    // an unbound ctrl-modified rune is not typed as text
+    var ctrl_ev: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "z", Ev.MOD_CTRL)
     var c6: Bool = ha.handle(ctrl_ev)
-    T.assert(!c6, "ctrl+a not consumed as text")
-    T.assert_eq(ha.value_str(), "x \n", "ctrl+a did not insert")
+    T.assert(!c6, "ctrl+z (unbound) not consumed as text")
+    T.assert_eq(ha.value_str(), "x \n", "ctrl+z did not insert")
 
     // paste event consumed and inserted
     var paste_ev: Ev.Event = Ev.paste_event("PASTE")
@@ -185,6 +185,44 @@ fun main() {
     T.assert(grid.contains("world"), "grid shows 'world'")
     IO.println("textarea grid:")
     IO.println(grid)
+
+    // ---------------------------------------------------------------------
+    // word-wise movement + deletion
+    // ---------------------------------------------------------------------
+    var wa: TA.TextArea = TA.textarea("", 40, 4)
+    wa.insert("hello big world")     // caret at col 15 (end)
+    wa.word_left()                   // -> start of "world" (col 10)
+    T.assert_eq(wa.col(), 10, "word_left to start of 'world'")
+    wa.word_left()                   // -> start of "big" (col 6)
+    T.assert_eq(wa.col(), 6, "word_left to start of 'big'")
+    wa.word_right()                  // -> end of "big" (col 9)
+    T.assert_eq(wa.col(), 9, "word_right to end of 'big'")
+    wa.end()                         // col 15
+    wa.delete_word_left()            // removes "world" -> "hello big "
+    T.assert_eq(wa.value_str(), "hello big ", "delete_word_left removes 'world'")
+    T.assert_eq(wa.col(), 10, "caret after delete_word_left")
+    wa.home()                        // col 0
+    wa.delete_word_right()           // removes "hello" -> " big "
+    T.assert_eq(wa.value_str(), " big ", "delete_word_right removes 'hello'")
+
+    // alt+left / alt+backspace via handle()
+    var wha: TA.TextArea = TA.textarea("", 40, 4)
+    wha.focus()
+    wha.insert("one two three")
+    var alt_left: Ev.Event = Ev.key_event(Ev.KEY_LEFT, "", Ev.MOD_ALT)
+    var wc1: Bool = wha.handle(alt_left)
+    T.assert(wc1, "alt+left consumed")
+    T.assert_eq(wha.col(), 8, "alt+left to start of 'three'")
+    var alt_bs: Ev.Event = Ev.key_event(Ev.KEY_BACKSPACE, "", Ev.MOD_ALT)
+    wha.handle(alt_bs)               // delete "two " before caret
+    T.assert_eq(wha.value_str(), "one three", "alt+backspace deletes previous word")
+    // ctrl+a / ctrl+e move to line start / end
+    var ctrl_e: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "e", Ev.MOD_CTRL)
+    wha.handle(ctrl_e)
+    T.assert_eq(wha.col(), 9, "ctrl+e to line end")
+    var ctrl_a: Ev.Event = Ev.key_event(Ev.KEY_RUNE, "a", Ev.MOD_CTRL)
+    wha.handle(ctrl_a)
+    T.assert_eq(wha.col(), 0, "ctrl+a to line start")
 
     // placeholder shows when empty + unfocused
     var pa: TA.TextArea = TA.textarea("enter text", 20, 4)

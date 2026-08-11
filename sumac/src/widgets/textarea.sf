@@ -339,6 +339,105 @@ class TextArea {
         this._set_col(line.length())
     }
 
+    // --- Word-wise movement / deletion ---------------------------------------
+    //
+    // A "word" is a maximal run of non-space characters. The boundary helpers
+    // implement the emacs/macOS convention: moving/deleting *backward* skips any
+    // spaces immediately behind the caret, then the word behind that; moving
+    // *forward* skips any spaces ahead, then the word ahead. All indices are Int
+    // (a Float index silently reads element 0 — BUGS #72).
+
+    /// The column at the start of the word preceding column `c` in `line`.
+    fun _prev_word_col(line: String, c: Int): Int {
+        var i: Int = c
+        var llen: Int = line.length()
+        if (i > llen) { i = llen }
+        while (i > 0 and line.char_at(i - 1) == " ") { i = i - 1 }
+        while (i > 0 and line.char_at(i - 1) != " ") { i = i - 1 }
+        return i
+    }
+
+    /// The column just past the word following column `c` in `line`.
+    fun _next_word_col(line: String, c: Int): Int {
+        var n: Int = line.length()
+        var i: Int = c
+        if (i < 0) { i = 0 }
+        while (i < n and line.char_at(i) == " ") { i = i + 1 }
+        while (i < n and line.char_at(i) != " ") { i = i + 1 }
+        return i
+    }
+
+    /// Move the caret to the previous word boundary. At column 0 this wraps to
+    /// the end of the previous line (matching `left()`).
+    fun word_left() {
+        var r: Int = this.row()
+        var c: Int = this.col()
+        if (c <= 0) {
+            this.left()
+            return
+        }
+        var lines: List<String> = this.lines()
+        var line: String = lines[r]
+        this._set_col(this._prev_word_col(line, c))
+        this._ensure_visible()
+    }
+
+    /// Move the caret to the next word boundary. At end of line this wraps to the
+    /// start of the next line (matching `right()`).
+    fun word_right() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c >= llen) {
+            this.right()
+            return
+        }
+        this._set_col(this._next_word_col(line, c))
+        this._ensure_visible()
+    }
+
+    /// Delete the word before the caret. At column 0 this joins with the previous
+    /// line (matching `backspace()`).
+    fun delete_word_left() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c > llen) { c = llen }
+        if (c <= 0) {
+            this.backspace()
+            return
+        }
+        var start: Int = this._prev_word_col(line, c)
+        var merged: String = line.slice(0, start) + line.slice(c, llen)
+        lines.set(r, merged)
+        this._set_col(start)
+        this._set_lines(lines)
+        this._ensure_visible()
+    }
+
+    /// Delete the word after the caret. At end of line this joins with the next
+    /// line (matching `delete_forward()`).
+    fun delete_word_right() {
+        var lines: List<String> = this.lines()
+        var r: Int = this.row()
+        var c: Int = this.col()
+        var line: String = lines[r]
+        var llen: Int = line.length()
+        if (c >= llen) {
+            this.delete_forward()
+            return
+        }
+        var stop: Int = this._next_word_col(line, c)
+        var merged: String = line.slice(0, c) + line.slice(stop, llen)
+        lines.set(r, merged)
+        this._set_lines(lines)
+        this._ensure_visible()
+    }
+
     /// Scroll so the caret row sits inside the [scroll, scroll+height) window.
     /// The offset is clamped non-negative — a negative offset would index element
     /// 0 (BUGS #72) and pin the window to the top.
@@ -449,9 +548,28 @@ class TextArea {
         var k: Ev.KeyEvent = e.key
         if (k != nil) {
             var kind: Int = k.kind
+            var mods: Int = k.mods
+            var ctrl: Bool = (mods & Ev.MOD_CTRL) != 0
+            var alt: Bool = (mods & Ev.MOD_ALT) != 0
+
+            // Word-wise + line editing chords (alt / ctrl). Checked before the
+            // plain-key handlers so an alt+left is a word move, not a bare left.
+            //   alt+left            → previous word
+            //   alt+right           → next word
+            //   alt+backspace / ^w  → delete previous word
+            //   alt+delete / alt+d  → delete next word
+            //   ^a / ^e             → line start / end (macOS-ish)
+            if (kind == Ev.KEY_LEFT and alt) { this.word_left(); return true }
+            if (kind == Ev.KEY_RIGHT and alt) { this.word_right(); return true }
+            if (kind == Ev.KEY_BACKSPACE and alt) { this.delete_word_left(); return true }
+            if (kind == Ev.KEY_DELETE and alt) { this.delete_word_right(); return true }
+            if (kind == Ev.KEY_RUNE and ctrl and k.rune == "w") { this.delete_word_left(); return true }
+            if (kind == Ev.KEY_RUNE and alt and k.rune == "d") { this.delete_word_right(); return true }
+            if (kind == Ev.KEY_RUNE and ctrl and k.rune == "a") { this.home(); return true }
+            if (kind == Ev.KEY_RUNE and ctrl and k.rune == "e") { this.end(); return true }
+
             if (kind == Ev.KEY_RUNE) {
-                var mods: Int = k.mods
-                if ((mods & Ev.MOD_CTRL) != 0 or (mods & Ev.MOD_ALT) != 0) {
+                if (ctrl or alt) {
                     return false
                 }
                 this.insert(k.rune)
