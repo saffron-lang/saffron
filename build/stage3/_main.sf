@@ -309,7 +309,7 @@ fun package_name_of_file(file_path: String): String {
     return body.slice(bar + 1, body.length())
 }
 
-/// "Same file?" — module identity in Saffron is the file (module_prefix_from_file).
+/// "Same file?" — module identity in Saffron is the file (its path-based prefix).
 fun same_module_file(a_path: String, b_path: String): Bool {
     return a_path == b_path
 }
@@ -1135,7 +1135,20 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     if (path_to_prefix.has(file_path)) {
         prefix = path_to_prefix.get(file_path)
     } else {
-        prefix = module_prefix_from_file(file_path)
+        // Provably unreachable today: every collect_modules caller seeds
+        // path_to_prefix for the resolved full_path immediately before recursing
+        // (the four path_to_prefix.set(...path_based_prefix...) sites that guard
+        // each collect_modules call). This prefix IS the cross-module ABI —
+        // a module's functions are emitted as <prefix>funcname and called by that
+        // mangled name, with no symbol table between units. A basename fallback
+        // here (bar_ instead of foo_bar_) would silently emit calls to a symbol
+        // defined under the other prefix: an undefined-symbol LINK error with no
+        // compiler diagnostic. If this fires, a new call path reached
+        // collect_modules without seeding — fix that caller to seed
+        // path_to_prefix via path_based_prefix; do NOT paper over it here, since
+        // collect_modules has no import spec to reconstruct the right prefix.
+        IO.println("internal error: module prefix not seeded for " + file_path)
+        c_exit(1)
     }
 
     // Collect this module's import aliases from text (robust)
@@ -1202,22 +1215,15 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     module_file_paths.push(file_path)
 }
 
-fun module_prefix_from_file(file_path: String): String {
-    var name: String = file_path
-    var slash_idx: Float = -1
-    var j: Float = 0
-    while (j < name.length()) {
-        if (name.char_at(j) == "/") { slash_idx = j }
-        j = j + 1
-    }
-    if (slash_idx >= 0) {
-        name = name.slice(slash_idx + 1, name.length())
-    }
-    if (name.ends_with(".sf")) {
-        name = name.slice(0, name.length() - 3)
-    }
-    return name + "_"
-}
+// module_prefix_from_file (basename-only prefix: .../foo/bar.sf → bar_) was
+// deleted here. It was the silent fallback in collect_modules for a file whose
+// path_to_prefix had not been seeded, and it DISAGREED with path_based_prefix
+// (which yields foo_bar_) for the same file. Since the symbol prefix is the
+// cross-module ABI, that divergence would silently emit calls to an undefined
+// mangled symbol — a link error with no compiler diagnostic. Every
+// collect_modules caller now seeds path_to_prefix via path_based_prefix before
+// recursing, and the (unreachable) unseeded case is a hard internal error, so
+// there is no path left that needs a basename prefix.
 
 // =============================================================================
 // `saffronc format` — the formatter subcommand
