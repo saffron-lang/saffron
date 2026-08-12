@@ -92,7 +92,7 @@
             // Custom gen: emit function header, extract captures from env, then body
             this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures, boxed_caps)
         } else {
-            this.gen_function(lambda_name, params_str, ret_type, body)
+            this.gen_function(lambda_name, params, ret_type, body)
         }
         this.in_function = saved_in_fn
         var lambda_ir: String = this.sb.to_string()
@@ -203,10 +203,8 @@
         var saved_in_fn2: Bool = this.in_function
         this.in_function = false
         this.sb = StringBuilder()
-        var full_params: String = "__env:Int"
-        if (params_str.length() > 0) {
-            full_params = full_params + "," + params_str
-        }
+        var env_p: List<AST.Param> = [AST.Param.Param("__env", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())]
+        var full_params: List<AST.Param> = this.concat_params(env_p, params)
         this.gen_function(lambda_name, full_params, ret_type, body)
         this.globals.push(this.sb.to_string())
         this.in_function = saved_in_fn2
