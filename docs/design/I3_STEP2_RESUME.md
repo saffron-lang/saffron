@@ -1,7 +1,16 @@
-# RESUME: I3 enum-fields migration — Step 2 (unverified) + Steps 3–4
+# RESUME: I3 enum-fields migration — COMPLETE (all 4 steps landed)
 
-**Read this file, then follow "How to pick up" below.** This is the resume point
-for the I3 (Stage-3 type-representation) enum-fields slice. Written 2026-08-11.
+**✅ SLICE COMPLETE (2026-08-11).** All four steps are landed on `main` and verified
+(bootstrap gen4 + suite 369/0 + oracle 0 mismatch each). `enum Variant.fields` is now
+`List<AST.Param>` end to end — parser, checker, and codegen all read the nodes directly.
+The only remaining renderer is `AST.variant_fields_string`, deliberately kept for two
+display/analysis consumers (LSP outline hover in `main.sf`; private-type leak scan in
+`checker.sf`). See `compiler-rewrite.md` **I3** for the landed record. This file is kept
+as the historical resume trail; nothing below is actionable. Next enum work is the
+separate bare-name `enum_variants`/`enum_fields` key-ambiguity slice (`checker.sf` ~1836).
+
+This was the resume point for the I3 (Stage-3 type-representation) enum-fields slice.
+Written 2026-08-11.
 
 ## One-paragraph context
 
@@ -21,7 +30,7 @@ collapse `Map<String,Int>` → `Map`).
 | 1 | `ast.sf` node → `List<Param>` + parser + `variant_fields_string` render shim; all readers routed through shim | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main`, commit `a77ffa2d` |
 | 2 | codegen reads nodes directly (`enum_variant_fields` table → `Map<String,List<AST.Param>>`; `get_variant_field_type` + `ensure_enum_eq` read `type_ann`); removes `record_unresolved` site `match_body.sf:638` | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main` |
 | 3 | migrate checker `enum_fields` table to nodes (`get_variant_field_params`; `get_enum_binding_type` reads `type_ann`) | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main` |
-| 4 | delete both render shims + dead `split_respecting_generics`/`split(":")` on enum strings | ❌ NOT STARTED | — |
+| 4 | codegen reads nodes on every path; delete codegen render shims + dead `split_respecting_generics`/`split(":")` on enum strings (`AST.variant_fields_string` kept for LSP + leak-scan display) | ✅ LANDED, verified (gen4 + suite 369/0 + oracle 0 mismatch) | on `main` |
 
 ## How to pick up (exact commands)
 

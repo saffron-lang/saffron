@@ -728,16 +728,12 @@
             var vname: String = variants[i]
             var key: String = enum_name + "." + vname
             if (this.enum_variant_fields.has(key)) {
-                // The table holds List<AST.Param> now; render the legacy CSV via
-                // the shim so this count stays byte-identical to the old behavior.
-                var fields: String = this.get_variant_field_str(key)
-                if (fields.length() > 0) {
-                    var parts: List<String> = this.split_respecting_generics(fields, ",")
-                    // Each part is "name:Type", count them
-                    var field_count: Float = parts.length()
-                    if (field_count > max_f) {
-                        max_f = field_count
-                    }
+                // The table holds List<AST.Param> now: one node per field, so the
+                // field count IS the list length. The old code rendered a CSV and
+                // re-split it on top-level commas to get the same count.
+                var field_count: Float = this.enum_variant_fields.get(key).length()
+                if (field_count > max_f) {
+                    max_f = field_count
                 }
             }
             i = i + 1
