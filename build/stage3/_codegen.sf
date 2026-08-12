@@ -65,6 +65,11 @@ class Codegen {
     var current_ret_type: String
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
+    // Captured-variable list per hoisted function, keyed by the same emit name
+    // used for the "__captures_" arity entry. Dedicated typed store so readers get
+    // the List<String> directly instead of re-splitting a comma-joined CSV that
+    // used to live under "__caps_"+name in func_prefix_map (codegen-refactors §8).
+    var captures_map: Map<String, List<String>>
     var module_prefixes: Map<String, String>
     // File-scoped alias bindings, keyed `<declaring module prefix>|<alias>`.
     // `module_prefixes` above is the flat whole-program union of every alias in
@@ -240,6 +245,7 @@ class Codegen {
         this.current_ret_type = "i64"
         this.called_functions = []
         this.called_function_arity = {}
+        this.captures_map = {}
         this.module_prefixes = {}
         this.scoped_module_prefixes = {}
         this.func_prefix_map = {}
@@ -3253,9 +3259,9 @@ class Codegen {
         var has_captures: Bool = this.called_function_arity.has("__captures_" + fn_name)
         var cap_names: List<String> = []
         if (has_captures) {
-            var caps_str: String = this.func_prefix_map.get("__caps_" + fn_name)
-            if (caps_str.length() > 0) {
-                cap_names = caps_str.split(",")
+            var c: List<String> = this.captures_map.get(fn_name)
+            if (c.length() > 0) {
+                cap_names = c
             } else {
                 has_captures = false
             }
@@ -4521,15 +4527,12 @@ class Codegen {
             var arg_strs: List<String> = []
             // If this is a nested function with captures, prepend capture POINTERS as args
             if (this.called_function_arity.has("__captures_" + resolved_callee)) {
-                var caps_str: String = this.func_prefix_map.get("__caps_" + resolved_callee)
-                if (caps_str.length() > 0) {
-                    var cap_names: List<String> = caps_str.split(",")
-                    var ci3: Float = 0
-                    while (ci3 < cap_names.length()) {
-                        var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci3]), "i64*")
-                        arg_strs.push("i64 " + cap_val)
-                        ci3 = ci3 + 1
-                    }
+                var cap_names: List<String> = this.captures_map.get(resolved_callee)
+                var ci3: Float = 0
+                while (ci3 < cap_names.length()) {
+                    var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci3]), "i64*")
+                    arg_strs.push("i64 " + cap_val)
+                    ci3 = ci3 + 1
                 }
             }
             // Named argument reordering: if any arg is an Assign node (named arg),
@@ -7058,7 +7061,7 @@ class Codegen {
                     _ => ""
                 }
                 if (call_name.length() > 0) {
-                    var caps_key: String = "__caps_" + this.current_prefix + call_name
+                    var caps_key: String = this.current_prefix + call_name
                     // BUGS #175: a sibling nested fun's captures are registered under
                     // the per-scope symbol (scope$$name), so a call to one from another
                     // must look them up by that same key or the transitive captures
@@ -7066,23 +7069,20 @@ class Codegen {
                     // references an undefined value. Single source of truth:
                     // nested_fun_symbol.
                     if (this.nested_scope.length() > 0) {
-                        var __nf_caps_key: String = "__caps_" + this.nested_fun_symbol(this.nested_scope, call_name)
-                        if (this.func_prefix_map.has(__nf_caps_key)) {
+                        var __nf_caps_key: String = this.nested_fun_symbol(this.nested_scope, call_name)
+                        if (this.captures_map.has(__nf_caps_key)) {
                             caps_key = __nf_caps_key
                         }
                     }
-                    if (this.func_prefix_map.has(caps_key)) {
-                        var caps_str: String = this.func_prefix_map.get(caps_key)
-                        if (caps_str.length() > 0) {
-                            var cap_list: List<String> = caps_str.split(",")
-                            var ci4: Float = 0
-                            while (ci4 < cap_list.length()) {
-                                var cn: String = cap_list[ci4]
-                                if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
-                                    free.push(cn)
-                                }
-                                ci4 = ci4 + 1
+                    if (this.captures_map.has(caps_key)) {
+                        var cap_list: List<String> = this.captures_map.get(caps_key)
+                        var ci4: Float = 0
+                        while (ci4 < cap_list.length()) {
+                            var cn: String = cap_list[ci4]
+                            if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
+                                free.push(cn)
                             }
+                            ci4 = ci4 + 1
                         }
                     }
                 }
@@ -12482,7 +12482,7 @@ class Codegen {
 
             // Record capture info for call sites
             this.called_function_arity.set("__captures_" + emit_name, captures.length())
-            this.func_prefix_map.set("__caps_" + emit_name, captures.join(","))
+            this.captures_map.set(emit_name, captures)
 
             // Save state and emit hoisted function
             var saved_sb2: StringBuilder = this.sb

@@ -192,7 +192,7 @@
 
             // Record capture info for call sites
             this.called_function_arity.set("__captures_" + emit_name, captures.length())
-            this.func_prefix_map.set("__caps_" + emit_name, captures.join(","))
+            this.captures_map.set(emit_name, captures)
 
             // Save state and emit hoisted function
             var saved_sb2: StringBuilder = this.sb

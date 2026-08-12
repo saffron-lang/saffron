@@ -548,7 +548,7 @@
                     _ => ""
                 }
                 if (call_name.length() > 0) {
-                    var caps_key: String = "__caps_" + this.current_prefix + call_name
+                    var caps_key: String = this.current_prefix + call_name
                     // BUGS #175: a sibling nested fun's captures are registered under
                     // the per-scope symbol (scope$$name), so a call to one from another
                     // must look them up by that same key or the transitive captures
@@ -556,23 +556,20 @@
                     // references an undefined value. Single source of truth:
                     // nested_fun_symbol.
                     if (this.nested_scope.length() > 0) {
-                        var __nf_caps_key: String = "__caps_" + this.nested_fun_symbol(this.nested_scope, call_name)
-                        if (this.func_prefix_map.has(__nf_caps_key)) {
+                        var __nf_caps_key: String = this.nested_fun_symbol(this.nested_scope, call_name)
+                        if (this.captures_map.has(__nf_caps_key)) {
                             caps_key = __nf_caps_key
                         }
                     }
-                    if (this.func_prefix_map.has(caps_key)) {
-                        var caps_str: String = this.func_prefix_map.get(caps_key)
-                        if (caps_str.length() > 0) {
-                            var cap_list: List<String> = caps_str.split(",")
-                            var ci4: Float = 0
-                            while (ci4 < cap_list.length()) {
-                                var cn: String = cap_list[ci4]
-                                if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
-                                    free.push(cn)
-                                }
-                                ci4 = ci4 + 1
+                    if (this.captures_map.has(caps_key)) {
+                        var cap_list: List<String> = this.captures_map.get(caps_key)
+                        var ci4: Float = 0
+                        while (ci4 < cap_list.length()) {
+                            var cn: String = cap_list[ci4]
+                            if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
+                                free.push(cn)
                             }
+                            ci4 = ci4 + 1
                         }
                     }
                 }

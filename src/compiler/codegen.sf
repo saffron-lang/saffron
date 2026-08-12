@@ -65,6 +65,11 @@ class Codegen {
     var current_ret_type: String
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
+    // Captured-variable list per hoisted function, keyed by the same emit name
+    // used for the "__captures_" arity entry. Dedicated typed store so readers get
+    // the List<String> directly instead of re-splitting a comma-joined CSV that
+    // used to live under "__caps_"+name in func_prefix_map (codegen-refactors §8).
+    var captures_map: Map<String, List<String>>
     var module_prefixes: Map<String, String>
     // File-scoped alias bindings, keyed `<declaring module prefix>|<alias>`.
     // `module_prefixes` above is the flat whole-program union of every alias in
@@ -240,6 +245,7 @@ class Codegen {
         this.current_ret_type = "i64"
         this.called_functions = []
         this.called_function_arity = {}
+        this.captures_map = {}
         this.module_prefixes = {}
         this.scoped_module_prefixes = {}
         this.func_prefix_map = {}

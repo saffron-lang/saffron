@@ -1529,9 +1529,9 @@
         var has_captures: Bool = this.called_function_arity.has("__captures_" + fn_name)
         var cap_names: List<String> = []
         if (has_captures) {
-            var caps_str: String = this.func_prefix_map.get("__caps_" + fn_name)
-            if (caps_str.length() > 0) {
-                cap_names = caps_str.split(",")
+            var c: List<String> = this.captures_map.get(fn_name)
+            if (c.length() > 0) {
+                cap_names = c
             } else {
                 has_captures = false
             }
@@ -2797,15 +2797,12 @@
             var arg_strs: List<String> = []
             // If this is a nested function with captures, prepend capture POINTERS as args
             if (this.called_function_arity.has("__captures_" + resolved_callee)) {
-                var caps_str: String = this.func_prefix_map.get("__caps_" + resolved_callee)
-                if (caps_str.length() > 0) {
-                    var cap_names: List<String> = caps_str.split(",")
-                    var ci3: Float = 0
-                    while (ci3 < cap_names.length()) {
-                        var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci3]), "i64*")
-                        arg_strs.push("i64 " + cap_val)
-                        ci3 = ci3 + 1
-                    }
+                var cap_names: List<String> = this.captures_map.get(resolved_callee)
+                var ci3: Float = 0
+                while (ci3 < cap_names.length()) {
+                    var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci3]), "i64*")
+                    arg_strs.push("i64 " + cap_val)
+                    ci3 = ci3 + 1
                 }
             }
             // Named argument reordering: if any arg is an Assign node (named arg),
