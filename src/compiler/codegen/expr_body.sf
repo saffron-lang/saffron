@@ -3505,7 +3505,7 @@
             if (this.string_vars.contains(name)) return true
             // Check class fields
             if (this.current_class.length() > 0 and this.class_fields.has(this.current_class)) {
-                var fields: String = this.class_fields.get(this.current_class)
+                var fields: String = this.get_class_fields_str(this.current_class)
                 if (fields.contains(name + ":String")) return true
             }
         }

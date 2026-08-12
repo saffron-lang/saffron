@@ -27,7 +27,13 @@ class Codegen {
     var type_defs: StringBuilder
     var known_functions: List<String>
     var func_ret_types: Map<String, AST.Type>
-    var class_fields: Map<String, String>
+    // Declared class fields as AST.Param nodes (own + inherited + actor-hidden,
+    // in struct-layout order). Same pattern as the checker's class_fields and the
+    // enum_variant_fields migration: store nodes, render the legacy "name:Type,…"
+    // CSV on read via get_class_fields_str. LOSSY render (type_to_string) — a
+    // class field's declared type is only ever consumed by name/index/type, never
+    // round-tripped, unlike the loss-less enum payload table.
+    var class_fields: Map<String, List<AST.Param>>
     var class_field_list: Map<String, List<String>>
     var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
@@ -681,6 +687,60 @@ class Codegen {
     }
     fun make_generic_type(base: String, args: List<AST.Type>): AST.Type {
         return AST.Type.GenericType(base, args)
+    }
+
+    // The stored AST.Param nodes for a class key, or [] if the key is unknown.
+    // class_fields holds List<AST.Param> now; this is the node accessor the build
+    // sites use to merge parent fields, mirroring get_variant_field_nodes.
+    fun get_class_field_params(key: String): List<AST.Param> {
+        if (!this.class_fields.has(key)) { return [] }
+        // Bind to a typed local first: Map.get is Any|Nil, and returning it raw
+        // trips "cannot return nullable" — a var decl coerces, a bare return does not.
+        var params: List<AST.Param> = this.class_fields.get(key)
+        return params
+    }
+
+    // Render the legacy "name:Type,…" CSV for one class key from its stored nodes.
+    // Byte-identical to what class_fields used to hold: params_to_string is the
+    // exact producer the old string was built with. The read-side choke point for
+    // the consumers that still want a flat string (is_string_field, the
+    // callable-field probe). An unknown key renders "".
+    fun get_class_fields_str(key: String): String {
+        if (!this.class_fields.has(key)) { return "" }
+        var params: List<AST.Param> = this.class_fields.get(key)
+        return this.params_to_string(params)
+    }
+
+    // The declared type string of ONE class field, matching the old
+    // `parts[i].split(":")[1]`: type_to_string truncated at its first ":". Only a
+    // Fun type renders a ":" ("Fun(A):R"), so this preserves the historical
+    // truncation to "Fun(A)" for a Fun-typed field and is a no-op for every other
+    // shape. The callers apply the identity-mode Float->Int fold themselves.
+    fun declared_class_field_type(pt: AST.Type): String {
+        var s: String = this.type_to_string(pt)
+        if (s.contains(":")) { return s.slice(0, s.index_of(":")) }
+        return s
+    }
+
+    // Append two AST.Param lists (a then b). Used to merge parent+child+actor
+    // fields in struct-layout order, replacing the old CSV `a + "," + b` concat.
+    fun concat_params(a: List<AST.Param>, b: List<AST.Param>): List<AST.Param> {
+        var out: List<AST.Param> = []
+        var i: Float = 0
+        while (i < a.length()) { out.push(a[i]); i = i + 1 }
+        i = 0
+        while (i < b.length()) { out.push(b[i]); i = i + 1 }
+        return out
+    }
+
+    // The two hidden fields an actor class carries, as nodes: __actor_busy and
+    // __actor_queue, both Int. type_to_string(IntType) == "Int", so this renders
+    // to exactly the old "__actor_busy:Int,__actor_queue:Int" prefix.
+    fun actor_hidden_params(): List<AST.Param> {
+        return [
+            AST.Param.Param("__actor_busy", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none()),
+            AST.Param.Param("__actor_queue", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())
+        ]
     }
 
     fun params_to_string(params: List<AST.Param>): String {
@@ -5171,7 +5231,7 @@ class Codegen {
             if (this.string_vars.contains(name)) return true
             // Check class fields
             if (this.current_class.length() > 0 and this.class_fields.has(this.current_class)) {
-                var fields: String = this.class_fields.get(this.current_class)
+                var fields: String = this.get_class_fields_str(this.current_class)
                 if (fields.contains(name + ":String")) return true
             }
         }
@@ -8261,8 +8321,6 @@ class Codegen {
         // contribute methods only — see the field guard below.
         var parent: String = ""
         if (parents.length() > 0) { parent = parents[0] }
-        // Convert fields to string format for internal use
-        var fields_str: String = this.params_to_string(fields)
         // Inherit parent fields (prepend parent fields before child's own).
         //
         // Only the FIRST base contributes fields, deliberately. Prepending base
@@ -8272,17 +8330,12 @@ class Codegen {
         // and every inherited method's field access correct without a vtable.
         // That can hold for exactly one base. Keeping it on parents[0] means a
         // single-inheritance class lays out byte-for-byte as it always has.
-        var all_fields: String = fields_str
-        if (parent.length() > 0 and this.class_fields.has(parent)) {
-            var parent_fields: String = this.class_fields.get(parent)
-            if (parent_fields.length() > 0) {
-                if (all_fields.length() > 0) {
-                    all_fields = parent_fields + "," + all_fields
-                } else {
-                    all_fields = parent_fields
-                }
-            }
-        }
+        //
+        // The nodes are merged directly (parent first, then child) instead of
+        // concatenating rendered CSVs — get_class_field_params returns [] for a
+        // missing or empty parent, so concat_params reproduces the old
+        // parent-only / child-only / both cases with no stray comma.
+        var all_fields: List<AST.Param> = this.concat_params(this.get_class_field_params(parent), fields)
         // So a second base that carries state cannot work, and must say so rather
         // than emit methods that read the first base's fields at those offsets.
         // Interfaces — the overwhelmingly common case for `extends A, B, C` — are
@@ -8295,10 +8348,10 @@ class Codegen {
             // operand from its left (see the Logical arm of checker.sf's
             // infer_type), but only for a *nil check on a variable* — `has()` is an
             // unrelated call the checker cannot connect to the `get()` beside it,
-            // so that spelling would still call `.length()` on a `String|Nil`.
+            // so that spelling would still call `.length()` on a `List|Nil`.
             // `!= nil` on a bound local is the guard that both narrows and
             // evaluates correctly (`is` is broken on unions, BUGS #69).
-            var extra_fields: String|Nil = this.class_fields.get(extra)
+            var extra_fields: List<AST.Param>|Nil = this.class_fields.get(extra)
             if (extra_fields != nil and extra_fields.length() > 0) {
                 IO.println("Error: class " + name + " cannot extend " + extra
                     + " as a secondary base: it declares fields, and only the first base's fields are inherited. Make it the first base, or give it no fields.")
@@ -8307,11 +8360,7 @@ class Codegen {
         }
         // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
         if (this.actor_classes.has(name)) {
-            if (all_fields.length() > 0) {
-                all_fields = "__actor_busy:Int,__actor_queue:Int," + all_fields
-            } else {
-                all_fields = "__actor_busy:Int,__actor_queue:Int"
-            }
+            all_fields = this.concat_params(this.actor_hidden_params(), all_fields)
         }
         // Generate the class with inherited fields
         this.current_parent = parent
@@ -8510,7 +8559,7 @@ class Codegen {
         }
     }
 
-    fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+    fun gen_class_decl(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
         // Use module-prefixed type name to avoid cross-module class name collisions
         var type_name: String = name
         if (this.current_prefix.length() > 0) {
@@ -8523,18 +8572,20 @@ class Codegen {
             this.class_struct_names.set(type_name, type_name)
         }
 
-        // Parse field names for struct layout
+        // Field names + "name:Type" entries for struct layout, straight off the
+        // nodes. Byte-identical to the old split of params_to_string(fields): the
+        // name is the Param's name (no colon split needed, so a Fun-typed field's
+        // "f:Fun():R" no longer risks a mis-split) and the entry is name + ":" +
+        // type_to_string, exactly what params_to_string emitted per field.
         var field_list: List<String> = []
         var field_entries: List<String> = []
         var i: Float = 0
-        if (fields.length() > 0) {
-            var parts: List<String> = this.split_respecting_generics(fields, ",")
-            while (i < parts.length()) {
-                var fp: List<String> = parts[i].split(":")
-                field_list.push(fp[0])
-                field_entries.push(parts[i])
-                i = i + 1
-            }
+        while (i < fields.length()) {
+            var fp_name: String = match (fields[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var fp_type: AST.Type = match (fields[i]) { Param(n, t, d, p_vis, __ns) => t }
+            field_list.push(fp_name)
+            field_entries.push(fp_name + ":" + this.type_to_string(fp_type))
+            i = i + 1
         }
         // Store structured field list (each entry is "name:type")
         this.class_field_list.set(name, field_entries)
@@ -8612,8 +8663,10 @@ class Codegen {
             i = i + 1
         }
 
-        // Generate constructor function: ClassName(args...) -> instance ptr
-        this.gen_class_constructor(type_name, fields, field_list)
+        // Generate constructor function: ClassName(args...) -> instance ptr.
+        // gen_class_constructor's `fields` string param is dead (it works off
+        // field_list), so render the same CSV it always received.
+        this.gen_class_constructor(type_name, this.params_to_string(fields), field_list)
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
@@ -13983,7 +14036,7 @@ class Codegen {
             }
             // Skip interfaces (classes with no fields) — prefer concrete classes.
             // Interfaces have empty class_fields and register stub methods.
-            var cf: String = this.class_fields.get(class_name)
+            var cf: List<AST.Param> = this.class_fields.get(class_name)
             if (cf.length() == 0) {
                 // Could be an interface — save as fallback, keep searching
                 if (interface_fallback.length() == 0) {
@@ -17414,7 +17467,7 @@ class Codegen {
         if (!__method_exists and this.class_fields.has(class_name)) {
             var __ft: String = this.try_get_field_type(class_name, method)
             if (__ft.starts_with("Fun(") or __ft.contains("=>")) { __method_exists = true }
-            var __fields_str: String = this.class_fields.get(class_name)
+            var __fields_str: String = this.get_class_fields_str(class_name)
             if (__fields_str.contains(method + ":")) { __method_exists = true }
         }
         if (!__method_exists) {
@@ -17651,16 +17704,14 @@ class Codegen {
     /// reporting; a site that asks "is there a field here at all?" does not. They
     /// were the same call, which is why the gap was uncountable.
     fun try_get_field_type(class_name: String, field: String): String {
-        var fields: String = ""
-        if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
-        if (fields.length() == 0) { return "" }
-        var parts: List<String> = this.split_respecting_generics(fields, ",")
+        var params: List<AST.Param> = this.get_class_field_params(class_name)
+        if (params.length() == 0) { return "" }
         var i: Float = 0
-        while (i < parts.length()) {
-            var fp: List<String> = parts[i].split(":")
-            if (fp[0] == field) {
-                if (fp.length() < 2) { return "" }
-                var ft: String = fp[1]
+        while (i < params.length()) {
+            var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            if (fp_name == field) {
+                var fp_type: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+                var ft: String = this.declared_class_field_type(fp_type)
                 if (this.identity_mode and ft == "Float") { return "Int" }
                 return ft
             }
@@ -17700,22 +17751,19 @@ class Codegen {
             if (this.class_fields.has(__bare)) { __gft_lookup = __bare }
         }
     }
-    // `.get()` is typed String|Nil, and the has() checks above are inside the
-    // `if` block rather than immediately before this line, so no narrowing
-    // reaches here — a class with no registered fields yielded nil and then had
-    // .length() called on it. Spell the miss out instead.
-    var fields: String = ""
-    if (this.class_fields.has(__gft_lookup)) { fields = this.class_fields.get(__gft_lookup) }
-    if (fields.length() == 0) {
+    // A class with no registered fields yields an empty node list; spell the miss
+    // out rather than reading a neighbouring slot.
+    var params: List<AST.Param> = this.get_class_field_params(__gft_lookup)
+    if (params.length() == 0) {
         Diag.record_unresolved("get_field_type: class has no registered fields", "'" + class_name + "." + field + "'", "Int")
         return "Int"
     }
-    var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
-    while (i < parts.length()) {
-        var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) {
-            var ft: String = fp[1]
+    while (i < params.length()) {
+        var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+        if (fp_name == field) {
+            var fp_type: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            var ft: String = this.declared_class_field_type(fp_type)
             // In identity mode, Float and Int are both i64 — treat Float as Int
             if (this.identity_mode and ft == "Float") { return "Int" }
             return ft
@@ -17768,37 +17816,35 @@ class Codegen {
     }
 
     fun get_field_index(class_name: String, field: String): Float {
-    // Unguarded `.get()` on a Map is String|Nil; the reverse lookup below is the
-    // recovery path for a miss, so the miss has to produce "" rather than nil.
-    var fields: String = ""
-    if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
+    // class_fields holds AST.Param nodes now; the reverse lookup below is the
+    // recovery path for a miss, so a miss has to produce an empty list.
+    var params: List<AST.Param> = this.get_class_field_params(class_name)
     // Cross-module: if prefixed name not found, try bare name via reverse lookup
-    if (fields.length() == 0) {
+    if (params.length() == 0) {
         var __fkeys: List<String> = this.class_struct_names.keys()
         var __fki: Float = 0
         while (__fki < __fkeys.length()) {
             if (this.class_struct_names.get(__fkeys[__fki]) == class_name) {
                 // The key came from class_struct_names, which does not imply a
-                // class_fields entry — the .get() was unguarded and nullable.
+                // class_fields entry — guard the read.
                 if (this.class_fields.has(__fkeys[__fki])) {
-                    fields = this.class_fields.get(__fkeys[__fki])
+                    params = this.class_fields.get(__fkeys[__fki])
                 }
-                if (fields.length() > 0) { __fki = __fkeys.length() }
+                if (params.length() > 0) { __fki = __fkeys.length() }
             }
             __fki = __fki + 1
         }
     }
     // Also try: strip current_prefix from class_name to get bare name
-    if (fields.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
+    if (params.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
         var bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
-        if (this.class_fields.has(bare)) { fields = this.class_fields.get(bare) }
+        if (this.class_fields.has(bare)) { params = this.class_fields.get(bare) }
     }
-    if (fields.length() == 0) return 0
-    var parts: List<String> = this.split_respecting_generics(fields, ",")
+    if (params.length() == 0) return 0
     var i: Float = 0
-    while (i < parts.length()) {
-        var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) return i
+    while (i < params.length()) {
+        var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+        if (fp_name == field) return i
         i = i + 1
     }
     // Field not found on known class — but suppress if it's actually a method
@@ -18187,18 +18233,10 @@ fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AS
                     _ => []
                 }
                 if (mod_name.length() > 0) {
-                    var mod_fields_str: String = gen.params_to_string(mod_fields)
-                    var mod_all_fields: String = mod_fields_str
-                    if (mod_parent.length() > 0 and gen.class_fields.has(mod_parent)) {
-                        var mod_parent_fields: String = gen.class_fields.get(mod_parent)
-                        if (mod_parent_fields.length() > 0) {
-                            if (mod_all_fields.length() > 0) {
-                                mod_all_fields = mod_parent_fields + "," + mod_all_fields
-                            } else {
-                                mod_all_fields = mod_parent_fields
-                            }
-                        }
-                    }
+                    // Merge parent + own fields as nodes (parent first), matching
+                    // gen_class_decl_with_parents. No actor fields here — those are
+                    // added only in the real gen pass, which re-sets these keys.
+                    var mod_all_fields: List<AST.Param> = gen.concat_params(gen.get_class_field_params(mod_parent), mod_fields)
                     gen.class_fields.set(mod_name, mod_all_fields)
                     gen.class_fields.set(prefix + mod_name, mod_all_fields)
                     var mod_sn: String = mod_name
@@ -18313,18 +18351,10 @@ fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AS
                 _ => []
             }
             if (pr_name.length() > 0) {
-                var pr_fields_str: String = gen.params_to_string(pr_fields)
-                var pr_all_fields: String = pr_fields_str
-                if (pr_parent.length() > 0 and gen.class_fields.has(pr_parent)) {
-                    var pr_parent_fields: String = gen.class_fields.get(pr_parent)
-                    if (pr_parent_fields.length() > 0) {
-                        if (pr_all_fields.length() > 0) {
-                            pr_all_fields = pr_parent_fields + "," + pr_all_fields
-                        } else {
-                            pr_all_fields = pr_parent_fields
-                        }
-                    }
-                }
+                // Merge parent + own fields as nodes (parent first), matching
+                // gen_class_decl_with_parents; actor fields are added later in the
+                // real gen pass, which re-sets this key.
+                var pr_all_fields: List<AST.Param> = gen.concat_params(gen.get_class_field_params(pr_parent), pr_fields)
                 gen.class_fields.set(pr_name, pr_all_fields)
                 gen.class_struct_names.set(pr_name, pr_name)
                 var pr_method_names: List<String> = []
