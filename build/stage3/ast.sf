@@ -446,14 +446,14 @@ fun type_to_source(t: Type): String {
     }
 }
 
-/// Render an enum variant's payload back to the legacy "name:Type,…" CSV that
-/// every current consumer still reads. The Variant node now stores parsed
-/// AST.Param nodes, so this is the render-on-read shim keeping those consumers
-/// byte-identical during the migration. Types go through type_to_source, NOT
-/// type_to_string: the parser stored the LOSS-LESS source form (`Map<String,Int>`
-/// kept whole), and type_to_string would collapse it to "Map". An empty payload
-/// renders "" — the same value the old empty-string field held for a fieldless
-/// variant like `None`.
+/// Render an enum variant's payload as a "name:Type,…" signature string. After
+/// I3, codegen and the checker's type logic read the AST.Param nodes directly;
+/// this renderer survives only for the two DISPLAY/ANALYSIS consumers that
+/// genuinely want a flat string — the LSP outline's hover detail (main.sf) and
+/// the private-type leak scan (checker.sf's check_leak). Types go through
+/// type_to_source, NOT type_to_string: the parser stored the LOSS-LESS source
+/// form (`Map<String,Int>` kept whole), and type_to_string would collapse it to
+/// "Map". An empty payload renders "" (a fieldless variant like `None`).
 fun variant_fields_string(v: Variant): String {
     var params: List<Param> = match (v) { Variant(n, f, __ns) => f
         _ => []

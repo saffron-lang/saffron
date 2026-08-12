@@ -649,11 +649,22 @@ render CSV on read, migrate consumers, delete the shim):
   `AST.variant_fields_string` stays alive for the codegen `get_variant_field_str` shim
   until Step 4. Verified: gen4 fixed-point, 0 fallbacks, suite 369/0, oracle 0 mismatches.
 
-- **Step 4 — NOT STARTED.** Delete both render shims (`AST.variant_fields_string`, the
-  codegen `get_variant_field_str`) and the now-dead `split_respecting_generics`/`split(":")`
-  on enum-field strings. Deliberately excluded from this slice: the bare-name
-  `enum_variants`/`enum_fields` key-ambiguity change (`checker.sf` ~1836) — larger,
-  ~10 read sites, its own slice.
+- **Step 4 — LANDED.** Codegen now reads the `AST.Param` nodes on every path — no CSV
+  is rendered or re-split anywhere in the backend. Deleted the two codegen render
+  shims (`get_variant_fields`, `get_variant_field_str`) and the dead
+  `split_respecting_generics`/`split(":")` on enum-field strings in `get_max_fields`,
+  `emit_enum_to_string`, and `emit_enum_constructor` (whose signature drops `fields_str`
+  for `num_fields`, since it only ever used the count). `emit_enum_to_string` reads each
+  field's type via the same `declared_field_type_node` helper `ensure_enum_eq` uses.
+  **`AST.variant_fields_string` is deliberately kept** — two genuine display/analysis
+  consumers still want a flat signature string and both import `AST`, so deleting the
+  shared renderer would only duplicate its body: the LSP outline's variant hover detail
+  (`main.sf`) and the private-type leak scan (`checker.sf` `check_leak`). It is
+  re-documented as the display renderer rather than a migration shim. Verified: gen4
+  fixed-point, 0 fallbacks, suite 369/0, oracle 0 mismatches (incl. `enum_payload_tostring`).
+
+  Deliberately excluded from this whole slice: the bare-name `enum_variants`/`enum_fields`
+  key-ambiguity change (`checker.sf` ~1836) — larger, ~10 read sites, its own slice.
 
 ### I4. Names are resolved once, into a `DefId` table, before typing.
 

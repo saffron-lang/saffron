@@ -1006,55 +1006,22 @@
         }
     }
 
-    fun get_variant_fields(v: AST.Variant): String {
-        // Render-on-read shim: the Variant node now stores List<AST.Param>, not
-        // a CSV string. variant_fields_string re-emits the legacy "name:Type,…"
-        // form via type_to_source so every store/emit path here stays byte-
-        // identical. This is the single choke point for the emit reads that still
-        // want the CSV (gen_enum_to_string, gen_enum_decl's length gate feeding
-        // emit_enum_constructor).
-        return AST.variant_fields_string(v)
-    }
-
     // The variant payload as AST.Param nodes, straight off the node. This is what
     // the 3 codegen store paths (register_variant, output_body's prescan,
-    // codegen.sf's prescan) now push into `enum_variant_fields`, which holds
-    // List<AST.Param> rather than a CSV string. Empty list == a fieldless variant.
+    // codegen.sf's prescan) push into `enum_variant_fields`, which holds
+    // List<AST.Param>, and what every read path (get_max_fields, ensure_enum_eq,
+    // get_variant_field_type, emit_enum_to_string, the constructor loop) reads
+    // back. Empty list == a fieldless variant. No CSV is rendered anywhere in
+    // codegen anymore — the render-on-read shims are gone (I3 step 4).
     fun get_variant_field_nodes(v: AST.Variant): List<AST.Param> {
         return match (v) { Variant(n, f, __ns) => f
             _ => []
         }
     }
 
-    // Render the legacy "name:Type,…" CSV for one stored variant key from the
-    // AST.Param nodes now held in `enum_variant_fields`. The single read-side
-    // choke point for the table's string consumers (get_max_fields, and — before
-    // its 2b node rewrite — get_variant_field_type / ensure_enum_eq). Renders each
-    // field via AST.type_to_source, EXACTLY as the old table value was produced by
-    // variant_fields_string, so the string every consumer sees is byte-identical
-    // to what the Map used to hold. An absent key or empty list renders "".
-    fun get_variant_field_str(key: String): String {
-        if (!this.enum_variant_fields.has(key)) { return "" }
-        var params: List<AST.Param> = this.enum_variant_fields.get(key)
-        var sb: StringBuilder = StringBuilder()
-        var i: Float = 0
-        while (i < params.length()) {
-            if (i > 0) { sb.append(",") }
-            var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t, d, p_vis, __ns) => n }
-            var pt: AST.Type = match (p) { Param(n, t, d, p_vis, __ns) => t }
-            sb.append(pname)
-            sb.append(":")
-            sb.append(AST.type_to_source(pt))
-            i = i + 1
-        }
-        return sb.to_string()
-    }
-
     fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
         var vname: String = this.get_variant_name(v)
-        // Store the AST.Param nodes directly — the table holds List<AST.Param>
-        // now. get_variant_field_str renders the same CSV on read.
+        // Store the AST.Param nodes directly — the table holds List<AST.Param>.
         var vfields: List<AST.Param> = this.get_variant_field_nodes(v)
         variant_names.push(vname)
         this.enum_variant_tags.set(name + "." + vname, idx)
@@ -1081,9 +1048,12 @@
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
             var vname: String = this.get_variant_name(v)
-            var vfields: String = this.get_variant_fields(v)
-            if (vfields.length() > 0) {
-                this.emit_enum_constructor(vname, i, vfields, max_fields, name)
+            // Read the payload nodes directly; emit_enum_constructor only ever
+            // needed the field COUNT (it emits generic i64 %fN params), so pass
+            // that instead of a CSV to split.
+            var vnodes: List<AST.Param> = this.get_variant_field_nodes(v)
+            if (vnodes.length() > 0) {
+                this.emit_enum_constructor(vname, i, vnodes.length(), max_fields, name)
             }
             i = i + 1
         }
@@ -1214,11 +1184,12 @@
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
             var vname: String = this.get_variant_name(v)
-            var vfields: String = this.get_variant_fields(v)
+            // Payload nodes straight off the Variant — one AST.Param per field.
+            var vnodes: List<AST.Param> = this.get_variant_field_nodes(v)
 
             this.start_block(arm_labels[i])
 
-            if (vfields.length() == 0) {
+            if (vnodes.length() == 0) {
                 // No fields: just return "VariantName"
                 var const_name: String = this.add_string_constant(vname)
                 var str_len: Float = vname.length() + 1
@@ -1236,8 +1207,7 @@
                 this.emit_terminator("ret i64 " + as_i64)
             } else {
                 // Has fields: build "VariantName(field0, field1, ...)"
-                var parts: List<String> = this.split_respecting_generics(vfields, ",")
-                var num_fields: Float = parts.length()
+                var num_fields: Float = vnodes.length()
 
                 // Allocate StringBuilder via malloc + manual concat
                 // Start with "VariantName("
@@ -1288,15 +1258,14 @@
                         this.emit_indent(field_val + " = load i64, i64* " + f_slot)
                     }
 
-                    // Determine field type and convert to string
-                    var field_part: String = parts[fi]
-                    var field_type: String = "Int"
-                    if (field_part.contains(":")) {
-                        var ft_parts: List<String> = field_part.split(":")
-                        if (ft_parts.length() > 1) {
-                            field_type = ft_parts[1]
-                        }
-                    }
+                    // Determine field type and convert to string. Read the field's
+                    // type_ann node directly via declared_field_type_node — the same
+                    // helper ensure_enum_eq uses — which is type_to_source(type_ann)
+                    // truncated at its first ":". The old CSV path did
+                    // parts[fi].split(":")[1], i.e. the segment after the field name
+                    // and up to the type's first internal ":", so this is
+                    // byte-identical (only a Fun type renders a ":").
+                    var field_type: String = this.declared_field_type_node(vnodes[fi])
 
                     // The payload slot holds a fully NaN-boxed value —
                     // gen_enum_construct stores gen_arg_value's result verbatim —
@@ -1444,12 +1413,10 @@
     // `enum_name` is only used to look up the payload GC tag, but it has to be
     // passed rather than derived: this is keyed by VARIANT name, and a variant
     // name alone does not identify its enum.
-    fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float, enum_name: String) {
+    fun emit_enum_constructor(vname: String, tag: Float, num_fields: Float, max_fields: Float, enum_name: String) {
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,vname)) { return }
         this.defined_funcs.push(vname)
-        var parts: List<String> = this.split_respecting_generics(fields_str, ",")
-        var num_fields: Float = parts.length()
 
         // Build param list: (i64 %f0, i64 %f1, ...)
         var params: String = ""
@@ -1472,7 +1439,7 @@
 
         // `== 0`, matching gen_enum_construct and gen_match. This is only
         // reachable with at least one field (the caller guards on
-        // `vfields.length() > 0`), so the simple-encoding branch is dead — but
+        // `vnodes.length() > 0`), so the simple-encoding branch is dead — but
         // it read `<= 1` and would have packed a one-field variant as
         // `tag << 56 | value`, which no reader decodes that way. Left in place
         // and corrected rather than deleted, so the three encoding decisions
