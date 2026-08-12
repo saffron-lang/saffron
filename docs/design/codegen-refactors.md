@@ -76,6 +76,26 @@ tools/saffron run test/inheritance.sf
 tools/saffron run test/reflect.sf
 ```
 
+### Landed 2026-08-11
+
+Done, but by a cleaner route than the `class_field_list` plan above (that parallel
+`List<String>` map stays untouched). `class_fields` itself became
+`Map<String, List<AST.Param>>` — the same node representation the checker's
+`class_fields` and the `enum_variant_fields` slice already use. New codegen helpers
+(`codegen/types_body.sf`): `get_class_field_params` (node accessor),
+`get_class_fields_str` (render-on-read CSV via `params_to_string`, for the two
+substring consumers `is_string_field` and the callable-field probe),
+`declared_class_field_type` (one field's `type_to_string` truncated at the first
+`:`, reproducing the old `split(":")[1]` — only Fun types have a `:`), `concat_params`
+(list merge), and `actor_hidden_params` (synthesizes the two `__actor_*:Int` fields as
+nodes — `type_to_string(IntType) == "Int"`, byte-identical to the old string prefix).
+The three build sites (`gen_class_decl_with_parents` merge + the two prescans in
+`codegen.sf`) merge parent+child+actor fields as node lists; `get_field_type`,
+`try_get_field_type`, and `get_field_index` iterate nodes instead of splitting a CSV.
+The lossy `type_to_string` spelling is kept (unlike the loss-less enum table) because a
+class field's type is only consumed by name/index/type, never round-tripped. Verified:
+gen4 fixed-point, 0 fallbacks, suite 369/0, differential oracle 0 mismatches.
+
 ---
 
 ## 2. `params` string passed to `gen_function` as `"name:type,name:type"`

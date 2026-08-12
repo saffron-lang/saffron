@@ -15,7 +15,7 @@
             }
             // Skip interfaces (classes with no fields) — prefer concrete classes.
             // Interfaces have empty class_fields and register stub methods.
-            var cf: String = this.class_fields.get(class_name)
+            var cf: List<AST.Param> = this.class_fields.get(class_name)
             if (cf.length() == 0) {
                 // Could be an interface — save as fallback, keep searching
                 if (interface_fallback.length() == 0) {
@@ -3446,7 +3446,7 @@
         if (!__method_exists and this.class_fields.has(class_name)) {
             var __ft: String = this.try_get_field_type(class_name, method)
             if (__ft.starts_with("Fun(") or __ft.contains("=>")) { __method_exists = true }
-            var __fields_str: String = this.class_fields.get(class_name)
+            var __fields_str: String = this.get_class_fields_str(class_name)
             if (__fields_str.contains(method + ":")) { __method_exists = true }
         }
         if (!__method_exists) {
@@ -3683,16 +3683,14 @@
     /// reporting; a site that asks "is there a field here at all?" does not. They
     /// were the same call, which is why the gap was uncountable.
     fun try_get_field_type(class_name: String, field: String): String {
-        var fields: String = ""
-        if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
-        if (fields.length() == 0) { return "" }
-        var parts: List<String> = this.split_respecting_generics(fields, ",")
+        var params: List<AST.Param> = this.get_class_field_params(class_name)
+        if (params.length() == 0) { return "" }
         var i: Float = 0
-        while (i < parts.length()) {
-            var fp: List<String> = parts[i].split(":")
-            if (fp[0] == field) {
-                if (fp.length() < 2) { return "" }
-                var ft: String = fp[1]
+        while (i < params.length()) {
+            var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            if (fp_name == field) {
+                var fp_type: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+                var ft: String = this.declared_class_field_type(fp_type)
                 if (this.identity_mode and ft == "Float") { return "Int" }
                 return ft
             }
@@ -3732,22 +3730,19 @@
             if (this.class_fields.has(__bare)) { __gft_lookup = __bare }
         }
     }
-    // `.get()` is typed String|Nil, and the has() checks above are inside the
-    // `if` block rather than immediately before this line, so no narrowing
-    // reaches here — a class with no registered fields yielded nil and then had
-    // .length() called on it. Spell the miss out instead.
-    var fields: String = ""
-    if (this.class_fields.has(__gft_lookup)) { fields = this.class_fields.get(__gft_lookup) }
-    if (fields.length() == 0) {
+    // A class with no registered fields yields an empty node list; spell the miss
+    // out rather than reading a neighbouring slot.
+    var params: List<AST.Param> = this.get_class_field_params(__gft_lookup)
+    if (params.length() == 0) {
         Diag.record_unresolved("get_field_type: class has no registered fields", "'" + class_name + "." + field + "'", "Int")
         return "Int"
     }
-    var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
-    while (i < parts.length()) {
-        var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) {
-            var ft: String = fp[1]
+    while (i < params.length()) {
+        var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+        if (fp_name == field) {
+            var fp_type: AST.Type = match (params[i]) { Param(n, t, d, p_vis, __ns) => t }
+            var ft: String = this.declared_class_field_type(fp_type)
             // In identity mode, Float and Int are both i64 — treat Float as Int
             if (this.identity_mode and ft == "Float") { return "Int" }
             return ft
@@ -3800,37 +3795,35 @@
     }
 
     fun get_field_index(class_name: String, field: String): Float {
-    // Unguarded `.get()` on a Map is String|Nil; the reverse lookup below is the
-    // recovery path for a miss, so the miss has to produce "" rather than nil.
-    var fields: String = ""
-    if (this.class_fields.has(class_name)) { fields = this.class_fields.get(class_name) }
+    // class_fields holds AST.Param nodes now; the reverse lookup below is the
+    // recovery path for a miss, so a miss has to produce an empty list.
+    var params: List<AST.Param> = this.get_class_field_params(class_name)
     // Cross-module: if prefixed name not found, try bare name via reverse lookup
-    if (fields.length() == 0) {
+    if (params.length() == 0) {
         var __fkeys: List<String> = this.class_struct_names.keys()
         var __fki: Float = 0
         while (__fki < __fkeys.length()) {
             if (this.class_struct_names.get(__fkeys[__fki]) == class_name) {
                 // The key came from class_struct_names, which does not imply a
-                // class_fields entry — the .get() was unguarded and nullable.
+                // class_fields entry — guard the read.
                 if (this.class_fields.has(__fkeys[__fki])) {
-                    fields = this.class_fields.get(__fkeys[__fki])
+                    params = this.class_fields.get(__fkeys[__fki])
                 }
-                if (fields.length() > 0) { __fki = __fkeys.length() }
+                if (params.length() > 0) { __fki = __fkeys.length() }
             }
             __fki = __fki + 1
         }
     }
     // Also try: strip current_prefix from class_name to get bare name
-    if (fields.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
+    if (params.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
         var bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
-        if (this.class_fields.has(bare)) { fields = this.class_fields.get(bare) }
+        if (this.class_fields.has(bare)) { params = this.class_fields.get(bare) }
     }
-    if (fields.length() == 0) return 0
-    var parts: List<String> = this.split_respecting_generics(fields, ",")
+    if (params.length() == 0) return 0
     var i: Float = 0
-    while (i < parts.length()) {
-        var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) return i
+    while (i < params.length()) {
+        var fp_name: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+        if (fp_name == field) return i
         i = i + 1
     }
     // Field not found on known class — but suppress if it's actually a method

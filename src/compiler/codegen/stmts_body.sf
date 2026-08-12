@@ -412,8 +412,6 @@
         // contribute methods only — see the field guard below.
         var parent: String = ""
         if (parents.length() > 0) { parent = parents[0] }
-        // Convert fields to string format for internal use
-        var fields_str: String = this.params_to_string(fields)
         // Inherit parent fields (prepend parent fields before child's own).
         //
         // Only the FIRST base contributes fields, deliberately. Prepending base
@@ -423,17 +421,12 @@
         // and every inherited method's field access correct without a vtable.
         // That can hold for exactly one base. Keeping it on parents[0] means a
         // single-inheritance class lays out byte-for-byte as it always has.
-        var all_fields: String = fields_str
-        if (parent.length() > 0 and this.class_fields.has(parent)) {
-            var parent_fields: String = this.class_fields.get(parent)
-            if (parent_fields.length() > 0) {
-                if (all_fields.length() > 0) {
-                    all_fields = parent_fields + "," + all_fields
-                } else {
-                    all_fields = parent_fields
-                }
-            }
-        }
+        //
+        // The nodes are merged directly (parent first, then child) instead of
+        // concatenating rendered CSVs — get_class_field_params returns [] for a
+        // missing or empty parent, so concat_params reproduces the old
+        // parent-only / child-only / both cases with no stray comma.
+        var all_fields: List<AST.Param> = this.concat_params(this.get_class_field_params(parent), fields)
         // So a second base that carries state cannot work, and must say so rather
         // than emit methods that read the first base's fields at those offsets.
         // Interfaces — the overwhelmingly common case for `extends A, B, C` — are
@@ -446,10 +439,10 @@
             // operand from its left (see the Logical arm of checker.sf's
             // infer_type), but only for a *nil check on a variable* — `has()` is an
             // unrelated call the checker cannot connect to the `get()` beside it,
-            // so that spelling would still call `.length()` on a `String|Nil`.
+            // so that spelling would still call `.length()` on a `List|Nil`.
             // `!= nil` on a bound local is the guard that both narrows and
             // evaluates correctly (`is` is broken on unions, BUGS #69).
-            var extra_fields: String|Nil = this.class_fields.get(extra)
+            var extra_fields: List<AST.Param>|Nil = this.class_fields.get(extra)
             if (extra_fields != nil and extra_fields.length() > 0) {
                 IO.println("Error: class " + name + " cannot extend " + extra
                     + " as a secondary base: it declares fields, and only the first base's fields are inherited. Make it the first base, or give it no fields.")
@@ -458,11 +451,7 @@
         }
         // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
         if (this.actor_classes.has(name)) {
-            if (all_fields.length() > 0) {
-                all_fields = "__actor_busy:Int,__actor_queue:Int," + all_fields
-            } else {
-                all_fields = "__actor_busy:Int,__actor_queue:Int"
-            }
+            all_fields = this.concat_params(this.actor_hidden_params(), all_fields)
         }
         // Generate the class with inherited fields
         this.current_parent = parent
@@ -661,7 +650,7 @@
         }
     }
 
-    fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+    fun gen_class_decl(name: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
         // Use module-prefixed type name to avoid cross-module class name collisions
         var type_name: String = name
         if (this.current_prefix.length() > 0) {
@@ -674,18 +663,20 @@
             this.class_struct_names.set(type_name, type_name)
         }
 
-        // Parse field names for struct layout
+        // Field names + "name:Type" entries for struct layout, straight off the
+        // nodes. Byte-identical to the old split of params_to_string(fields): the
+        // name is the Param's name (no colon split needed, so a Fun-typed field's
+        // "f:Fun():R" no longer risks a mis-split) and the entry is name + ":" +
+        // type_to_string, exactly what params_to_string emitted per field.
         var field_list: List<String> = []
         var field_entries: List<String> = []
         var i: Float = 0
-        if (fields.length() > 0) {
-            var parts: List<String> = this.split_respecting_generics(fields, ",")
-            while (i < parts.length()) {
-                var fp: List<String> = parts[i].split(":")
-                field_list.push(fp[0])
-                field_entries.push(parts[i])
-                i = i + 1
-            }
+        while (i < fields.length()) {
+            var fp_name: String = match (fields[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var fp_type: AST.Type = match (fields[i]) { Param(n, t, d, p_vis, __ns) => t }
+            field_list.push(fp_name)
+            field_entries.push(fp_name + ":" + this.type_to_string(fp_type))
+            i = i + 1
         }
         // Store structured field list (each entry is "name:type")
         this.class_field_list.set(name, field_entries)
@@ -763,8 +754,10 @@
             i = i + 1
         }
 
-        // Generate constructor function: ClassName(args...) -> instance ptr
-        this.gen_class_constructor(type_name, fields, field_list)
+        // Generate constructor function: ClassName(args...) -> instance ptr.
+        // gen_class_constructor's `fields` string param is dead (it works off
+        // field_list), so render the same CSV it always received.
+        this.gen_class_constructor(type_name, this.params_to_string(fields), field_list)
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {

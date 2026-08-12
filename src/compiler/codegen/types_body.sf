@@ -11,6 +11,60 @@
         return AST.Type.GenericType(base, args)
     }
 
+    // The stored AST.Param nodes for a class key, or [] if the key is unknown.
+    // class_fields holds List<AST.Param> now; this is the node accessor the build
+    // sites use to merge parent fields, mirroring get_variant_field_nodes.
+    fun get_class_field_params(key: String): List<AST.Param> {
+        if (!this.class_fields.has(key)) { return [] }
+        // Bind to a typed local first: Map.get is Any|Nil, and returning it raw
+        // trips "cannot return nullable" — a var decl coerces, a bare return does not.
+        var params: List<AST.Param> = this.class_fields.get(key)
+        return params
+    }
+
+    // Render the legacy "name:Type,…" CSV for one class key from its stored nodes.
+    // Byte-identical to what class_fields used to hold: params_to_string is the
+    // exact producer the old string was built with. The read-side choke point for
+    // the consumers that still want a flat string (is_string_field, the
+    // callable-field probe). An unknown key renders "".
+    fun get_class_fields_str(key: String): String {
+        if (!this.class_fields.has(key)) { return "" }
+        var params: List<AST.Param> = this.class_fields.get(key)
+        return this.params_to_string(params)
+    }
+
+    // The declared type string of ONE class field, matching the old
+    // `parts[i].split(":")[1]`: type_to_string truncated at its first ":". Only a
+    // Fun type renders a ":" ("Fun(A):R"), so this preserves the historical
+    // truncation to "Fun(A)" for a Fun-typed field and is a no-op for every other
+    // shape. The callers apply the identity-mode Float->Int fold themselves.
+    fun declared_class_field_type(pt: AST.Type): String {
+        var s: String = this.type_to_string(pt)
+        if (s.contains(":")) { return s.slice(0, s.index_of(":")) }
+        return s
+    }
+
+    // Append two AST.Param lists (a then b). Used to merge parent+child+actor
+    // fields in struct-layout order, replacing the old CSV `a + "," + b` concat.
+    fun concat_params(a: List<AST.Param>, b: List<AST.Param>): List<AST.Param> {
+        var out: List<AST.Param> = []
+        var i: Float = 0
+        while (i < a.length()) { out.push(a[i]); i = i + 1 }
+        i = 0
+        while (i < b.length()) { out.push(b[i]); i = i + 1 }
+        return out
+    }
+
+    // The two hidden fields an actor class carries, as nodes: __actor_busy and
+    // __actor_queue, both Int. type_to_string(IntType) == "Int", so this renders
+    // to exactly the old "__actor_busy:Int,__actor_queue:Int" prefix.
+    fun actor_hidden_params(): List<AST.Param> {
+        return [
+            AST.Param.Param("__actor_busy", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none()),
+            AST.Param.Param("__actor_queue", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())
+        ]
+    }
+
     fun params_to_string(params: List<AST.Param>): String {
         if (!(params is List)) {
             return ""
