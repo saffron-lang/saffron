@@ -2,6 +2,24 @@
 
 8 string-encoded-struct antipatterns found in the codegen audit. Each section is self-contained for handoff to a subagent.
 
+## Status (updated 2026-08-12)
+
+All string-encoded-struct antipatterns are RESOLVED. Remaining items are architectural.
+
+| § | Antipattern | Status |
+|---|---|---|
+| 1 | `class_fields` CSV | ✅ Landed — codegen `class_fields: Map<String, List<AST.Param>>` (`07f801e4`) |
+| 2 | `gen_function` params CSV | ✅ Landed — `gen_function(params: List<AST.Param>)` (`3925f32f`) |
+| 3 | `loop_end_label` | ✅ Landed — was write-only dead; removed (`a4a0eef2`) |
+| 4 | `prefixes_joined` string | ✅ Landed — module prefixes passed as `List<String>` across codegen/checker/resolve/main (`73d3fd99`) |
+| 5 | `builtin_methods` | ✅ Done earlier — removed entirely via type-aware class dispatch |
+| 6 | `enum_variant_fields` CSV | ✅ Landed — I3 slice; see compiler-rewrite.md I3 (`655a8e0c`/`9c3a3370`/`ac7dada4`) |
+| 7 | doc-field smuggling | ⛔ Not started — ARCHITECTURAL. Needs a gen2 promotion cycle for new `AST.Stmt` variants (~80 entangled `@`-marker sites across parser/checker/codegen/driver). Only "Phase 1" (a `classify_decl_doc` consolidation helper, no AST change) is a safe standalone slice. |
+| 8 | `__caps_` capture CSV | ✅ Landed — `captures_map: Map<String, List<String>>` (`ab660e23`) |
+| 9 | NaN-boxing / LLVM lib | ⛔ Not started — ARCHITECTURAL. A codegen-emission/LLVM-lib subsystem rewrite, not a string-encoding migration. |
+
+Each ✅ slice was verified byte-identical: gen4 bootstrap fixed-point (0 inference fallbacks), test suite 369/0, differential oracle 0 mismatches.
+
 ---
 
 ## 1. `class_fields: Map<String, String>` stores `"name:Type,name2:Type2"`
