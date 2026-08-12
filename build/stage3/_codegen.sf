@@ -6605,7 +6605,7 @@ class Codegen {
             // Custom gen: emit function header, extract captures from env, then body
             this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures, boxed_caps)
         } else {
-            this.gen_function(lambda_name, params_str, ret_type, body)
+            this.gen_function(lambda_name, params, ret_type, body)
         }
         this.in_function = saved_in_fn
         var lambda_ir: String = this.sb.to_string()
@@ -6716,10 +6716,8 @@ class Codegen {
         var saved_in_fn2: Bool = this.in_function
         this.in_function = false
         this.sb = StringBuilder()
-        var full_params: String = "__env:Int"
-        if (params_str.length() > 0) {
-            full_params = full_params + "," + params_str
-        }
+        var env_p: List<AST.Param> = [AST.Param.Param("__env", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())]
+        var full_params: List<AST.Param> = this.concat_params(env_p, params)
         this.gen_function(lambda_name, full_params, ret_type, body)
         this.globals.push(this.sb.to_string())
         this.in_function = saved_in_fn2
@@ -7969,7 +7967,6 @@ class Codegen {
                     // Mark function for alwaysinline attribute, then process normally
                     var emit_name: String = this.current_prefix + name
                     this.inline_funcs.push(emit_name)
-                    var params_str: String = this.params_to_string(params)
                     var defaults: List<AST.Expr> = []
                     var param_names: List<String> = []
                     var pi: Float = 0
@@ -7984,7 +7981,7 @@ class Codegen {
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
                     this.func_param_names.set(emit_name, param_names)
-                    this.gen_function(name, params_str, ret_type, body)
+                    this.gen_function(name, params, ret_type, body)
                 } else if (doc.starts_with("@extern:")) {
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
@@ -8000,7 +7997,6 @@ class Codegen {
                     // but pre-scan identified this as an extension method
                     this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
-                    var params_str: String = this.params_to_string(params)
                     // Register default values for optional params. BUGS #175: a
                     // NESTED fun is emitted under a per-scope symbol (scope$$name),
                     // so its param metadata must be keyed the same way or the call
@@ -8025,7 +8021,7 @@ class Codegen {
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
                     this.func_param_names.set(emit_name, param_names)
-                    this.gen_function(name, params_str, ret_type, body)
+                    this.gen_function(name, params, ret_type, body)
                 }
             }
             EnumDecl(name, variants, doc, e_vis, __ns, __fs) => {
@@ -8711,15 +8707,9 @@ class Codegen {
             this.inline_funcs.push(inline_emit)
             this.inline_funcs.push(full_name)
         }
-        var mparams_str: String = this.params_to_string(mparams)
-        var full_params: String = "self:Int"
-        if (mparams_str.length() > 0) {
-            full_params = full_params + "," + mparams_str
-        }
-        var param_count: Float = 1
-        if (mparams_str.length() > 0) {
-            param_count = this.split_respecting_generics(mparams_str, ",").length() + 1
-        }
+        var self_p: List<AST.Param> = [AST.Param.Param("self", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())]
+        var full_params: List<AST.Param> = this.concat_params(self_p, mparams)
+        var param_count: Float = mparams.length() + 1
         this.called_function_arity.set(full_name, param_count)
         if (this.current_prefix.length() > 0) {
             this.called_function_arity.set(this.current_prefix + full_name, param_count)
@@ -12342,7 +12332,7 @@ class Codegen {
         }
     }
 
-    fun gen_function(name: String, params: String, ret_type: AST.Type, body: List<AST.Stmt>) {
+    fun gen_function(name: String, params: List<AST.Param>, ret_type: AST.Type, body: List<AST.Stmt>) {
         var ret_name: String = this.type_to_string(ret_type)
         var is_lambda_body: Bool = name.contains("__lambda")
         var implicit_return: Bool = ret_name != "Nil" and ret_name != "void"
@@ -12383,13 +12373,9 @@ class Codegen {
             var ov_arity: Float = 0
             var ov_first: String = ""
             if (params.length() > 0) {
-                var ov_pl: List<String> = this.split_respecting_generics(params, ",")
-                ov_arity = ov_pl.length()
-                if (ov_pl.length() > 0) {
-                    var ov_p0: String = ov_pl[0]
-                    var ov_c: Float = ov_p0.index_of(":")
-                    if (ov_c >= 0) { ov_first = ov_p0.slice(ov_c + 1, ov_p0.length()) }
-                }
+                ov_arity = params.length()
+                var ov_p0t: AST.Type = match (params[0]) { Param(n, t, d, p_vis, __ns) => t }
+                ov_first = this.type_to_string(ov_p0t)
             }
             emit_name = this.overload_mangle(emit_name, ov_arity, ov_first)
         }
@@ -12427,14 +12413,11 @@ class Codegen {
         // For nested functions: hoist as regular function with captures as extra params
         if (is_nested) {
             var param_names: List<String> = []
-            if (params.length() > 0) {
-                var pl: List<String> = this.split_respecting_generics(params, ",")
-                var pi2: Float = 0
-                while (pi2 < pl.length()) {
-                    var pp: List<String> = pl[pi2].split(":")
-                    param_names.push(pp[0])
-                    pi2 = pi2 + 1
-                }
+            var pi2: Float = 0
+            while (pi2 < params.length()) {
+                var pn2: String = match (params[pi2]) { Param(n, t, d, p_vis, __ns) => n }
+                param_names.push(pn2)
+                pi2 = pi2 + 1
             }
             var captures_raw: List<String> = []
             this.find_free_vars_stmts(body, param_names, captures_raw)
@@ -12464,21 +12447,17 @@ class Codegen {
             }
 
             // Build extended params: captures (with actual types from parent) + original params
-            var full_params: String = ""
+            var cap_params: List<AST.Param> = []
             var ci2: Float = 0
             while (ci2 < captures.length()) {
-                if (full_params.length() > 0) { full_params = full_params + "," }
                 var cap_type: String = this.get_var_type_str(captures[ci2])
                 if (cap_type.length() == 0) {
                     cap_type = "Int"
                 }
-                full_params = full_params + captures[ci2] + ":" + cap_type
+                cap_params.push(AST.Param.Param(captures[ci2], this.str_to_type(cap_type), AST.Expr.NilLit, "public", AST.span_none()))
                 ci2 = ci2 + 1
             }
-            if (params.length() > 0) {
-                if (full_params.length() > 0) { full_params = full_params + "," }
-                full_params = full_params + params
-            }
+            var all_params: List<AST.Param> = this.concat_params(cap_params, params)
 
             // Record capture info for call sites
             this.called_function_arity.set("__captures_" + emit_name, captures.length())
@@ -12498,15 +12477,11 @@ class Codegen {
             this.gc_root_count = 0
             this.reset_locals()
             var ret_llvm2: String = this.llvm_type(ret_name)
-            var all_params: List<String> = []
-            if (full_params.length() > 0) {
-                all_params = this.split_respecting_generics(full_params, ",")
-            }
             var param_strs2: List<String> = []
             var pi3: Float = 0
             while (pi3 < all_params.length()) {
-                var pp2: List<String> = all_params[pi3].split(":")
-                param_strs2.push("i64 %" + this.sanitize_name(pp2[0]) + ".arg")
+                var pn3: String = match (all_params[pi3]) { Param(n, t, d, p_vis, __ns) => n }
+                param_strs2.push("i64 %" + this.sanitize_name(pn3) + ".arg")
                 pi3 = pi3 + 1
             }
             var linkage2: String = "define"
@@ -12529,22 +12504,23 @@ class Codegen {
             this.block_terminated = false
             pi3 = 0
             while (pi3 < all_params.length()) {
-                var pp2: List<String> = all_params[pi3].split(":")
+                var pn2b: String = match (all_params[pi3]) { Param(n, t, d, p_vis, __ns) => n }
+                var pt2b: AST.Type = match (all_params[pi3]) { Param(n, t, d, p_vis, __ns) => t }
                 if (pi3 < captures.length()) {
                     // Capture params are POINTERS — reconstruct via inttoptr
                     if (this.target == "wasm32" or this.target == "wasm") {
                         var __cap_i32: String = this.fresh_local()
-                        this.emit_indent(__cap_i32 + " = trunc i64 %" + this.sanitize_name(pp2[0]) + ".arg to i32")
-                        this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i32 " + __cap_i32 + " to i64*")
+                        this.emit_indent(__cap_i32 + " = trunc i64 %" + this.sanitize_name(pn2b) + ".arg to i32")
+                        this.emit_indent("%" + this.sanitize_name(pn2b) + " = inttoptr i32 " + __cap_i32 + " to i64*")
                     } else {
-                        this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i64 %" + this.sanitize_name(pp2[0]) + ".arg to i64*")
+                        this.emit_indent("%" + this.sanitize_name(pn2b) + " = inttoptr i64 %" + this.sanitize_name(pn2b) + ".arg to i64*")
                     }
                 } else {
                     // Regular params — alloca and store
-                    this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
-                    this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
+                    this.emit_indent("%" + this.sanitize_name(pn2b) + " = alloca i64")
+                    this.emit_indent("store i64 %" + this.sanitize_name(pn2b) + ".arg, i64* %" + this.sanitize_name(pn2b))
                 }
-                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
+                this.typed_vars.set(pn2b, this.str_to_type(this.declared_class_field_type(pt2b)))
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -12565,8 +12541,8 @@ class Codegen {
             var allocated: List<String> = []
             var aai: Float = 0
             while (aai < all_params.length()) {
-                var aap: List<String> = all_params[aai].split(":")
-                allocated.push(aap[0])
+                var aan: String = match (all_params[aai]) { Param(n, t, d, p_vis, __ns) => n }
+                allocated.push(aan)
                 aai = aai + 1
             }
             // Same heap-cell treatment as the non-nested path below (BUGS #51
@@ -12647,38 +12623,27 @@ class Codegen {
         this.typed_vars = {}
         var ret_llvm: String = this.llvm_type(ret_name)
 
-        // Parse params string "name:type,name:type"
-        var param_list: List<String> = []
-        if (params.length() > 0) {
-            param_list = this.split_respecting_generics(params, ",")
-        }
-
         var param_strs: List<String> = []
         var i: Float = 0
-        while (i < param_list.length()) {
-            var parts: List<String> = param_list[i].split(":")
-            var pname: String = parts[0]
-            var ptype: String = parts[1]
+        while (i < params.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var ptype: String = this.declared_class_field_type(match (params[i]) { Param(n, t, d, p_vis, __ns) => t })
             param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
         // Register param names for named argument dispatch, and param TYPE
-        // spellings for generic return-type resolution (BUGS #171). Split on the
-        // FIRST colon only: a param type can itself contain colons in a function
-        // type, and the name never does.
+        // spellings for generic return-type resolution (BUGS #171). The type
+        // string keeps the FULL declared spelling (type_to_string), matching the
+        // old slice-after-first-colon: a param type can itself contain colons in a
+        // function type, and the name never does.
         var pnames_list: List<String> = []
         var ptypes_list: List<String> = []
         var pni: Float = 0
-        while (pni < param_list.length()) {
-            var pentry: String = param_list[pni]
-            var pcolon: Float = pentry.index_of(":")
-            if (pcolon >= 0) {
-                pnames_list.push(pentry.slice(0, pcolon))
-                ptypes_list.push(pentry.slice(pcolon + 1, pentry.length()))
-            } else {
-                pnames_list.push(pentry)
-                ptypes_list.push("")
-            }
+        while (pni < params.length()) {
+            var pen_n: String = match (params[pni]) { Param(n, t, d, p_vis, __ns) => n }
+            var pen_t: AST.Type = match (params[pni]) { Param(n, t, d, p_vis, __ns) => t }
+            pnames_list.push(pen_n)
+            ptypes_list.push(this.type_to_string(pen_t))
             pni = pni + 1
         }
         this.func_param_names.set(emit_name, pnames_list)
@@ -12692,9 +12657,9 @@ class Codegen {
         if (this.use_llvm_lib and !this.identity_mode) {
             var llvm_params: List<LLVMFunc.Param> = []
             var lpi: Float = 0
-            while (lpi < param_list.length()) {
-                var lp_parts: List<String> = param_list[lpi].split(":")
-                var lp_name: String = "%" + this.sanitize_name(lp_parts[0]) + ".arg"
+            while (lpi < params.length()) {
+                var lp_n: String = match (params[lpi]) { Param(n, t, d, p_vis, __ns) => n }
+                var lp_name: String = "%" + this.sanitize_name(lp_n) + ".arg"
                 var lp: LLVMFunc.Param = LLVMFunc.Param(lp_name, LLVMTypes.Type.I64)
                 // Workaround: gen2 doesn't emit init calls for cross-module constructors
                 lp.init(lp_name, LLVMTypes.Type.I64)
@@ -12831,10 +12796,9 @@ class Codegen {
 
         // Emit all allocas in entry block (params + locals)
         i = 0
-        while (i < param_list.length()) {
-            var parts: List<String> = param_list[i].split(":")
-            var pname: String = parts[0]
-            var ptype: String = parts[1]
+        while (i < params.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var ptype: String = this.declared_class_field_type(match (params[i]) { Param(n, t, d, p_vis, __ns) => t })
             this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             i = i + 1
         }
@@ -12895,10 +12859,9 @@ class Codegen {
 
         // Store params into their allocas and track types
         i = 0
-        while (i < param_list.length()) {
-            var parts: List<String> = param_list[i].split(":")
-            var pname: String = parts[0]
-            var ptype: String = parts[1]
+        while (i < params.length()) {
+            var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+            var ptype: String = this.declared_class_field_type(match (params[i]) { Param(n, t, d, p_vis, __ns) => t })
             // Variadic `*nums:Int`: the body binding is `nums` of type List<Int>.
             // sanitize_name already strips the `*` from the emitted registers, so
             // only the typed_vars key and its type need the marker handled here.
@@ -12960,10 +12923,9 @@ class Codegen {
             }
             // Track params that are heap types
             i = 0
-            while (i < param_list.length()) {
-                var parts: List<String> = param_list[i].split(":")
-                var pname: String = parts[0]
-                var ptype: String = parts[1]
+            while (i < params.length()) {
+                var pname: String = match (params[i]) { Param(n, t, d, p_vis, __ns) => n }
+                var ptype: String = this.declared_class_field_type(match (params[i]) { Param(n, t, d, p_vis, __ns) => t })
                 if (this.is_gc_root_type(ptype)) {
                     var alloca_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(pname), "i64*")
                     this.emit_indent("call void @__gc_push_root(i64 " + alloca_as_int + ")")
@@ -14891,9 +14853,8 @@ class Codegen {
         var methods: List = this.class_methods.get(ext_class)
         methods.push(name)
     }
-    var params_str: String = this.params_to_string(params)
-    var full_params: String = "self:Int"
-    if (params_str.length() > 0) { full_params = full_params + "," + params_str }
+    var self_p: List<AST.Param> = [AST.Param.Param("self", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())]
+    var full_params: List<AST.Param> = this.concat_params(self_p, params)
     var saved_class: String = this.current_class
     var saved_prefix: String = this.current_prefix
     this.current_class = ext_class

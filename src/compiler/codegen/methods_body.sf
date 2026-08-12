@@ -875,9 +875,8 @@
         var methods: List = this.class_methods.get(ext_class)
         methods.push(name)
     }
-    var params_str: String = this.params_to_string(params)
-    var full_params: String = "self:Int"
-    if (params_str.length() > 0) { full_params = full_params + "," + params_str }
+    var self_p: List<AST.Param> = [AST.Param.Param("self", AST.Type.IntType, AST.Expr.NilLit, "public", AST.span_none())]
+    var full_params: List<AST.Param> = this.concat_params(self_p, params)
     var saved_class: String = this.current_class
     var saved_prefix: String = this.current_prefix
     this.current_class = ext_class
