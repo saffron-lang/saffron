@@ -60,7 +60,6 @@ class Codegen {
     var string_vars: List<String>
     var last_type: AST.Type
     var typed_vars: Map<String, AST.Type>
-    var loop_end_label: String
     var loop_break_label: String
     var loop_continue_label: String
     var current_ret_type: String
@@ -236,7 +235,6 @@ class Codegen {
         this.string_vars = []
         this.last_type = AST.Type.IntType
         this.typed_vars = {}
-        this.loop_end_label = ""
         this.loop_break_label = ""
         this.loop_continue_label = ""
         this.current_ret_type = "i64"
@@ -9803,10 +9801,8 @@ class Codegen {
         var body_label: String = this.fresh_label("while.body")
         var end_label: String = this.fresh_label("while.end")
 
-        var saved_loop_end: String = this.loop_end_label
         var saved_break: String = this.loop_break_label
         var saved_continue: String = this.loop_continue_label
-        this.loop_end_label = end_label + ":" + cond_label
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
@@ -9864,7 +9860,6 @@ class Codegen {
             this.verify_br(cond_label)
         }
 
-        this.loop_end_label = saved_loop_end
         this.loop_break_label = saved_break
         this.loop_continue_label = saved_continue
 
