@@ -1934,17 +1934,15 @@ fun main(): Int {
         return 0
     }
 
-    // Flatten module_stmts into a single list with boundary markers
-    // Encode prefixes as a single joined string to avoid native list issues
+    // Flatten module_stmts into a single list with boundary markers.
+    // module_prefixes_list (parallel to module_stmts, index i) is passed
+    // directly to resolve/checker/codegen — no join/split round-trip.
     var all_import_stmts: List<AST.Stmt> = []
     var module_boundaries: List<Float> = []
-    var prefixes_joined: String = ""
     var mfi: Float = 0
     while (mfi < module_stmts.length()) {
         var mod: List<AST.Stmt> = module_stmts[mfi]
         module_boundaries.push(all_import_stmts.length())
-        if (mfi > 0) { prefixes_joined = prefixes_joined + "|" }
-        prefixes_joined = prefixes_joined + module_prefixes_list[mfi]
         var msi: Float = 0
         while (msi < mod.length()) {
             all_import_stmts.push(mod[msi])
@@ -2048,7 +2046,7 @@ fun main(): Int {
     if (run_resolve) {
         var resolver: Resolve.Resolver = Resolve.new_resolver()
         if (all_import_stmts.length() > 0) {
-            all_import_stmts = Resolve.resolve_imports(resolver, all_import_stmts, module_boundaries, prefixes_joined)
+            all_import_stmts = Resolve.resolve_imports(resolver, all_import_stmts, module_boundaries, module_prefixes_list)
         }
         program = Resolve.resolve_main(resolver, program)
     }
@@ -2063,7 +2061,7 @@ fun main(): Int {
             // which module anything came from, so two modules declaring the
             // same class name are one entry (docs/design/access-modifiers.md
             // Phase 2; `Response` in http/client.sf and http/server.sf).
-            checker_errors = Checker.check_errors_with_module_packages(program, all_import_stmts, module_boundaries, prefixes_joined, package_roots_joined(module_file_paths), _entry_package_root(input_path), resolved_aliases)
+            checker_errors = Checker.check_errors_with_module_packages(program, all_import_stmts, module_boundaries, module_prefixes_list, package_roots_joined(module_file_paths), _entry_package_root(input_path), resolved_aliases)
         } else {
             checker_errors = Checker.check_errors_only(program)
         }
@@ -2088,7 +2086,7 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat_opts5(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases, entry_module_doc)
+        ir = Codegen.generate_with_modules_flat_opts5(program, all_import_stmts, module_boundaries, module_prefixes_list, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib, scoped_aliases, entry_module_doc)
     } else {
         ir = Codegen.generate_with_target_opts4(program, target, identity_mode, use_llvm_lib, emit_llvm_lib, entry_module_doc)
     }

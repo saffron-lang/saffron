@@ -513,8 +513,7 @@ fun resolve_program(program: List<AST.Stmt>): List<AST.Stmt> {
 // boundary, so a per-file resolver would still get it wrong. Returns the
 // flattened list rebuilt in place, and leaves the resolver ready for the main
 // program via resolve_main.
-fun resolve_imports(r: Resolver, stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): List<AST.Stmt> {
-    var prefixes: List<String> = prefixes_joined.split("|")
+fun resolve_imports(r: Resolver, stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>): List<AST.Stmt> {
     // Prescan every module first, so a module importing another module's
     // function sees it regardless of the order they were flattened in.
     var bi: Float = 0

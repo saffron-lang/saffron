@@ -5936,23 +5936,23 @@ fun check_errors_only(program: List<AST.Stmt>): String {
 // tests keep working; anything that HAS the boundaries should pass them, because
 // without them two modules declaring the same class are indistinguishable here.
 fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
-    return check_errors_with_modules(program, imports, [], "")
+    return check_errors_with_modules(program, imports, [], [])
 }
 
 // Phase 2 of docs/design/access-modifiers.md: the checker learns which module
 // each imported declaration came from.
 //
-// `boundaries` and `prefixes_joined` are decoded exactly as
+// `boundaries` and `prefixes` are decoded exactly as
 // Resolve.resolve_imports decodes them — boundaries[i]..boundaries[i+1] is
-// module i's slice of the flat statement list, and prefixes_joined is the
-// "|"-joined prefix list indexed by the same i. Deliberately the same decoding
+// module i's slice of the flat statement list, and prefixes is the
+// prefix list indexed by the same i. Deliberately the same decoding
 // and not a second scheme: two readers of one encoding that disagree is how the
 // module identity would drift from what codegen and resolve believe.
 //
 // With an empty boundary list this degrades to the old flat behaviour rather
 // than failing, which is what makes check_errors_with_imports above still valid.
-fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): String {
-    return check_errors_with_module_packages(program, imports, boundaries, prefixes_joined, "", no_package_marker(), {})
+fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>): String {
+    return check_errors_with_module_packages(program, imports, boundaries, prefixes, "", no_package_marker(), {})
 }
 
 // The `internal` (package-scope) half of module identity: same walk as
@@ -5973,10 +5973,9 @@ fun check_errors_with_modules(program: List<AST.Stmt>, imports: List<AST.Stmt>, 
 // gets the packageless marker, which denies `internal` access rather than
 // granting it. That is what keeps check_errors_with_modules above — and every
 // caller that has no manifest information at all — valid and conservative.
-fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, package_roots_joined: String, program_package: String, entry_aliases: Map<String, String>): String {
+fun check_errors_with_module_packages(program: List<AST.Stmt>, imports: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>, package_roots_joined: String, program_package: String, entry_aliases: Map<String, String>): String {
     var checker: NullChecker = NullChecker()
     checker.entry_aliases = entry_aliases
-    var prefixes: List<String> = prefixes_joined.split("|")
     var pkg_roots: List<String> = []
     if (package_roots_joined.length() > 0) {
         pkg_roots = package_roots_joined.split("\n")
