@@ -1894,10 +1894,8 @@
         var body_label: String = this.fresh_label("while.body")
         var end_label: String = this.fresh_label("while.end")
 
-        var saved_loop_end: String = this.loop_end_label
         var saved_break: String = this.loop_break_label
         var saved_continue: String = this.loop_continue_label
-        this.loop_end_label = end_label + ":" + cond_label
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
@@ -1955,7 +1953,6 @@
             this.verify_br(cond_label)
         }
 
-        this.loop_end_label = saved_loop_end
         this.loop_break_label = saved_break
         this.loop_continue_label = saved_continue
 
