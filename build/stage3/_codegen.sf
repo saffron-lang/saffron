@@ -18014,7 +18014,7 @@ fun generate_with_target_opts4(program: List<AST.Stmt>, target: String, identity
 /// BUGS #188: `module_doc` is the entry file's `//!` text (Parser.module_doc()),
 /// threaded to gen.module_doc_text so Reflect.module_doc() returns it instead of
 /// nil. Additive `opts5` wrapper; older arities delegate with "".
-fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, scoped_aliases: Map<String, String>, module_doc: String): String {
+fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool, scoped_aliases: Map<String, String>, module_doc: String): String {
     var gen: Codegen = Codegen()
     gen.scoped_module_prefixes = scoped_aliases
     gen.target = target
@@ -18063,7 +18063,6 @@ fun generate_with_modules_flat_opts5(program: List<AST.Stmt>, all_stmts: List<AS
     gen.module_prefixes.set("Reflect", "stdlib_reflect_")
     gen.named_imports = named_imports
     gen.register_only = false
-    var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
     while (dbgi < prefixes.length()) {
         dbgi = dbgi + 1
