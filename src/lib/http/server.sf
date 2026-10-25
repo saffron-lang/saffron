@@ -470,7 +470,8 @@ class App {
     var max_request_bytes: Int
 
     fun init(port: Int) {
-        this.host = "0.0.0.0"
+        // Loopback by default; set `app.host = "0.0.0.0"` to listen on all interfaces.
+        this.host = "127.0.0.1"
         this.port = port
         this.routes = []
         this._middlewares = []
