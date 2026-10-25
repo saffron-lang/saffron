@@ -330,6 +330,17 @@ fun _handle_publish(req: Http.Request): Http.Response {
     if (name == "" or version == "" or tarball_data == "") {
         return _error_json(400, "missing required fields: name, vers, tarball")
     }
+    if (!Storage.valid_name(name)) {
+        return _error_json(400, "invalid package name: use [a-z0-9_-]")
+    }
+    if (!Storage.valid_version(version)) {
+        return _error_json(400, "invalid version: expected MAJOR.MINOR.PATCH")
+    }
+
+    var pkg = Db.get_package(name)
+    if (pkg != nil and !Db.is_owner(name, Db.ensure_user(username))) {
+        return _error_json(403, "not an owner of this package")
+    }
 
     var existing = Db.get_version(name, version)
     if (existing != nil) {
@@ -346,7 +357,6 @@ fun _handle_publish(req: Http.Request): Http.Response {
     var license = ""
     if (body.has("license")) { license = body.get("license") }
 
-    var pkg = Db.get_package(name)
     if (pkg == nil) {
         Db.create_package(name, description, repository, license)
         var user_id = Db.ensure_user(username)

@@ -4,6 +4,7 @@
 
 import "@os" as OS
 import "@path" as Path
+import "@regex" as Regex
 
 /// Base directory for package tarball storage.
 /// The directory must exist before the server starts — it is created by git
@@ -18,6 +19,7 @@ var STORAGE_DIR = "data/packages"
 /// content is the raw tarball data (or base64-encoded, depending on transport).
 /// Returns the path where the tarball was saved.
 fun store(name: String, version: String, content: String): String {
+    if (!valid_name(name) or !valid_version(version)) { return "" }
     var dir = package_dir(name)
     if (!OS.file_exists(dir)) {
         OS.mkdir(dir)
@@ -30,12 +32,14 @@ fun store(name: String, version: String, content: String): String {
 /// Retrieve the tarball content for a given package and version.
 /// Returns the raw file content.
 fun retrieve(name: String, version: String): String {
+    if (!valid_name(name) or !valid_version(version)) { return "" }
     var path = tarball_path(name, version)
     return IO.read_file(path)
 }
 
 /// Check if a tarball exists for the given package and version.
 fun exists(name: String, version: String): Bool {
+    if (!valid_name(name) or !valid_version(version)) { return false }
     var path = tarball_path(name, version)
     return OS.file_exists(path)
 }
@@ -43,6 +47,19 @@ fun exists(name: String, version: String): Bool {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/// Package names are lowercase alphanumerics, `_` and `-`. Checked before any
+/// name reaches Path.join, so a name can never contain `/` or be `..`.
+fun valid_name(name: String): Bool {
+    return Regex.test("^[a-z0-9_-]{1,64}$", name)
+}
+
+/// Versions must look like semver (MAJOR.MINOR.PATCH with an optional
+/// -prerelease / +build suffix), which also rules out path separators.
+fun valid_version(version: String): Bool {
+    if (version.length() > 64) { return false }
+    return Regex.test("^[0-9]+[.][0-9]+[.][0-9]+([-+][0-9A-Za-z.+-]+)?$", version)
+}
 
 /// Compute the directory for a package's tarballs.
 fun package_dir(name: String): String {

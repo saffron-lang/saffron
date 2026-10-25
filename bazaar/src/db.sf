@@ -4,6 +4,7 @@
 import "@sqlite" as DB
 import "@os" as OS
 import "@process" as Process
+import "@regex" as Regex
 
 /// The shared database connection (initialized by init()).
 var _db: DB.Database = nil
@@ -299,12 +300,25 @@ fun search(query: String, limit: String): List<Map<String, String>> {
         return list_packages_paginated("0", limit)
     }
     var esc_q = query.replace("'", "''")
-    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p WHERE p.name LIKE '%" + esc_q + "%' OR p.description LIKE '%" + esc_q + "%' ORDER BY p.total_downloads DESC LIMIT " + limit)
+    var lim = _bounded_int(limit, 20, 100)
+    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p WHERE p.name LIKE '%" + esc_q + "%' OR p.description LIKE '%" + esc_q + "%' ORDER BY p.total_downloads DESC LIMIT ${lim}")
 }
 
 /// List packages with pagination.
 fun list_packages_paginated(offset: String, limit: String): List<Map<String, String>> {
-    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p ORDER BY p.total_downloads DESC LIMIT " + limit + " OFFSET " + offset)
+    var lim = _bounded_int(limit, 20, 100)
+    var off = _bounded_int(offset, 0, 1000000)
+    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p ORDER BY p.total_downloads DESC LIMIT ${lim} OFFSET ${off}")
+}
+
+/// Coerce a ?limit= / ?offset= query value to an Int in [0, max]. Anything
+/// that is not a plain run of digits becomes `fallback`, so the result is
+/// always safe to splice into SQL.
+fun _bounded_int(value: String, fallback: Int, max: Int): Int {
+    if (!Regex.test("^[0-9]{1,7}$", value)) { return fallback }
+    var n: Int = value.to_number()
+    if (n > max) { return max }
+    return n
 }
 
 /// Get total number of packages.
