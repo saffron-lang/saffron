@@ -10,6 +10,7 @@
 import "@process" as Process
 import "@os" as OS
 import "time" as Time
+import "@regex" as Regex
 
 /// Largest program we will accept, in bytes. Keeps a pathological input from
 /// turning into an unbounded compile.
@@ -89,6 +90,21 @@ fun _too_large(source: String): Bool {
     return source.length() > MAX_SOURCE_BYTES
 }
 
+/// True if the program imports an absolute path or one containing `..`. The
+/// compiler runs on the host, so such an import would read files from outside
+/// the per-request directory. Stdlib (`@...`) and package imports are fine.
+fun _escaping_import(source: String): Bool {
+    var specs: List<String> = Regex.find_all("(import|from)[[:space:]]+\"[^\"]*\"", source)
+    var i: Int = 0
+    while (i < specs.length()) {
+        var spec: String = specs[i]
+        var path: String = spec.slice(spec.index_of("\"") + 1, spec.length() - 1)
+        if (path.starts_with("/") or path.contains("..")) { return true }
+        i = i + 1
+    }
+    return false
+}
+
 /// The git revision of the repo whose compiler this service will invoke.
 ///
 /// Surfaced in /api/health as a freshness signal: the service shells out to
@@ -135,6 +151,10 @@ fun compile_to_wasm(source: String): CompileResult {
         return CompileResult(false, "",
             "program too large: " + source.length().to_string() +
             " bytes (limit " + MAX_SOURCE_BYTES.to_string() + ")")
+    }
+    if (_escaping_import(source)) {
+        return CompileResult(false, "",
+            "imports of absolute or '..' paths are not allowed in the playground")
     }
 
     // Fresh directory per request, so two concurrent compiles can never collide
